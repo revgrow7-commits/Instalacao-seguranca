@@ -14,8 +14,13 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Redirect installers to their specific dashboard
+    if (isInstaller) {
+      navigate('/installer/dashboard');
+      return;
+    }
     loadDashboardData();
-  }, []);
+  }, [isInstaller, navigate]);
 
   const loadDashboardData = async () => {
     try {
