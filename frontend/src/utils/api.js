@@ -31,12 +31,17 @@ export const api = {
   scheduleJob: (jobId, scheduledDate, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() }),
 
   // Check-ins
-  createCheckin: (data) => axios.post(`${API_URL}/checkins`, data, { headers: getAuthHeader() }),
-  checkout: (checkinId, data) => axios.put(`${API_URL}/checkins/${checkinId}/checkout`, data, { headers: getAuthHeader() }),
+  createCheckin: (formData) => axios.post(`${API_URL}/checkins`, formData, { 
+    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
+  }),
+  checkout: (checkinId, formData) => axios.put(`${API_URL}/checkins/${checkinId}/checkout`, formData, { 
+    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
+  }),
   getCheckins: (jobId = null) => {
     const url = jobId ? `${API_URL}/checkins?job_id=${jobId}` : `${API_URL}/checkins`;
     return axios.get(url, { headers: getAuthHeader() });
   },
+  getCheckinPhoto: (checkinId, photoType) => `${API_URL}/checkins/${checkinId}/photo/${photoType}`,
 
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
