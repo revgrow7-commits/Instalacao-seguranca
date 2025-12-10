@@ -616,14 +616,13 @@ async def list_checkins(job_id: Optional[str] = None, current_user: User = Depen
     
     return checkins
 
-@api_router.get("/checkins/{checkin_id}/photo/{photo_type}")
-async def get_checkin_photo(
+@api_router.get("/checkins/{checkin_id}/details")
+async def get_checkin_details(
     checkin_id: str,
-    photo_type: str,  # 'checkin' or 'checkout'
     current_user: User = Depends(get_current_user)
 ):
-    """Get check-in or check-out photo"""
-    # Only admin and managers can view photos
+    """Get check-in details with photos and GPS data for managers/admins"""
+    # Only admin and managers can view detailed checkin data
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
@@ -631,22 +630,17 @@ async def get_checkin_photo(
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
     
-    photo_filename = None
-    if photo_type == "checkin":
-        photo_filename = checkin.get('checkin_photo')
-    elif photo_type == "checkout":
-        photo_filename = checkin.get('checkout_photo')
-    else:
-        raise HTTPException(status_code=400, detail="Invalid photo type")
+    # Get installer info
+    installer = await db.installers.find_one({"id": checkin['installer_id']}, {"_id": 0})
     
-    if not photo_filename:
-        raise HTTPException(status_code=404, detail="Photo not found")
+    # Get job info
+    job = await db.jobs.find_one({"id": checkin['job_id']}, {"_id": 0})
     
-    photo_path = UPLOAD_DIR / photo_filename
-    if not photo_path.exists():
-        raise HTTPException(status_code=404, detail="Photo file not found")
-    
-    return FileResponse(photo_path, media_type="image/jpeg")
+    return {
+        "checkin": checkin,
+        "installer": installer,
+        "job": job
+    }
 
 # ============ INSTALLER ROUTES ============
 
