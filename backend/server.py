@@ -206,18 +206,22 @@ async def fetch_holdprint_jobs(branch: str):
     if not api_key:
         raise HTTPException(status_code=500, detail=f"API key not configured for branch {branch}")
     
-    headers = {"Authorization": f"Bearer {api_key}"}
+    headers = {"x-api-key": api_key}
     
     try:
         response = requests.get(HOLDPRINT_API_URL, headers=headers, timeout=30)
         response.raise_for_status()
         data = response.json()
         
-        if data.get('success'):
-            return data.get('data', {}).get('items', [])
+        # Holdprint returns {data: [...]} format
+        if isinstance(data, dict) and 'data' in data:
+            return data['data']
+        elif isinstance(data, list):
+            return data
         else:
-            raise HTTPException(status_code=500, detail="Holdprint API returned error")
+            return []
     except requests.RequestException as e:
+        logger.error(f"Error fetching from Holdprint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching from Holdprint: {str(e)}")
 
 # ============ AUTH ROUTES ============
