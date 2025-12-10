@@ -3,11 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Alert, AlertDescription } from '../components/ui/alert';
-import BrowserCheck from '../components/BrowserCheck';
-import { Camera, MapPin, Loader2, CheckCircle, X } from 'lucide-react';
+import { Checkbox } from '../components/ui/checkbox';
+import { Label } from '../components/ui/label';
+import { Camera, Loader2, CheckCircle, X, Upload } from 'lucide-react';
 import { toast } from 'sonner';
-import CameraPermissionGuide from '../components/CameraPermissionGuide';
 
 const CheckIn = () => {
   const { jobId } = useParams();
@@ -16,16 +15,16 @@ const CheckIn = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState(null);
-  const [gpsLocation, setGpsLocation] = useState(null);
-  const [gpsError, setGpsError] = useState(null);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [locationAuthorized, setLocationAuthorized] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     loadJob();
-    requestGPS();
     return () => {
       stopCamera();
     };
@@ -43,114 +42,24 @@ const CheckIn = () => {
     }
   };
 
-  const requestGPS = () => {
-    if ('geolocation' in navigator) {
-      setGpsError(null);
-      toast.info('Obtendo localização GPS...');
-      
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGpsLocation({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
-          toast.success('Localização GPS capturada!');
-        },
-        (error) => {
-          let errorMessage = 'Erro ao obter localização GPS';
-          
-          switch(error.code) {
-            case error.PERMISSION_DENIED:
-              errorMessage = 'Permissão de localização negada. Ative nas configurações.';
-              break;
-            case error.POSITION_UNAVAILABLE:
-              errorMessage = 'Localização indisponível. Verifique se o GPS está ativo.';
-              break;
-            case error.TIMEOUT:
-              errorMessage = 'Tempo esgotado. Tente novamente.';
-              break;
-            default:
-              errorMessage = error.message;
-          }
-          
-          setGpsError(errorMessage);
-          toast.error(errorMessage);
-        },
-        {
-          enableHighAccuracy: true,
-          timeout: 30000, // Aumentado para 30 segundos
-          maximumAge: 60000 // Aceita localização de até 1 minuto atrás
-        }
-      );
-    } else {
-      setGpsError('GPS não disponível neste dispositivo');
-      toast.error('GPS não suportado');
-    }
-  };
-
   const startCamera = async () => {
     try {
-      // Check if mediaDevices is available
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        toast.error('Câmera não disponível neste navegador');
-        return;
-      }
-
-      console.log('Starting camera...');
-
-      let stream;
-      try {
-        // Try with simple constraints first (more compatible)
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: 'environment' }
-          }
-        });
-      } catch (err) {
-        console.log('Trying even simpler camera constraints...', err);
-        // Fallback to most basic constraint
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: true
-        });
-      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }
+      });
       
       if (stream && videoRef.current) {
-        console.log('Stream obtained, setting video source');
         videoRef.current.srcObject = stream;
         streamRef.current = stream;
-        
-        // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
-          console.log('Video metadata loaded');
-          videoRef.current.play().then(() => {
-            console.log('Video playing');
-            setCameraActive(true);
-            toast.success('Câmera aberta!');
-          }).catch(err => {
-            console.error('Error playing video:', err);
-            toast.error('Erro ao reproduzir vídeo da câmera');
-          });
+          videoRef.current.play();
+          setCameraActive(true);
+          toast.success('Câmera aberta!');
         };
       }
     } catch (error) {
       console.error('Camera error:', error);
-      
-      let errorMessage = 'Erro ao acessar câmera';
-      
-      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        errorMessage = 'Você precisa permitir o acesso à câmera. Clique no ícone de câmera na barra de endereço e permita.';
-      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-        errorMessage = 'Nenhuma câmera encontrada no dispositivo.';
-      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-        errorMessage = 'Câmera está sendo usada por outro aplicativo. Feche outros apps e tente novamente.';
-      } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
-        errorMessage = 'Não foi possível configurar a câmera.';
-      } else if (error.name === 'TypeError') {
-        errorMessage = 'Câmera só funciona com HTTPS. Use https:// na URL.';
-      }
-      
-      toast.error(errorMessage, { duration: 5000 });
+      toast.error('Não foi possível abrir a câmera. Use o botão de upload de foto.');
     }
   };
 
@@ -173,43 +82,56 @@ const CheckIn = () => {
       const context = canvas.getContext('2d');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      const photoData = canvas.toDataURL('image/jpeg', 0.8);
-      setPhoto(photoData);
-      stopCamera();
-      toast.success('Foto capturada!');
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], 'checkin.jpg', { type: 'image/jpeg' });
+          setPhotoFile(file);
+          setPhoto(URL.createObjectURL(blob));
+          stopCamera();
+          toast.success('Foto capturada!');
+        }
+      }, 'image/jpeg', 0.8);
+    }
+  };
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type.startsWith('image/')) {
+      setPhotoFile(file);
+      setPhoto(URL.createObjectURL(file));
+      toast.success('Foto selecionada!');
+    } else {
+      toast.error('Por favor, selecione uma imagem válida');
     }
   };
 
   const retakePhoto = () => {
     setPhoto(null);
-    startCamera();
+    setPhotoFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleSubmit = async () => {
-    if (!photo) {
-      toast.error('Tire uma foto antes de fazer check-in');
+    if (!photoFile) {
+      toast.error('Tire uma foto ou faça upload de uma imagem');
       return;
     }
 
-    // Allow check-in without GPS if it's taking too long
-    // In production, you might want to make GPS optional or have a fallback
-    if (!gpsLocation && !gpsError) {
-      toast.error('Aguarde a captura da localização GPS ou tente novamente');
+    if (!locationAuthorized) {
+      toast.error('Por favor, autorize o uso de localização em tempo real');
       return;
     }
 
     setSubmitting(true);
 
     try {
-      // Remove data:image/jpeg;base64, prefix
-      const photoBase64 = photo.split(',')[1];
+      const formData = new FormData();
+      formData.append('job_id', jobId);
+      formData.append('photo', photoFile);
       
-      await api.createCheckin({
-        job_id: jobId,
-        gps_lat: gpsLocation?.latitude || 0,
-        gps_long: gpsLocation?.longitude || 0,
-        photo_base64: photoBase64
-      });
+      await api.createCheckin(formData);
 
       toast.success('Check-in realizado com sucesso!');
       navigate('/dashboard');
@@ -245,40 +167,30 @@ const CheckIn = () => {
         <p className="text-muted-foreground mt-2">{job?.title}</p>
       </div>
 
-      {/* Browser Compatibility Check */}
-      <BrowserCheck />
-
-      {/* Camera Permission Guide */}
-      <CameraPermissionGuide onPermissionGranted={() => console.log('Camera permission granted!')} />
-
-      {/* GPS Status */}
-      <Alert className={`border ${gpsLocation ? 'border-green-500/50 bg-green-500/10' : gpsError ? 'border-red-500/50 bg-red-500/10' : 'border-yellow-500/50 bg-yellow-500/10'}`}>
-        <MapPin className="h-4 w-4" />
-        <AlertDescription className="text-white">
-          {gpsLocation ? (
-            <>
-              ✓ GPS Capturado: {gpsLocation.latitude.toFixed(6)}, {gpsLocation.longitude.toFixed(6)}
-              <br />
-              <span className="text-sm text-muted-foreground">Precisão: {gpsLocation.accuracy.toFixed(0)}m</span>
-            </>
-          ) : gpsError ? (
-            <div className="space-y-2">
-              <p>✗ Erro GPS: {gpsError}</p>
-              <Button 
-                size="sm" 
-                onClick={requestGPS} 
-                className="bg-primary hover:bg-primary/90 text-white"
+      {/* Location Authorization */}
+      <Card className="bg-card border-white/5">
+        <CardContent className="p-6">
+          <div className="flex items-start space-x-3">
+            <Checkbox
+              id="location-auth"
+              checked={locationAuthorized}
+              onCheckedChange={setLocationAuthorized}
+              className="mt-1"
+            />
+            <div className="flex-1">
+              <Label
+                htmlFor="location-auth"
+                className="text-white font-medium cursor-pointer"
               >
-                🔄 Tentar Novamente
-              </Button>
+                Autorizo o uso de localização em tempo real
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Confirmo que estou no local correto para realizar este check-in
+              </p>
             </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <div className="loading-pulse">Obtendo localização GPS...</div>
-            </div>
-          )}
-        </AlertDescription>
-      </Alert>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Camera */}
       <Card className="bg-card border-white/5">
@@ -290,14 +202,42 @@ const CheckIn = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           {!photo && !cameraActive && (
-            <Button
-              onClick={startCamera}
-              className="w-full bg-primary hover:bg-primary/90 h-14"
-              data-testid="open-camera-button"
-            >
-              <Camera className="mr-2 h-5 w-5" />
-              Abrir Câmera
-            </Button>
+            <div className="space-y-3">
+              <Button
+                onClick={startCamera}
+                className="w-full bg-primary hover:bg-primary/90 h-14"
+                data-testid="open-camera-button"
+              >
+                <Camera className="mr-2 h-5 w-5" />
+                Abrir Câmera
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">ou</span>
+                </div>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                variant="outline"
+                className="w-full border-white/20 text-white hover:bg-white/10 h-14"
+              >
+                <Upload className="mr-2 h-5 w-5" />
+                Selecionar Foto
+              </Button>
+            </div>
           )}
 
           {cameraActive && (
@@ -345,7 +285,7 @@ const CheckIn = () => {
                 className="w-full border-white/20 text-white hover:bg-white/10"
               >
                 <Camera className="mr-2 h-5 w-5" />
-                Tirar Nova Foto
+                Trocar Foto
               </Button>
             </div>
           )}
@@ -357,7 +297,7 @@ const CheckIn = () => {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        disabled={!photo || submitting}
+        disabled={!photoFile || !locationAuthorized || submitting}
         className="w-full bg-green-500 hover:bg-green-600 text-white h-14 text-lg"
         data-testid="submit-checkin-button"
       >
@@ -369,16 +309,10 @@ const CheckIn = () => {
         ) : (
           <>
             <CheckCircle className="mr-2 h-5 w-5" />
-            {gpsLocation ? 'Confirmar Check-in' : 'Confirmar sem GPS ⚠️'}
+            Confirmar Check-in
           </>
         )}
       </Button>
-
-      {!gpsLocation && photo && (
-        <p className="text-yellow-500 text-sm text-center -mt-4">
-          ⚠️ GPS não disponível. Check-in será feito sem localização precisa.
-        </p>
-      )}
     </div>
   );
 };
