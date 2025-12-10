@@ -89,7 +89,7 @@ class Job(BaseModel):
     title: str
     client_name: str
     client_address: Optional[str] = None
-    status: str = "pending"  # pending, in_progress, completed
+    status: str = "aguardando"  # aguardando, instalando, pausado, finalizado, atrasado
     area_m2: Optional[float] = None
     branch: str  # POA or SP
     assigned_installers: List[str] = []  # List of installer IDs
