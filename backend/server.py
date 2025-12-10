@@ -532,11 +532,14 @@ async def create_checkin(
 @api_router.put("/checkins/{checkin_id}/checkout", response_model=CheckIn)
 async def checkout(
     checkin_id: str,
-    photo: UploadFile = File(...),
+    photo_base64: str = Form(...),
+    gps_lat: float = Form(...),
+    gps_long: float = Form(...),
+    gps_accuracy: Optional[float] = Form(None),
     notes: str = Form(""),
     current_user: User = Depends(get_current_user)
 ):
-    """Check out from a job with photo upload"""
+    """Check out from a job with photo in Base64 and GPS coordinates"""
     checkin_doc = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin_doc:
         raise HTTPException(status_code=404, detail="Check-in not found")
@@ -544,25 +547,18 @@ async def checkout(
     if checkin_doc['status'] == "completed":
         raise HTTPException(status_code=400, detail="Already checked out")
     
-    # Save photo file
-    file_extension = Path(photo.filename).suffix or ".jpg"
-    photo_filename = f"checkout_{checkin_id}{file_extension}"
-    photo_path = UPLOAD_DIR / photo_filename
-    
-    with photo_path.open("wb") as buffer:
-        shutil.copyfileobj(photo.file, buffer)
-    
     # Calculate duration
     checkout_at = datetime.now(timezone.utc)
     checkin_at = datetime.fromisoformat(checkin_doc['checkin_at']) if isinstance(checkin_doc['checkin_at'], str) else checkin_doc['checkin_at']
     duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
     
-    # Update checkin
+    # Update checkin with Base64 photo and GPS
     update_data = {
         "checkout_at": checkout_at.isoformat(),
-        "checkout_photo": photo_filename,
-        "checkout_gps_lat": 0.0,
-        "checkout_gps_long": 0.0,
+        "checkout_photo": photo_base64,
+        "checkout_gps_lat": gps_lat,
+        "checkout_gps_long": gps_long,
+        "checkout_gps_accuracy": gps_accuracy,
         "notes": notes,
         "duration_minutes": duration_minutes,
         "status": "completed"
