@@ -104,6 +104,14 @@ const CheckOut = () => {
 
   const startCamera = async () => {
     try {
+      // Check if mediaDevices is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        toast.error('Câmera não disponível neste navegador');
+        return;
+      }
+
+      toast.info('Solicitando acesso à câmera...');
+
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: 'environment',
@@ -114,12 +122,31 @@ const CheckOut = () => {
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current.play();
+        };
         streamRef.current = stream;
         setCameraActive(true);
+        toast.success('Câmera aberta!');
       }
     } catch (error) {
-      toast.error('Erro ao acessar câmera');
       console.error('Camera error:', error);
+      
+      let errorMessage = 'Erro ao acessar câmera';
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        errorMessage = 'Permissão de câmera negada. Por favor, permita o acesso à câmera nas configurações do navegador.';
+      } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+        errorMessage = 'Nenhuma câmera encontrada no dispositivo.';
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        errorMessage = 'Câmera está sendo usada por outro aplicativo.';
+      } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+        errorMessage = 'Câmera não suporta as configurações solicitadas.';
+      } else if (error.name === 'TypeError') {
+        errorMessage = 'Câmera não está disponível. Certifique-se de estar usando HTTPS.';
+      }
+      
+      toast.error(errorMessage);
     }
   };
 
