@@ -1,0 +1,188 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "INDÚSTRIA VISUAL",
+      "slogan": "Transformamos ideias em realidade",
+      "archetype": "Industrial Futurist",
+      "vibe": "Precision, High-Energy, Professional, Dark-Industrial"
+    },
+    "typography": {
+      "font_family": {
+        "headings": "Manrope, sans-serif",
+        "body": "Inter, sans-serif",
+        "mono": "JetBrains Mono, monospace"
+      },
+      "weights": {
+        "headings": "700",
+        "subheadings": "600",
+        "body": "400",
+        "bold": "600"
+      },
+      "scale": {
+        "h1": "text-4xl md:text-5xl tracking-tight",
+        "h2": "text-3xl md:text-4xl tracking-tight",
+        "h3": "text-2xl font-semibold tracking-tight",
+        "p": "text-base leading-relaxed text-muted-foreground",
+        "small": "text-sm font-medium leading-none"
+      }
+    },
+    "colors": {
+      "palette": {
+        "primary": {
+          "hex": "#FF1F5A",
+          "hsl": "344 100% 56%",
+          "usage": "Main CTAs, Active States, Critical Alerts, Brand Highlights"
+        },
+        "secondary": {
+          "hex": "#3D2D6E",
+          "hsl": "255 42% 30%",
+          "usage": "Secondary Buttons, Sidebar Backgrounds, Headers"
+        },
+        "background": {
+          "hex": "#1A1625",
+          "hsl": "256 25% 12%",
+          "usage": "App Background (Dark Mode Default)"
+        },
+        "surface": {
+          "hex": "#241E32",
+          "hsl": "256 25% 16%",
+          "usage": "Cards, Modals, Dropdowns"
+        },
+        "success": {
+          "hex": "#10B981",
+          "usage": "Job Completed, Online Status"
+        },
+        "warning": {
+          "hex": "#F59E0B",
+          "usage": "Pending, Late"
+        }
+      },
+      "css_vars": {
+        "root": {
+          "--background": "256 25% 12%",
+          "--foreground": "0 0% 98%",
+          "--card": "256 25% 16%",
+          "--card-foreground": "0 0% 98%",
+          "--popover": "256 25% 16%",
+          "--popover-foreground": "0 0% 98%",
+          "--primary": "344 100% 56%",
+          "--primary-foreground": "0 0% 100%",
+          "--secondary": "255 42% 30%",
+          "--secondary-foreground": "0 0% 100%",
+          "--muted": "256 20% 25%",
+          "--muted-foreground": "256 10% 65%",
+          "--accent": "344 100% 56%",
+          "--accent-foreground": "0 0% 100%",
+          "--destructive": "0 62.8% 30.6%",
+          "--destructive-foreground": "0 0% 98%",
+          "--border": "256 20% 25%",
+          "--input": "256 20% 25%",
+          "--ring": "344 100% 56%",
+          "--radius": "0.5rem"
+        }
+      }
+    },
+    "layout": {
+      "spacing": {
+        "container_padding": "p-4 md:p-8 lg:p-12",
+        "section_gap": "gap-8 md:gap-12",
+        "component_gap": "gap-4"
+      },
+      "grid_system": {
+        "dashboard": "grid grid-cols-1 md:grid-cols-12 gap-6",
+        "mobile_list": "flex flex-col gap-4",
+        "card_grid": "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
+      },
+      "containers": {
+        "main": "max-w-7xl mx-auto w-full",
+        "narrow": "max-w-3xl mx-auto w-full"
+      }
+    },
+    "components": {
+      "buttons": {
+        "primary": "bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_15px_rgba(255,31,90,0.3)] transition-all duration-300",
+        "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        "outline": "border-2 border-primary text-primary hover:bg-primary/10",
+        "ghost": "hover:bg-white/10 text-foreground"
+      },
+      "cards": {
+        "default": "bg-card border border-white/5 shadow-xl rounded-xl overflow-hidden",
+        "interactive": "bg-card border border-white/5 hover:border-primary/50 transition-colors cursor-pointer"
+      },
+      "inputs": {
+        "default": "bg-white/5 border-white/10 focus:border-primary focus:ring-primary/20 h-12"
+      },
+      "status_badges": {
+        "base": "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider",
+        "variants": {
+          "pending": "bg-yellow-500/20 text-yellow-500 border border-yellow-500/20",
+          "in_progress": "bg-blue-500/20 text-blue-500 border border-blue-500/20",
+          "completed": "bg-green-500/20 text-green-500 border border-green-500/20",
+          "late": "bg-red-500/20 text-red-500 border border-red-500/20"
+        }
+      }
+    },
+    "visual_enhancers": {
+      "glassmorphism": "backdrop-blur-xl bg-black/40 border border-white/10",
+      "neon_glow": "shadow-[0_0_20px_rgba(255,31,90,0.4)]",
+      "gradients": {
+        "brand_subtle": "bg-gradient-to-br from-secondary/50 to-background",
+        "overlay": "bg-gradient-to-t from-background via-background/80 to-transparent"
+      },
+      "textures": "bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-5"
+    },
+    "motion": {
+      "page_transition": "initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }}",
+      "hover_lift": "hover:-translate-y-1 transition-transform duration-200",
+      "button_tap": "active:scale-95 transition-transform duration-100"
+    }
+  },
+  "assets": {
+    "images": {
+      "login_bg": {
+        "url": "https://images.unsplash.com/photo-1729944950511-e9c71556cfd4?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Industrial Printing Press Background",
+        "category": "background"
+      },
+      "installer_hero": {
+        "url": "https://images.unsplash.com/photo-1723672947453-e6d09052bdf3?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Vehicle Wrap Installation",
+        "category": "hero"
+      },
+      "worker_avatar": {
+        "url": "https://images.unsplash.com/photo-1659353587722-54d027fcc09d?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Worker with Tablet",
+        "category": "avatar"
+      },
+      "placeholder_job": {
+        "url": "https://images.unsplash.com/photo-1603050121508-2a7f63c8522b?crop=entropy&cs=srgb&fm=jpg&q=85",
+        "alt": "Job Reference",
+        "category": "content"
+      }
+    },
+    "icons": {
+      "library": "lucide-react",
+      "preferred_set": ["MapPin", "Camera", "CheckCircle", "Clock", "Calendar", "Users", "BarChart3", "Settings", "LogOut", "Menu", "X", "ChevronRight"]
+    }
+  },
+  "implementation_guide": {
+    "file_structure": {
+      "components": "/app/frontend/src/components/ui",
+      "pages": "/app/frontend/src/pages",
+      "layouts": "/app/frontend/src/layouts",
+      "context": "/app/frontend/src/context"
+    },
+    "universal_rules": [
+      "ALWAYS use the 'dark' class on the root HTML element or body to enforce the dark theme.",
+      "Do NOT use generic gradients. Use the specific brand colors defined in css_vars.",
+      "For mobile views (Installers), buttons must be at least 48px height (h-12) for touch accessibility.",
+      "Use 'sonner' for all toast notifications.",
+      "All interactive elements must have 'data-testid' attributes.",
+      "Do not use 'Inter' for headings; use 'Manrope' (import from Google Fonts).",
+      "Ensure high contrast for text on the dark background (use text-white or text-gray-200).",
+      "Use 'lucide-react' for icons.",
+      "Components must be .jsx (not .tsx) as per project structure."
+    ],
+    "instructions_to_main_agent": "You are building the 'INDÚSTRIA VISUAL' PWA. Start by updating the tailwind.config.js and index.css with the provided color palette. Then, create the layout structure (Sidebar for Desktop, Bottom Nav for Mobile). Prioritize the 'Installer' mobile experience with large touch targets. Use the provided image URLs for the login screen and dummy data. Ensure the 'Offline Mode' UI indicators are visible (e.g., a banner when disconnected)."
+  }
+}
