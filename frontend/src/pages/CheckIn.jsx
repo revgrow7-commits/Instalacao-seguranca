@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 import BrowserCheck from '../components/BrowserCheck';
 import { Camera, MapPin, Loader2, CheckCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
+import CameraPermissionGuide from '../components/CameraPermissionGuide';
 
 const CheckIn = () => {
   const { jobId } = useParams();
