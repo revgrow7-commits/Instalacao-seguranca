@@ -31,6 +31,12 @@ const Sidebar = () => {
       roles: ['admin', 'manager', 'installer']
     },
     {
+      name: 'Check-ins',
+      href: '/checkins',
+      icon: CheckCircle,
+      roles: ['admin', 'manager']
+    },
+    {
       name: 'Calendário',
       href: '/calendar',
       icon: Calendar,
