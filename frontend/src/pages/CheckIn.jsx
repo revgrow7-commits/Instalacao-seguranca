@@ -233,42 +233,12 @@ const CheckIn = () => {
               />
               <Button
                 onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="w-full border-white/20 text-white hover:bg-white/10 h-14"
+                className="w-full bg-red-500 hover:bg-red-600 text-white h-14"
+                data-testid="select-photo-button"
               >
                 <Upload className="mr-2 h-5 w-5" />
                 Selecionar Foto
               </Button>
-            </div>
-          )}
-
-          {cameraActive && (
-            <div className="space-y-4">
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={capturePhoto}
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  data-testid="capture-photo-button"
-                >
-                  <Camera className="mr-2 h-5 w-5" />
-                  Capturar Foto
-                </Button>
-                <Button
-                  onClick={stopCamera}
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
             </div>
           )}
 
@@ -278,7 +248,7 @@ const CheckIn = () => {
                 <img src={photo} alt="Check-in" className="w-full h-full object-cover" />
                 <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
-                  Foto Capturada
+                  Foto Selecionada
                 </div>
               </div>
               <Button
@@ -286,13 +256,11 @@ const CheckIn = () => {
                 variant="outline"
                 className="w-full border-white/20 text-white hover:bg-white/10"
               >
-                <Camera className="mr-2 h-5 w-5" />
+                <Upload className="mr-2 h-5 w-5" />
                 Trocar Foto
               </Button>
             </div>
           )}
-
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
         </CardContent>
       </Card>
 
