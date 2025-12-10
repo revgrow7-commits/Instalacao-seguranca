@@ -120,8 +120,10 @@ class CheckIn(BaseModel):
     checkout_photo: Optional[str] = None  # Base64 encoded
     gps_lat: Optional[float] = None
     gps_long: Optional[float] = None
+    gps_accuracy: Optional[float] = None
     checkout_gps_lat: Optional[float] = None
     checkout_gps_long: Optional[float] = None
+    checkout_gps_accuracy: Optional[float] = None
     notes: Optional[str] = None
     duration_minutes: Optional[int] = None
     status: str = "in_progress"  # in_progress, completed
