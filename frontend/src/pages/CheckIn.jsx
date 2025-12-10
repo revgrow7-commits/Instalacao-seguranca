@@ -21,10 +21,8 @@ const CheckIn = () => {
   const [locationAuthorized, setLocationAuthorized] = useState(false);
   const [gpsCoords, setGpsCoords] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(false);
-  const [cameraActive, setCameraActive] = useState(false);
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const streamRef = useRef(null);
+  const [difficultyLevel, setDifficultyLevel] = useState('');
+  const [difficultyDescription, setDifficultyDescription] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
