@@ -4,8 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Users, Briefcase, Clock, MapPin, Image, CheckCircle, AlertCircle } from 'lucide-react';
+import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Reports = () => {
@@ -16,6 +17,8 @@ const Reports = () => {
   const [installers, setInstallers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('jobs');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     if (!isAdmin && !isManager) {
@@ -50,7 +53,6 @@ const Reports = () => {
       'pausado': 'bg-orange-500/20 text-orange-500 border-orange-500/20',
       'finalizado': 'bg-green-500/20 text-green-500 border-green-500/20',
       'atrasado': 'bg-red-500/20 text-red-500 border-red-500/20',
-      // Legacy status mapping
       'pending': 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20',
       'in_progress': 'bg-blue-500/20 text-blue-500 border-blue-500/20',
       'completed': 'bg-green-500/20 text-green-500 border-green-500/20'
@@ -65,7 +67,6 @@ const Reports = () => {
       'pausado': 'PAUSADO',
       'finalizado': 'FINALIZADO',
       'atrasado': 'ATRASADO',
-      // Legacy status mapping
       'pending': 'AGUARDANDO',
       'in_progress': 'INSTALANDO',
       'completed': 'FINALIZADO'
@@ -110,6 +111,39 @@ const Reports = () => {
     };
   };
 
+  const getJobsByStatus = () => {
+    const statusCounts = {
+      aguardando: 0,
+      instalando: 0,
+      pausado: 0,
+      finalizado: 0,
+      atrasado: 0
+    };
+
+    jobs.forEach(job => {
+      const status = job.status?.toLowerCase();
+      if (status === 'pending') statusCounts.aguardando++;
+      else if (status === 'in_progress') statusCounts.instalando++;
+      else if (status === 'completed') statusCounts.finalizado++;
+      else if (statusCounts.hasOwnProperty(status)) statusCounts[status]++;
+    });
+
+    return statusCounts;
+  };
+
+  const filterJobsByDate = (jobsList) => {
+    if (!startDate && !endDate) return jobsList;
+    
+    return jobsList.filter(job => {
+      const jobDate = new Date(job.created_at);
+      const start = startDate ? new Date(startDate) : new Date(0);
+      const end = endDate ? new Date(endDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      
+      return jobDate >= start && jobDate <= end;
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -117,6 +151,11 @@ const Reports = () => {
       </div>
     );
   }
+
+  const statusCounts = getJobsByStatus();
+  const filteredJobs = filterJobsByDate(jobs);
+  const totalJobs = filteredJobs.length;
+  const maxCount = Math.max(...Object.values(statusCounts));
 
   return (
     <div className="p-4 md:p-8 space-y-6">
@@ -130,45 +169,133 @@ const Reports = () => {
         </p>
       </div>
 
+      {/* Filter by Date */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            Filtro por Data
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">Data Inicial</label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">Data Final</label>
+              <Input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+          </div>
+          {(startDate || endDate) && (
+            <Button
+              variant="outline"
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="mt-4 border-white/20 text-white hover:bg-white/10"
+              size="sm"
+            >
+              Limpar Filtros
+            </Button>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Visual Chart - Jobs by Status */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Jobs por Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {Object.entries(statusCounts).map(([status, count]) => {
+              const percentage = totalJobs > 0 ? (count / totalJobs) * 100 : 0;
+              const colors = {
+                aguardando: 'bg-yellow-500',
+                instalando: 'bg-blue-500',
+                pausado: 'bg-orange-500',
+                finalizado: 'bg-green-500',
+                atrasado: 'bg-red-500'
+              };
+              
+              return (
+                <div key={status} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-white font-medium uppercase">{getStatusLabel(status)}</span>
+                    <span className="text-muted-foreground">{count} ({percentage.toFixed(0)}%)</span>
+                  </div>
+                  <div className="h-3 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${colors[status]} transition-all duration-500`}
+                      style={{ width: `${percentage}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="bg-card border border-white/10">
           <TabsTrigger value="jobs" className="data-[state=active]:bg-primary">
             <Briefcase className="h-4 w-4 mr-2" />
-            Relatório por Job
+            Relatório por Job ({filteredJobs.length})
           </TabsTrigger>
           <TabsTrigger value="installers" className="data-[state=active]:bg-primary">
             <Users className="h-4 w-4 mr-2" />
-            Relatório por Instalador
+            Relatório por Instalador ({installers.length})
           </TabsTrigger>
         </TabsList>
 
         {/* Jobs Report */}
         <TabsContent value="jobs" className="space-y-6">
-          {jobs.length === 0 ? (
+          {filteredJobs.length === 0 ? (
             <Card className="bg-card border-white/5">
               <CardContent className="py-12 text-center">
                 <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">Nenhum job encontrado</p>
+                <p className="text-muted-foreground">Nenhum job encontrado com os filtros selecionados</p>
               </CardContent>
             </Card>
           ) : (
             <div className="space-y-4">
-              {jobs.map((job) => {
+              {filteredJobs.map((job) => {
                 const jobCheckins = getJobCheckins(job.id);
                 const completedCheckins = jobCheckins.filter(c => c.status === 'completed');
                 const totalDuration = completedCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+                const isDelayed = job.scheduled_date && new Date(job.scheduled_date) < new Date() && job.status !== 'finalizado' && job.status !== 'completed';
                 
                 return (
                   <Card key={job.id} className="bg-card border-white/5 hover:border-primary/50 transition-colors">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <CardTitle className="text-xl text-white flex items-center gap-3">
+                          <CardTitle className="text-xl text-white flex items-center gap-3 flex-wrap">
                             {job.title}
                             <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getStatusColor(job.status)}`}>
                               {getStatusLabel(job.status)}
                             </span>
+                            {isDelayed && (
+                              <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-red-500/20 border border-red-500/30">
+                                <AlertCircle className="h-3 w-3 text-red-500" />
+                                <span className="text-xs font-semibold text-red-500 uppercase">ATRASADO</span>
+                              </div>
+                            )}
                           </CardTitle>
                           <p className="text-sm text-muted-foreground mt-2">{job.client_name}</p>
                         </div>
