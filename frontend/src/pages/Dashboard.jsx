@@ -34,12 +34,32 @@ const Dashboard = () => {
       if (isAdmin || isManager) {
         const metricsRes = await api.getMetrics();
         setMetrics(metricsRes.data);
+        
+        // Load recent checkins
+        const checkinsRes = await api.getCheckins();
+        // Sort by most recent and take last 6
+        const sortedCheckins = checkinsRes.data.sort((a, b) => 
+          new Date(b.checkin_at) - new Date(a.checkin_at)
+        );
+        setCheckins(sortedCheckins.slice(0, 6));
       }
     } catch (error) {
       toast.error('Erro ao carregar dados do dashboard');
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (loading) {
