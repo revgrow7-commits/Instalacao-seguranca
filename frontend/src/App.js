@@ -109,6 +109,32 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/installer/dashboard"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <InstallerDashboard />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkin/:jobId"
+        element={
+          <ProtectedRoute>
+            <CheckIn />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout/:checkinId"
+        element={
+          <ProtectedRoute>
+            <CheckOut />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
