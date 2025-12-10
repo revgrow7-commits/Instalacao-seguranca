@@ -42,7 +42,7 @@ export const api = {
     const url = jobId ? `${API_URL}/checkins?job_id=${jobId}` : `${API_URL}/checkins`;
     return axios.get(url, { headers: getAuthHeader() });
   },
-  getCheckinPhoto: (checkinId, photoType) => `${API_URL}/checkins/${checkinId}/photo/${photoType}`,
+  getCheckinDetails: (checkinId) => axios.get(`${API_URL}/checkins/${checkinId}/details`, { headers: getAuthHeader() }),
 
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
