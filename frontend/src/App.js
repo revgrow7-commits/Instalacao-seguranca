@@ -76,6 +76,36 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/jobs/:jobId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <JobDetail />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Users />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/calendar"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Calendar />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
