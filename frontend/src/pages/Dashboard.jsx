@@ -135,6 +135,104 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Recent Check-ins - Admin & Manager only */}
+      {(isAdmin || isManager) && (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-heading font-bold text-white">Check-ins Recentes</h2>
+          </div>
+
+          {checkins.length === 0 ? (
+            <Card className="bg-card border-white/5">
+              <CardContent className="py-12 text-center">
+                <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Nenhum check-in registrado ainda</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {checkins.map((checkin) => {
+                const job = jobs.find(j => j.id === checkin.job_id);
+                return (
+                  <Card
+                    key={checkin.id}
+                    className="bg-card border-white/5 hover:border-primary/50 transition-colors"
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg text-white line-clamp-1">
+                            {job?.title || 'Job não encontrado'}
+                          </CardTitle>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {formatDate(checkin.checkin_at)}
+                          </p>
+                        </div>
+                        <span
+                          className={
+                            `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              checkin.status === 'completed'
+                                ? 'bg-green-500/20 text-green-500 border border-green-500/20'
+                                : 'bg-blue-500/20 text-blue-500 border border-blue-500/20'
+                            }`
+                          }
+                        >
+                          {checkin.status === 'completed' ? 'Completo' : 'Em andamento'}
+                        </span>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Photo thumbnail */}
+                      {checkin.checkin_photo && (
+                        <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                          <img
+                            src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
+                            alt="Check-in"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs text-white flex items-center gap-1">
+                            <Image className="h-3 w-3" />
+                            Check-in
+                          </div>
+                        </div>
+                      )}
+
+                      {/* GPS Info */}
+                      {checkin.gps_lat && checkin.gps_long && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <MapPin className="h-4 w-4 text-blue-400" />
+                          <span className="text-xs">
+                            {checkin.gps_lat.toFixed(4)}, {checkin.gps_long.toFixed(4)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Duration if completed */}
+                      {checkin.status === 'completed' && checkin.duration_minutes && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4 text-green-400" />
+                          <span className="text-xs">{checkin.duration_minutes} minutos</span>
+                        </div>
+                      )}
+
+                      {/* View Details Button */}
+                      <Button
+                        onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                        className="w-full bg-primary hover:bg-primary/90"
+                        size="sm"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver Detalhes
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Recent Jobs */}
       <div>
         <div className="flex items-center justify-between mb-6">
