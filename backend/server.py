@@ -469,45 +469,53 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
 
 # ============ CHECK-IN/OUT ROUTES ============
 
+# Create uploads directory if it doesn't exist
+UPLOAD_DIR = Path("/app/uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
+
 @api_router.post("/checkins", response_model=CheckIn)
-async def create_checkin(checkin_data: CheckInCreate, current_user: User = Depends(get_current_user)):
-    """Create check-in for a job"""
+async def create_checkin(
+    job_id: str = Form(...),
+    photo: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Create check-in for a job with photo upload"""
     # Get installer
     installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
     if not installer:
         raise HTTPException(status_code=400, detail="User is not an installer")
     
     # Check if job exists
-    job = await db.jobs.find_one({"id": checkin_data.job_id}, {"_id": 0})
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
     # Check for existing open checkin
     existing = await db.checkins.find_one({
-        "job_id": checkin_data.job_id,
+        "job_id": job_id,
         "installer_id": installer['id'],
         "status": "in_progress"
     })
     if existing:
         raise HTTPException(status_code=400, detail="Already checked in")
     
-    # Compress photo if provided
-    checkin_photo = None
-    if checkin_data.photo_base64:
-        try:
-            photo_bytes = base64.b64decode(checkin_data.photo_base64)
-            checkin_photo = compress_image_to_base64(photo_bytes)
-        except Exception as e:
-            logger.warning(f"Failed to compress photo: {e}")
-            checkin_photo = checkin_data.photo_base64
+    # Save photo file
+    checkin_id = str(uuid.uuid4())
+    file_extension = Path(photo.filename).suffix or ".jpg"
+    photo_filename = f"checkin_{checkin_id}{file_extension}"
+    photo_path = UPLOAD_DIR / photo_filename
+    
+    with photo_path.open("wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
     
     # Create checkin
     checkin = CheckIn(
-        job_id=checkin_data.job_id,
+        id=checkin_id,
+        job_id=job_id,
         installer_id=installer['id'],
-        gps_lat=checkin_data.gps_lat,
-        gps_long=checkin_data.gps_long,
-        checkin_photo=checkin_photo
+        checkin_photo=photo_filename,
+        gps_lat=0.0,
+        gps_long=0.0
     )
     
     checkin_dict = checkin.model_dump()
@@ -519,7 +527,7 @@ async def create_checkin(checkin_data: CheckInCreate, current_user: User = Depen
     
     # Update job status
     await db.jobs.update_one(
-        {"id": checkin_data.job_id},
+        {"id": job_id},
         {"$set": {"status": "in_progress"}}
     )
     
