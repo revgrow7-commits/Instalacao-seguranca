@@ -182,14 +182,78 @@ const JobDetail = () => {
           <p className="text-muted-foreground mt-2">Job ID: {job.id}</p>
         </div>
 
-        <span className={`px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wider ${getStatusColor(job.status)}`}>
-          {getStatusText(job.status)}
-        </span>
+        <div className="flex items-center gap-3">
+          {isJobDelayed() && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30">
+              <AlertCircle className="h-4 w-4 text-red-500" />
+              <span className="text-xs font-semibold text-red-500 uppercase">ATRASADO</span>
+            </div>
+          )}
+          <span className={`px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wider border ${getStatusColor(job.status)}`}>
+            {getStatusLabel(job.status)}
+          </span>
+        </div>
       </div>
 
       {/* Action Buttons - Admin/Manager only */}
       {(isAdmin || isManager) && (
         <div className="flex gap-3">
+          <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+                Alterar Status
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-white/10">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading text-white">Alterar Status do Job</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Selecione o novo status para este job
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label className="text-white">Status Atual</Label>
+                  <div className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider border inline-block ${getStatusColor(job.status)}`}>
+                    {getStatusLabel(job.status)}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-white">Novo Status</Label>
+                  <Select value={newStatus} onValueChange={setNewStatus}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue placeholder="Selecione o status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="aguardando">🟡 AGUARDANDO</SelectItem>
+                      <SelectItem value="instalando">🔵 INSTALANDO</SelectItem>
+                      <SelectItem value="pausado">🟠 PAUSADO</SelectItem>
+                      <SelectItem value="finalizado">🟢 FINALIZADO</SelectItem>
+                      <SelectItem value="atrasado">🔴 ATRASADO</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowStatusDialog(false)}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleChangeStatus}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  Confirmar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
             <DialogTrigger asChild>
               <Button className="bg-primary hover:bg-primary/90">
