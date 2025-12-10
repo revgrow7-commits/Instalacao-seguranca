@@ -25,6 +25,7 @@ const JobDetail = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [checkins, setCheckins] = useState([]);
 
   useEffect(() => {
     loadData();
