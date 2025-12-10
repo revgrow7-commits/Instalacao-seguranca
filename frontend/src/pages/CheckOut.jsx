@@ -115,6 +115,13 @@ const CheckOut = () => {
     }
   };
 
+  const handleDifficultyChange = (value) => {
+    setDifficultyLevel(value);
+    if (!value) {
+      setDifficultyDescription('');
+    }
+  };
+
   const handleSubmit = async () => {
     if (!photoBase64) {
       toast.error('Tire uma foto ou faça upload de uma imagem');
