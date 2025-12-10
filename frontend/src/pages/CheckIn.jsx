@@ -32,6 +32,12 @@ const CheckIn = () => {
     };
   }, [jobId]);
 
+  useEffect(() => {
+    if (locationAuthorized) {
+      getGPSLocation();
+    }
+  }, [locationAuthorized]);
+
   const loadJob = async () => {
     try {
       const response = await api.getJob(jobId);
