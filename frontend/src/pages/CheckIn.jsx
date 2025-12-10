@@ -27,9 +27,6 @@ const CheckIn = () => {
 
   useEffect(() => {
     loadJob();
-    return () => {
-      stopCamera();
-    };
   }, [jobId]);
 
   useEffect(() => {
