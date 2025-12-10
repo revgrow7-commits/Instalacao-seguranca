@@ -33,13 +33,15 @@ const JobDetail = () => {
 
   const loadData = async () => {
     try {
-      const [jobRes, installersRes] = await Promise.all([
+      const [jobRes, installersRes, checkinsRes] = await Promise.all([
         api.getJob(jobId),
-        isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] })
+        isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] }),
+        api.getCheckins(jobId)
       ]);
       
       setJob(jobRes.data);
       setInstallers(installersRes.data);
+      setCheckins(checkinsRes.data);
       setSelectedInstallers(jobRes.data.assigned_installers || []);
       
       if (jobRes.data.scheduled_date) {
