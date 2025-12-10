@@ -270,6 +270,9 @@ const CheckOut = () => {
       {/* Browser Compatibility Check */}
       <BrowserCheck />
 
+      {/* Camera Permission Guide */}
+      <CameraPermissionGuide onPermissionGranted={() => console.log('Camera permission granted!')} />
+
       {/* Time Elapsed */}
       <Alert className="border-blue-500/50 bg-blue-500/10">
         <Clock className="h-4 w-4" />
