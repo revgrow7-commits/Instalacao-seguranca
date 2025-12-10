@@ -6,6 +6,7 @@ import { Button } from '../components/ui/button';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import BrowserCheck from '../components/BrowserCheck';
 import { Camera, MapPin, Loader2, CheckCircle, Clock, X } from 'lucide-react';
 import { toast } from 'sonner';
 
