@@ -5,10 +5,11 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JobDetail = () => {
