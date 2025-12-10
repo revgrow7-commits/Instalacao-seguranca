@@ -230,7 +230,7 @@ const CheckOut = () => {
       </Alert>
 
       {/* GPS Status */}
-      <Alert className={`border ${gpsLocation ? 'border-green-500/50 bg-green-500/10' : 'border-yellow-500/50 bg-yellow-500/10'}`}>
+      <Alert className={`border ${gpsLocation ? 'border-green-500/50 bg-green-500/10' : gpsError ? 'border-red-500/50 bg-red-500/10' : 'border-yellow-500/50 bg-yellow-500/10'}`}>
         <MapPin className="h-4 w-4" />
         <AlertDescription className="text-white">
           {gpsLocation ? (
@@ -240,14 +240,20 @@ const CheckOut = () => {
               <span className="text-sm text-muted-foreground">Precisão: {gpsLocation.accuracy.toFixed(0)}m</span>
             </>
           ) : gpsError ? (
-            <>
-              ✗ Erro GPS: {gpsError}
-              <Button size="sm" variant="link" onClick={requestGPS} className="text-primary">
-                Tentar novamente
+            <div className="space-y-2">
+              <p>✗ Erro GPS: {gpsError}</p>
+              <Button 
+                size="sm" 
+                onClick={requestGPS} 
+                className="bg-primary hover:bg-primary/90 text-white"
+              >
+                🔄 Tentar Novamente
               </Button>
-            </>
+            </div>
           ) : (
-            'Obtendo localização GPS...'
+            <div className="flex items-center gap-2">
+              <div className="loading-pulse">Obtendo localização GPS...</div>
+            </div>
           )}
         </AlertDescription>
       </Alert>
