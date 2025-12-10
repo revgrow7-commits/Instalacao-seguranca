@@ -259,6 +259,9 @@ const CheckOut = () => {
         <p className="text-muted-foreground mt-2">{job?.title}</p>
       </div>
 
+      {/* Browser Compatibility Check */}
+      <BrowserCheck />
+
       {/* Time Elapsed */}
       <Alert className="border-blue-500/50 bg-blue-500/10">
         <Clock className="h-4 w-4" />
