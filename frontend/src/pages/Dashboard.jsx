@@ -3,7 +3,8 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Briefcase, CheckCircle, Clock, Users, TrendingUp } from 'lucide-react';
+import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye } from 'lucide-react';
+import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
 const Dashboard = () => {
