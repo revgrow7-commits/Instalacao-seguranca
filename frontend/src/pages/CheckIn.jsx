@@ -212,35 +212,17 @@ const CheckIn = () => {
         </CardContent>
       </Card>
 
-      {/* Camera */}
+      {/* Photo Upload */}
       <Card className="bg-card border-white/5">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Camera className="h-5 w-5 text-primary" />
+            <Upload className="h-5 w-5 text-primary" />
             Foto de Check-in
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!photo && !cameraActive && (
+          {!photo && (
             <div className="space-y-3">
-              <Button
-                onClick={startCamera}
-                className="w-full bg-primary hover:bg-primary/90 h-14"
-                data-testid="open-camera-button"
-              >
-                <Camera className="mr-2 h-5 w-5" />
-                Abrir Câmera
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/10" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-
               <input
                 ref={fileInputRef}
                 type="file"
