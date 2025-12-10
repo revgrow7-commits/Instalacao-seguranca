@@ -169,13 +169,13 @@ const CheckOut = () => {
   };
 
   const handleSubmit = async () => {
-    if (!photoFile) {
+    if (!photoBase64) {
       toast.error('Tire uma foto ou faça upload de uma imagem');
       return;
     }
 
-    if (!locationAuthorized) {
-      toast.error('Por favor, autorize o uso de localização em tempo real');
+    if (!locationAuthorized || !gpsCoords) {
+      toast.error('Por favor, autorize o uso de localização e aguarde a captura do GPS');
       return;
     }
 
@@ -183,7 +183,10 @@ const CheckOut = () => {
 
     try {
       const formData = new FormData();
-      formData.append('photo', photoFile);
+      formData.append('photo_base64', photoBase64);
+      formData.append('gps_lat', gpsCoords.latitude);
+      formData.append('gps_long', gpsCoords.longitude);
+      formData.append('gps_accuracy', gpsCoords.accuracy);
       formData.append('notes', notes);
       
       await api.checkout(checkinId, formData);
