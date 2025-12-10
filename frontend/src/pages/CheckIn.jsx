@@ -357,7 +357,7 @@ const CheckIn = () => {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        disabled={!photo || !gpsLocation || submitting}
+        disabled={!photo || submitting}
         className="w-full bg-green-500 hover:bg-green-600 text-white h-14 text-lg"
         data-testid="submit-checkin-button"
       >
@@ -369,10 +369,16 @@ const CheckIn = () => {
         ) : (
           <>
             <CheckCircle className="mr-2 h-5 w-5" />
-            Confirmar Check-in
+            {gpsLocation ? 'Confirmar Check-in' : 'Confirmar sem GPS ⚠️'}
           </>
         )}
       </Button>
+
+      {!gpsLocation && photo && (
+        <p className="text-yellow-500 text-sm text-center -mt-4">
+          ⚠️ GPS não disponível. Check-in será feito sem localização precisa.
+        </p>
+      )}
     </div>
   );
 };
