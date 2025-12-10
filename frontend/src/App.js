@@ -63,6 +63,16 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/jobs"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <Jobs />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
