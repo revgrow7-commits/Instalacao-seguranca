@@ -362,7 +362,7 @@ const CheckIn = () => {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        disabled={!photoFile || !locationAuthorized || submitting}
+        disabled={!photoBase64 || !locationAuthorized || !gpsCoords || submitting}
         className="w-full bg-green-500 hover:bg-green-600 text-white h-14 text-lg"
         data-testid="submit-checkin-button"
       >
