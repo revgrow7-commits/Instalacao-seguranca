@@ -12,6 +12,7 @@ import Calendar from './pages/Calendar';
 import CheckIn from './pages/CheckIn';
 import CheckOut from './pages/CheckOut';
 import CheckinViewer from './pages/CheckinViewer';
+import Checkins from './pages/Checkins';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import './App.css';
