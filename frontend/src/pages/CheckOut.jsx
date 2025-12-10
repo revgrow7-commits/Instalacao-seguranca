@@ -147,9 +147,14 @@ const CheckOut = () => {
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
-      setPhotoFile(file);
-      setPhoto(URL.createObjectURL(file));
-      toast.success('Foto selecionada!');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64 = reader.result;
+        setPhotoBase64(base64.split(',')[1]); // Remove prefix
+        setPhoto(base64);
+        toast.success('Foto selecionada!');
+      };
+      reader.readAsDataURL(file);
     } else {
       toast.error('Por favor, selecione uma imagem válida');
     }
@@ -157,7 +162,7 @@ const CheckOut = () => {
 
   const retakePhoto = () => {
     setPhoto(null);
-    setPhotoFile(null);
+    setPhotoBase64(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
