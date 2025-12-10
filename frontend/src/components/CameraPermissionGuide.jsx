@@ -88,12 +88,21 @@ const CameraPermissionGuide = ({ onPermissionGranted }) => {
           </p>
           
           <div className="bg-black/30 p-3 rounded-lg space-y-2 text-sm">
-            <p className="font-bold text-primary">📱 Passo a Passo:</p>
+            <p className="font-bold text-primary">📱 Android Chrome:</p>
             <ol className="list-decimal list-inside space-y-1 ml-2">
-              <li>Clique no <strong>ícone de cadeado 🔒</strong> (ou câmera 📷) na barra de endereço</li>
-              <li>Procure por <strong>"Câmera"</strong> nas permissões</li>
-              <li>Mude de <strong>"Bloquear"</strong> para <strong>"Permitir"</strong></li>
-              <li>Clique em <strong>"Recarregar"</strong> ou pressione F5</li>
+              <li>Toque nos <strong>3 pontinhos (⋮)</strong> no canto superior direito</li>
+              <li>Toque em <strong>"Configurações"</strong></li>
+              <li>Vá em <strong>"Configurações do site"</strong></li>
+              <li>Toque em <strong>"Câmera"</strong></li>
+              <li>Encontre este site e mude para <strong>"Permitir"</strong></li>
+              <li>Volte e recarregue a página</li>
+            </ol>
+            
+            <p className="font-bold text-primary mt-3">🖥️ Desktop Chrome:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-2">
+              <li>Clique no <strong>cadeado 🔒</strong> na barra de endereço</li>
+              <li>Procure <strong>"Câmera"</strong> e mude para <strong>"Permitir"</strong></li>
+              <li>Recarregue a página (F5)</li>
             </ol>
           </div>
 
