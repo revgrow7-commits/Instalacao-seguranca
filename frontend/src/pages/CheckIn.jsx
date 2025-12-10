@@ -50,6 +50,37 @@ const CheckIn = () => {
     }
   };
 
+  const getGPSLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocalização não suportada pelo navegador');
+      return;
+    }
+
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setGpsCoords({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
+        });
+        setGpsLoading(false);
+        toast.success('Localização capturada com sucesso!');
+      },
+      (error) => {
+        console.error('GPS error:', error);
+        toast.error('Erro ao capturar localização. Verifique as permissões do navegador.');
+        setGpsLoading(false);
+        setLocationAuthorized(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+  };
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
