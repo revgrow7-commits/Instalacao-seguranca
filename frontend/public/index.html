@@ -23,12 +23,26 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-        <title>Emergent | Fullstack App</title>
+        <title>Indústria Visual</title>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
+        <script>
+            // Register Service Worker for PWA
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker.register('/service-worker.js')
+                        .then(registration => {
+                            console.log('SW registered:', registration);
+                        })
+                        .catch(error => {
+                            console.log('SW registration failed:', error);
+                        });
+                });
+            }
+        </script>
         <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
