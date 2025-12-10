@@ -91,55 +91,6 @@ const CheckOut = () => {
     );
   };
 
-  const startCamera = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } }
-      });
-      
-      if (stream && videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current.play();
-          setCameraActive(true);
-          toast.success('Câmera aberta!');
-        };
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      toast.error('Não foi possível abrir a câmera. Use o botão de upload de foto.');
-    }
-  };
-
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setCameraActive(false);
-  };
-
-  const capturePhoto = () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      
-      const context = canvas.getContext('2d');
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      
-      // Convert to Base64
-      const base64 = canvas.toDataURL('image/jpeg', 0.8);
-      setPhotoBase64(base64.split(',')[1]); // Remove "data:image/jpeg;base64," prefix
-      setPhoto(base64);
-      stopCamera();
-      toast.success('Foto capturada!');
-    }
-  };
-
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file && file.type.startsWith('image/')) {
