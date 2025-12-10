@@ -469,6 +469,60 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
     
     return Job(**result)
 
+@api_router.put("/jobs/{job_id}", response_model=Job)
+async def update_job(job_id: str, job_update: dict, current_user: User = Depends(get_current_user)):
+    """Update job details (status, schedule, assignments, etc)"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Prepare update data
+    update_data = {}
+    
+    # Handle allowed fields
+    if "status" in job_update:
+        update_data["status"] = job_update["status"]
+    
+    if "scheduled_date" in job_update:
+        # Convert to datetime if string
+        if isinstance(job_update["scheduled_date"], str):
+            update_data["scheduled_date"] = job_update["scheduled_date"]
+        else:
+            update_data["scheduled_date"] = job_update["scheduled_date"].isoformat()
+    
+    if "assigned_installers" in job_update:
+        update_data["assigned_installers"] = job_update["assigned_installers"]
+    
+    if "client_name" in job_update:
+        update_data["client_name"] = job_update["client_name"]
+    
+    if "client_address" in job_update:
+        update_data["client_address"] = job_update["client_address"]
+    
+    if "title" in job_update:
+        update_data["title"] = job_update["title"]
+    
+    if "area_m2" in job_update:
+        update_data["area_m2"] = job_update["area_m2"]
+    
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    
+    result = await db.jobs.find_one_and_update(
+        {"id": job_id},
+        {"$set": update_data},
+        return_document=True,
+        projection={"_id": 0}
+    )
+    
+    if not result:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if isinstance(result['created_at'], str):
+        result['created_at'] = datetime.fromisoformat(result['created_at'])
+    if result.get('scheduled_date') and isinstance(result['scheduled_date'], str):
+        result['scheduled_date'] = datetime.fromisoformat(result['scheduled_date'])
+    
+    return Job(**result)
+
 # ============ CHECK-IN/OUT ROUTES ============
 
 # Create uploads directory if it doesn't exist
