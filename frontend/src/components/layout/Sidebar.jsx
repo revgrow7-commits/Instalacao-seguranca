@@ -9,7 +9,8 @@ import {
   Calendar,
   LogOut,
   User,
-  CheckCircle
+  CheckCircle,
+  FileText
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
