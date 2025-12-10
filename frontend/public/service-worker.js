@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'industria-visual-v1';
+const CACHE_NAME = 'industria-visual-v2-updated';
 const urlsToCache = [
   '/',
   '/index.html',
