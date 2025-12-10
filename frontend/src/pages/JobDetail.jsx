@@ -470,6 +470,193 @@ const JobDetail = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Check-ins Section */}
+      {checkins.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              Check-ins Realizados ({checkins.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-6">
+              {checkins.map((checkin) => {
+                const installer = installers.find(i => i.id === checkin.installer_id);
+                
+                return (
+                  <div key={checkin.id} className="border border-white/10 rounded-lg p-4 bg-white/5">
+                    {/* Header */}
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <User className="h-5 w-5 text-primary" />
+                        <div>
+                          <p className="text-white font-medium">{installer?.full_name || 'Instalador'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(checkin.checkin_at).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                        checkin.status === 'completed' 
+                          ? 'bg-green-500/20 text-green-500 border-green-500/20'
+                          : 'bg-blue-500/20 text-blue-500 border-blue-500/20'
+                      }`}>
+                        {checkin.status === 'completed' ? 'COMPLETO' : 'EM ANDAMENTO'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Check-in Info */}
+                      <div className="space-y-3">
+                        <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                          Check-in
+                        </h4>
+                        
+                        {/* Check-in Photo */}
+                        {checkin.checkin_photo && (
+                          <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Image className="h-3 w-3" />
+                              Foto de Check-in
+                            </p>
+                            <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                              <img
+                                src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
+                                alt="Check-in"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* GPS Check-in */}
+                        {checkin.gps_lat && checkin.gps_long && (
+                          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                            <div className="flex items-start gap-2">
+                              <MapPin className="h-4 w-4 text-blue-400 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-blue-400">Localização</p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Lat: {checkin.gps_lat.toFixed(6)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Long: {checkin.gps_long.toFixed(6)}
+                                </p>
+                                {checkin.gps_accuracy && (
+                                  <p className="text-xs text-muted-foreground">
+                                    Precisão: {checkin.gps_accuracy.toFixed(0)}m
+                                  </p>
+                                )}
+                                <a
+                                  href={`https://www.google.com/maps?q=${checkin.gps_lat},${checkin.gps_long}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-400 hover:text-blue-300 underline mt-1 inline-block"
+                                >
+                                  Ver no Google Maps →
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Check-out Info */}
+                      {checkin.status === 'completed' && (
+                        <div className="space-y-3">
+                          <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-red-500" />
+                            Check-out
+                          </h4>
+                          
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <p>Horário: {new Date(checkin.checkout_at).toLocaleString('pt-BR')}</p>
+                            {checkin.duration_minutes && (
+                              <p className="text-white font-medium">Duração: {checkin.duration_minutes} minutos</p>
+                            )}
+                          </div>
+
+                          {/* Check-out Photo */}
+                          {checkin.checkout_photo && (
+                            <div className="space-y-2">
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Image className="h-3 w-3" />
+                                Foto de Check-out
+                              </p>
+                              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
+                                <img
+                                  src={`data:image/jpeg;base64,${checkin.checkout_photo}`}
+                                  alt="Check-out"
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          {/* GPS Check-out */}
+                          {checkin.checkout_gps_lat && checkin.checkout_gps_long && (
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                              <div className="flex items-start gap-2">
+                                <MapPin className="h-4 w-4 text-blue-400 mt-0.5" />
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-blue-400">Localização</p>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Lat: {checkin.checkout_gps_lat.toFixed(6)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    Long: {checkin.checkout_gps_long.toFixed(6)}
+                                  </p>
+                                  {checkin.checkout_gps_accuracy && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Precisão: {checkin.checkout_gps_accuracy.toFixed(0)}m
+                                    </p>
+                                  )}
+                                  <a
+                                    href={`https://www.google.com/maps?q=${checkin.checkout_gps_lat},${checkin.checkout_gps_long}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-400 hover:text-blue-300 underline mt-1 inline-block"
+                                  >
+                                    Ver no Google Maps →
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Notes */}
+                          {checkin.notes && (
+                            <div className="bg-white/5 border border-white/10 rounded-lg p-3">
+                              <p className="text-xs font-medium text-gray-300 mb-1">Observações</p>
+                              <p className="text-xs text-muted-foreground">{checkin.notes}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* View Full Details Button */}
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <Button
+                        onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                        variant="outline"
+                        size="sm"
+                        className="border-white/20 text-white hover:bg-white/10"
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        Ver Detalhes Completos
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
