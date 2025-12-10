@@ -35,7 +35,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 # Holdprint API Keys
 HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
 HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-HOLDPRINT_API_URL = "https://api.holdworks.ai/api/v1/jobs"
+HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
