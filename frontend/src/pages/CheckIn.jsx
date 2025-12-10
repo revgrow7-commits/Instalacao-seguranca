@@ -246,6 +246,9 @@ const CheckIn = () => {
       {/* Browser Compatibility Check */}
       <BrowserCheck />
 
+      {/* Camera Permission Guide */}
+      <CameraPermissionGuide onPermissionGranted={() => console.log('Camera permission granted!')} />
+
       {/* GPS Status */}
       <Alert className={`border ${gpsLocation ? 'border-green-500/50 bg-green-500/10' : gpsError ? 'border-red-500/50 bg-red-500/10' : 'border-yellow-500/50 bg-yellow-500/10'}`}>
         <MapPin className="h-4 w-4" />
