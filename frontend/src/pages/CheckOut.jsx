@@ -35,6 +35,12 @@ const CheckOut = () => {
     };
   }, [checkinId]);
 
+  useEffect(() => {
+    if (locationAuthorized) {
+      getGPSLocation();
+    }
+  }, [locationAuthorized]);
+
   const loadData = async () => {
     try {
       const checkinsRes = await api.getCheckins();
