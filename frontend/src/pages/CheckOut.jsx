@@ -135,15 +135,12 @@ const CheckOut = () => {
       const context = canvas.getContext('2d');
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], 'checkout.jpg', { type: 'image/jpeg' });
-          setPhotoFile(file);
-          setPhoto(URL.createObjectURL(blob));
-          stopCamera();
-          toast.success('Foto capturada!');
-        }
-      }, 'image/jpeg', 0.8);
+      // Convert to Base64
+      const base64 = canvas.toDataURL('image/jpeg', 0.8);
+      setPhotoBase64(base64.split(',')[1]); // Remove "data:image/jpeg;base64," prefix
+      setPhoto(base64);
+      stopCamera();
+      toast.success('Foto capturada!');
     }
   };
 
