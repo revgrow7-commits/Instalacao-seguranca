@@ -148,7 +148,7 @@ const CheckIn = () => {
 
   const retakePhoto = () => {
     setPhoto(null);
-    setPhotoFile(null);
+    setPhotoBase64(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
