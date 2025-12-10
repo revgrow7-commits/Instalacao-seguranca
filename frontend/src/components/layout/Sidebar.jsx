@@ -8,7 +8,8 @@ import {
   BarChart3, 
   Calendar,
   LogOut,
-  User
+  User,
+  CheckCircle
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
