@@ -476,10 +476,13 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 @api_router.post("/checkins", response_model=CheckIn)
 async def create_checkin(
     job_id: str = Form(...),
-    photo: UploadFile = File(...),
+    photo_base64: str = Form(...),
+    gps_lat: float = Form(...),
+    gps_long: float = Form(...),
+    gps_accuracy: Optional[float] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
-    """Create check-in for a job with photo upload"""
+    """Create check-in for a job with photo in Base64 and GPS coordinates"""
     # Get installer
     installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
     if not installer:
@@ -499,23 +502,16 @@ async def create_checkin(
     if existing:
         raise HTTPException(status_code=400, detail="Already checked in")
     
-    # Save photo file
+    # Create checkin with Base64 photo and GPS
     checkin_id = str(uuid.uuid4())
-    file_extension = Path(photo.filename).suffix or ".jpg"
-    photo_filename = f"checkin_{checkin_id}{file_extension}"
-    photo_path = UPLOAD_DIR / photo_filename
-    
-    with photo_path.open("wb") as buffer:
-        shutil.copyfileobj(photo.file, buffer)
-    
-    # Create checkin
     checkin = CheckIn(
         id=checkin_id,
         job_id=job_id,
         installer_id=installer['id'],
-        checkin_photo=photo_filename,
-        gps_lat=0.0,
-        gps_long=0.0
+        checkin_photo=photo_base64,
+        gps_lat=gps_lat,
+        gps_long=gps_long,
+        gps_accuracy=gps_accuracy
     )
     
     checkin_dict = checkin.model_dump()
