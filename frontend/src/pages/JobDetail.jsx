@@ -93,14 +93,57 @@ const JobDetail = () => {
     );
   };
 
+  const handleChangeStatus = async () => {
+    if (!newStatus) {
+      toast.error('Selecione um status');
+      return;
+    }
+
+    try {
+      await api.updateJob(jobId, { status: newStatus });
+      toast.success('Status atualizado com sucesso!');
+      setShowStatusDialog(false);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao atualizar status');
+    }
+  };
+
   const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-500/20 text-green-500 border border-green-500/20';
-      case 'in_progress':
-        return 'bg-blue-500/20 text-blue-500 border border-blue-500/20';
-      default:
-        return 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/20';
+    const colors = {
+      'aguardando': 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20',
+      'instalando': 'bg-blue-500/20 text-blue-500 border-blue-500/20',
+      'pausado': 'bg-orange-500/20 text-orange-500 border-orange-500/20',
+      'finalizado': 'bg-green-500/20 text-green-500 border-green-500/20',
+      'atrasado': 'bg-red-500/20 text-red-500 border-red-500/20',
+      // Legacy status mapping
+      'pending': 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20',
+      'in_progress': 'bg-blue-500/20 text-blue-500 border-blue-500/20',
+      'completed': 'bg-green-500/20 text-green-500 border-green-500/20'
+    };
+    return colors[status?.toLowerCase()] || 'bg-gray-500/20 text-gray-500 border-gray-500/20';
+  };
+
+  const getStatusLabel = (status) => {
+    const labels = {
+      'aguardando': 'AGUARDANDO',
+      'instalando': 'INSTALANDO',
+      'pausado': 'PAUSADO',
+      'finalizado': 'FINALIZADO',
+      'atrasado': 'ATRASADO',
+      // Legacy status mapping
+      'pending': 'AGUARDANDO',
+      'in_progress': 'INSTALANDO',
+      'completed': 'FINALIZADO'
+    };
+    return labels[status?.toLowerCase()] || status?.toUpperCase();
+  };
+
+  const isJobDelayed = () => {
+    if (!job?.scheduled_date) return false;
+    const scheduledDate = new Date(job.scheduled_date);
+    const now = new Date();
+    return scheduledDate < now && job.status !== 'finalizado' && job.status !== 'completed';
     }
   };
 
