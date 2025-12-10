@@ -246,9 +246,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Complete check-in/check-out flow testing"
-    - "GPS and Base64 photo validation"
-    - "Authentication and authorization"
+    - "Frontend UI testing completed"
+    - "Check-ins section verification completed"
+    - "Manager authentication verified"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
