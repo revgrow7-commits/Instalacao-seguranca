@@ -34,17 +34,33 @@ const CameraPermissionGuide = ({ onPermissionGranted }) => {
 
   const requestPermission = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      // On mobile, sometimes getUserMedia doesn't show the prompt
+      // This forces a user gesture to trigger it properly
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        } 
+      });
+      
+      // Immediately stop the stream - we just needed to trigger the permission
       stream.getTracks().forEach(track => track.stop());
       setPermissionStatus('granted');
+      
       if (onPermissionGranted) {
         onPermissionGranted();
       }
     } catch (error) {
       console.error('Permission error:', error);
-      if (error.name === 'NotAllowedError') {
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
         setPermissionStatus('denied');
         setShowGuide(true);
+      } else if (error.name === 'NotFoundError') {
+        alert('Nenhuma câmera encontrada no dispositivo.');
+      } else {
+        alert('Erro ao solicitar permissão de câmera: ' + error.message);
       }
     }
   };
