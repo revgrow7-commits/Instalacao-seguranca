@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import BrowserCheck from '../components/BrowserCheck';
 import { Camera, MapPin, Loader2, CheckCircle, X } from 'lucide-react';
 import { toast } from 'sonner';
 
