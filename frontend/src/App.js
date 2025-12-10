@@ -136,6 +136,16 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/checkin-viewer/:checkinId"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <CheckinViewer />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
