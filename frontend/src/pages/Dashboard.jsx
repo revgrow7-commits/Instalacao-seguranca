@@ -274,16 +274,23 @@ const Dashboard = () => {
                     </div>
                     <span
                       className={
-                        `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                          job.status === 'completed'
-                            ? 'bg-green-500/20 text-green-500 border border-green-500/20'
-                            : job.status === 'in_progress'
-                            ? 'bg-blue-500/20 text-blue-500 border border-blue-500/20'
-                            : 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/20'
+                        `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                          job.status === 'completed' || job.status === 'finalizado'
+                            ? 'bg-green-500/20 text-green-500 border-green-500/20'
+                            : job.status === 'in_progress' || job.status === 'instalando'
+                            ? 'bg-blue-500/20 text-blue-500 border-blue-500/20'
+                            : job.status === 'pausado'
+                            ? 'bg-orange-500/20 text-orange-500 border-orange-500/20'
+                            : job.status === 'atrasado'
+                            ? 'bg-red-500/20 text-red-500 border-red-500/20'
+                            : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'
                         }`
                       }
                     >
-                      {job.status === 'completed' ? 'Concluído' : job.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                      {job.status === 'completed' || job.status === 'finalizado' ? 'FINALIZADO' : 
+                       job.status === 'in_progress' || job.status === 'instalando' ? 'INSTALANDO' :
+                       job.status === 'pausado' ? 'PAUSADO' :
+                       job.status === 'atrasado' ? 'ATRASADO' : 'AGUARDANDO'}
                     </span>
                   </div>
                 </CardHeader>
