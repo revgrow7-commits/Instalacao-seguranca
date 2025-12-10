@@ -144,18 +144,6 @@ const JobDetail = () => {
     const scheduledDate = new Date(job.scheduled_date);
     const now = new Date();
     return scheduledDate < now && job.status !== 'finalizado' && job.status !== 'completed';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'Concluído';
-      case 'in_progress':
-        return 'Em Andamento';
-      default:
-        return 'Pendente';
-    }
   };
 
   if (loading) {
