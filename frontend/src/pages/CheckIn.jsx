@@ -43,6 +43,9 @@ const CheckIn = () => {
 
   const requestGPS = () => {
     if ('geolocation' in navigator) {
+      setGpsError(null);
+      toast.info('Obtendo localização GPS...');
+      
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setGpsLocation({
@@ -53,13 +56,29 @@ const CheckIn = () => {
           toast.success('Localização GPS capturada!');
         },
         (error) => {
-          setGpsError(error.message);
-          toast.error('Erro ao obter localização GPS');
+          let errorMessage = 'Erro ao obter localização GPS';
+          
+          switch(error.code) {
+            case error.PERMISSION_DENIED:
+              errorMessage = 'Permissão de localização negada. Ative nas configurações.';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              errorMessage = 'Localização indisponível. Verifique se o GPS está ativo.';
+              break;
+            case error.TIMEOUT:
+              errorMessage = 'Tempo esgotado. Tente novamente.';
+              break;
+            default:
+              errorMessage = error.message;
+          }
+          
+          setGpsError(errorMessage);
+          toast.error(errorMessage);
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
+          timeout: 30000, // Aumentado para 30 segundos
+          maximumAge: 60000 // Aceita localização de até 1 minuto atrás
         }
       );
     } else {
