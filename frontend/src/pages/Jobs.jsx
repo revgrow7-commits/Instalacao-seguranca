@@ -207,9 +207,11 @@ const Jobs = () => {
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="in_progress">Em Andamento</SelectItem>
-                <SelectItem value="completed">Concluído</SelectItem>
+                <SelectItem value="aguardando">🟡 AGUARDANDO</SelectItem>
+                <SelectItem value="instalando">🔵 INSTALANDO</SelectItem>
+                <SelectItem value="pausado">🟠 PAUSADO</SelectItem>
+                <SelectItem value="finalizado">🟢 FINALIZADO</SelectItem>
+                <SelectItem value="atrasado">🔴 ATRASADO</SelectItem>
               </SelectContent>
             </Select>
 
