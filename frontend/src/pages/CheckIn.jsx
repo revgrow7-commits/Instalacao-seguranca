@@ -191,8 +191,10 @@ const CheckIn = () => {
       return;
     }
 
-    if (!gpsLocation) {
-      toast.error('Aguarde a captura da localização GPS');
+    // Allow check-in without GPS if it's taking too long
+    // In production, you might want to make GPS optional or have a fallback
+    if (!gpsLocation && !gpsError) {
+      toast.error('Aguarde a captura da localização GPS ou tente novamente');
       return;
     }
 
@@ -204,8 +206,8 @@ const CheckIn = () => {
       
       await api.createCheckin({
         job_id: jobId,
-        gps_lat: gpsLocation.latitude,
-        gps_long: gpsLocation.longitude,
+        gps_lat: gpsLocation?.latitude || 0,
+        gps_long: gpsLocation?.longitude || 0,
         photo_base64: photoBase64
       });
 
