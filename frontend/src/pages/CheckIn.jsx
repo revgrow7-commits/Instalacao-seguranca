@@ -97,13 +97,23 @@ const CheckIn = () => {
 
       toast.info('Solicitando acesso à câmera...');
 
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
-        }
-      });
+      let stream;
+      try {
+        // Try with full constraints first
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        });
+      } catch (err) {
+        // Fallback to simple constraints
+        console.log('Trying simpler camera constraints...', err);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true
+        });
+      }
       
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
