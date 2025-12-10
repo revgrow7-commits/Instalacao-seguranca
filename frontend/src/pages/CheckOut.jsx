@@ -408,7 +408,7 @@ const CheckOut = () => {
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
-        disabled={!photo || !gpsLocation || submitting}
+        disabled={!photo || submitting}
         className="w-full bg-green-500 hover:bg-green-600 text-white h-14 text-lg"
         data-testid="submit-checkout-button"
       >
@@ -420,10 +420,16 @@ const CheckOut = () => {
         ) : (
           <>
             <CheckCircle className="mr-2 h-5 w-5" />
-            Confirmar Check-out
+            {gpsLocation ? 'Confirmar Check-out' : 'Confirmar sem GPS ⚠️'}
           </>
         )}
       </Button>
+
+      {!gpsLocation && photo && (
+        <p className="text-yellow-500 text-sm text-center -mt-4">
+          ⚠️ GPS não disponível. Check-out será feito sem localização precisa.
+        </p>
+      )}
     </div>
   );
 };
