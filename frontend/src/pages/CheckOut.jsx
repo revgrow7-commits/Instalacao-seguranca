@@ -29,9 +29,6 @@ const CheckOut = () => {
 
   useEffect(() => {
     loadData();
-    return () => {
-      stopCamera();
-    };
   }, [checkinId]);
 
   useEffect(() => {
