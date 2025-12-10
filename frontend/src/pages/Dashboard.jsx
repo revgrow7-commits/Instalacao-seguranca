@@ -12,6 +12,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
