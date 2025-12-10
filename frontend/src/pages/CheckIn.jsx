@@ -264,6 +264,41 @@ const CheckIn = () => {
         </CardContent>
       </Card>
 
+      {/* Difficulty Level */}
+      <Card className="bg-card border-white/5">
+        <CardContent className="p-6 space-y-4">
+          <div className="space-y-2">
+            <Label className="text-white font-medium">Nível de Dificuldade</Label>
+            <Select value={difficultyLevel} onValueChange={handleDifficultyChange}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Selecione o nível de dificuldade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="obstaculo1">Obstáculo 1</SelectItem>
+                <SelectItem value="obstaculo2">Obstáculo 2</SelectItem>
+                <SelectItem value="obstaculo3">Obstáculo 3</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {difficultyLevel && (
+            <div className="space-y-2">
+              <Label className="text-white font-medium">Descreva a Dificuldade</Label>
+              <Textarea
+                value={difficultyDescription}
+                onChange={(e) => setDifficultyDescription(e.target.value)}
+                placeholder="Descreva qual foi a dificuldade encontrada..."
+                className="bg-white/5 border-white/10 text-white min-h-[100px] resize-none"
+                maxLength={500}
+              />
+              <p className="text-xs text-muted-foreground text-right">
+                {difficultyDescription.length}/500 caracteres
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Submit Button */}
       <Button
         onClick={handleSubmit}
