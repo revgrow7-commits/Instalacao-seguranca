@@ -534,8 +534,13 @@ async def create_checkin(
     return checkin
 
 @api_router.put("/checkins/{checkin_id}/checkout", response_model=CheckIn)
-async def checkout(checkin_id: str, checkout_data: CheckOutUpdate, current_user: User = Depends(get_current_user)):
-    """Check out from a job"""
+async def checkout(
+    checkin_id: str,
+    photo: UploadFile = File(...),
+    notes: str = Form(""),
+    current_user: User = Depends(get_current_user)
+):
+    """Check out from a job with photo upload"""
     checkin_doc = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin_doc:
         raise HTTPException(status_code=404, detail="Check-in not found")
@@ -543,15 +548,13 @@ async def checkout(checkin_id: str, checkout_data: CheckOutUpdate, current_user:
     if checkin_doc['status'] == "completed":
         raise HTTPException(status_code=400, detail="Already checked out")
     
-    # Compress photo if provided
-    checkout_photo = None
-    if checkout_data.photo_base64:
-        try:
-            photo_bytes = base64.b64decode(checkout_data.photo_base64)
-            checkout_photo = compress_image_to_base64(photo_bytes)
-        except Exception as e:
-            logger.warning(f"Failed to compress photo: {e}")
-            checkout_photo = checkout_data.photo_base64
+    # Save photo file
+    file_extension = Path(photo.filename).suffix or ".jpg"
+    photo_filename = f"checkout_{checkin_id}{file_extension}"
+    photo_path = UPLOAD_DIR / photo_filename
+    
+    with photo_path.open("wb") as buffer:
+        shutil.copyfileobj(photo.file, buffer)
     
     # Calculate duration
     checkout_at = datetime.now(timezone.utc)
@@ -561,10 +564,10 @@ async def checkout(checkin_id: str, checkout_data: CheckOutUpdate, current_user:
     # Update checkin
     update_data = {
         "checkout_at": checkout_at.isoformat(),
-        "checkout_photo": checkout_photo,
-        "checkout_gps_lat": checkout_data.gps_lat,
-        "checkout_gps_long": checkout_data.gps_long,
-        "notes": checkout_data.notes,
+        "checkout_photo": photo_filename,
+        "checkout_gps_lat": 0.0,
+        "checkout_gps_long": 0.0,
+        "notes": notes,
         "duration_minutes": duration_minutes,
         "status": "completed"
     }
