@@ -214,24 +214,45 @@ const CheckIn = () => {
       {/* Location Authorization */}
       <Card className="bg-card border-white/5">
         <CardContent className="p-6">
-          <div className="flex items-start space-x-3">
-            <Checkbox
-              id="location-auth"
-              checked={locationAuthorized}
-              onCheckedChange={setLocationAuthorized}
-              className="mt-1"
-            />
-            <div className="flex-1">
-              <Label
-                htmlFor="location-auth"
-                className="text-white font-medium cursor-pointer"
-              >
-                Autorizo o uso de localização em tempo real
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Confirmo que estou no local correto para realizar este check-in
-              </p>
+          <div className="space-y-4">
+            <div className="flex items-start space-x-3">
+              <Checkbox
+                id="location-auth"
+                checked={locationAuthorized}
+                onCheckedChange={setLocationAuthorized}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <Label
+                  htmlFor="location-auth"
+                  className="text-white font-medium cursor-pointer"
+                >
+                  Autorizo o uso de localização em tempo real
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Confirmo que estou no local correto para realizar este check-in
+                </p>
+              </div>
             </div>
+            
+            {gpsLoading && (
+              <div className="flex items-center gap-2 text-sm text-blue-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Capturando localização GPS...
+              </div>
+            )}
+            
+            {gpsCoords && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                <p className="text-sm text-green-400 font-medium">✓ Localização capturada</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Lat: {gpsCoords.latitude.toFixed(6)}, Long: {gpsCoords.longitude.toFixed(6)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Precisão: {gpsCoords.accuracy.toFixed(0)}m
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
