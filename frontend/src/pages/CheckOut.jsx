@@ -248,35 +248,17 @@ const CheckOut = () => {
         </CardContent>
       </Card>
 
-      {/* Camera */}
+      {/* Photo Upload */}
       <Card className="bg-card border-white/5">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            <Camera className="h-5 w-5 text-primary" />
+            <Upload className="h-5 w-5 text-primary" />
             Foto de Check-out
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!photo && !cameraActive && (
+          {!photo && (
             <div className="space-y-3">
-              <Button
-                onClick={startCamera}
-                className="w-full bg-primary hover:bg-primary/90 h-14"
-                data-testid="open-camera-button"
-              >
-                <Camera className="mr-2 h-5 w-5" />
-                Abrir Câmera
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-white/10" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">ou</span>
-                </div>
-              </div>
-
               <input
                 ref={fileInputRef}
                 type="file"
@@ -287,42 +269,12 @@ const CheckOut = () => {
               />
               <Button
                 onClick={() => fileInputRef.current?.click()}
-                variant="outline"
-                className="w-full border-white/20 text-white hover:bg-white/10 h-14"
+                className="w-full bg-red-500 hover:bg-red-600 text-white h-14"
+                data-testid="select-photo-button"
               >
                 <Upload className="mr-2 h-5 w-5" />
                 Selecionar Foto
               </Button>
-            </div>
-          )}
-
-          {cameraActive && (
-            <div className="space-y-4">
-              <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="flex gap-3">
-                <Button
-                  onClick={capturePhoto}
-                  className="flex-1 bg-primary hover:bg-primary/90"
-                  data-testid="capture-photo-button"
-                >
-                  <Camera className="mr-2 h-5 w-5" />
-                  Capturar Foto
-                </Button>
-                <Button
-                  onClick={stopCamera}
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10"
-                >
-                  <X className="h-5 w-5" />
-                </Button>
-              </div>
             </div>
           )}
 
@@ -332,7 +284,7 @@ const CheckOut = () => {
                 <img src={photo} alt="Check-out" className="w-full h-full object-cover" />
                 <div className="absolute top-2 right-2 bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   <CheckCircle className="h-3 w-3" />
-                  Foto Capturada
+                  Foto Selecionada
                 </div>
               </div>
               <Button
@@ -340,13 +292,11 @@ const CheckOut = () => {
                 variant="outline"
                 className="w-full border-white/20 text-white hover:bg-white/10"
               >
-                <Camera className="mr-2 h-5 w-5" />
+                <Upload className="mr-2 h-5 w-5" />
                 Trocar Foto
               </Button>
             </div>
           )}
-
-          <canvas ref={canvasRef} style={{ display: 'none' }} />
         </CardContent>
       </Card>
 
