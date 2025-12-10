@@ -15,8 +15,10 @@ const CheckIn = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [photo, setPhoto] = useState(null);
-  const [photoFile, setPhotoFile] = useState(null);
+  const [photoBase64, setPhotoBase64] = useState(null);
   const [locationAuthorized, setLocationAuthorized] = useState(false);
+  const [gpsCoords, setGpsCoords] = useState(null);
+  const [gpsLoading, setGpsLoading] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
