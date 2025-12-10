@@ -206,8 +206,9 @@ const CheckOut = () => {
       return;
     }
 
-    if (!gpsLocation) {
-      toast.error('Aguarde a captura da localização GPS');
+    // Allow checkout without GPS if it's taking too long
+    if (!gpsLocation && !gpsError) {
+      toast.error('Aguarde a captura da localização GPS ou tente novamente');
       return;
     }
 
@@ -217,8 +218,8 @@ const CheckOut = () => {
       const photoBase64 = photo.split(',')[1];
       
       await api.checkout(checkinId, {
-        gps_lat: gpsLocation.latitude,
-        gps_long: gpsLocation.longitude,
+        gps_lat: gpsLocation?.latitude || 0,
+        gps_long: gpsLocation?.longitude || 0,
         photo_base64: photoBase64,
         notes: notes
       });
