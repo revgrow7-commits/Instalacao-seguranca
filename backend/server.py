@@ -373,10 +373,10 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
     job = Job(
         holdprint_job_id=job_data.holdprint_job_id,
         title=holdprint_job.get('title', 'Sem título'),
-        client_name=holdprint_job.get('client', {}).get('name', 'Cliente não informado'),
-        client_address=holdprint_job.get('client', {}).get('address', ''),
+        client_name=holdprint_job.get('customerName', 'Cliente não informado'),
+        client_address='',
         branch=job_data.branch,
-        items=holdprint_job.get('items', []),
+        items=holdprint_job.get('production', {}).get('items', []),
         holdprint_data=holdprint_job
     )
     
