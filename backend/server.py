@@ -770,6 +770,123 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
         "total_installers": total_installers
     }
 
+
+@api_router.get("/reports/export")
+async def export_reports(current_user: User = Depends(get_current_user)):
+    """Export consolidated report to Excel"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Get all checkins with related data
+    checkins = await db.checkins.find({}, {"_id": 0}).to_list(1000)
+    jobs = await db.jobs.find({}, {"_id": 0}).to_list(1000)
+    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
+    
+    # Create mapping dicts for faster lookup
+    jobs_map = {job['id']: job for job in jobs}
+    installers_map = {installer['id']: installer for installer in installers}
+    
+    # Create workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Relatório de Trabalhos"
+    
+    # Define styles
+    header_fill = PatternFill(start_color="FF1F5A", end_color="FF1F5A", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=12)
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    border = Border(
+        left=Side(style='thin'),
+        right=Side(style='thin'),
+        top=Side(style='thin'),
+        bottom=Side(style='thin')
+    )
+    
+    # Headers
+    headers = [
+        "ID do Job",
+        "Nome do Job",
+        "Cliente",
+        "Área Total (m²)",
+        "M² Instalado",
+        "Instalador",
+        "GPS Check-in (Lat)",
+        "GPS Check-in (Long)",
+        "GPS Check-out (Lat)",
+        "GPS Check-out (Long)",
+        "Data Check-in",
+        "Data Check-out",
+        "Tempo (min)",
+        "Status",
+        "Filial"
+    ]
+    
+    # Write headers
+    for col_num, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_num, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+        cell.border = border
+    
+    # Write data
+    row_num = 2
+    for checkin in checkins:
+        job = jobs_map.get(checkin.get('job_id'))
+        installer = installers_map.get(checkin.get('installer_id'))
+        
+        if not job:
+            continue
+            
+        ws.cell(row=row_num, column=1, value=job.get('id', '')).border = border
+        ws.cell(row=row_num, column=2, value=job.get('title', '')).border = border
+        ws.cell(row=row_num, column=3, value=job.get('client_name', '')).border = border
+        ws.cell(row=row_num, column=4, value=job.get('area_m2', '')).border = border
+        ws.cell(row=row_num, column=5, value=checkin.get('installed_m2', '')).border = border
+        ws.cell(row=row_num, column=6, value=installer.get('full_name', '') if installer else '').border = border
+        ws.cell(row=row_num, column=7, value=checkin.get('gps_lat', '')).border = border
+        ws.cell(row=row_num, column=8, value=checkin.get('gps_long', '')).border = border
+        ws.cell(row=row_num, column=9, value=checkin.get('checkout_gps_lat', '')).border = border
+        ws.cell(row=row_num, column=10, value=checkin.get('checkout_gps_long', '')).border = border
+        
+        checkin_at = checkin.get('checkin_at')
+        if isinstance(checkin_at, str):
+            checkin_at = datetime.fromisoformat(checkin_at)
+        ws.cell(row=row_num, column=11, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
+        
+        checkout_at = checkin.get('checkout_at')
+        if isinstance(checkout_at, str):
+            checkout_at = datetime.fromisoformat(checkout_at)
+        ws.cell(row=row_num, column=12, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
+        
+        ws.cell(row=row_num, column=13, value=checkin.get('duration_minutes', '')).border = border
+        ws.cell(row=row_num, column=14, value=checkin.get('status', '')).border = border
+        ws.cell(row=row_num, column=15, value=job.get('branch', '')).border = border
+        
+        row_num += 1
+    
+    # Adjust column widths
+    column_widths = {
+        'A': 35, 'B': 30, 'C': 25, 'D': 15, 'E': 15,
+        'F': 20, 'G': 18, 'H': 18, 'I': 18, 'J': 18,
+        'K': 18, 'L': 18, 'M': 12, 'N': 15, 'O': 12
+    }
+    for col, width in column_widths.items():
+        ws.column_dimensions[col].width = width
+    
+    # Save to BytesIO
+    excel_file = BytesIO()
+    wb.save(excel_file)
+    excel_file.seek(0)
+    
+    # Generate filename with current date
+    filename = f"relatorio_trabalhos_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        excel_file,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @api_router.get("/")
 async def root():
     return {"message": "INDÚSTRIA VISUAL API", "status": "online"}
