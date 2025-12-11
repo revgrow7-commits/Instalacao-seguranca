@@ -550,26 +550,6 @@ const JobDetail = () => {
                               <p className="text-white font-bold">{measures.copies}</p>
                             </div>
                           )}
-                          
-                          {/* Valor Unitário */}
-                          {product.unitPrice > 0 && (
-                            <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
-                              <p className="text-xs text-green-400">Valor Unit.</p>
-                              <p className="text-white font-bold">
-                                R$ {product.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                          )}
-                          
-                          {/* Valor Total */}
-                          {product.totalValue > 0 && (
-                            <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
-                              <p className="text-xs text-green-400">Valor Total</p>
-                              <p className="text-white font-bold">
-                                R$ {product.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                              </p>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
