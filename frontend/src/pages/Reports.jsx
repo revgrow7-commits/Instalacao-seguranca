@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar } from 'lucide-react';
+import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Reports = () => {
@@ -16,6 +16,7 @@ const Reports = () => {
   const [checkins, setCheckins] = useState([]);
   const [installers, setInstallers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
