@@ -138,3 +138,15 @@ code {
 .neon-glow {
     box-shadow: 0 0 20px rgba(255, 31, 90, 0.4);
 }
+
+/* Hide Emergent badge */
+a[href*="emergent-badge"],
+a[href*="emergentagent.com/badge"],
+a[href*="emergent"],
+.emergent-badge,
+#emergent-badge {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
