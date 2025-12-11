@@ -593,6 +593,7 @@ async def checkout(
     gps_lat: float = Form(...),
     gps_long: float = Form(...),
     gps_accuracy: Optional[float] = Form(None),
+    installed_m2: Optional[float] = Form(None),
     notes: str = Form(""),
     current_user: User = Depends(get_current_user)
 ):
