@@ -126,6 +126,7 @@ class CheckIn(BaseModel):
     checkout_gps_accuracy: Optional[float] = None
     notes: Optional[str] = None
     duration_minutes: Optional[int] = None
+    installed_m2: Optional[float] = None  # M² instalado
     status: str = "in_progress"  # in_progress, completed
 
 class CheckInCreate(BaseModel):
