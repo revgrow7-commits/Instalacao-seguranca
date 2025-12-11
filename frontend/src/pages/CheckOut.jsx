@@ -23,6 +23,7 @@ const CheckOut = () => {
   const [gpsCoords, setGpsCoords] = useState(null);
   const [gpsLoading, setGpsLoading] = useState(false);
   const [notes, setNotes] = useState('');
+  const [installedM2, setInstalledM2] = useState('');
   const [difficultyLevel, setDifficultyLevel] = useState('');
   const [difficultyDescription, setDifficultyDescription] = useState('');
   const fileInputRef = useRef(null);
