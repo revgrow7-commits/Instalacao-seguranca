@@ -501,8 +501,165 @@ const JobDetail = () => {
         </Card>
       </div>
 
-      {/* Job Items */}
-      {job.items && job.items.length > 0 && (
+      {/* Produtos/Itens do Job - usando dados da Holdprint */}
+      {job.holdprint_data?.products && job.holdprint_data.products.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <Package className="h-5 w-5 text-primary" />
+              Produtos / Itens ({job.holdprint_data.products.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {job.holdprint_data.products.map((product, index) => {
+                // Extrair medidas da descrição HTML
+                const extractMeasures = (description) => {
+                  if (!description) return null;
+                  const measures = {};
+                  
+                  // Extrair Largura
+                  const widthMatch = description.match(/Largura:\s*<span[^>]*>([^<]+)<\/span>/i);
+                  if (widthMatch) measures.width = widthMatch[1];
+                  
+                  // Extrair Altura
+                  const heightMatch = description.match(/Altura:\s*<span[^>]*>([^<]+)<\/span>/i);
+                  if (heightMatch) measures.height = heightMatch[1];
+                  
+                  // Extrair Cópias
+                  const copiesMatch = description.match(/Cópias:\s*<span[^>]*>([^<]+)<\/span>/i);
+                  if (copiesMatch) measures.copies = copiesMatch[1];
+                  
+                  return Object.keys(measures).length > 0 ? measures : null;
+                };
+                
+                const measures = extractMeasures(product.description);
+                
+                return (
+                  <div
+                    key={index}
+                    className="p-4 rounded-lg bg-white/5 border border-white/10"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1">
+                        <h4 className="text-white font-semibold text-lg">{product.name}</h4>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                          {/* Quantidade */}
+                          <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
+                            <p className="text-xs text-blue-400">Quantidade</p>
+                            <p className="text-white font-bold">{product.quantity}</p>
+                          </div>
+                          
+                          {/* Medidas */}
+                          {measures?.width && (
+                            <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
+                              <p className="text-xs text-purple-400 flex items-center gap-1">
+                                <Ruler className="h-3 w-3" /> Largura
+                              </p>
+                              <p className="text-white font-bold">{measures.width}</p>
+                            </div>
+                          )}
+                          
+                          {measures?.height && (
+                            <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
+                              <p className="text-xs text-purple-400 flex items-center gap-1">
+                                <Ruler className="h-3 w-3" /> Altura
+                              </p>
+                              <p className="text-white font-bold">{measures.height}</p>
+                            </div>
+                          )}
+                          
+                          {measures?.copies && (
+                            <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                              <p className="text-xs text-yellow-400">Cópias</p>
+                              <p className="text-white font-bold">{measures.copies}</p>
+                            </div>
+                          )}
+                          
+                          {/* Valor Unitário */}
+                          {product.unitPrice > 0 && (
+                            <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
+                              <p className="text-xs text-green-400">Valor Unit.</p>
+                              <p className="text-white font-bold">
+                                R$ {product.unitPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Valor Total */}
+                          {product.totalValue > 0 && (
+                            <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
+                              <p className="text-xs text-green-400">Valor Total</p>
+                              <p className="text-white font-bold">
+                                R$ {product.totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Itens de Produção */}
+      {job.holdprint_data?.production?.items && job.holdprint_data.production.items.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <FileText className="h-5 w-5 text-primary" />
+              Itens de Produção ({job.holdprint_data.production.items.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {job.holdprint_data.production.items.map((item, index) => (
+                <div
+                  key={index}
+                  className="p-3 rounded-lg bg-white/5 border border-white/5"
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-white font-medium">{item.name}</p>
+                    <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/20">
+                      Qtd: {item.quantity}
+                    </span>
+                  </div>
+                  
+                  {/* Tasks/Processos */}
+                  {item.tasks && item.tasks.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {item.tasks
+                        .filter(task => task.name && task.isProductive)
+                        .map((task, taskIndex) => (
+                          <span
+                            key={taskIndex}
+                            className={`px-2 py-0.5 text-xs rounded ${
+                              task.productionStatus === 'Finalized' 
+                                ? 'bg-green-500/20 text-green-400'
+                                : task.productionStatus === 'Ready'
+                                ? 'bg-yellow-500/20 text-yellow-400'
+                                : 'bg-gray-500/20 text-gray-400'
+                            }`}
+                          >
+                            {task.name}
+                          </span>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Legacy: Itens simples se não tiver dados da Holdprint */}
+      {(!job.holdprint_data?.products || job.holdprint_data.products.length === 0) && job.items && job.items.length > 0 && (
         <Card className="bg-card border-white/5">
           <CardHeader>
             <CardTitle className="text-white">Itens do Job</CardTitle>
