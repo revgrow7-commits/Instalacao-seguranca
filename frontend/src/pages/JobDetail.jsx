@@ -179,9 +179,16 @@ const JobDetail = () => {
       {/* Job Header */}
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
-            {job.title}
-          </h1>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
+              {job.title}
+            </h1>
+            {job.holdprint_data?.code && (
+              <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-bold border border-purple-500/30">
+                OS #{job.holdprint_data.code}
+              </span>
+            )}
+          </div>
           <p className="text-muted-foreground mt-2">Job ID: {job.id}</p>
         </div>
 
