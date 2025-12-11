@@ -617,6 +617,7 @@ async def checkout(
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
+        "installed_m2": installed_m2,
         "notes": notes,
         "duration_minutes": duration_minutes,
         "status": "completed"
