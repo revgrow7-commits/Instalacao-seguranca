@@ -46,6 +46,12 @@ export const api = {
 
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
+
+  // Reports
+  exportReports: () => axios.get(`${API_URL}/reports/export`, { 
+    headers: getAuthHeader(),
+    responseType: 'blob'
+  }),
 };
 
 export default api;
