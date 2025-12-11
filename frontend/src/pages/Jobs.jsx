@@ -293,7 +293,7 @@ const Jobs = () => {
               <CardContent className="space-y-3">
                 <div className="flex items-center text-sm text-muted-foreground">
                   <Users className="h-4 w-4 mr-2" />
-                  {job.client_name}
+                  {job.holdprint_data?.customerName || job.client_name}
                 </div>
 
                 {job.client_address && (
