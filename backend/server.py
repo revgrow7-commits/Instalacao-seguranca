@@ -143,6 +143,86 @@ class CheckOutUpdate(BaseModel):
     photo_base64: Optional[str] = None
     notes: Optional[str] = None
 
+# ============ PRODUCT FAMILIES & PRODUCTIVITY MODELS ============
+
+class ProductFamily(BaseModel):
+    """Família de produtos para categorização"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str  # Ex: "Adesivos", "Lonas", "ACM", etc.
+    description: Optional[str] = None
+    color: str = "#3B82F6"  # Cor para identificação visual
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProductFamilyCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    color: str = "#3B82F6"
+
+class ProductInstalled(BaseModel):
+    """Registro de cada produto instalado com métricas de produtividade"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    checkin_id: Optional[str] = None
+    product_name: str  # Nome do produto da Holdprint
+    family_id: Optional[str] = None  # FK para ProductFamily
+    family_name: Optional[str] = None  # Nome da família (desnormalizado para consultas rápidas)
+    
+    # Medidas
+    width_m: Optional[float] = None
+    height_m: Optional[float] = None
+    quantity: int = 1
+    area_m2: Optional[float] = None  # Calculado: width * height * quantity
+    
+    # Complexidade e contexto
+    complexity_level: int = 1  # 1-5
+    height_category: str = "terreo"  # terreo, media, alta, muito_alta
+    scenario_category: str = "loja_rua"  # loja_rua, shopping, evento, fachada, etc.
+    
+    # Tempos
+    estimated_time_min: Optional[int] = None
+    actual_time_min: Optional[int] = None
+    
+    # Produtividade calculada
+    productivity_m2_h: Optional[float] = None  # m²/hora
+    
+    # Metadados
+    installers_count: int = 1
+    installation_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    cause_notes: Optional[str] = None  # Causa de desvio, se houver
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class ProductInstalledCreate(BaseModel):
+    job_id: str
+    checkin_id: Optional[str] = None
+    product_name: str
+    family_id: Optional[str] = None
+    width_m: Optional[float] = None
+    height_m: Optional[float] = None
+    quantity: int = 1
+    complexity_level: int = 1
+    height_category: str = "terreo"
+    scenario_category: str = "loja_rua"
+    estimated_time_min: Optional[int] = None
+    actual_time_min: Optional[int] = None
+    installers_count: int = 1
+    cause_notes: Optional[str] = None
+
+class ProductivityHistory(BaseModel):
+    """Histórico consolidado de produtividade para benchmarks"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    family_id: str
+    family_name: str
+    complexity_level: int
+    height_category: str
+    scenario_category: str
+    avg_productivity_m2_h: float
+    avg_time_per_m2_min: float
+    sample_count: int
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
 # ============ UTILITY FUNCTIONS ============
 
 def verify_password(plain_password, hashed_password):
