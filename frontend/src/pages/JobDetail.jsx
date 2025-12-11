@@ -575,7 +575,10 @@ const JobDetail = () => {
                           <div className="text-xs text-muted-foreground space-y-1">
                             <p>Horário: {new Date(checkin.checkout_at).toLocaleString('pt-BR')}</p>
                             {checkin.duration_minutes && (
-                              <p className="text-white font-medium">Duração: {checkin.duration_minutes} minutos</p>
+                              <p className="text-white font-medium">⏱️ Duração: {checkin.duration_minutes} minutos</p>
+                            )}
+                            {checkin.installed_m2 && (
+                              <p className="text-white font-medium">📐 M² Instalado: {checkin.installed_m2} m²</p>
                             )}
                           </div>
 
