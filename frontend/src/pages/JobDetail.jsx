@@ -403,14 +403,6 @@ const JobDetail = () => {
                 {job.holdprint_data?.customerName || job.client_name}
               </p>
             </div>
-
-            {/* Responsável */}
-            {job.holdprint_data?.responsibleName && (
-              <div>
-                <p className="text-sm text-muted-foreground">Responsável</p>
-                <p className="text-white">{job.holdprint_data.responsibleName}</p>
-              </div>
-            )}
             
             {job.client_address && (
               <div>
