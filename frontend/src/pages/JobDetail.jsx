@@ -386,10 +386,31 @@ const JobDetail = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {/* Número da OS */}
+            {job.holdprint_data?.code && (
+              <div>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <FileText className="h-3 w-3" /> Número da OS
+                </p>
+                <p className="text-white font-bold text-lg">#{job.holdprint_data.code}</p>
+              </div>
+            )}
+
+            {/* Cliente - usando dados da Holdprint se disponível */}
             <div>
               <p className="text-sm text-muted-foreground">Cliente</p>
-              <p className="text-white font-medium">{job.client_name}</p>
+              <p className="text-white font-medium">
+                {job.holdprint_data?.customerName || job.client_name}
+              </p>
             </div>
+
+            {/* Responsável */}
+            {job.holdprint_data?.responsibleName && (
+              <div>
+                <p className="text-sm text-muted-foreground">Responsável</p>
+                <p className="text-white">{job.holdprint_data.responsibleName}</p>
+              </div>
+            )}
             
             {job.client_address && (
               <div>
@@ -405,6 +426,24 @@ const JobDetail = () => {
               <p className="text-white font-medium">{job.branch === 'SP' ? 'São Paulo' : 'Porto Alegre'}</p>
             </div>
 
+            {/* Valor Total */}
+            {job.holdprint_data?.totalPrice && (
+              <div>
+                <p className="text-sm text-muted-foreground">Valor Total</p>
+                <p className="text-green-400 font-bold">
+                  R$ {job.holdprint_data.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            )}
+
+            {/* Forma de Pagamento */}
+            {job.holdprint_data?.paymentOption && (
+              <div>
+                <p className="text-sm text-muted-foreground">Forma de Pagamento</p>
+                <p className="text-white">{job.holdprint_data.paymentOption}</p>
+              </div>
+            )}
+
             {job.scheduled_date && (
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -412,6 +451,16 @@ const JobDetail = () => {
                 </p>
                 <p className="text-white font-medium">
                   {new Date(job.scheduled_date).toLocaleString('pt-BR')}
+                </p>
+              </div>
+            )}
+
+            {/* Data de Criação */}
+            {job.holdprint_data?.creationTime && (
+              <div>
+                <p className="text-sm text-muted-foreground">Data de Criação</p>
+                <p className="text-white">
+                  {new Date(job.holdprint_data.creationTime).toLocaleString('pt-BR')}
                 </p>
               </div>
             )}
