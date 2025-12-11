@@ -418,24 +418,6 @@ const JobDetail = () => {
               <p className="text-white font-medium">{job.branch === 'SP' ? 'São Paulo' : 'Porto Alegre'}</p>
             </div>
 
-            {/* Valor Total */}
-            {job.holdprint_data?.totalPrice && (
-              <div>
-                <p className="text-sm text-muted-foreground">Valor Total</p>
-                <p className="text-green-400 font-bold">
-                  R$ {job.holdprint_data.totalPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                </p>
-              </div>
-            )}
-
-            {/* Forma de Pagamento */}
-            {job.holdprint_data?.paymentOption && (
-              <div>
-                <p className="text-sm text-muted-foreground">Forma de Pagamento</p>
-                <p className="text-white">{job.holdprint_data.paymentOption}</p>
-              </div>
-            )}
-
             {job.scheduled_date && (
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
