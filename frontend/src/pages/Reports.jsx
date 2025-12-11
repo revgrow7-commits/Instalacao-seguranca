@@ -184,13 +184,32 @@ const Reports = () => {
   return (
     <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
-          Relatórios
-        </h1>
-        <p className="text-muted-foreground mt-2">
-          Visualize relatórios detalhados por job e instalador
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
+            Relatórios
+          </h1>
+          <p className="text-muted-foreground mt-2">
+            Visualize relatórios detalhados por job e instalador
+          </p>
+        </div>
+        <Button
+          onClick={handleExportExcel}
+          disabled={exporting || checkins.length === 0}
+          className="bg-green-600 hover:bg-green-700 text-white"
+        >
+          {exporting ? (
+            <>
+              <Clock className="h-4 w-4 mr-2 animate-spin" />
+              Exportando...
+            </>
+          ) : (
+            <>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar Excel
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Filter by Date */}
