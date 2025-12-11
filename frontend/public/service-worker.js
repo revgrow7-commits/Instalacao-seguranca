@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_NAME = 'industria-visual-v3-final-' + Date.now();
+const CACHE_NAME = 'industria-visual-v4-1765463696';
 const urlsToCache = [
   '/',
   '/index.html',
