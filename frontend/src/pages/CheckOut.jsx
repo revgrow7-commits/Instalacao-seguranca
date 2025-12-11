@@ -142,6 +142,9 @@ const CheckOut = () => {
       formData.append('gps_lat', gpsCoords.latitude);
       formData.append('gps_long', gpsCoords.longitude);
       formData.append('gps_accuracy', gpsCoords.accuracy);
+      if (installedM2) {
+        formData.append('installed_m2', installedM2);
+      }
       formData.append('notes', notes);
       
       await api.checkout(checkinId, formData);
