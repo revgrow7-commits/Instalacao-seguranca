@@ -171,9 +171,16 @@ const CheckinViewer = () => {
               </div>
 
               <div>
-                <p className="text-sm text-muted-foreground">Duração</p>
+                <p className="text-sm text-muted-foreground">⏱️ Duração</p>
                 <p className="font-medium">{checkin.duration_minutes || 0} minutos</p>
               </div>
+
+              {checkin.installed_m2 && (
+                <div>
+                  <p className="text-sm text-muted-foreground">📐 M² Instalado</p>
+                  <p className="font-medium text-primary">{checkin.installed_m2} m²</p>
+                </div>
+              )}
               
               {checkin.checkout_gps_lat && checkin.checkout_gps_long && (
                 <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
