@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JobDetail = () => {
