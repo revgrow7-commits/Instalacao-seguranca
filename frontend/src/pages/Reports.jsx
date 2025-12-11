@@ -47,6 +47,29 @@ const Reports = () => {
     }
   };
 
+  const handleExportExcel = async () => {
+    setExporting(true);
+    try {
+      const response = await api.exportReports();
+      
+      // Create blob link to download
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `relatorio_trabalhos_${new Date().toISOString().slice(0,10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      
+      toast.success('Relatório exportado com sucesso!');
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Erro ao exportar relatório');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const getStatusColor = (status) => {
     const colors = {
       'aguardando': 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20',
