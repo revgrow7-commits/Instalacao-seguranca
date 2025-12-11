@@ -304,6 +304,57 @@ const CheckOut = () => {
         </CardContent>
       </Card>
 
+      {/* Installed M² */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            📐 M² Instalado
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            {job?.area_m2 && (
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-3">
+                <p className="text-sm text-blue-400 font-medium">📋 Área Total do Job</p>
+                <p className="text-2xl font-bold text-white mt-1">{job.area_m2} m²</p>
+              </div>
+            )}
+            
+            <Label htmlFor="installed-m2" className="text-white font-medium">
+              Informe quantos M² foram instalados
+            </Label>
+            <div className="relative">
+              <input
+                id="installed-m2"
+                type="number"
+                step="0.01"
+                min="0"
+                value={installedM2}
+                onChange={(e) => setInstalledM2(e.target.value)}
+                placeholder="Ex: 15.5"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white text-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <span className="absolute right-4 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                m²
+              </span>
+            </div>
+            {installedM2 && job?.area_m2 && (
+              <div className="flex items-center gap-2 text-sm">
+                <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-primary h-full transition-all duration-300"
+                    style={{ width: `${Math.min((parseFloat(installedM2) / job.area_m2) * 100, 100)}%` }}
+                  />
+                </div>
+                <span className="text-white font-medium min-w-[60px] text-right">
+                  {((parseFloat(installedM2) / job.area_m2) * 100).toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Difficulty Level */}
       <Card className="bg-card border-white/5">
         <CardContent className="p-6 space-y-4">
