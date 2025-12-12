@@ -54,6 +54,16 @@ const JobDetail = () => {
         const date = new Date(jobRes.data.scheduled_date);
         setScheduledDate(date.toISOString().slice(0, 16));
       }
+      
+      // Carregar atribuições de itens
+      if (isAdmin || isManager) {
+        try {
+          const assignmentsRes = await api.getJobAssignments(jobId);
+          setAssignments(assignmentsRes.data);
+        } catch (e) {
+          // Se não tiver atribuições, ignora
+        }
+      }
     } catch (error) {
       toast.error('Erro ao carregar job');
       navigate('/jobs');
@@ -76,6 +86,50 @@ const JobDetail = () => {
     } catch (error) {
       toast.error('Erro ao atribuir instaladores');
     }
+  };
+
+  const toggleItemSelection = (index) => {
+    setSelectedItems(prev => 
+      prev.includes(index) 
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  const toggleItemInstaller = (installerId) => {
+    setSelectedItemInstallers(prev => 
+      prev.includes(installerId) 
+        ? prev.filter(id => id !== installerId)
+        : [...prev, installerId]
+    );
+  };
+
+  const handleAssignItems = async () => {
+    if (selectedItems.length === 0) {
+      toast.error('Selecione pelo menos um item');
+      return;
+    }
+    if (selectedItemInstallers.length === 0) {
+      toast.error('Selecione pelo menos um instalador');
+      return;
+    }
+
+    try {
+      await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers);
+      toast.success('Itens atribuídos com sucesso!');
+      setShowAssignItemsDialog(false);
+      setSelectedItems([]);
+      setSelectedItemInstallers([]);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao atribuir itens');
+    }
+  };
+
+  // Verificar se um item já está atribuído
+  const getItemAssignment = (itemIndex) => {
+    if (!assignments?.by_item) return null;
+    return assignments.by_item.find(item => item.item_index === itemIndex);
   };
 
   const handleScheduleJob = async () => {
