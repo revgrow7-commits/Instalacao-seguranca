@@ -1034,10 +1034,11 @@ async def get_job_assignments(job_id: str, current_user: User = Depends(get_curr
         item_idx = assignment.get("item_index")
         if item_idx not in by_item:
             product = products[item_idx] if item_idx < len(products) else {}
+            item_area = product.get("total_area_m2", 0) or 0
             by_item[item_idx] = {
                 "item_index": item_idx,
                 "item_name": product.get("name", f"Item {item_idx}"),
-                "item_area_m2": product.get("total_area_m2", 0),
+                "item_area_m2": item_area,
                 "installers": []
             }
         
