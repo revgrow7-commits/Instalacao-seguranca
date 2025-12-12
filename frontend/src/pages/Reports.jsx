@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar, Download, Layers } from 'lucide-react';
+import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar, Download, Layers, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Reports = () => {
