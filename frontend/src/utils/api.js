@@ -30,6 +30,11 @@ export const api = {
   updateJob: (jobId, data) => axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() }),
   assignJob: (jobId, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() }),
   scheduleJob: (jobId, scheduledDate, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() }),
+  
+  // Item Assignments
+  assignItemsToInstallers: (jobId, itemIndices, installerIds) => axios.post(`${API_URL}/jobs/${jobId}/assign-items`, { item_indices: itemIndices, installer_ids: installerIds }, { headers: getAuthHeader() }),
+  getJobAssignments: (jobId) => axios.get(`${API_URL}/jobs/${jobId}/assignments`, { headers: getAuthHeader() }),
+  updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
 
   // Check-ins
   createCheckin: (formData) => axios.post(`${API_URL}/checkins`, formData, { 
