@@ -1222,6 +1222,228 @@ async def get_productivity_metrics(current_user: User = Depends(get_current_user
         "benchmarks": history
     }
 
+@api_router.get("/reports/by-family")
+async def get_report_by_family(current_user: User = Depends(get_current_user)):
+    """
+    Relatório completo por família de produtos.
+    Analisa todos os jobs importados e classifica seus produtos por família.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Buscar todos os jobs
+    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
+    
+    # Buscar famílias cadastradas
+    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    family_map = {f["name"]: f for f in families}
+    
+    # Estrutura para agrupar dados por família
+    family_report = {}
+    all_products = []
+    unclassified_products = []
+    
+    for job in jobs:
+        holdprint_data = job.get("holdprint_data", {})
+        products = holdprint_data.get("products", [])
+        production_items = holdprint_data.get("production", {}).get("items", [])
+        
+        # Processar produtos do job
+        for product in products:
+            product_name = product.get("name", "")
+            quantity = product.get("quantity", 1)
+            
+            # Extrair medidas da descrição
+            description = product.get("description", "")
+            width_m = None
+            height_m = None
+            
+            # Parse de medidas da descrição HTML
+            import re
+            width_match = re.search(r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
+            height_match = re.search(r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
+            
+            if width_match:
+                width_m = float(width_match.group(1).replace(',', '.'))
+            if height_match:
+                height_m = float(height_match.group(1).replace(',', '.'))
+            
+            # Calcular área
+            area_m2 = None
+            if width_m and height_m:
+                area_m2 = round(width_m * height_m * quantity, 2)
+            
+            # Classificar produto em família
+            family_name, confidence = classify_product_to_family(product_name)
+            
+            product_data = {
+                "job_id": job.get("id"),
+                "job_title": job.get("title"),
+                "job_code": holdprint_data.get("code"),
+                "client_name": holdprint_data.get("customerName", job.get("client_name")),
+                "product_name": product_name,
+                "family_name": family_name,
+                "confidence": confidence,
+                "quantity": quantity,
+                "width_m": width_m,
+                "height_m": height_m,
+                "area_m2": area_m2,
+                "unit_price": product.get("unitPrice", 0),
+                "total_value": product.get("totalValue", 0),
+                "branch": job.get("branch")
+            }
+            
+            all_products.append(product_data)
+            
+            # Agrupar por família
+            if family_name not in family_report:
+                family_info = family_map.get(family_name, {})
+                family_report[family_name] = {
+                    "family_name": family_name,
+                    "color": family_info.get("color", "#6B7280"),
+                    "total_jobs": set(),
+                    "total_products": 0,
+                    "total_quantity": 0,
+                    "total_area_m2": 0,
+                    "total_value": 0,
+                    "products": []
+                }
+            
+            family_report[family_name]["total_jobs"].add(job.get("id"))
+            family_report[family_name]["total_products"] += 1
+            family_report[family_name]["total_quantity"] += quantity
+            if area_m2:
+                family_report[family_name]["total_area_m2"] += area_m2
+            family_report[family_name]["total_value"] += product.get("totalValue", 0)
+            family_report[family_name]["products"].append(product_data)
+            
+            # Rastrear produtos não classificados com alta confiança
+            if confidence < 50:
+                unclassified_products.append(product_data)
+        
+        # Processar itens de produção também
+        for item in production_items:
+            item_name = item.get("name", "")
+            item_quantity = item.get("quantity", 1)
+            
+            family_name, confidence = classify_product_to_family(item_name)
+            
+            if family_name not in family_report:
+                family_info = family_map.get(family_name, {})
+                family_report[family_name] = {
+                    "family_name": family_name,
+                    "color": family_info.get("color", "#6B7280"),
+                    "total_jobs": set(),
+                    "total_products": 0,
+                    "total_quantity": 0,
+                    "total_area_m2": 0,
+                    "total_value": 0,
+                    "products": []
+                }
+            
+            family_report[family_name]["total_jobs"].add(job.get("id"))
+            family_report[family_name]["total_quantity"] += item_quantity
+    
+    # Converter sets para contagem
+    for family_name in family_report:
+        family_report[family_name]["total_jobs"] = len(family_report[family_name]["total_jobs"])
+        family_report[family_name]["total_area_m2"] = round(family_report[family_name]["total_area_m2"], 2)
+        family_report[family_name]["total_value"] = round(family_report[family_name]["total_value"], 2)
+        # Limitar lista de produtos para não sobrecarregar resposta
+        family_report[family_name]["products"] = family_report[family_name]["products"][:50]
+    
+    # Ordenar por quantidade total
+    sorted_families = sorted(
+        family_report.values(),
+        key=lambda x: x["total_quantity"],
+        reverse=True
+    )
+    
+    # Estatísticas gerais
+    total_area = sum(f["total_area_m2"] for f in sorted_families)
+    total_value = sum(f["total_value"] for f in sorted_families)
+    total_products = sum(f["total_products"] for f in sorted_families)
+    
+    return {
+        "summary": {
+            "total_jobs": len(jobs),
+            "total_products": total_products,
+            "total_area_m2": round(total_area, 2),
+            "total_value": round(total_value, 2),
+            "families_count": len(sorted_families),
+            "unclassified_count": len(unclassified_products)
+        },
+        "by_family": sorted_families,
+        "unclassified": unclassified_products[:20],  # Primeiros 20 não classificados
+        "all_products": all_products[:100]  # Primeiros 100 produtos para análise
+    }
+
+@api_router.post("/jobs/{job_id}/classify-products")
+async def classify_job_products(job_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Classifica os produtos de um job específico por família.
+    Retorna a análise detalhada para esse job.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    holdprint_data = job.get("holdprint_data", {})
+    products = holdprint_data.get("products", [])
+    
+    classified_products = []
+    
+    for product in products:
+        product_name = product.get("name", "")
+        family_name, confidence = classify_product_to_family(product_name)
+        
+        # Extrair medidas
+        description = product.get("description", "")
+        import re
+        width_match = re.search(r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
+        height_match = re.search(r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
+        
+        width_m = float(width_match.group(1).replace(',', '.')) if width_match else None
+        height_m = float(height_match.group(1).replace(',', '.')) if height_match else None
+        
+        area_m2 = round(width_m * height_m * product.get("quantity", 1), 2) if width_m and height_m else None
+        
+        classified_products.append({
+            "product_name": product_name,
+            "family_name": family_name,
+            "confidence": confidence,
+            "quantity": product.get("quantity", 1),
+            "width_m": width_m,
+            "height_m": height_m,
+            "area_m2": area_m2,
+            "unit_price": product.get("unitPrice", 0),
+            "total_value": product.get("totalValue", 0)
+        })
+    
+    # Agrupar por família
+    family_summary = {}
+    for p in classified_products:
+        fname = p["family_name"]
+        if fname not in family_summary:
+            family_summary[fname] = {
+                "count": 0,
+                "total_area_m2": 0,
+                "total_value": 0
+            }
+        family_summary[fname]["count"] += 1
+        if p["area_m2"]:
+            family_summary[fname]["total_area_m2"] += p["area_m2"]
+        family_summary[fname]["total_value"] += p["total_value"]
+    
+    return {
+        "job_id": job_id,
+        "job_title": job.get("title"),
+        "client": holdprint_data.get("customerName"),
+        "products": classified_products,
+        "family_summary": family_summary
+    }
+
 @api_router.get("/metrics")
 async def get_metrics(current_user: User = Depends(get_current_user)):
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
