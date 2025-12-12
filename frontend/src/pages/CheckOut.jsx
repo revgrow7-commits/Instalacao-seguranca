@@ -146,13 +146,6 @@ const CheckOut = () => {
     }
   };
 
-  const handleDifficultyChange = (value) => {
-    setDifficultyLevel(value);
-    if (!value) {
-      setDifficultyDescription('');
-    }
-  };
-
   const handleSubmit = async () => {
     if (!photoBase64) {
       toast.error('Tire uma foto ou faça upload de uma imagem');
@@ -172,8 +165,21 @@ const CheckOut = () => {
       formData.append('gps_lat', gpsCoords.latitude);
       formData.append('gps_long', gpsCoords.longitude);
       formData.append('gps_accuracy', gpsCoords.accuracy);
+      
       if (installedM2) {
         formData.append('installed_m2', installedM2);
+      }
+      if (complexityLevel) {
+        formData.append('complexity_level', complexityLevel);
+      }
+      if (heightCategory) {
+        formData.append('height_category', heightCategory);
+      }
+      if (scenarioCategory) {
+        formData.append('scenario_category', scenarioCategory);
+      }
+      if (difficultyDescription) {
+        formData.append('difficulty_description', difficultyDescription);
       }
       formData.append('notes', notes);
       
