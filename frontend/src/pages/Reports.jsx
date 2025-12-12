@@ -193,23 +193,33 @@ const Reports = () => {
             Visualize relatórios detalhados por job e instalador
           </p>
         </div>
-        <Button
-          onClick={handleExportExcel}
-          disabled={exporting || checkins.length === 0}
-          className="bg-green-600 hover:bg-green-700 text-white"
-        >
-          {exporting ? (
-            <>
-              <Clock className="h-4 w-4 mr-2 animate-spin" />
-              Exportando...
-            </>
-          ) : (
-            <>
-              <Download className="h-4 w-4 mr-2" />
-              Exportar Excel
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => navigate('/reports/family')}
+            className="gap-2"
+          >
+            <Layers className="h-4 w-4" />
+            Relatório por Família
+          </Button>
+          <Button
+            onClick={handleExportExcel}
+            disabled={exporting || checkins.length === 0}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            {exporting ? (
+              <>
+                <Clock className="h-4 w-4 mr-2 animate-spin" />
+                Exportando...
+              </>
+            ) : (
+              <>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar Excel
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Filter by Date */}
