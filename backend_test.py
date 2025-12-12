@@ -110,6 +110,32 @@ class FieldworkAPITest:
         self.log(f"   Role: {user_info.get('role')}")
         return True
         
+    def test_login_manager(self):
+        """Test 2b: Login as manager"""
+        self.log("Testing manager login...")
+        
+        response = self.session.post(
+            f"{BASE_URL}/auth/login",
+            json=MANAGER_CREDENTIALS
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Manager login failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        if "access_token" not in data:
+            self.log(f"❌ No access token in response: {data}")
+            return False
+            
+        self.manager_token = data["access_token"]
+        user_info = data.get("user", {})
+        
+        self.log(f"✅ Manager login successful")
+        self.log(f"   User: {user_info.get('name')} ({user_info.get('email')})")
+        self.log(f"   Role: {user_info.get('role')}")
+        return True
+        
     def test_list_installer_jobs(self):
         """Test 3: List jobs assigned to installer"""
         self.log("Testing job listing for installer...")
