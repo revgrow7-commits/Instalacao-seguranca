@@ -203,6 +203,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/installer/job/:jobId"
+        element={
+          <ProtectedRoute>
+            <InstallerJobDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
