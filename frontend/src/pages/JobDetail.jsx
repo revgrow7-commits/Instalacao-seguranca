@@ -418,6 +418,26 @@ const JobDetail = () => {
               <p className="text-white font-medium">{job.branch === 'SP' ? 'São Paulo' : 'Porto Alegre'}</p>
             </div>
 
+            {/* Área Total do Job */}
+            {(job.area_m2 > 0 || job.total_products > 0) && (
+              <div className="pt-3 border-t border-white/10">
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="bg-primary/10 rounded-lg p-2 border border-primary/20 text-center">
+                    <p className="text-xs text-primary">Área Total</p>
+                    <p className="text-white font-bold text-lg">{job.area_m2?.toLocaleString('pt-BR') || 0} <span className="text-xs">m²</span></p>
+                  </div>
+                  <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20 text-center">
+                    <p className="text-xs text-blue-400">Produtos</p>
+                    <p className="text-white font-bold text-lg">{job.total_products || 0}</p>
+                  </div>
+                  <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20 text-center">
+                    <p className="text-xs text-green-400">Quantidade</p>
+                    <p className="text-white font-bold text-lg">{job.total_quantity || 0}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {job.scheduled_date && (
               <div>
                 <p className="text-sm text-muted-foreground flex items-center gap-1">
