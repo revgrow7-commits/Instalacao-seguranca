@@ -246,12 +246,12 @@ const InstallerDashboard = () => {
                   )}
 
                   <Button
-                    onClick={() => handleStartJob(job.id)}
+                    onClick={() => handleOpenJob(job.id)}
                     className="w-full bg-primary hover:bg-primary/90 neon-glow"
                     data-testid={`start-job-${job.id}`}
                   >
                     <PlayCircle className="mr-2 h-5 w-5" />
-                    Iniciar Job
+                    Abrir Job
                   </Button>
                 </CardContent>
               </Card>
