@@ -213,6 +213,18 @@ backend:
           agent: "testing"
           comment: "✅ Item assignment system fully functional. Manager can assign specific job items to installers with automatic m² calculation and distribution. Assignment verification API working correctly. Tested complete flow: manager login → job selection → installer selection → item assignment ([0,1] items) → installer login → check-in → assignment verification. All APIs working with proper role-based access control."
 
+  - task: "Check-out with Productivity Metrics Fields"
+    implemented: true
+    working: true
+    file: "server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "testing"
+          comment: "✅ Complete checkout flow with productivity metrics fully functional. All new fields working correctly: installed_m2 (25.5), complexity_level (4), height_category ('alta'), scenario_category ('fachada'), difficulty_description ('Trabalho em altura exigiu equipamento especial'), notes ('Instalação concluída com sucesso'). Data saved correctly in database. Productivity calculation automatic (m²/h). Manager productivity report (/api/reports/by-installer) shows installer with reported m² correctly. Complete workflow tested with real credentials and API endpoints."
+
 frontend:
   - task: "Job Details Page Check-ins Section"
     implemented: true
