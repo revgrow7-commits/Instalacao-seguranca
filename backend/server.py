@@ -362,6 +362,8 @@ class Job(BaseModel):
     products_with_area: List[dict] = []  # Produtos com área calculada
     total_products: int = 0
     total_quantity: int = 0
+    # Atribuição de itens a instaladores
+    item_assignments: List[dict] = []  # [{item_index, installer_id, installer_name, assigned_at}]
 
 class JobCreate(BaseModel):
     holdprint_job_id: str
