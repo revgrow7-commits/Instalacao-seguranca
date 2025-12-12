@@ -407,6 +407,34 @@ class CheckIn(BaseModel):
     productivity_m2_h: Optional[float] = None  # Produtividade calculada (m²/hora)
     status: str = "in_progress"  # in_progress, completed
 
+class ItemCheckin(BaseModel):
+    """Check-in por item do job"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    job_id: str
+    item_index: int  # Índice do item no array products_with_area
+    installer_id: str
+    checkin_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    checkout_at: Optional[datetime] = None
+    checkin_photo: Optional[str] = None
+    checkout_photo: Optional[str] = None
+    gps_lat: Optional[float] = None
+    gps_long: Optional[float] = None
+    gps_accuracy: Optional[float] = None
+    checkout_gps_lat: Optional[float] = None
+    checkout_gps_long: Optional[float] = None
+    checkout_gps_accuracy: Optional[float] = None
+    installed_m2: Optional[float] = None
+    complexity_level: Optional[int] = None
+    height_category: Optional[str] = None
+    scenario_category: Optional[str] = None
+    notes: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    productivity_m2_h: Optional[float] = None
+    product_name: Optional[str] = None
+    family_name: Optional[str] = None
+    status: str = "in_progress"
+
 class CheckInCreate(BaseModel):
     job_id: str
     gps_lat: Optional[float] = None
