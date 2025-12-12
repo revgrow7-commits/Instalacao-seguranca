@@ -1501,6 +1501,196 @@ async def get_checkin_details(
         "job": job
     }
 
+# ============ ITEM CHECK-IN/OUT ROUTES (per item) ============
+
+@api_router.post("/item-checkins")
+async def create_item_checkin(
+    job_id: str = Form(...),
+    item_index: int = Form(...),
+    photo_base64: Optional[str] = Form(None),
+    gps_lat: Optional[float] = Form(None),
+    gps_long: Optional[float] = Form(None),
+    gps_accuracy: Optional[float] = Form(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Create a check-in for a specific item in a job"""
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Only installers can create item check-ins")
+    
+    # Get installer
+    installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not installer:
+        raise HTTPException(status_code=404, detail="Installer not found")
+    
+    # Get job and item info
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    products = job.get("products_with_area", [])
+    if item_index >= len(products):
+        raise HTTPException(status_code=400, detail="Invalid item index")
+    
+    product = products[item_index]
+    
+    # Check if item already has an active checkin
+    existing = await db.item_checkins.find_one({
+        "job_id": job_id,
+        "item_index": item_index,
+        "installer_id": installer["id"],
+        "status": "in_progress"
+    })
+    if existing:
+        raise HTTPException(status_code=400, detail="Item already has an active check-in")
+    
+    # Detect family
+    family_id, family_name = await detect_product_family([product.get("name", "")])
+    
+    # Create item checkin
+    item_checkin = ItemCheckin(
+        job_id=job_id,
+        item_index=item_index,
+        installer_id=installer["id"],
+        checkin_photo=photo_base64,
+        gps_lat=gps_lat,
+        gps_long=gps_long,
+        gps_accuracy=gps_accuracy,
+        product_name=product.get("name", f"Item {item_index}"),
+        family_name=family_name
+    )
+    
+    await db.item_checkins.insert_one(item_checkin.model_dump())
+    
+    # Update job status
+    await db.jobs.update_one({"id": job_id}, {"$set": {"status": "in_progress"}})
+    
+    return item_checkin.model_dump()
+
+@api_router.get("/item-checkins")
+async def get_item_checkins(
+    job_id: str = None,
+    current_user: User = Depends(get_current_user)
+):
+    """Get item check-ins for a job"""
+    query = {}
+    
+    if current_user.role == UserRole.INSTALLER:
+        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        if installer:
+            query["installer_id"] = installer["id"]
+    
+    if job_id:
+        query["job_id"] = job_id
+    
+    checkins = await db.item_checkins.find(query, {"_id": 0}).to_list(1000)
+    
+    # Convert datetime strings
+    for c in checkins:
+        if isinstance(c.get('checkin_at'), str):
+            c['checkin_at'] = datetime.fromisoformat(c['checkin_at'])
+        if c.get('checkout_at') and isinstance(c['checkout_at'], str):
+            c['checkout_at'] = datetime.fromisoformat(c['checkout_at'])
+    
+    return checkins
+
+@api_router.put("/item-checkins/{checkin_id}/checkout")
+async def complete_item_checkout(
+    checkin_id: str,
+    photo_base64: Optional[str] = Form(None),
+    gps_lat: Optional[float] = Form(None),
+    gps_long: Optional[float] = Form(None),
+    gps_accuracy: Optional[float] = Form(None),
+    installed_m2: Optional[float] = Form(None),
+    complexity_level: Optional[int] = Form(None),
+    height_category: Optional[str] = Form(None),
+    scenario_category: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    current_user: User = Depends(get_current_user)
+):
+    """Complete checkout for a specific item"""
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Only installers can complete item checkouts")
+    
+    # Get checkin
+    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Item check-in not found")
+    
+    if checkin["status"] == "completed":
+        raise HTTPException(status_code=400, detail="Item already checked out")
+    
+    # Calculate duration
+    checkin_at = checkin['checkin_at']
+    if isinstance(checkin_at, str):
+        checkin_at = datetime.fromisoformat(checkin_at)
+    
+    checkout_at = datetime.now(timezone.utc)
+    duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
+    
+    # Calculate productivity
+    productivity_m2_h = None
+    if installed_m2 and installed_m2 > 0 and duration_minutes > 0:
+        hours = duration_minutes / 60
+        productivity_m2_h = round(installed_m2 / hours, 2)
+    
+    # Update checkin
+    update_data = {
+        "checkout_at": checkout_at.isoformat(),
+        "checkout_photo": photo_base64,
+        "checkout_gps_lat": gps_lat,
+        "checkout_gps_long": gps_long,
+        "checkout_gps_accuracy": gps_accuracy,
+        "installed_m2": installed_m2,
+        "complexity_level": complexity_level,
+        "height_category": height_category,
+        "scenario_category": scenario_category,
+        "notes": notes,
+        "duration_minutes": duration_minutes,
+        "productivity_m2_h": productivity_m2_h,
+        "status": "completed"
+    }
+    
+    await db.item_checkins.update_one({"id": checkin_id}, {"$set": update_data})
+    
+    # Register installed product
+    job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
+    if job:
+        products = job.get("products_with_area", [])
+        product = products[checkin["item_index"]] if checkin["item_index"] < len(products) else {}
+        
+        family_id, family_name = await detect_product_family([product.get("name", "")])
+        
+        installed_product = ProductInstalled(
+            job_id=checkin["job_id"],
+            checkin_id=checkin_id,
+            product_name=product.get("name", f"Item {checkin['item_index']}"),
+            family_id=family_id,
+            family_name=family_name,
+            width_m=product.get("width"),
+            height_m=product.get("height"),
+            area_m2=installed_m2 or product.get("total_area_m2", 0),
+            complexity_level=complexity_level or 1,
+            height_category=height_category or "terreo",
+            scenario_category=scenario_category or "loja_rua",
+            actual_time_min=duration_minutes,
+            productivity_m2_h=productivity_m2_h,
+            cause_notes=notes
+        )
+        
+        await db.installed_products.insert_one(installed_product.model_dump())
+        await update_productivity_history(installed_product)
+    
+    # Check if all items in job are completed
+    job_checkins = await db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0}).to_list(1000)
+    all_completed = all(c["status"] == "completed" for c in job_checkins)
+    
+    if all_completed:
+        await db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
+    
+    # Return updated checkin
+    result = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    return result
+
 # ============ INSTALLER ROUTES ============
 
 @api_router.get("/installers", response_model=List[Installer])
