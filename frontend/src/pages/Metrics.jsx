@@ -271,15 +271,21 @@ const Metrics = () => {
                 <form onSubmit={handleAddProduct} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <Label className="text-white">Job</Label>
+                      <Label className="text-white">Job (Concluídos)</Label>
                       <Select value={newProduct.job_id} onValueChange={(v) => setNewProduct({ ...newProduct, job_id: v })}>
                         <SelectTrigger className="bg-white/5 border-white/10 text-white">
                           <SelectValue placeholder="Selecione o job" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
-                          {jobs.map(job => (
-                            <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
-                          ))}
+                          {jobs.filter(job => job.status === 'completed').length === 0 ? (
+                            <div className="p-3 text-center text-muted-foreground text-sm">
+                              Nenhum job concluído disponível
+                            </div>
+                          ) : (
+                            jobs.filter(job => job.status === 'completed').map(job => (
+                              <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
