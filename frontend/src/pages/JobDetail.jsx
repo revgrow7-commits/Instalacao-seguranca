@@ -818,6 +818,61 @@ const JobDetail = () => {
         </Card>
       )}
 
+      {/* Atribuições por Instalador */}
+      {(isAdmin || isManager) && assignments?.by_installer?.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Atribuições por Instalador
+              </div>
+              <span className="text-sm font-normal px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                {assignments.by_installer.reduce((acc, i) => acc + i.total_m2, 0).toFixed(2)} m² atribuídos
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {assignments.by_installer.map((installer) => (
+                <div key={installer.installer_id} className="p-4 rounded-lg bg-white/5 border border-white/10">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <User className="h-5 w-5 text-primary" />
+                      <span className="text-white font-semibold">{installer.installer_name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-muted-foreground">{installer.items.length} item(s)</span>
+                      <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 font-bold">
+                        {installer.total_m2.toFixed(2)} m²
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    {installer.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-white/5">
+                        <span className="text-white">{item.item_name}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400 font-medium">{item.assigned_m2} m²</span>
+                          <span className={`px-2 py-0.5 rounded text-xs ${
+                            item.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            item.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {item.status === 'completed' ? 'Concluído' : 
+                             item.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Itens de Produção */}
       {job.holdprint_data?.production?.items && job.holdprint_data.production.items.length > 0 && (
         <Card className="bg-card border-white/5">
