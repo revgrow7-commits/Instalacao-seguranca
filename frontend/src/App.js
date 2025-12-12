@@ -216,6 +216,7 @@ function App() {
       <AuthProvider>
         <div className="dark">
           <AppRoutes />
+          <UpdateNotification />
           <Toaster 
             position="top-right"
             toastOptions={{
