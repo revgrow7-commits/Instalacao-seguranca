@@ -72,6 +72,8 @@ export const api = {
   getProductivityMetrics: () => axios.get(`${API_URL}/productivity-metrics`, { headers: getAuthHeader() }),
 
   // Reports
+  getReportByFamily: () => axios.get(`${API_URL}/reports/by-family`, { headers: getAuthHeader() }),
+  classifyJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/classify-products`, {}, { headers: getAuthHeader() }),
   exportReports: () => axios.get(`${API_URL}/reports/export`, { 
     headers: getAuthHeader(),
     responseType: 'blob'
