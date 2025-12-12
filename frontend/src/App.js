@@ -19,6 +19,7 @@ import FamilyReport from './pages/FamilyReport';
 import InstallerReport from './pages/InstallerReport';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
+import UpdateNotification from './components/UpdateNotification';
 import './App.css';
 
 const ProtectedRoute = ({ children }) => {
