@@ -258,9 +258,9 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Frontend UI testing completed"
-    - "Check-ins section verification completed"
-    - "Manager authentication verified"
+    - "Item assignment and check-in flow testing completed"
+    - "Complete backend API testing verified"
+    - "All core functionalities working correctly"
   stuck_tasks: []
   test_all: true
   test_priority: "high_first"
