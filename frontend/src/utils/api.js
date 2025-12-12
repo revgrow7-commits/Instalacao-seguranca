@@ -47,6 +47,30 @@ export const api = {
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
 
+  // Product Families
+  getProductFamilies: () => axios.get(`${API_URL}/product-families`, { headers: getAuthHeader() }),
+  createProductFamily: (data) => axios.post(`${API_URL}/product-families`, data, { headers: getAuthHeader() }),
+  updateProductFamily: (familyId, data) => axios.put(`${API_URL}/product-families/${familyId}`, data, { headers: getAuthHeader() }),
+  deleteProductFamily: (familyId) => axios.delete(`${API_URL}/product-families/${familyId}`, { headers: getAuthHeader() }),
+  seedProductFamilies: () => axios.post(`${API_URL}/product-families/seed`, {}, { headers: getAuthHeader() }),
+
+  // Products Installed & Productivity
+  getProductsInstalled: (jobId = null, familyId = null) => {
+    let url = `${API_URL}/products-installed`;
+    const params = [];
+    if (jobId) params.push(`job_id=${jobId}`);
+    if (familyId) params.push(`family_id=${familyId}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
+  createProductInstalled: (data) => axios.post(`${API_URL}/products-installed`, data, { headers: getAuthHeader() }),
+  getProductivityHistory: (familyId = null) => {
+    let url = `${API_URL}/productivity-history`;
+    if (familyId) url += `?family_id=${familyId}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
+  getProductivityMetrics: () => axios.get(`${API_URL}/productivity-metrics`, { headers: getAuthHeader() }),
+
   // Reports
   exportReports: () => axios.get(`${API_URL}/reports/export`, { 
     headers: getAuthHeader(),
