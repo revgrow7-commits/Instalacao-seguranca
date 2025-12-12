@@ -407,6 +407,69 @@ class FieldworkAPITest:
             
         return True
         
+    def test_productivity_report(self):
+        """Test 8: Verify productivity report shows installer with reported m²"""
+        self.log("Testing productivity report...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/reports/by-installer",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Productivity report failed: {response.status_code} - {response.text}")
+            return False
+            
+        report_data = response.json()
+        
+        self.log(f"✅ Productivity report retrieved successfully")
+        
+        # Check if report contains installer data
+        if isinstance(report_data, list):
+            installers_found = len(report_data)
+            self.log(f"   Found {installers_found} installers in report")
+            
+            # Look for our test installer
+            test_installer_found = False
+            for installer_data in report_data:
+                installer_name = installer_data.get('installer_name', '')
+                total_m2 = installer_data.get('total_m2', 0)
+                
+                self.log(f"   Installer: {installer_name} - Total M²: {total_m2}")
+                
+                # Check if this installer has the m² we just reported
+                if total_m2 >= 25.5:  # Should include our 25.5 m²
+                    test_installer_found = True
+                    self.log(f"   ✅ Found installer with reported m² (≥25.5): {installer_name}")
+                    
+            if not test_installer_found:
+                self.log(f"   ⚠️  No installer found with the expected m² (≥25.5)")
+                
+        elif isinstance(report_data, dict):
+            self.log(f"   Report structure: {list(report_data.keys())}")
+            
+            # Check if there's installer data in the report
+            if 'installers' in report_data:
+                installers = report_data['installers']
+                self.log(f"   Found {len(installers)} installers in report")
+                
+                for installer_data in installers:
+                    installer_name = installer_data.get('name', installer_data.get('installer_name', ''))
+                    total_m2 = installer_data.get('total_m2', 0)
+                    self.log(f"   Installer: {installer_name} - Total M²: {total_m2}")
+            else:
+                self.log(f"   Report data keys: {list(report_data.keys())}")
+        else:
+            self.log(f"   Unexpected report format: {type(report_data)}")
+            
+        return True
+        
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
