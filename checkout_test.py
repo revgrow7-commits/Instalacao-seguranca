@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://work-monitor-5.preview.emergentagent.com/api"
+BASE_URL = "https://install-pulse.preview.emergentagent.com/api"
 
 INSTALLER_CREDENTIALS = {
     "email": "instalador@industriavisual.com",
