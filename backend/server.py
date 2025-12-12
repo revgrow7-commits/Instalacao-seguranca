@@ -1163,10 +1163,14 @@ async def checkout(
     gps_long: float = Form(...),
     gps_accuracy: Optional[float] = Form(None),
     installed_m2: Optional[float] = Form(None),
+    complexity_level: Optional[int] = Form(None),
+    height_category: Optional[str] = Form(None),
+    scenario_category: Optional[str] = Form(None),
+    difficulty_description: Optional[str] = Form(None),
     notes: str = Form(""),
     current_user: User = Depends(get_current_user)
 ):
-    """Check out from a job with photo in Base64 and GPS coordinates"""
+    """Check out from a job with photo in Base64, GPS coordinates and productivity metrics"""
     checkin_doc = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin_doc:
         raise HTTPException(status_code=404, detail="Check-in not found")
@@ -1179,7 +1183,13 @@ async def checkout(
     checkin_at = datetime.fromisoformat(checkin_doc['checkin_at']) if isinstance(checkin_doc['checkin_at'], str) else checkin_doc['checkin_at']
     duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
     
-    # Update checkin with Base64 photo and GPS
+    # Calculate productivity if m2 and duration available
+    productivity_m2_h = None
+    if installed_m2 and installed_m2 > 0 and duration_minutes > 0:
+        hours = duration_minutes / 60
+        productivity_m2_h = round(installed_m2 / hours, 2)
+    
+    # Update checkin with Base64 photo, GPS and metrics
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         "checkout_photo": photo_base64,
@@ -1187,6 +1197,11 @@ async def checkout(
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
         "installed_m2": installed_m2,
+        "complexity_level": complexity_level,
+        "height_category": height_category,
+        "scenario_category": scenario_category,
+        "difficulty_description": difficulty_description,
+        "productivity_m2_h": productivity_m2_h,
         "notes": notes,
         "duration_minutes": duration_minutes,
         "status": "completed"
