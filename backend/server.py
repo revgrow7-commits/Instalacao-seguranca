@@ -376,6 +376,11 @@ class JobSchedule(BaseModel):
     scheduled_date: datetime
     installer_ids: Optional[List[str]] = None
 
+class ItemAssignment(BaseModel):
+    """Atribuição de itens específicos a instaladores"""
+    item_indices: List[int]  # Índices dos itens/produtos a atribuir
+    installer_ids: List[str]  # IDs dos instaladores
+
 class CheckIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
