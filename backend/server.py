@@ -952,7 +952,8 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     
     for item_idx in assignment.item_indices:
         product = products[item_idx] if item_idx < len(products) else None
-        item_area = product.get("total_area_m2", 0) if product else 0
+        item_area = product.get("total_area_m2") if product else 0
+        item_area = item_area if item_area is not None else 0
         
         for installer_id in assignment.installer_ids:
             installer = installer_map.get(installer_id)
@@ -962,7 +963,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
                                   if not (a.get("item_index") == item_idx and a.get("installer_id") == installer_id)]
             
             # Calcular m² por instalador (dividir igualmente se múltiplos instaladores)
-            m2_per_installer = round(item_area / len(assignment.installer_ids), 2) if item_area > 0 else 0
+            m2_per_installer = round(item_area / len(assignment.installer_ids), 2) if item_area and item_area > 0 else 0
             
             new_assignment = {
                 "item_index": item_idx,
