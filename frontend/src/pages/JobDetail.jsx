@@ -618,38 +618,6 @@ const JobDetail = () => {
           </CardContent>
         </Card>
       )}
-                              <p className="text-xs text-purple-400 flex items-center gap-1">
-                                <Ruler className="h-3 w-3" /> Largura
-                              </p>
-                              <p className="text-white font-bold">{measures.width}</p>
-                            </div>
-                          )}
-                          
-                          {measures?.height && (
-                            <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
-                              <p className="text-xs text-purple-400 flex items-center gap-1">
-                                <Ruler className="h-3 w-3" /> Altura
-                              </p>
-                              <p className="text-white font-bold">{measures.height}</p>
-                            </div>
-                          )}
-                          
-                          {measures?.copies && (
-                            <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
-                              <p className="text-xs text-yellow-400">Cópias</p>
-                              <p className="text-white font-bold">{measures.copies}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Itens de Produção */}
       {job.holdprint_data?.production?.items && job.holdprint_data.production.items.length > 0 && (
