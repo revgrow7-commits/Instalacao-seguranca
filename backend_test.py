@@ -478,12 +478,14 @@ class FieldworkAPITest:
         
         tests = [
             ("Installer Login", self.test_login_installer),
+            ("Manager Login", self.test_login_manager),
             ("Admin Login", self.test_login_admin),
             ("List Installer Jobs", self.test_list_installer_jobs),
             ("Check-in with GPS & Photo", self.test_checkin_with_gps_photo),
-            ("Check-out with GPS & Photo", self.test_checkout_with_gps_photo),
+            ("Check-out with Productivity Metrics", self.test_checkout_with_productivity_metrics),
             ("Check-in Details (Admin)", self.test_checkin_details_as_admin),
-            ("Job Scheduling System", self.test_job_scheduling_system)
+            ("Job Scheduling System", self.test_job_scheduling_system),
+            ("Productivity Report (Manager)", self.test_productivity_report)
         ]
         
         results = []
