@@ -214,9 +214,9 @@ class FieldworkAPITest:
             
         return True
         
-    def test_checkout_with_gps_photo(self):
-        """Test 5: Check-out with GPS and Base64 photo"""
-        self.log("Testing check-out with GPS and photo...")
+    def test_checkout_with_productivity_metrics(self):
+        """Test 5: Check-out with GPS, photo and productivity metrics"""
+        self.log("Testing check-out with GPS, photo and productivity metrics...")
         
         if not self.installer_token or not self.test_checkin_id:
             self.log("❌ Missing installer token or check-in ID")
@@ -227,13 +227,18 @@ class FieldworkAPITest:
         
         headers = {"Authorization": f"Bearer {self.installer_token}"}
         
-        # Prepare form data
+        # Prepare form data with new productivity metrics fields
         form_data = {
             "photo_base64": TEST_IMAGE_BASE64,
             "gps_lat": GPS_CHECKOUT["lat"],
             "gps_long": GPS_CHECKOUT["long"],
             "gps_accuracy": GPS_CHECKOUT["accuracy"],
-            "notes": "Instalação concluída com sucesso. Teste automatizado."
+            "installed_m2": 25.5,  # M² instalado
+            "complexity_level": 4,  # Escala 1-5, 4=Difícil
+            "height_category": "alta",  # terreo, media, alta, muito_alta
+            "scenario_category": "fachada",  # loja_rua, shopping, evento, fachada, outdoor, veiculo
+            "difficulty_description": "Trabalho em altura exigiu equipamento especial",
+            "notes": "Instalação concluída com sucesso"
         }
         
         response = self.session.put(
@@ -256,6 +261,14 @@ class FieldworkAPITest:
         self.log(f"   Notes: {checkout_data.get('notes')}")
         self.log(f"   Checkout photo stored: {'Yes' if checkout_data.get('checkout_photo') else 'No'}")
         
+        # Verify new productivity metrics fields
+        self.log(f"   Installed M²: {checkout_data.get('installed_m2')}")
+        self.log(f"   Complexity Level: {checkout_data.get('complexity_level')}")
+        self.log(f"   Height Category: {checkout_data.get('height_category')}")
+        self.log(f"   Scenario Category: {checkout_data.get('scenario_category')}")
+        self.log(f"   Difficulty Description: {checkout_data.get('difficulty_description')}")
+        self.log(f"   Productivity (m²/h): {checkout_data.get('productivity_m2_h')}")
+        
         # Verify checkout GPS coordinates
         if abs(checkout_data.get('checkout_gps_lat', 0) - GPS_CHECKOUT["lat"]) > 0.001:
             self.log(f"⚠️  Checkout GPS latitude mismatch: expected {GPS_CHECKOUT['lat']}, got {checkout_data.get('checkout_gps_lat')}")
@@ -266,6 +279,28 @@ class FieldworkAPITest:
         # Verify duration was calculated
         if not checkout_data.get('duration_minutes'):
             self.log("⚠️  Duration not calculated")
+            
+        # Verify productivity metrics were saved correctly
+        expected_values = {
+            'installed_m2': 25.5,
+            'complexity_level': 4,
+            'height_category': 'alta',
+            'scenario_category': 'fachada',
+            'difficulty_description': 'Trabalho em altura exigiu equipamento especial'
+        }
+        
+        for field, expected in expected_values.items():
+            actual = checkout_data.get(field)
+            if actual != expected:
+                self.log(f"⚠️  {field} mismatch: expected {expected}, got {actual}")
+            else:
+                self.log(f"   ✅ {field} saved correctly: {actual}")
+                
+        # Verify productivity calculation
+        if checkout_data.get('productivity_m2_h'):
+            self.log(f"   ✅ Productivity calculated automatically: {checkout_data.get('productivity_m2_h')} m²/h")
+        else:
+            self.log(f"   ⚠️  Productivity not calculated")
             
         return True
         
