@@ -183,12 +183,12 @@ const InstallerDashboard = () => {
                     )}
 
                     <Button
-                      onClick={() => handleFinishJob(job.id)}
+                      onClick={() => handleOpenJob(job.id)}
                       className="w-full bg-green-500 hover:bg-green-600 text-white"
                       data-testid={`finish-job-${job.id}`}
                     >
                       <StopCircle className="mr-2 h-5 w-5" />
-                      Finalizar Job
+                      Abrir Job
                     </Button>
                   </CardContent>
                 </Card>
