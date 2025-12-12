@@ -123,13 +123,73 @@ def classify_product_to_family(product_name: str) -> tuple:
     
     product_lower = product_name.lower()
     
-    # Busca por correspondência nas palavras-chave
-    for family_name, keywords in PRODUCT_FAMILY_MAPPING.items():
+    # Mapeamento com prioridade (mais específico primeiro)
+    priority_mapping = [
+        # Letras Caixa - verificar antes de outros
+        ("Letras Caixa", ["letra caixa", "letra-caixa", "letras caixa"]),
+        # Totens
+        ("Totens", ["totem"]),
+        # Envelopamento
+        ("Envelopamento", ["envelopamento", "envelopar"]),
+        # Painéis Luminosos
+        ("Painéis Luminosos", ["painel backlight", "painel luminoso", "backlight", "lightbox"]),
+        # Tecidos
+        ("Tecidos", ["tecido", "bandeira", "wind banner"]),
+        # Estruturas Metálicas
+        ("Estruturas Metálicas", ["estrutura metálica", "estrutura metalica", "backdrop", "cavalete"]),
+        # Lonas e Banners
+        ("Lonas e Banners", ["lona", "banner", "faixa", "empena"]),
+        # Adesivos - depois de lonas para não pegar "lona com adesivo"
+        ("Adesivos", ["adesivo", "vinil", "fachada adesivada", "fachada com vinil"]),
+        # Chapas e Placas
+        ("Chapas e Placas", ["chapa", "placa", "acm", "acrílico", "acrilico", "mdf", " ps ", "pvc", "polionda", 
+                           "policarbonato", "petg", "compensado", "xps"]),
+        # Serviços
+        ("Serviços", ["serviço", "serviços", "instalação", "instalacao", "entrega", "montagem", 
+                     "pintura", "serralheria", "solda", "corte", "aplicação", "aplicacao"]),
+        # Materiais Promocionais
+        ("Materiais Promocionais", ["cartaz", "flyer", "folder", "panfleto", "imã", "marca-página"]),
+        # Sublimação
+        ("Sublimação", ["sublimação", "sublimática", "sublimatico", "sublimacao"]),
+        # Impressão
+        ("Impressão", ["impressão uv", "impressão latex", "impressão solvente", "impresso"]),
+        # Display/PS
+        ("Display/PS", ["display", "móbile", "mobile", "orelha de monitor"]),
+        # Produtos Terceirizados
+        ("Produtos Terceirizados", ["terceirizado", "produto genérico"]),
+        # Fundação
+        ("Fundação/Estrutura", ["fundação", "sapata", "estrutura em madeira"]),
+    ]
+    
+    best_match = None
+    best_score = 0
+    
+    for family_name, keywords in priority_mapping:
         for keyword in keywords:
             if keyword.lower() in product_lower:
-                # Calcula score baseado no tamanho do match
-                score = len(keyword) / len(product_name) * 100
-                return (family_name, min(score * 2, 100))  # Score de 0-100
+                # Score baseado no tamanho do match e posição
+                keyword_len = len(keyword)
+                product_len = len(product_name)
+                
+                # Score base: proporção do keyword no nome
+                base_score = (keyword_len / product_len) * 100
+                
+                # Bonus se keyword está no início
+                if product_lower.startswith(keyword.lower()):
+                    base_score += 30
+                
+                # Bonus por match exato de palavra
+                if keyword.lower() == product_lower:
+                    base_score = 100
+                
+                score = min(base_score, 100)
+                
+                if score > best_score:
+                    best_score = score
+                    best_match = family_name
+    
+    if best_match:
+        return (best_match, round(best_score, 1))
     
     return ("Outros", 10)  # Família genérica com baixa confiança
 
