@@ -1634,7 +1634,7 @@ async def create_product_installed(product: ProductInstalledCreate, current_user
         family_name=family_name
     )
     
-    await db.products_installed.insert_one(new_product.model_dump())
+    await db.installed_products.insert_one(new_product.model_dump())
     
     # Update productivity history
     await update_productivity_history(new_product)
