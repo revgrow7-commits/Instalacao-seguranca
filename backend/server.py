@@ -735,6 +735,9 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
     if not holdprint_job:
         raise HTTPException(status_code=404, detail="Job not found in Holdprint")
     
+    # Calcular área dos produtos
+    products_with_area, total_area_m2, total_products, total_quantity = calculate_job_products_area(holdprint_job)
+    
     # Create job
     job = Job(
         holdprint_job_id=job_data.holdprint_job_id,
@@ -743,7 +746,12 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
         client_address='',
         branch=job_data.branch,
         items=holdprint_job.get('production', {}).get('items', []),
-        holdprint_data=holdprint_job
+        holdprint_data=holdprint_job,
+        # Campos calculados
+        area_m2=total_area_m2,
+        products_with_area=products_with_area,
+        total_products=total_products,
+        total_quantity=total_quantity
     )
     
     job_dict = job.model_dump()
