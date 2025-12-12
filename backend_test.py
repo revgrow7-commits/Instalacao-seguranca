@@ -50,6 +50,7 @@ class FieldworkAPITest:
     def __init__(self):
         self.installer_token = None
         self.admin_token = None
+        self.manager_token = None
         self.test_job_id = None
         self.test_checkin_id = None
         self.session = requests.Session()
