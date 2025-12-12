@@ -62,8 +62,11 @@ const InstallerDashboard = () => {
         return 'bg-green-500/20 text-green-500 border border-green-500/20';
       case 'in_progress':
         return 'bg-blue-500/20 text-blue-500 border border-blue-500/20';
-      default:
+      case 'pending':
+      case 'aguardando':
         return 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/20';
+      default:
+        return 'bg-gray-500/20 text-gray-500 border border-gray-500/20';
     }
   };
 
@@ -73,8 +76,11 @@ const InstallerDashboard = () => {
         return 'Concluído';
       case 'in_progress':
         return 'Em Andamento';
-      default:
+      case 'pending':
+      case 'aguardando':
         return 'Pendente';
+      default:
+        return status;
     }
   };
 
