@@ -287,7 +287,7 @@ def compress_image_to_base64(image_data: bytes, max_size_kb: int = 500) -> str:
     return base64.b64encode(output.getvalue()).decode('utf-8')
 
 async def fetch_holdprint_jobs(branch: str):
-    """Fetch jobs from Holdprint API"""
+    """Fetch jobs from Holdprint API - últimos 7 dias, excluindo finalizados"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
@@ -295,18 +295,41 @@ async def fetch_holdprint_jobs(branch: str):
     
     headers = {"x-api-key": api_key}
     
+    # Calcular datas: últimos 7 dias
+    end_date = datetime.now(timezone.utc)
+    start_date = end_date - timedelta(days=7)
+    
+    # Formatar datas no padrão YYYY-MM-DD
+    start_date_str = start_date.strftime("%Y-%m-%d")
+    end_date_str = end_date.strftime("%Y-%m-%d")
+    
+    # Montar URL com parâmetros de filtro
+    params = {
+        "page": 1,
+        "pageSize": 100,
+        "startDate": start_date_str,
+        "endDate": end_date_str,
+        "language": "pt-BR"
+    }
+    
     try:
-        response = requests.get(HOLDPRINT_API_URL, headers=headers, timeout=30)
+        response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=30)
         response.raise_for_status()
         data = response.json()
         
         # Holdprint returns {data: [...]} format
+        jobs = []
         if isinstance(data, dict) and 'data' in data:
-            return data['data']
+            jobs = data['data']
         elif isinstance(data, list):
-            return data
-        else:
-            return []
+            jobs = data
+        
+        # Filtrar jobs NÃO finalizados (isFinalized = false ou não existe)
+        filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
+        
+        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} não finalizados (últimos 7 dias: {start_date_str} a {end_date_str})")
+        
+        return filtered_jobs
     except requests.RequestException as e:
         logger.error(f"Error fetching from Holdprint: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching from Holdprint: {str(e)}")
