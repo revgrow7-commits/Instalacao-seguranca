@@ -7,8 +7,33 @@ import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Loader2, CheckCircle, Clock, Upload } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, Upload, Ruler, Mountain, Building, Target } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Opções de métricas (mesmas da seção de Métricas)
+const complexityOptions = [
+  { value: "1", label: "1 - Muito Fácil", color: "bg-green-500" },
+  { value: "2", label: "2 - Fácil", color: "bg-blue-500" },
+  { value: "3", label: "3 - Médio", color: "bg-yellow-500" },
+  { value: "4", label: "4 - Difícil", color: "bg-orange-500" },
+  { value: "5", label: "5 - Muito Difícil", color: "bg-red-500" }
+];
+
+const heightOptions = [
+  { value: "terreo", label: "Térreo (até 2m)", icon: "🏠" },
+  { value: "media", label: "Média (2-4m)", icon: "🏢" },
+  { value: "alta", label: "Alta (4-8m)", icon: "🏗️" },
+  { value: "muito_alta", label: "Muito Alta (+8m)", icon: "🏔️" }
+];
+
+const scenarioOptions = [
+  { value: "loja_rua", label: "Loja de Rua", icon: "🏪" },
+  { value: "shopping", label: "Shopping", icon: "🛒" },
+  { value: "evento", label: "Evento", icon: "🎪" },
+  { value: "fachada", label: "Fachada", icon: "🏛️" },
+  { value: "outdoor", label: "Outdoor", icon: "📺" },
+  { value: "veiculo", label: "Veículo", icon: "🚗" }
+];
 
 const CheckOut = () => {
   const { checkinId } = useParams();
@@ -24,8 +49,13 @@ const CheckOut = () => {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [notes, setNotes] = useState('');
   const [installedM2, setInstalledM2] = useState('');
-  const [difficultyLevel, setDifficultyLevel] = useState('');
+  
+  // Novos campos de métricas
+  const [complexityLevel, setComplexityLevel] = useState('');
+  const [heightCategory, setHeightCategory] = useState('');
+  const [scenarioCategory, setScenarioCategory] = useState('');
   const [difficultyDescription, setDifficultyDescription] = useState('');
+  
   const fileInputRef = useRef(null);
 
   useEffect(() => {
