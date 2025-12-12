@@ -200,7 +200,15 @@ const Reports = () => {
             className="gap-2"
           >
             <Layers className="h-4 w-4" />
-            Relatório por Família
+            Por Família
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => navigate('/reports/installer')}
+            className="gap-2"
+          >
+            <User className="h-4 w-4" />
+            Por Instalador
           </Button>
           <Button
             onClick={handleExportExcel}
