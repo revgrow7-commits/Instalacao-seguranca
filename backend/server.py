@@ -399,6 +399,12 @@ class CheckIn(BaseModel):
     notes: Optional[str] = None
     duration_minutes: Optional[int] = None
     installed_m2: Optional[float] = None  # M² instalado
+    # Campos de métricas de produtividade
+    complexity_level: Optional[int] = None  # 1-5
+    height_category: Optional[str] = None  # terreo, media, alta, muito_alta
+    scenario_category: Optional[str] = None  # loja_rua, shopping, evento, fachada, outdoor, veiculo
+    difficulty_description: Optional[str] = None  # Descrição da dificuldade
+    productivity_m2_h: Optional[float] = None  # Produtividade calculada (m²/hora)
     status: str = "in_progress"  # in_progress, completed
 
 class CheckInCreate(BaseModel):
