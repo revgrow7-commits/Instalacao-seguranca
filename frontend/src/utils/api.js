@@ -73,7 +73,9 @@ export const api = {
 
   // Reports
   getReportByFamily: () => axios.get(`${API_URL}/reports/by-family`, { headers: getAuthHeader() }),
+  getReportByInstaller: () => axios.get(`${API_URL}/reports/by-installer`, { headers: getAuthHeader() }),
   classifyJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/classify-products`, {}, { headers: getAuthHeader() }),
+  recalculateJobAreas: () => axios.post(`${API_URL}/jobs/recalculate-areas`, {}, { headers: getAuthHeader() }),
   exportReports: () => axios.get(`${API_URL}/reports/export`, { 
     headers: getAuthHeader(),
     responseType: 'blob'
