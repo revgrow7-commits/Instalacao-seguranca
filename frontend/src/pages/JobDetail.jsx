@@ -495,39 +495,53 @@ const JobDetail = () => {
         </Card>
       </div>
 
-      {/* Produtos/Itens do Job - usando dados da Holdprint */}
-      {job.holdprint_data?.products && job.holdprint_data.products.length > 0 && (
+      {/* Produtos/Itens do Job - com área calculada */}
+      {(job.products_with_area?.length > 0 || (job.holdprint_data?.products && job.holdprint_data.products.length > 0)) && (
         <Card className="bg-card border-white/5">
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Package className="h-5 w-5 text-primary" />
-              Produtos / Itens ({job.holdprint_data.products.length})
+            <CardTitle className="text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Package className="h-5 w-5 text-primary" />
+                Produtos / Itens ({job.products_with_area?.length || job.holdprint_data?.products?.length || 0})
+              </div>
+              {job.area_m2 > 0 && (
+                <span className="text-sm font-normal px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30">
+                  Total: {job.area_m2?.toLocaleString('pt-BR')} m²
+                </span>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {job.holdprint_data.products.map((product, index) => {
-                // Extrair medidas da descrição HTML
-                const extractMeasures = (description) => {
-                  if (!description) return null;
-                  const measures = {};
-                  
-                  // Extrair Largura
-                  const widthMatch = description.match(/Largura:\s*<span[^>]*>([^<]+)<\/span>/i);
-                  if (widthMatch) measures.width = widthMatch[1];
-                  
-                  // Extrair Altura
-                  const heightMatch = description.match(/Altura:\s*<span[^>]*>([^<]+)<\/span>/i);
-                  if (heightMatch) measures.height = heightMatch[1];
-                  
-                  // Extrair Cópias
-                  const copiesMatch = description.match(/Cópias:\s*<span[^>]*>([^<]+)<\/span>/i);
-                  if (copiesMatch) measures.copies = copiesMatch[1];
-                  
-                  return Object.keys(measures).length > 0 ? measures : null;
-                };
+              {/* Usar products_with_area se disponível, senão holdprint_data.products */}
+              {(job.products_with_area?.length > 0 ? job.products_with_area : job.holdprint_data?.products || []).map((product, index) => {
+                // Se for do products_with_area, já tem os dados calculados
+                const isCalculated = job.products_with_area?.length > 0;
                 
-                const measures = extractMeasures(product.description);
+                // Extrair medidas da descrição HTML se não tiver dados calculados
+                let measures = null;
+                if (!isCalculated && product.description) {
+                  const widthMatch = product.description.match(/Largura:\s*<span[^>]*>([0-9.,]+)\s*m/i);
+                  const heightMatch = product.description.match(/Altura:\s*<span[^>]*>([0-9.,]+)\s*m/i);
+                  const copiesMatch = product.description.match(/Cópias:\s*<span[^>]*>([0-9]+)/i);
+                  
+                  if (widthMatch || heightMatch) {
+                    measures = {
+                      width: widthMatch ? parseFloat(widthMatch[1].replace(',', '.')) : null,
+                      height: heightMatch ? parseFloat(heightMatch[1].replace(',', '.')) : null,
+                      copies: copiesMatch ? parseInt(copiesMatch[1]) : 1
+                    };
+                  }
+                }
+                
+                // Dados do produto
+                const width = isCalculated ? product.width_m : measures?.width;
+                const height = isCalculated ? product.height_m : measures?.height;
+                const copies = isCalculated ? product.copies : measures?.copies || 1;
+                const quantity = product.quantity || 1;
+                const unitArea = width && height ? (width * height) : null;
+                const totalArea = isCalculated ? product.total_area_m2 : (unitArea ? unitArea * quantity * copies : null);
+                const familyName = product.family_name;
                 
                 return (
                   <div
@@ -536,18 +550,74 @@ const JobDetail = () => {
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1">
-                        <h4 className="text-white font-semibold text-lg">{product.name}</h4>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-white font-semibold text-lg">{product.name}</h4>
+                          {familyName && (
+                            <span className="px-2 py-0.5 rounded-full text-xs bg-primary/20 text-primary">
+                              {familyName}
+                            </span>
+                          )}
+                        </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+                        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-3">
                           {/* Quantidade */}
                           <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
                             <p className="text-xs text-blue-400">Quantidade</p>
-                            <p className="text-white font-bold">{product.quantity}</p>
+                            <p className="text-white font-bold">{quantity}</p>
                           </div>
                           
-                          {/* Medidas */}
-                          {measures?.width && (
+                          {/* Largura */}
+                          {width && (
                             <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
+                              <p className="text-xs text-purple-400 flex items-center gap-1">
+                                <Ruler className="h-3 w-3" /> Largura
+                              </p>
+                              <p className="text-white font-bold">{width}m</p>
+                            </div>
+                          )}
+                          
+                          {/* Altura */}
+                          {height && (
+                            <div className="bg-purple-500/10 rounded-lg p-2 border border-purple-500/20">
+                              <p className="text-xs text-purple-400 flex items-center gap-1">
+                                <Ruler className="h-3 w-3" /> Altura
+                              </p>
+                              <p className="text-white font-bold">{height}m</p>
+                            </div>
+                          )}
+                          
+                          {/* Cópias */}
+                          {copies > 1 && (
+                            <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                              <p className="text-xs text-yellow-400">Cópias</p>
+                              <p className="text-white font-bold">{copies}</p>
+                            </div>
+                          )}
+                          
+                          {/* Área Total do Item */}
+                          {totalArea && (
+                            <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
+                              <p className="text-xs text-green-400 font-medium">Área Total</p>
+                              <p className="text-green-400 font-bold text-lg">{totalArea.toLocaleString('pt-BR')} m²</p>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Cálculo detalhado */}
+                        {width && height && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Cálculo: {width}m × {height}m{copies > 1 ? ` × ${copies} cópias` : ''} × {quantity} un = <span className="text-green-400 font-medium">{totalArea?.toLocaleString('pt-BR')} m²</span>
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
                               <p className="text-xs text-purple-400 flex items-center gap-1">
                                 <Ruler className="h-3 w-3" /> Largura
                               </p>
