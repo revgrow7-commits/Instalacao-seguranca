@@ -14,6 +14,7 @@ import CheckOut from './pages/CheckOut';
 import CheckinViewer from './pages/CheckinViewer';
 import Checkins from './pages/Checkins';
 import Reports from './pages/Reports';
+import Metrics from './pages/Metrics';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import './App.css';
