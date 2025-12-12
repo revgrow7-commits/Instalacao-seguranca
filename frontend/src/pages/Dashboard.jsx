@@ -186,7 +186,7 @@ const Dashboard = () => {
                       {checkin.checkin_photo && (
                         <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                           <img
-                            src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
+                            src={checkin.checkin_photo.startsWith('data:') ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
                             alt="Check-in"
                             className="w-full h-full object-cover"
                           />
