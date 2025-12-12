@@ -374,6 +374,145 @@ const JobDetail = () => {
             </DialogContent>
           </Dialog>
 
+          {/* Dialog para atribuir itens específicos */}
+          <Dialog open={showAssignItemsDialog} onOpenChange={setShowAssignItemsDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-green-500/50 text-green-400 hover:bg-green-500/10">
+                <UserPlus className="mr-2 h-4 w-4" />
+                Atribuir Itens
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-heading text-white">Atribuir Itens a Instaladores</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Selecione os itens e instaladores. O m² será calculado automaticamente.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-4">
+                {/* Selecionar itens */}
+                <div>
+                  <Label className="text-white mb-2 block">1. Selecione os Itens</Label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2">
+                    {(job?.products_with_area || job?.holdprint_data?.products || []).map((product, index) => {
+                      const itemAssignment = getItemAssignment(index);
+                      const isAssigned = !!itemAssignment;
+                      
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                            selectedItems.includes(index) 
+                              ? 'bg-green-500/20 border border-green-500/50' 
+                              : isAssigned
+                                ? 'bg-blue-500/10 border border-blue-500/30'
+                                : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={selectedItems.includes(index)}
+                            onCheckedChange={() => toggleItemSelection(index)}
+                          />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{product.name}</p>
+                            <div className="flex items-center gap-3 text-sm">
+                              <span className="text-muted-foreground">Qtd: {product.quantity}</span>
+                              {product.total_area_m2 && (
+                                <span className="text-green-400 font-medium">{product.total_area_m2} m²</span>
+                              )}
+                              {isAssigned && (
+                                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-xs">
+                                  Atribuído: {itemAssignment.installers.map(i => i.installer_name).join(', ')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {selectedItems.length > 0 && (
+                    <p className="text-sm text-green-400 mt-2">
+                      {selectedItems.length} item(s) selecionado(s) - Total: {
+                        selectedItems.reduce((acc, idx) => {
+                          const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                          return acc + (products[idx]?.total_area_m2 || 0);
+                        }, 0).toFixed(2)
+                      } m²
+                    </p>
+                  )}
+                </div>
+
+                {/* Selecionar instaladores */}
+                <div>
+                  <Label className="text-white mb-2 block">2. Selecione os Instaladores</Label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2">
+                    {installers.map((installer) => (
+                      <div
+                        key={installer.id}
+                        className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                          selectedItemInstallers.includes(installer.id) 
+                            ? 'bg-primary/20 border border-primary/50' 
+                            : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                        }`}
+                      >
+                        <Checkbox
+                          checked={selectedItemInstallers.includes(installer.id)}
+                          onCheckedChange={() => toggleItemInstaller(installer.id)}
+                        />
+                        <div className="flex-1">
+                          <p className="text-white font-medium">{installer.full_name}</p>
+                          <p className="text-sm text-muted-foreground">{installer.branch}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Resumo */}
+                {selectedItems.length > 0 && selectedItemInstallers.length > 0 && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                    <p className="text-green-400 font-medium">Resumo da Atribuição:</p>
+                    <p className="text-sm text-white mt-1">
+                      {selectedItems.length} item(s) serão atribuídos a {selectedItemInstallers.length} instalador(es)
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Cada instalador receberá: {
+                        (selectedItems.reduce((acc, idx) => {
+                          const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                          return acc + (products[idx]?.total_area_m2 || 0);
+                        }, 0) / selectedItemInstallers.length).toFixed(2)
+                      } m² (dividido igualmente)
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowAssignItemsDialog(false);
+                    setSelectedItems([]);
+                    setSelectedItemInstallers([]);
+                  }}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Cancelar
+                </Button>
+                <Button 
+                  onClick={handleAssignItems} 
+                  className="bg-green-600 hover:bg-green-700"
+                  disabled={selectedItems.length === 0 || selectedItemInstallers.length === 0}
+                >
+                  <Check className="mr-2 h-4 w-4" />
+                  Atribuir Itens
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
             <DialogTrigger asChild>
               <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
