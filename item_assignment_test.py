@@ -11,7 +11,7 @@ from datetime import datetime
 import time
 
 # Test configuration
-BASE_URL = "https://work-monitor-5.preview.emergentagent.com/api"
+BASE_URL = "https://install-pulse.preview.emergentagent.com/api"
 
 # Test credentials as specified in the request
 MANAGER_CREDENTIALS = {
