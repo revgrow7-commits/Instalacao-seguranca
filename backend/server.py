@@ -907,6 +907,192 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     
     return Job(**result)
 
+@api_router.post("/jobs/{job_id}/assign-items")
+async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, current_user: User = Depends(get_current_user)):
+    """
+    Atribui itens específicos do job a instaladores.
+    Permite selecionar múltiplos itens e atribuir a um ou mais instaladores.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Buscar job
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Buscar instaladores
+    installers = await db.installers.find({"id": {"$in": assignment.installer_ids}}, {"_id": 0}).to_list(100)
+    installer_map = {i["id"]: i for i in installers}
+    
+    if len(installers) != len(assignment.installer_ids):
+        raise HTTPException(status_code=400, detail="One or more installers not found")
+    
+    # Validar índices dos itens
+    products = job.get("products_with_area", [])
+    if not products:
+        # Se não tiver products_with_area, usar holdprint_data.products
+        products = job.get("holdprint_data", {}).get("products", [])
+    
+    for idx in assignment.item_indices:
+        if idx < 0 or idx >= len(products):
+            raise HTTPException(status_code=400, detail=f"Invalid item index: {idx}")
+    
+    # Criar atribuições
+    current_assignments = job.get("item_assignments", [])
+    now = datetime.now(timezone.utc).isoformat()
+    
+    new_assignments = []
+    total_m2_assigned = 0
+    
+    for item_idx in assignment.item_indices:
+        product = products[item_idx] if item_idx < len(products) else None
+        item_area = product.get("total_area_m2", 0) if product else 0
+        
+        for installer_id in assignment.installer_ids:
+            installer = installer_map.get(installer_id)
+            
+            # Remover atribuição anterior do mesmo item (se existir)
+            current_assignments = [a for a in current_assignments 
+                                  if not (a.get("item_index") == item_idx and a.get("installer_id") == installer_id)]
+            
+            # Calcular m² por instalador (dividir igualmente se múltiplos instaladores)
+            m2_per_installer = round(item_area / len(assignment.installer_ids), 2) if item_area > 0 else 0
+            
+            new_assignment = {
+                "item_index": item_idx,
+                "item_name": product.get("name", f"Item {item_idx}") if product else f"Item {item_idx}",
+                "installer_id": installer_id,
+                "installer_name": installer.get("full_name", ""),
+                "assigned_at": now,
+                "item_area_m2": item_area,
+                "assigned_m2": m2_per_installer,
+                "status": "pending"  # pending, in_progress, completed
+            }
+            new_assignments.append(new_assignment)
+            total_m2_assigned += m2_per_installer
+    
+    # Combinar atribuições
+    all_assignments = current_assignments + new_assignments
+    
+    # Atualizar assigned_installers do job (lista única de IDs)
+    all_installer_ids = list(set([a["installer_id"] for a in all_assignments]))
+    
+    # Atualizar job
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "item_assignments": all_assignments,
+            "assigned_installers": all_installer_ids
+        }}
+    )
+    
+    return {
+        "message": f"{len(new_assignments)} atribuições criadas",
+        "total_m2_assigned": total_m2_assigned,
+        "assignments": new_assignments
+    }
+
+@api_router.get("/jobs/{job_id}/assignments")
+async def get_job_assignments(job_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Retorna as atribuições de itens do job, agrupadas por instalador.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    assignments = job.get("item_assignments", [])
+    products = job.get("products_with_area", []) or job.get("holdprint_data", {}).get("products", [])
+    
+    # Agrupar por instalador
+    by_installer = {}
+    for assignment in assignments:
+        installer_id = assignment.get("installer_id")
+        if installer_id not in by_installer:
+            by_installer[installer_id] = {
+                "installer_id": installer_id,
+                "installer_name": assignment.get("installer_name"),
+                "items": [],
+                "total_m2": 0
+            }
+        
+        by_installer[installer_id]["items"].append(assignment)
+        by_installer[installer_id]["total_m2"] += assignment.get("assigned_m2", 0)
+    
+    # Agrupar por item
+    by_item = {}
+    for assignment in assignments:
+        item_idx = assignment.get("item_index")
+        if item_idx not in by_item:
+            product = products[item_idx] if item_idx < len(products) else {}
+            by_item[item_idx] = {
+                "item_index": item_idx,
+                "item_name": product.get("name", f"Item {item_idx}"),
+                "item_area_m2": product.get("total_area_m2", 0),
+                "installers": []
+            }
+        
+        by_item[item_idx]["installers"].append({
+            "installer_id": assignment.get("installer_id"),
+            "installer_name": assignment.get("installer_name"),
+            "assigned_m2": assignment.get("assigned_m2"),
+            "status": assignment.get("status")
+        })
+    
+    return {
+        "job_id": job_id,
+        "job_title": job.get("title"),
+        "total_area_m2": job.get("area_m2", 0),
+        "by_installer": list(by_installer.values()),
+        "by_item": list(by_item.values()),
+        "all_assignments": assignments
+    }
+
+@api_router.put("/jobs/{job_id}/assignments/{item_index}/status")
+async def update_assignment_status(job_id: str, item_index: int, status_update: dict, current_user: User = Depends(get_current_user)):
+    """
+    Atualiza o status de uma atribuição de item (instalador reportando progresso).
+    """
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    new_status = status_update.get("status")
+    installed_m2 = status_update.get("installed_m2")
+    
+    if new_status not in ["pending", "in_progress", "completed"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+    
+    assignments = job.get("item_assignments", [])
+    updated = False
+    
+    for assignment in assignments:
+        if assignment.get("item_index") == item_index:
+            # Se for instalador, só pode atualizar sua própria atribuição
+            if current_user.role == UserRole.INSTALLER:
+                installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+                if not installer or installer.get("id") != assignment.get("installer_id"):
+                    continue
+            
+            assignment["status"] = new_status
+            if installed_m2 is not None:
+                assignment["installed_m2"] = installed_m2
+            if new_status == "completed":
+                assignment["completed_at"] = datetime.now(timezone.utc).isoformat()
+            updated = True
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Assignment not found or unauthorized")
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"item_assignments": assignments}}
+    )
+    
+    return {"message": "Assignment status updated", "assignments": assignments}
+
 # ============ CHECK-IN/OUT ROUTES ============
 
 # Create uploads directory if it doesn't exist
