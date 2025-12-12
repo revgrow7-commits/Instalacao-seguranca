@@ -1003,7 +1003,7 @@ const JobDetail = () => {
                             </p>
                             <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                               <img
-                                src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
+                                src={checkin.checkin_photo.startsWith('data:'\) ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
                                 alt="Check-in"
                                 className="w-full h-full object-cover"
                               />
@@ -1070,7 +1070,7 @@ const JobDetail = () => {
                               </p>
                               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                                 <img
-                                  src={`data:image/jpeg;base64,${checkin.checkout_photo}`}
+                                  src={checkin.checkout_photo.startsWith('data:'\) ? checkin.checkout_photo : `data:image/jpeg;base64,${checkin.checkout_photo}`}
                                   alt="Check-out"
                                   className="w-full h-full object-cover"
                                 />
