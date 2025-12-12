@@ -37,15 +37,8 @@ const InstallerDashboard = () => {
     return checkins.find(c => c.job_id === jobId && c.status === 'in_progress');
   };
 
-  const handleStartJob = (jobId) => {
-    navigate(`/checkin/${jobId}`);
-  };
-
-  const handleFinishJob = (jobId) => {
-    const checkin = getJobCheckin(jobId);
-    if (checkin) {
-      navigate(`/checkout/${checkin.id}`);
-    }
+  const handleOpenJob = (jobId) => {
+    navigate(`/installer/job/${jobId}`);
   };
 
   const getJobStatus = (job) => {
