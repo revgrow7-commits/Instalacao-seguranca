@@ -1232,6 +1232,20 @@ async def checkout(
             {"$set": {"status": "completed"}}
         )
     
+    # === AUTOMATIC REGISTRATION OF INSTALLED PRODUCTS ===
+    # Register installed products based on job items assigned to this installer
+    await register_installed_products_from_checkout(
+        checkin_id=checkin_id,
+        job_id=checkin_doc['job_id'],
+        installer_id=checkin_doc['installer_id'],
+        installed_m2=installed_m2,
+        complexity_level=complexity_level,
+        height_category=height_category,
+        scenario_category=scenario_category,
+        duration_minutes=duration_minutes,
+        notes=notes
+    )
+    
     if isinstance(result['checkin_at'], str):
         result['checkin_at'] = datetime.fromisoformat(result['checkin_at'])
     if result.get('checkout_at') and isinstance(result['checkout_at'], str):
