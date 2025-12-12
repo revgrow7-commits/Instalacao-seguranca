@@ -244,13 +244,17 @@ class Job(BaseModel):
     client_name: str
     client_address: Optional[str] = None
     status: str = "aguardando"  # aguardando, instalando, pausado, finalizado, atrasado
-    area_m2: Optional[float] = None
+    area_m2: Optional[float] = None  # Área total calculada do job
     branch: str  # POA or SP
     assigned_installers: List[str] = []  # List of installer IDs
     scheduled_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     items: List[dict] = []  # Job items from Holdprint
     holdprint_data: dict = {}  # Raw data from Holdprint
+    # Campos calculados para análise de produtividade
+    products_with_area: List[dict] = []  # Produtos com área calculada
+    total_products: int = 0
+    total_quantity: int = 0
 
 class JobCreate(BaseModel):
     holdprint_job_id: str
