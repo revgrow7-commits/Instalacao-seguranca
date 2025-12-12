@@ -344,7 +344,8 @@ const CheckOut = () => {
       <Card className="bg-card border-white/5">
         <CardHeader>
           <CardTitle className="text-white flex items-center gap-2">
-            📐 M² Instalado
+            <Ruler className="h-5 w-5 text-green-400" />
+            M² Instalado
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -378,7 +379,7 @@ const CheckOut = () => {
               <div className="flex items-center gap-2 text-sm">
                 <div className="flex-1 bg-white/5 rounded-full h-2 overflow-hidden">
                   <div 
-                    className="bg-primary h-full transition-all duration-300"
+                    className="bg-green-500 h-full transition-all duration-300"
                     style={{ width: `${Math.min((parseFloat(installedM2) / job.area_m2) * 100, 100)}%` }}
                   />
                 </div>
@@ -391,45 +392,126 @@ const CheckOut = () => {
         </CardContent>
       </Card>
 
-      {/* Difficulty Level */}
+      {/* Complexidade */}
       <Card className="bg-card border-white/5">
-        <CardContent className="p-6 space-y-4">
-          <div className="space-y-2">
-            <Label className="text-white font-medium">Nível de Dificuldade</Label>
-            <Select value={difficultyLevel} onValueChange={handleDifficultyChange}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Selecione o nível de dificuldade" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="obstaculo1">Obstáculo 1</SelectItem>
-                <SelectItem value="obstaculo2">Obstáculo 2</SelectItem>
-                <SelectItem value="obstaculo3">Obstáculo 3</SelectItem>
-              </SelectContent>
-            </Select>
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Target className="h-5 w-5 text-yellow-400" />
+            Complexidade da Instalação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-5 gap-2">
+            {complexityOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setComplexityLevel(option.value)}
+                className={`p-3 rounded-lg border-2 transition-all ${
+                  complexityLevel === option.value
+                    ? `${option.color} border-white text-white`
+                    : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                }`}
+              >
+                <p className="text-xl font-bold">{option.value}</p>
+                <p className="text-xs mt-1 opacity-80">{option.label.split(' - ')[1]}</p>
+              </button>
+            ))}
           </div>
-
-          {difficultyLevel && (
-            <div className="space-y-2">
-              <Label className="text-white font-medium">Descreva a Dificuldade</Label>
-              <Textarea
-                value={difficultyDescription}
-                onChange={(e) => setDifficultyDescription(e.target.value)}
-                placeholder="Descreva qual foi a dificuldade encontrada..."
-                className="bg-white/5 border-white/10 text-white min-h-[100px] resize-none"
-                maxLength={500}
-              />
-              <p className="text-xs text-muted-foreground text-right">
-                {difficultyDescription.length}/500 caracteres
-              </p>
-            </div>
+          {complexityLevel && (
+            <p className="text-sm text-muted-foreground text-center">
+              Selecionado: <span className="text-white font-medium">
+                {complexityOptions.find(o => o.value === complexityLevel)?.label}
+              </span>
+            </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Altura */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Mountain className="h-5 w-5 text-purple-400" />
+            Altura da Instalação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            {heightOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setHeightCategory(option.value)}
+                className={`p-4 rounded-lg border-2 transition-all flex items-center gap-3 ${
+                  heightCategory === option.value
+                    ? 'bg-purple-500/20 border-purple-500 text-white'
+                    : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                }`}
+              >
+                <span className="text-2xl">{option.icon}</span>
+                <span className="text-sm font-medium">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Cenário */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center gap-2">
+            <Building className="h-5 w-5 text-blue-400" />
+            Cenário da Instalação
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-3">
+            {scenarioOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setScenarioCategory(option.value)}
+                className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
+                  scenarioCategory === option.value
+                    ? 'bg-blue-500/20 border-blue-500 text-white'
+                    : 'bg-white/5 border-white/10 text-white hover:border-white/30'
+                }`}
+              >
+                <span className="text-2xl">{option.icon}</span>
+                <span className="text-xs font-medium text-center">{option.label}</span>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Dificuldade/Observações */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white">Dificuldades Encontradas (opcional)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-white font-medium">Descreva as dificuldades ou obstáculos encontrados</Label>
+            <Textarea
+              value={difficultyDescription}
+              onChange={(e) => setDifficultyDescription(e.target.value)}
+              placeholder="Ex: Chuva durante a instalação, superfície irregular, altura exigiu equipamento especial..."
+              className="bg-white/5 border-white/10 text-white min-h-[100px] resize-none"
+              maxLength={500}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {difficultyDescription.length}/500 caracteres
+            </p>
+          </div>
         </CardContent>
       </Card>
 
       {/* Notes */}
       <Card className="bg-card border-white/5">
         <CardHeader>
-          <CardTitle className="text-white">Observações</CardTitle>
+          <CardTitle className="text-white">Observações Gerais</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
