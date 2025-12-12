@@ -191,6 +191,16 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/reports/installer"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <InstallerReport />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
