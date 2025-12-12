@@ -1601,7 +1601,7 @@ async def get_products_installed(
     if family_id:
         query["family_id"] = family_id
     
-    products = await db.products_installed.find(query, {"_id": 0}).to_list(1000)
+    products = await db.installed_products.find(query, {"_id": 0}).to_list(1000)
     return products
 
 @api_router.post("/products-installed")
