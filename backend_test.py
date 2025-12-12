@@ -24,6 +24,11 @@ ADMIN_CREDENTIALS = {
     "password": "admin123"
 }
 
+MANAGER_CREDENTIALS = {
+    "email": "gerente@industriavisual.com",
+    "password": "gerente123"
+}
+
 # GPS coordinates for testing (Porto Alegre, Brazil)
 GPS_CHECKIN = {
     "lat": -30.0346,
