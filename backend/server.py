@@ -1622,7 +1622,9 @@ async def complete_item_checkout(
     # Calculate duration
     checkin_at = checkin['checkin_at']
     if isinstance(checkin_at, str):
-        checkin_at = datetime.fromisoformat(checkin_at)
+        checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+    if checkin_at.tzinfo is None:
+        checkin_at = checkin_at.replace(tzinfo=timezone.utc)
     
     checkout_at = datetime.now(timezone.utc)
     duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
