@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler, UserPlus, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JobDetail = () => {
@@ -26,6 +26,12 @@ const JobDetail = () => {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [checkins, setCheckins] = useState([]);
+  
+  // Estados para atribuição de itens
+  const [showAssignItemsDialog, setShowAssignItemsDialog] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]);
+  const [selectedItemInstallers, setSelectedItemInstallers] = useState([]);
+  const [assignments, setAssignments] = useState(null);
 
   useEffect(() => {
     loadData();
