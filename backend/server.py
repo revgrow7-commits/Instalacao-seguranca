@@ -1713,7 +1713,7 @@ async def get_productivity_metrics(current_user: User = Depends(get_current_user
     families = await db.product_families.find({}, {"_id": 0}).to_list(100)
     
     # Get all products installed
-    products = await db.products_installed.find({}, {"_id": 0}).to_list(10000)
+    products = await db.installed_products.find({}, {"_id": 0}).to_list(10000)
     
     # Get productivity history
     history = await db.productivity_history.find({}, {"_id": 0}).to_list(1000)
