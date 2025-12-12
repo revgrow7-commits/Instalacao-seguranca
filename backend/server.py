@@ -1253,6 +1253,174 @@ async def checkout(
     
     return CheckIn(**result)
 
+async def register_installed_products_from_checkout(
+    checkin_id: str,
+    job_id: str,
+    installer_id: str,
+    installed_m2: Optional[float],
+    complexity_level: Optional[int],
+    height_category: Optional[str],
+    scenario_category: Optional[str],
+    duration_minutes: int,
+    notes: Optional[str]
+):
+    """
+    Automatically registers installed products based on checkout data.
+    Links the checkout metrics to the productivity system.
+    """
+    try:
+        # Get the job details
+        job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+        if not job:
+            return
+        
+        # Get products with area from the job
+        products = job.get("products_with_area", [])
+        if not products:
+            products = job.get("holdprint_data", {}).get("products", [])
+        
+        # Get item assignments for this installer
+        item_assignments = job.get("item_assignments", [])
+        assigned_items = [a for a in item_assignments if a.get("installer_id") == installer_id]
+        
+        # If no specific assignments, create one general record for the checkout
+        if not assigned_items and installed_m2 and installed_m2 > 0:
+            # Create a general product record
+            product_name = f"Instalação - {job.get('title', 'Job')}"
+            
+            # Try to find a matching family based on job products
+            family_id = None
+            family_name = None
+            
+            # Detect family from product names
+            product_names = [p.get("name", "") for p in products]
+            family_id, family_name = await detect_product_family(product_names)
+            
+            # Calculate productivity
+            productivity_m2_h = None
+            if duration_minutes > 0:
+                hours = duration_minutes / 60
+                productivity_m2_h = round(installed_m2 / hours, 2)
+            
+            # Create the installed product record
+            installed_product = ProductInstalled(
+                job_id=job_id,
+                checkin_id=checkin_id,
+                product_name=product_name,
+                family_id=family_id,
+                family_name=family_name,
+                area_m2=installed_m2,
+                complexity_level=complexity_level or 1,
+                height_category=height_category or "terreo",
+                scenario_category=scenario_category or "loja_rua",
+                actual_time_min=duration_minutes,
+                productivity_m2_h=productivity_m2_h,
+                cause_notes=notes
+            )
+            
+            await db.installed_products.insert_one(installed_product.model_dump())
+            
+            # Update productivity history
+            await update_productivity_history(installed_product)
+            
+        else:
+            # Create records for each assigned item
+            total_assigned_items = len(assigned_items)
+            time_per_item = duration_minutes // total_assigned_items if total_assigned_items > 0 else duration_minutes
+            
+            for assignment in assigned_items:
+                item_idx = assignment.get("item_index", 0)
+                item_m2 = assignment.get("m2_assigned", 0)
+                
+                # Get product details
+                product = products[item_idx] if item_idx < len(products) else {}
+                product_name = product.get("name", f"Item {item_idx}")
+                width = product.get("width") or product.get("width_m")
+                height = product.get("height") or product.get("height_m")
+                
+                # Detect family
+                family_id, family_name = await detect_product_family([product_name])
+                
+                # Use reported m² or calculated m²
+                final_m2 = item_m2 if item_m2 > 0 else (installed_m2 / total_assigned_items if installed_m2 else 0)
+                
+                # Calculate productivity for this item
+                productivity_m2_h = None
+                if time_per_item > 0 and final_m2 > 0:
+                    hours = time_per_item / 60
+                    productivity_m2_h = round(final_m2 / hours, 2)
+                
+                installed_product = ProductInstalled(
+                    job_id=job_id,
+                    checkin_id=checkin_id,
+                    product_name=product_name,
+                    family_id=family_id,
+                    family_name=family_name,
+                    width_m=float(width) if width else None,
+                    height_m=float(height) if height else None,
+                    area_m2=final_m2,
+                    complexity_level=complexity_level or 1,
+                    height_category=height_category or "terreo",
+                    scenario_category=scenario_category or "loja_rua",
+                    actual_time_min=time_per_item,
+                    productivity_m2_h=productivity_m2_h,
+                    cause_notes=notes
+                )
+                
+                await db.installed_products.insert_one(installed_product.model_dump())
+                
+                # Update productivity history
+                await update_productivity_history(installed_product)
+                
+    except Exception as e:
+        # Log error but don't fail the checkout
+        print(f"Error registering installed products: {e}")
+
+
+async def detect_product_family(product_names: list) -> tuple:
+    """
+    Detects the product family based on product names.
+    Returns (family_id, family_name) tuple.
+    """
+    # Get all families
+    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    
+    # Keywords for each family type
+    family_keywords = {
+        "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
+        "lonas": ["lona", "banner", "faixa", "frontlight", "backlight"],
+        "acm": ["acm", "alumínio composto", "chapa", "placa"],
+        "painéis": ["painel", "outdoor", "totem", "display"],
+        "outros": []
+    }
+    
+    # Check each product name
+    for name in product_names:
+        name_lower = name.lower() if name else ""
+        
+        for family in families:
+            family_name_lower = family.get("name", "").lower()
+            
+            # Check if family name matches
+            if family_name_lower in name_lower:
+                return family.get("id"), family.get("name")
+            
+            # Check keywords
+            keywords = family_keywords.get(family_name_lower, [])
+            for keyword in keywords:
+                if keyword in name_lower:
+                    return family.get("id"), family.get("name")
+    
+    # Default to first family or None
+    if families:
+        # Try to find "Outros" family
+        outros = next((f for f in families if "outro" in f.get("name", "").lower()), None)
+        if outros:
+            return outros.get("id"), outros.get("name")
+        return families[0].get("id"), families[0].get("name")
+    
+    return None, None
+
 @api_router.get("/checkins", response_model=List[CheckIn])
 async def list_checkins(job_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
     """List check-ins"""
