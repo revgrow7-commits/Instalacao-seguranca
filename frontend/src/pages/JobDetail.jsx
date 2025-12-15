@@ -526,7 +526,7 @@ const JobDetail = () => {
                           <SelectValue placeholder="Selecione o nível" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
-                          <SelectItem value="">Não definido</SelectItem>
+                          <SelectItem value="none">Não definido</SelectItem>
                           {difficultyOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
@@ -541,7 +541,7 @@ const JobDetail = () => {
                           <SelectValue placeholder="Selecione o cenário" />
                         </SelectTrigger>
                         <SelectContent className="bg-card border-white/10">
-                          <SelectItem value="">Não definido</SelectItem>
+                          <SelectItem value="none">Não definido</SelectItem>
                           {scenarioOptions.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                           ))}
