@@ -200,43 +200,43 @@ const InstallerDashboard = () => {
 
       {/* Pending Jobs */}
       <div>
-        <h2 className="text-2xl font-heading font-bold text-white mb-4">Jobs Pendentes</h2>
+        <h2 className="text-lg md:text-2xl font-heading font-bold text-white mb-3 md:mb-4">Jobs Pendentes</h2>
         {pendingJobs.length === 0 ? (
           <Card className="bg-card border-white/5">
-            <CardContent className="py-12 text-center">
-              <CheckCircle2 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">Nenhum job pendente</p>
+            <CardContent className="py-8 md:py-12 text-center">
+              <CheckCircle2 className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground mb-3 md:mb-4" />
+              <p className="text-sm md:text-base text-muted-foreground">Nenhum job pendente</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-6">
             {pendingJobs.map((job) => (
               <Card
                 key={job.id}
                 className="bg-card border-white/5 hover:border-primary/50 transition-colors"
                 data-testid={`pending-job-${job.id}`}
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg text-white">{job.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{job.client_name}</p>
+                <CardHeader className="p-4 md:p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base md:text-lg text-white line-clamp-2">{job.title}</CardTitle>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">{job.client_name}</p>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor('pending')}`}>
+                    <span className={`px-2 md:px-3 py-1 rounded-full text-xs font-bold uppercase whitespace-nowrap ${getStatusColor('pending')}`}>
                       Pendente
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="p-4 pt-0 md:p-6 md:pt-0 space-y-3 md:space-y-4">
                   {job.client_address && (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2 text-xs md:text-sm text-muted-foreground">
                       <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>{job.client_address}</span>
+                      <span className="line-clamp-2">{job.client_address}</span>
                     </div>
                   )}
 
                   {job.scheduled_date && (
-                    <div className="flex items-center gap-2 text-sm text-primary">
+                    <div className="flex items-center gap-2 text-xs md:text-sm text-primary">
                       <Calendar className="h-4 w-4" />
                       <span>
                         {new Date(job.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
@@ -247,7 +247,7 @@ const InstallerDashboard = () => {
 
                   <Button
                     onClick={() => handleOpenJob(job.id)}
-                    className="w-full bg-primary hover:bg-primary/90 neon-glow"
+                    className="w-full bg-primary hover:bg-primary/90 neon-glow h-11 md:h-10"
                     data-testid={`start-job-${job.id}`}
                   >
                     <PlayCircle className="mr-2 h-5 w-5" />
