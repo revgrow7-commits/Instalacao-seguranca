@@ -51,6 +51,24 @@ const Dashboard = () => {
     }
   };
 
+  const handleDeleteCheckin = async (checkinId) => {
+    if (!window.confirm('Tem certeza que deseja excluir este check-in? Esta ação não pode ser desfeita.')) {
+      return;
+    }
+    
+    try {
+      setDeletingId(checkinId);
+      await api.deleteCheckin(checkinId);
+      toast.success('Check-in excluído com sucesso');
+      // Reload data
+      loadDashboardData();
+    } catch (error) {
+      toast.error('Erro ao excluir check-in');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
