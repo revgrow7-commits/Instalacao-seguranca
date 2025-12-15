@@ -272,7 +272,19 @@ frontend:
     status_history:
         - working: true
           agent: "main"
-          comment: "✅ CheckOut page fully implemented with all new fields: M² Instalado (shows job total area as reference), Complexidade (1-5 scale), Altura (4 options), Cenário (6 options), Dificuldades Encontradas. Full page screenshot verified all fields present and correctly styled. API test confirmed data is saved to database correctly."
+          comment: "✅ CheckOut page fully implemented with all new fields: M² Instalado (with job total area reference), Complexidade (scale 1-5), Altura (4 options), Cenário (6 options), Dificuldades Encontradas. Full page screenshot verified all fields present and correctly styled. API test confirmed data is saved to database correctly."
+
+  - task: "Simplified Item Checkout Form (InstallerJobDetail)"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/frontend/src/pages/InstallerJobDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "needs_testing"
+          agent: "main"
+          comment: "UI simplified: removed M² Instalados, Complexidade, Altura, Cenário fields. Added Observação (notes) field. Now shows 'DADOS DEFINIDOS PELO GERENTE' as read-only section. Screenshots confirmed UI changes. Needs full flow testing."
 
   - task: "PWA Update Notification"
     implemented: true
