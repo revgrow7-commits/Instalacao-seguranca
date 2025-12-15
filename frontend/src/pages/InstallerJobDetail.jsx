@@ -142,28 +142,30 @@ const InstallerJobDetail = () => {
       }
 
       const item = getItemByIndex(itemIndex);
+      const assignment = getItemAssignment(itemIndex);
+      
+      // Usar valores definidos pelo gerente na atribuição
+      const complexityLevel = assignment?.manager_difficulty_level || 3;
+      const heightCategory = 'terreo'; // Valor padrão (altura será definida pelo cenário)
+      const scenarioCategory = assignment?.manager_scenario_category || 'loja_rua';
+      const installedM2 = item?.total_area_m2 || 0; // Usar o m² calculado do item
+      
       const formData = new FormData();
       formData.append('photo_base64', photoBase64);
       formData.append('gps_lat', gpsLocation?.lat || -29.9);
       formData.append('gps_long', gpsLocation?.long || -51.1);
       formData.append('gps_accuracy', gpsLocation?.accuracy || 10);
-      formData.append('installed_m2', checkoutForm.installed_m2 || item?.total_area_m2 || 0);
-      formData.append('complexity_level', checkoutForm.complexity_level);
-      formData.append('height_category', checkoutForm.height_category);
-      formData.append('scenario_category', checkoutForm.scenario_category);
+      formData.append('installed_m2', installedM2);
+      formData.append('complexity_level', complexityLevel);
+      formData.append('height_category', heightCategory);
+      formData.append('scenario_category', scenarioCategory);
       formData.append('notes', checkoutForm.notes);
 
       await api.completeItemCheckout(checkin.id, formData);
       toast.success('Check-out do item realizado!');
       
       // Reset form
-      setCheckoutForm({
-        installed_m2: '',
-        complexity_level: 3,
-        height_category: 'terreo',
-        scenario_category: 'loja_rua',
-        notes: ''
-      });
+      setCheckoutForm({ notes: '' });
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
