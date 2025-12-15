@@ -950,6 +950,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     """
     Atribui itens específicos do job a instaladores.
     Permite selecionar múltiplos itens e atribuir a um ou mais instaladores.
+    Inclui nível de dificuldade e cenário definidos pelo gerente.
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
@@ -1005,10 +1006,27 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
                 "assigned_at": now,
                 "item_area_m2": item_area,
                 "assigned_m2": m2_per_installer,
-                "status": "pending"  # pending, in_progress, completed
+                "status": "pending",  # pending, in_progress, completed
+                # Campos definidos pelo gerente
+                "manager_difficulty_level": assignment.difficulty_level,
+                "manager_scenario_category": assignment.scenario_category,
+                "assigned_by": current_user.id
             }
             new_assignments.append(new_assignment)
             total_m2_assigned += m2_per_installer
+    
+    # Se apply_to_all está ativado, atualizar também a configuração do job
+    if assignment.apply_to_all and (assignment.difficulty_level or assignment.scenario_category):
+        job_config = job.get("installation_config", {})
+        if assignment.difficulty_level:
+            job_config["default_difficulty_level"] = assignment.difficulty_level
+        if assignment.scenario_category:
+            job_config["default_scenario_category"] = assignment.scenario_category
+        
+        await db.jobs.update_one(
+            {"id": job_id},
+            {"$set": {"installation_config": job_config}}
+        )
     
     # Combinar atribuições
     all_assignments = current_assignments + new_assignments
