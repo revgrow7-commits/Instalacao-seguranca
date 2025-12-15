@@ -253,12 +253,12 @@ const JobDetail = () => {
   const assignedInstallersData = installers.filter(i => selectedInstallers.includes(i.id));
 
   return (
-    <div className="p-4 md:p-8 space-y-6" data-testid="job-detail-page">
+    <div className="p-4 md:p-8 space-y-4 md:space-y-6 pb-24 md:pb-8" data-testid="job-detail-page">
       {/* Back Button */}
       <Button
         variant="ghost"
         onClick={() => navigate('/jobs')}
-        className="text-white hover:text-primary"
+        className="text-white hover:text-primary -ml-2"
         data-testid="back-button"
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
@@ -266,29 +266,32 @@ const JobDetail = () => {
       </Button>
 
       {/* Job Header */}
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
+      <div className="space-y-3">
+        <div className="flex flex-col gap-2">
+          <div className="flex items-start justify-between gap-2">
+            <h1 className="text-xl md:text-4xl font-heading font-bold text-white tracking-tight line-clamp-2 flex-1">
               {job.title}
             </h1>
             {job.holdprint_data?.code && (
-              <span className="px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-sm font-bold border border-purple-500/30">
+              <span className="px-2 md:px-3 py-1 rounded-full bg-purple-500/20 text-purple-400 text-xs md:text-sm font-bold border border-purple-500/30 whitespace-nowrap">
                 OS #{job.holdprint_data.code}
               </span>
             )}
           </div>
-          <p className="text-muted-foreground mt-2">Job ID: {job.id}</p>
+          <p className="text-xs md:text-sm text-muted-foreground break-all md:break-normal">
+            Job ID: <span className="hidden md:inline">{job.id}</span>
+            <span className="md:hidden">{job.id.slice(0, 8)}...{job.id.slice(-4)}</span>
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {isJobDelayed() && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/30">
-              <AlertCircle className="h-4 w-4 text-red-500" />
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-500/20 border border-red-500/30">
+              <AlertCircle className="h-3 w-3 md:h-4 md:w-4 text-red-500" />
               <span className="text-xs font-semibold text-red-500 uppercase">ATRASADO</span>
             </div>
           )}
-          <span className={`px-4 py-2 rounded-full text-sm font-bold uppercase tracking-wider border ${getStatusColor(job.status)}`}>
+          <span className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-bold uppercase tracking-wider border ${getStatusColor(job.status)}`}>
             {getStatusLabel(job.status)}
           </span>
         </div>
