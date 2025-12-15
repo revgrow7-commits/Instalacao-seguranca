@@ -234,15 +234,30 @@ const Dashboard = () => {
                         </div>
                       )}
 
-                      {/* View Details Button */}
-                      <Button
-                        onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
-                        className="w-full bg-primary hover:bg-primary/90"
-                        size="sm"
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Ver Detalhes
-                      </Button>
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                          className="flex-1 bg-primary hover:bg-primary/90"
+                          size="sm"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver Detalhes
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteCheckin(checkin.id)}
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+                          disabled={deletingId === checkin.id}
+                        >
+                          {deletingId === checkin.id ? (
+                            <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
