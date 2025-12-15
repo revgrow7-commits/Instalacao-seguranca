@@ -138,11 +138,17 @@ const JobDetail = () => {
     }
 
     try {
-      await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers);
+      await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers, {
+        difficulty_level: assignmentDifficulty ? parseInt(assignmentDifficulty) : null,
+        scenario_category: assignmentScenario || null,
+        apply_to_all: applyToAllItems
+      });
       toast.success('Itens atribuídos com sucesso!');
       setShowAssignItemsDialog(false);
       setSelectedItems([]);
       setSelectedItemInstallers([]);
+      setAssignmentDifficulty('');
+      setAssignmentScenario('');
       loadData();
     } catch (error) {
       toast.error('Erro ao atribuir itens');
