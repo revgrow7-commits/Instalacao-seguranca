@@ -336,6 +336,27 @@ const Jobs = () => {
                     Agendado: {new Date(job.scheduled_date).toLocaleDateString('pt-BR')}
                   </div>
                 )}
+
+                {/* Delete Button - Only for Admin/Manager */}
+                {(isAdmin || isManager) && (
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteJob(job.id, job.title);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2 border-red-500/50 text-red-500 hover:bg-red-500/10"
+                    disabled={deletingJobId === job.id}
+                  >
+                    {deletingJobId === job.id ? (
+                      <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full mr-2" />
+                    ) : (
+                      <Trash2 className="h-4 w-4 mr-2" />
+                    )}
+                    Excluir Job
+                  </Button>
+                )}
               </CardContent>
             </Card>
           ))}
