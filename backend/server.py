@@ -1501,6 +1501,75 @@ async def get_checkin_details(
         "job": job
     }
 
+@api_router.delete("/checkins/{checkin_id}")
+async def delete_checkin(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a check-in - Only admin and managers"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Check if checkin exists
+    checkin = await db.checkins.find_one({"id": checkin_id})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Check-in not found")
+    
+    # Delete the checkin
+    await db.checkins.delete_one({"id": checkin_id})
+    
+    # Also delete related installed products
+    await db.installed_products.delete_many({"checkin_id": checkin_id})
+    
+    return {"message": "Check-in deleted successfully"}
+
+@api_router.delete("/jobs/{job_id}")
+async def delete_job(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete a job and all related data - Only admin and managers"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Check if job exists
+    job = await db.jobs.find_one({"id": job_id})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Delete all related checkins
+    await db.checkins.delete_many({"job_id": job_id})
+    
+    # Delete all related item checkins
+    await db.item_checkins.delete_many({"job_id": job_id})
+    
+    # Delete all related installed products
+    await db.installed_products.delete_many({"job_id": job_id})
+    
+    # Delete the job
+    await db.jobs.delete_one({"id": job_id})
+    
+    return {"message": "Job and all related data deleted successfully"}
+
+@api_router.delete("/item-checkins/{checkin_id}")
+async def delete_item_checkin(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Delete an item check-in - Only admin and managers"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Check if item checkin exists
+    checkin = await db.item_checkins.find_one({"id": checkin_id})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Item check-in not found")
+    
+    # Delete the item checkin
+    await db.item_checkins.delete_one({"id": checkin_id})
+    
+    # Also delete related installed products
+    await db.installed_products.delete_many({"checkin_id": checkin_id})
+    
+    return {"message": "Item check-in deleted successfully"}
+
 # ============ ITEM CHECK-IN/OUT ROUTES (per item) ============
 
 @api_router.post("/item-checkins")
