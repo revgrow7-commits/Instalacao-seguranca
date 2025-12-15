@@ -377,9 +377,13 @@ class JobSchedule(BaseModel):
     installer_ids: Optional[List[str]] = None
 
 class ItemAssignment(BaseModel):
+class ItemAssignment(BaseModel):
     """Atribuição de itens específicos a instaladores"""
     item_indices: List[int]  # Índices dos itens/produtos a atribuir
     installer_ids: List[str]  # IDs dos instaladores
+    difficulty_level: Optional[int] = None  # 1-5 Nível de dificuldade definido pelo gerente
+    scenario_category: Optional[str] = None  # Cenário definido pelo gerente
+    apply_to_all: bool = True  # Aplicar a todos os itens selecionados
 
 class CheckIn(BaseModel):
     model_config = ConfigDict(extra="ignore")
