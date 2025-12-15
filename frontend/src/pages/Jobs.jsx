@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, Download } from 'lucide-react';
+import { Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, Download, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Jobs = () => {
@@ -22,6 +22,7 @@ const Jobs = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState(null);
 
   useEffect(() => {
     loadJobs();
@@ -35,6 +36,23 @@ const Jobs = () => {
       toast.error('Erro ao carregar jobs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteJob = async (jobId, jobTitle) => {
+    if (!window.confirm(`Tem certeza que deseja excluir o job "${jobTitle}"?\n\nIsso também excluirá todos os check-ins relacionados. Esta ação não pode ser desfeita.`)) {
+      return;
+    }
+    
+    try {
+      setDeletingJobId(jobId);
+      await api.deleteJob(jobId);
+      toast.success('Job excluído com sucesso');
+      loadJobs();
+    } catch (error) {
+      toast.error('Erro ao excluir job');
+    } finally {
+      setDeletingJobId(null);
     }
   };
 
