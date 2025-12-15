@@ -94,46 +94,46 @@ const InstallerDashboard = () => {
   const completedJobs = jobs.filter(j => j.status === 'completed');
 
   return (
-    <div className="p-4 md:p-8 space-y-8" data-testid="installer-dashboard">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8" data-testid="installer-dashboard">
       {/* Header */}
       <div>
-        <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
+        <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">
           Olá, {user?.name}
         </h1>
-        <p className="text-muted-foreground mt-2">
+        <p className="text-sm md:text-base text-muted-foreground mt-1">
           Seus Jobs de Instalação
         </p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-3 gap-3 md:gap-6">
         <Card className="bg-card border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-300">Pendentes</CardTitle>
-            <Clock className="h-5 w-5 text-yellow-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-300">Pendentes</CardTitle>
+            <Clock className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{pendingJobs.length}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-2xl md:text-3xl font-bold text-white">{pendingJobs.length}</div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-300">Em Andamento</CardTitle>
-            <PlayCircle className="h-5 w-5 text-blue-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-300">Em Andamento</CardTitle>
+            <PlayCircle className="h-4 w-4 md:h-5 md:w-5 text-blue-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{activeJobs.length}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-2xl md:text-3xl font-bold text-white">{activeJobs.length}</div>
           </CardContent>
         </Card>
 
         <Card className="bg-card border-white/5">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-300">Concluídos</CardTitle>
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 md:pb-2 px-3 md:px-6 pt-3 md:pt-6">
+            <CardTitle className="text-xs md:text-sm font-medium text-gray-300">Concluídos</CardTitle>
+            <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
           </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-white">{completedJobs.length}</div>
+          <CardContent className="px-3 md:px-6 pb-3 md:pb-6">
+            <div className="text-2xl md:text-3xl font-bold text-white">{completedJobs.length}</div>
           </CardContent>
         </Card>
       </div>
