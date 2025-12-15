@@ -377,7 +377,6 @@ class JobSchedule(BaseModel):
     installer_ids: Optional[List[str]] = None
 
 class ItemAssignment(BaseModel):
-class ItemAssignment(BaseModel):
     """Atribuição de itens específicos a instaladores"""
     item_indices: List[int]  # Índices dos itens/produtos a atribuir
     installer_ids: List[str]  # IDs dos instaladores
