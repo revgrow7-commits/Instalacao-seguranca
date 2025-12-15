@@ -32,6 +32,29 @@ const JobDetail = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [selectedItemInstallers, setSelectedItemInstallers] = useState([]);
   const [assignments, setAssignments] = useState(null);
+  
+  // Estados para nível de dificuldade e cenário (atribuição em massa)
+  const [assignmentDifficulty, setAssignmentDifficulty] = useState('');
+  const [assignmentScenario, setAssignmentScenario] = useState('');
+  const [applyToAllItems, setApplyToAllItems] = useState(true);
+
+  // Opções de dificuldade e cenário
+  const difficultyOptions = [
+    { value: '1', label: 'Nível 1 - Muito Fácil' },
+    { value: '2', label: 'Nível 2 - Fácil' },
+    { value: '3', label: 'Nível 3 - Médio' },
+    { value: '4', label: 'Nível 4 - Difícil' },
+    { value: '5', label: 'Nível 5 - Muito Difícil' }
+  ];
+
+  const scenarioOptions = [
+    { value: 'loja_rua', label: '01 - Loja de Rua' },
+    { value: 'shopping', label: '02 - Shopping' },
+    { value: 'evento', label: '03 - Evento' },
+    { value: 'fachada', label: '04 - Fachada' },
+    { value: 'outdoor', label: '05 - Outdoor' },
+    { value: 'veiculo', label: '06 - Veículo' }
+  ];
 
   useEffect(() => {
     loadData();
