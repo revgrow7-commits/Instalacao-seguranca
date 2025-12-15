@@ -727,10 +727,10 @@ const JobDetail = () => {
 
             {job.scheduled_date && (
               <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" /> Agendado para
                 </p>
-                <p className="text-white font-medium">
+                <p className="text-white font-medium text-sm md:text-base">
                   {new Date(job.scheduled_date).toLocaleString('pt-BR')}
                 </p>
               </div>
@@ -739,8 +739,8 @@ const JobDetail = () => {
             {/* Data de Criação */}
             {job.holdprint_data?.creationTime && (
               <div>
-                <p className="text-sm text-muted-foreground">Data de Criação</p>
-                <p className="text-white">
+                <p className="text-xs md:text-sm text-muted-foreground">Data de Criação</p>
+                <p className="text-white text-sm md:text-base">
                   {new Date(job.holdprint_data.creationTime).toLocaleString('pt-BR')}
                 </p>
               </div>
@@ -749,13 +749,13 @@ const JobDetail = () => {
         </Card>
 
         <Card className="bg-card border-white/5">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="text-white flex items-center gap-2 text-base md:text-lg">
+              <Users className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Instaladores Atribuídos
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 md:p-6 pt-0">
             {assignedInstallersData.length > 0 ? (
               <div className="space-y-2">
                 {assignedInstallersData.map((installer) => (
