@@ -48,6 +48,7 @@ export const api = {
     return axios.get(url, { headers: getAuthHeader() });
   },
   getCheckinDetails: (checkinId) => axios.get(`${API_URL}/checkins/${checkinId}/details`, { headers: getAuthHeader() }),
+  deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
   // Item Check-ins (per item)
   createItemCheckin: (formData) => axios.post(`${API_URL}/item-checkins`, formData, { 
@@ -57,9 +58,11 @@ export const api = {
     headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
   }),
   getItemCheckins: (jobId) => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
+  deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
   
   // Job by ID
   getJobById: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
+  deleteJob: (jobId) => axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
 
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
