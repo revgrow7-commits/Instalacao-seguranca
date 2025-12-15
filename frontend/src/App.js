@@ -18,6 +18,7 @@ import Reports from './pages/Reports';
 import Metrics from './pages/Metrics';
 import FamilyReport from './pages/FamilyReport';
 import InstallerReport from './pages/InstallerReport';
+import Profile from './pages/Profile';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import UpdateNotification from './components/UpdateNotification';
