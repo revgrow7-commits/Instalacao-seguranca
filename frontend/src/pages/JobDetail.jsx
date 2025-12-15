@@ -603,7 +603,7 @@ const JobDetail = () => {
 
           <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10">
+              <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 w-full sm:w-auto justify-center text-sm">
                 <Calendar className="mr-2 h-4 w-4" />
                 Agendar
               </Button>
