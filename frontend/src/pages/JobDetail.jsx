@@ -139,8 +139,8 @@ const JobDetail = () => {
 
     try {
       await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers, {
-        difficulty_level: assignmentDifficulty ? parseInt(assignmentDifficulty) : null,
-        scenario_category: assignmentScenario || null,
+        difficulty_level: assignmentDifficulty && assignmentDifficulty !== 'none' ? parseInt(assignmentDifficulty) : null,
+        scenario_category: assignmentScenario && assignmentScenario !== 'none' ? assignmentScenario : null,
         apply_to_all: applyToAllItems
       });
       toast.success('Itens atribuídos com sucesso!');
