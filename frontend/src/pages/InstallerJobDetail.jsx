@@ -26,12 +26,8 @@ const InstallerJobDetail = () => {
   const [gpsError, setGpsError] = useState(null);
   const fileInputRef = useRef({});
 
-  // Form state for checkout
+  // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
-    installed_m2: '',
-    complexity_level: 3,
-    height_category: 'terreo',
-    scenario_category: 'loja_rua',
     notes: ''
   });
 
@@ -39,6 +35,13 @@ const InstallerJobDetail = () => {
     loadJobData();
     requestGPS();
   }, [jobId]);
+
+  // Buscar os valores de atribuição definidos pelo gerente para um item
+  const getItemAssignment = (itemIndex) => {
+    if (!job) return null;
+    const assignments = job.item_assignments || [];
+    return assignments.find(a => a.item_index === itemIndex);
+  };
 
   const requestGPS = () => {
     if (navigator.geolocation) {
