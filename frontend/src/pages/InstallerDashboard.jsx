@@ -141,8 +141,8 @@ const InstallerDashboard = () => {
       {/* Active Jobs */}
       {activeJobs.length > 0 && (
         <div>
-          <h2 className="text-2xl font-heading font-bold text-white mb-4">Jobs em Andamento</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <h2 className="text-lg md:text-2xl font-heading font-bold text-white mb-3 md:mb-4">Jobs em Andamento</h2>
+          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-6">
             {activeJobs.map((job) => {
               const checkin = getJobCheckin(job.id);
               const startTime = checkin ? new Date(checkin.checkin_at) : null;
@@ -154,37 +154,37 @@ const InstallerDashboard = () => {
                   className="bg-card border-blue-500/30 neon-glow"
                   data-testid={`active-job-${job.id}`}
                 >
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-lg text-white">{job.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground mt-1">{job.client_name}</p>
+                  <CardHeader className="p-4 md:p-6">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-base md:text-lg text-white line-clamp-2">{job.title}</CardTitle>
+                        <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">{job.client_name}</p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor('in_progress')}`}>
+                      <span className={`px-2 md:px-3 py-1 rounded-full text-xs font-bold uppercase whitespace-nowrap ${getStatusColor('in_progress')}`}>
                         Em Andamento
                       </span>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="p-4 pt-0 md:p-6 md:pt-0 space-y-3 md:space-y-4">
                     {job.client_address && (
-                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-start gap-2 text-xs md:text-sm text-muted-foreground">
                         <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                        <span>{job.client_address}</span>
+                        <span className="line-clamp-2">{job.client_address}</span>
                       </div>
                     )}
 
                     {startTime && (
-                      <div className="flex items-center gap-2 text-sm">
+                      <div className="flex items-center gap-2 text-xs md:text-sm">
                         <Clock className="h-4 w-4 text-blue-500" />
                         <span className="text-white font-medium">
-                          Tempo decorrido: {Math.floor(elapsedMinutes / 60)}h {elapsedMinutes % 60}min
+                          Tempo: {Math.floor(elapsedMinutes / 60)}h {elapsedMinutes % 60}min
                         </span>
                       </div>
                     )}
 
                     <Button
                       onClick={() => handleOpenJob(job.id)}
-                      className="w-full bg-green-500 hover:bg-green-600 text-white"
+                      className="w-full bg-green-500 hover:bg-green-600 text-white h-11 md:h-10"
                       data-testid={`finish-job-${job.id}`}
                     >
                       <StopCircle className="mr-2 h-5 w-5" />
