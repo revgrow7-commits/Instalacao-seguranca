@@ -358,7 +358,7 @@ const JobDetail = () => {
           </Dialog>
           <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
+              <Button className="bg-primary hover:bg-primary/90 w-full sm:w-auto justify-center text-sm">
                 <Users className="mr-2 h-4 w-4" />
                 Atribuir Instaladores
               </Button>
