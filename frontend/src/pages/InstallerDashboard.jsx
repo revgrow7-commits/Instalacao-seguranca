@@ -263,18 +263,18 @@ const InstallerDashboard = () => {
       {/* Completed Jobs */}
       {completedJobs.length > 0 && (
         <div>
-          <h2 className="text-2xl font-heading font-bold text-white mb-4">Jobs Concluídos Recentes</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <h2 className="text-lg md:text-2xl font-heading font-bold text-white mb-3 md:mb-4">Jobs Concluídos Recentes</h2>
+          <div className="space-y-2 md:space-y-0 md:grid md:grid-cols-2 lg:grid-cols-3 md:gap-6">
             {completedJobs.slice(0, 6).map((job) => (
               <Card
                 key={job.id}
                 className="bg-card border-white/5"
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-base text-white line-clamp-1">{job.title}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{job.client_name}</p>
+                <CardHeader className="p-4 md:p-6">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-sm md:text-base text-white line-clamp-1">{job.title}</CardTitle>
+                      <p className="text-xs md:text-sm text-muted-foreground mt-1 truncate">{job.client_name}</p>
                     </div>
                     <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
                   </div>
