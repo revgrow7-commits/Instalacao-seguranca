@@ -299,10 +299,10 @@ const JobDetail = () => {
 
       {/* Action Buttons - Admin/Manager only */}
       {(isAdmin || isManager) && (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <Dialog open={showStatusDialog} onOpenChange={setShowStatusDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10">
+              <Button variant="outline" className="border-white/20 text-white hover:bg-white/10 w-full sm:w-auto justify-center text-sm">
                 Alterar Status
               </Button>
             </DialogTrigger>
