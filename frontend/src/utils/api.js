@@ -32,7 +32,13 @@ export const api = {
   scheduleJob: (jobId, scheduledDate, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() }),
   
   // Item Assignments
-  assignItemsToInstallers: (jobId, itemIndices, installerIds) => axios.post(`${API_URL}/jobs/${jobId}/assign-items`, { item_indices: itemIndices, installer_ids: installerIds }, { headers: getAuthHeader() }),
+  assignItemsToInstallers: (jobId, itemIndices, installerIds, options = {}) => axios.post(`${API_URL}/jobs/${jobId}/assign-items`, { 
+    item_indices: itemIndices, 
+    installer_ids: installerIds,
+    difficulty_level: options.difficulty_level || null,
+    scenario_category: options.scenario_category || null,
+    apply_to_all: options.apply_to_all !== undefined ? options.apply_to_all : true
+  }, { headers: getAuthHeader() }),
   getJobAssignments: (jobId) => axios.get(`${API_URL}/jobs/${jobId}/assignments`, { headers: getAuthHeader() }),
   updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
 
