@@ -444,93 +444,58 @@ const InstallerJobDetail = () => {
                           <div className="bg-blue-500/10 rounded-lg p-3">
                             <p className="text-sm text-blue-400 flex items-center gap-2">
                               <Clock className="h-4 w-4" />
-                              Check-in realizado. Preencha os dados abaixo e faça o check-out.
+                              Check-in realizado. Adicione uma observação e finalize o check-out.
                             </p>
                           </div>
 
-                          {/* Checkout Form */}
-                          <div className="space-y-3">
-                            <div>
-                              <Label className="text-sm text-muted-foreground">M² Instalados</Label>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                placeholder={`Sugestão: ${(item.total_area_m2 || 0).toFixed(2)}`}
-                                value={checkoutForm.installed_m2}
-                                onChange={(e) => setCheckoutForm({...checkoutForm, installed_m2: e.target.value})}
-                                className="bg-background/50"
-                              />
-                            </div>
-
-                            <div>
-                              <Label className="text-sm text-muted-foreground">Complexidade</Label>
-                              <div className="grid grid-cols-5 gap-1 mt-1">
-                                {[1, 2, 3, 4, 5].map((level) => (
-                                  <button
-                                    key={level}
-                                    onClick={() => setCheckoutForm({...checkoutForm, complexity_level: level})}
-                                    className={`p-2 rounded text-sm transition-all ${
-                                      checkoutForm.complexity_level === level
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted hover:bg-muted/80'
-                                    }`}
-                                  >
-                                    {level}
-                                  </button>
-                                ))}
+                          {/* Info definida pelo Gerente (somente leitura) */}
+                          {(() => {
+                            const assignment = getItemAssignment(index);
+                            const scenarioLabels = {
+                              'loja_rua': 'Loja de Rua',
+                              'shopping': 'Shopping',
+                              'evento': 'Evento',
+                              'fachada': 'Fachada',
+                              'outdoor': 'Outdoor',
+                              'veiculo': 'Veículo'
+                            };
+                            return assignment ? (
+                              <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Dados definidos pelo Gerente</p>
+                                <div className="grid grid-cols-2 gap-2 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">m² do Item:</span>
+                                    <span className="ml-2 text-foreground font-medium">{(item.total_area_m2 || 0).toFixed(2)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Dificuldade:</span>
+                                    <span className="ml-2 text-foreground font-medium">{assignment.manager_difficulty_level || 3}/5</span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-muted-foreground">Cenário:</span>
+                                    <span className="ml-2 text-foreground font-medium">
+                                      {scenarioLabels[assignment.manager_scenario_category] || assignment.manager_scenario_category || 'Loja de Rua'}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <p className="text-xs text-muted-foreground mt-1">1=Fácil, 5=Muito Difícil</p>
-                            </div>
-
-                            <div>
-                              <Label className="text-sm text-muted-foreground">Altura</Label>
-                              <div className="grid grid-cols-2 gap-2 mt-1">
-                                {[
-                                  { value: 'terreo', label: 'Térreo' },
-                                  { value: 'media', label: 'Média' },
-                                  { value: 'alta', label: 'Alta' },
-                                  { value: 'muito_alta', label: 'Muito Alta' }
-                                ].map((opt) => (
-                                  <button
-                                    key={opt.value}
-                                    onClick={() => setCheckoutForm({...checkoutForm, height_category: opt.value})}
-                                    className={`p-2 rounded text-sm transition-all ${
-                                      checkoutForm.height_category === opt.value
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted hover:bg-muted/80'
-                                    }`}
-                                  >
-                                    {opt.label}
-                                  </button>
-                                ))}
+                            ) : (
+                              <div className="bg-yellow-500/10 rounded-lg p-3">
+                                <p className="text-xs text-yellow-400">Dados de atribuição não encontrados. Serão usados valores padrão.</p>
                               </div>
-                            </div>
+                            );
+                          })()}
 
-                            <div>
-                              <Label className="text-sm text-muted-foreground">Cenário</Label>
-                              <div className="grid grid-cols-3 gap-2 mt-1">
-                                {[
-                                  { value: 'loja_rua', label: 'Loja' },
-                                  { value: 'shopping', label: 'Shopping' },
-                                  { value: 'evento', label: 'Evento' },
-                                  { value: 'fachada', label: 'Fachada' },
-                                  { value: 'outdoor', label: 'Outdoor' },
-                                  { value: 'veiculo', label: 'Veículo' }
-                                ].map((opt) => (
-                                  <button
-                                    key={opt.value}
-                                    onClick={() => setCheckoutForm({...checkoutForm, scenario_category: opt.value})}
-                                    className={`p-2 rounded text-sm transition-all ${
-                                      checkoutForm.scenario_category === opt.value
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted hover:bg-muted/80'
-                                    }`}
-                                  >
-                                    {opt.label}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                          {/* Campo de Observação */}
+                          <div>
+                            <Label className="text-sm text-muted-foreground">Observação (opcional)</Label>
+                            <textarea
+                              placeholder="Adicione uma observação sobre a instalação..."
+                              value={checkoutForm.notes}
+                              onChange={(e) => setCheckoutForm({...checkoutForm, notes: e.target.value})}
+                              className="w-full mt-1 p-3 rounded-md bg-background/50 border border-border text-foreground placeholder:text-muted-foreground text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                              rows={3}
+                            />
                           </div>
 
                           <Button
