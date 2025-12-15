@@ -409,7 +409,7 @@ const JobDetail = () => {
           {/* Dialog para atribuir itens específicos */}
           <Dialog open={showAssignItemsDialog} onOpenChange={setShowAssignItemsDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-green-500/50 text-green-400 hover:bg-green-500/10">
+              <Button variant="outline" className="border-green-500/50 text-green-400 hover:bg-green-500/10 w-full sm:w-auto justify-center text-sm">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Atribuir Itens
               </Button>
