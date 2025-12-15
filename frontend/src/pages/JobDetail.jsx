@@ -499,6 +499,62 @@ const JobDetail = () => {
                   </div>
                 </div>
 
+                {/* Nível de Dificuldade e Cenário */}
+                <div className="space-y-4 p-4 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-white font-medium flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-purple-400" />
+                      Classificação da Instalação
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="applyToAll"
+                        checked={applyToAllItems}
+                        onCheckedChange={setApplyToAllItems}
+                      />
+                      <Label htmlFor="applyToAll" className="text-sm text-muted-foreground cursor-pointer">
+                        Aplicar a todos os itens
+                      </Label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-white">Nível de Dificuldade</Label>
+                      <Select value={assignmentDifficulty} onValueChange={setAssignmentDifficulty}>
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                          <SelectValue placeholder="Selecione o nível" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-white/10">
+                          <SelectItem value="">Não definido</SelectItem>
+                          {difficultyOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-white">Cenário de Instalação</Label>
+                      <Select value={assignmentScenario} onValueChange={setAssignmentScenario}>
+                        <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                          <SelectValue placeholder="Selecione o cenário" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-card border-white/10">
+                          <SelectItem value="">Não definido</SelectItem>
+                          {scenarioOptions.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    Esses valores serão usados para calcular métricas de produtividade e gerar relatórios.
+                  </p>
+                </div>
+
                 {/* Resumo */}
                 {selectedItems.length > 0 && selectedItemInstallers.length > 0 && (
                   <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3">
