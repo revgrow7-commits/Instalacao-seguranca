@@ -664,62 +664,62 @@ const JobDetail = () => {
       )}
 
       {/* Job Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         <Card className="bg-card border-white/5">
-          <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <Briefcase className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="text-white flex items-center gap-2 text-base md:text-lg">
+              <Briefcase className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               Informações do Job
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-4 md:p-6 pt-0 space-y-3">
             {/* Número da OS */}
             {job.holdprint_data?.code && (
               <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
                   <FileText className="h-3 w-3" /> Número da OS
                 </p>
-                <p className="text-white font-bold text-lg">#{job.holdprint_data.code}</p>
+                <p className="text-white font-bold text-base md:text-lg">#{job.holdprint_data.code}</p>
               </div>
             )}
 
             {/* Cliente - usando dados da Holdprint se disponível */}
             <div>
-              <p className="text-sm text-muted-foreground">Cliente</p>
-              <p className="text-white font-medium">
+              <p className="text-xs md:text-sm text-muted-foreground">Cliente</p>
+              <p className="text-white font-medium text-sm md:text-base">
                 {job.holdprint_data?.customerName || job.client_name}
               </p>
             </div>
             
             {job.client_address && (
               <div>
-                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                <p className="text-xs md:text-sm text-muted-foreground flex items-center gap-1">
                   <MapPin className="h-3 w-3" /> Endereço
                 </p>
-                <p className="text-white">{job.client_address}</p>
+                <p className="text-white text-sm md:text-base">{job.client_address}</p>
               </div>
             )}
 
             <div>
-              <p className="text-sm text-muted-foreground">Filial</p>
-              <p className="text-white font-medium">{job.branch === 'SP' ? 'São Paulo' : 'Porto Alegre'}</p>
+              <p className="text-xs md:text-sm text-muted-foreground">Filial</p>
+              <p className="text-white font-medium text-sm md:text-base">{job.branch === 'SP' ? 'São Paulo' : 'Porto Alegre'}</p>
             </div>
 
             {/* Área Total do Job */}
             {(job.area_m2 > 0 || job.total_products > 0) && (
               <div className="pt-3 border-t border-white/10">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 md:gap-3">
                   <div className="bg-primary/10 rounded-lg p-2 border border-primary/20 text-center">
-                    <p className="text-xs text-primary">Área Total</p>
-                    <p className="text-white font-bold text-lg">{job.area_m2?.toLocaleString('pt-BR') || 0} <span className="text-xs">m²</span></p>
+                    <p className="text-[10px] md:text-xs text-primary">Área Total</p>
+                    <p className="text-white font-bold text-sm md:text-lg">{job.area_m2?.toLocaleString('pt-BR') || 0} <span className="text-[10px] md:text-xs">m²</span></p>
                   </div>
                   <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20 text-center">
-                    <p className="text-xs text-blue-400">Produtos</p>
-                    <p className="text-white font-bold text-lg">{job.total_products || 0}</p>
+                    <p className="text-[10px] md:text-xs text-blue-400">Produtos</p>
+                    <p className="text-white font-bold text-sm md:text-lg">{job.total_products || 0}</p>
                   </div>
                   <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20 text-center">
-                    <p className="text-xs text-green-400">Quantidade</p>
-                    <p className="text-white font-bold text-lg">{job.total_quantity || 0}</p>
+                    <p className="text-[10px] md:text-xs text-green-400">Quantidade</p>
+                    <p className="text-white font-bold text-sm md:text-lg">{job.total_quantity || 0}</p>
                   </div>
                 </div>
               </div>
