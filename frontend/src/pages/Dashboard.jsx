@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye } from 'lucide-react';
+import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
@@ -13,6 +13,7 @@ const Dashboard = () => {
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
+  const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
