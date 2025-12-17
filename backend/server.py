@@ -1840,11 +1840,27 @@ async def complete_item_checkout(
         await db.installed_products.insert_one(installed_product.model_dump())
         await update_productivity_history(installed_product)
     
-    # Check if all items in job are completed
+    # Check if all ASSIGNED items in job are completed
+    job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
     job_checkins = await db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0}).to_list(1000)
-    all_completed = all(c["status"] == "completed" for c in job_checkins)
     
-    if all_completed:
+    # Get all assigned item indices
+    item_assignments = job.get("item_assignments", []) if job else []
+    assigned_item_indices = set()
+    for assignment in item_assignments:
+        for idx in assignment.get("item_indices", []):
+            assigned_item_indices.add(idx)
+    
+    # If no specific items assigned, consider all products
+    if not assigned_item_indices:
+        products = job.get("products_with_area", []) if job else []
+        assigned_item_indices = set(range(len(products)))
+    
+    # Check if all assigned items have completed checkins
+    completed_item_indices = set(c["item_index"] for c in job_checkins if c["status"] == "completed")
+    all_assigned_completed = assigned_item_indices.issubset(completed_item_indices) if assigned_item_indices else False
+    
+    if all_assigned_completed and len(assigned_item_indices) > 0:
         await db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
     
     # Return updated checkin
