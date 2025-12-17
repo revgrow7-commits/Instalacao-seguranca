@@ -218,6 +218,7 @@ const InstallerJobDetail = () => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) return 'pending';
     if (checkin.status === 'completed') return 'completed';
+    if (checkin.status === 'paused') return 'paused';
     return 'in_progress';
   };
 
@@ -225,12 +226,82 @@ const InstallerJobDetail = () => {
     switch (status) {
       case 'completed': return 'bg-green-500/20 text-green-400 border-green-500/30';
       case 'in_progress': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'paused': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
       default: return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
     }
   };
 
   const getStatusText = (status) => {
     switch (status) {
+      case 'completed': return 'Concluído';
+      case 'in_progress': return 'Em Andamento';
+      case 'paused': return 'Pausado';
+      default: return 'Pendente';
+    }
+  };
+
+  const handleOpenPauseModal = (itemIndex) => {
+    setPauseItemIndex(itemIndex);
+    setPauseReason('');
+    setShowPauseModal(true);
+  };
+
+  const handlePauseItem = async () => {
+    if (!pauseReason) {
+      toast.error('Selecione o motivo da pausa');
+      return;
+    }
+    
+    const checkin = itemCheckins[pauseItemIndex];
+    if (!checkin) return;
+    
+    try {
+      setProcessingItem(pauseItemIndex);
+      await api.pauseItemCheckin(checkin.id, pauseReason);
+      toast.success('Item pausado');
+      setShowPauseModal(false);
+      await loadJobData();
+    } catch (error) {
+      toast.error('Erro ao pausar item');
+      console.error(error);
+    } finally {
+      setProcessingItem(null);
+    }
+  };
+
+  const handleResumeItem = async (itemIndex) => {
+    const checkin = itemCheckins[itemIndex];
+    if (!checkin) return;
+    
+    try {
+      setProcessingItem(itemIndex);
+      await api.resumeItemCheckin(checkin.id);
+      toast.success('Item retomado');
+      await loadJobData();
+    } catch (error) {
+      toast.error('Erro ao retomar item');
+      console.error(error);
+    } finally {
+      setProcessingItem(null);
+    }
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes) return '0min';
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0) {
+      return `${hours}h ${mins}min`;
+    }
+    return `${mins}min`;
+  };
+
+  const getElapsedTime = (checkin) => {
+    if (!checkin || !checkin.checkin_at) return 0;
+    const start = new Date(checkin.checkin_at);
+    const now = new Date();
+    return Math.floor((now - start) / 60000);
+  };
       case 'completed': return 'Concluído';
       case 'in_progress': return 'Em Andamento';
       default: return 'Pendente';
