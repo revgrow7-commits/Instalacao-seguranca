@@ -86,6 +86,65 @@ const Calendar = () => {
     }
   };
 
+  const connectGoogleCalendar = async () => {
+    try {
+      const response = await api.getGoogleAuthUrl();
+      window.location.href = response.data.authorization_url;
+    } catch (error) {
+      toast.error('Erro ao iniciar conexão com Google');
+    }
+  };
+
+  const disconnectGoogleCalendar = async () => {
+    try {
+      await api.disconnectGoogle();
+      setGoogleConnected(false);
+      setGoogleEmail(null);
+      toast.success('Google Calendar desconectado');
+    } catch (error) {
+      toast.error('Erro ao desconectar Google Calendar');
+    }
+  };
+
+  const syncJobToGoogleCalendar = async (job) => {
+    if (!googleConnected) {
+      toast.error('Conecte seu Google Calendar primeiro');
+      return;
+    }
+
+    setSyncingJob(job.id);
+    try {
+      const scheduledDate = new Date(job.scheduled_date);
+      // Assume job duration of 4 hours if not specified
+      const endDate = new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000);
+
+      const eventData = {
+        title: `[Instalação] ${job.title}`,
+        description: `Job: ${job.title}\nCliente: ${job.client_name || 'N/A'}\nFilial: ${job.branch}\nStatus: ${job.status}`,
+        start_datetime: scheduledDate.toISOString(),
+        end_datetime: endDate.toISOString(),
+        location: job.address || ''
+      };
+
+      const response = await api.createGoogleCalendarEvent(eventData);
+      toast.success('Job adicionado ao Google Calendar!');
+      
+      if (response.data.html_link) {
+        window.open(response.data.html_link, '_blank');
+      }
+    } catch (error) {
+      console.error('Error syncing to Google:', error);
+      if (error.response?.status === 401) {
+        toast.error('Sessão do Google expirada. Reconecte sua conta.');
+        setGoogleConnected(false);
+      } else {
+        toast.error('Erro ao adicionar ao Google Calendar');
+      }
+    } finally {
+      setSyncingJob(null);
+    }
+  };
+
   const getJobsForDate = (date) => {
     return jobs.filter(job => {
       const jobDate = new Date(job.scheduled_date);
