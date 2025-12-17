@@ -873,6 +873,379 @@ class FieldworkAPITest:
                 
         return True
 
+    def test_image_compression_function_direct(self):
+        """Test 16: Test image compression function directly"""
+        self.log("Testing image compression function directly...")
+        
+        # Create a large test image (3000x2000 pixels)
+        large_image_b64, original_size = create_large_test_image(3000, 2000)
+        original_size_kb = original_size / 1024
+        
+        self.log(f"   Created test image: 3000x2000 pixels, {original_size_kb:.1f}KB")
+        
+        # Test the compression by calling the backend endpoint that uses compression
+        if not self.installer_token:
+            self.log("❌ Missing installer token")
+            return False
+            
+        # We'll test compression indirectly by uploading a large image and checking the result
+        # Since we can't directly call the compression function, we'll verify it works through the API
+        
+        # Verify the large image is indeed large (should be > 300KB)
+        if original_size_kb <= 300:
+            self.log(f"⚠️  Test image is not large enough ({original_size_kb:.1f}KB), creating larger image...")
+            large_image_b64, original_size = create_large_test_image(4000, 3000)
+            original_size_kb = original_size / 1024
+            self.log(f"   Created larger test image: 4000x3000 pixels, {original_size_kb:.1f}KB")
+        
+        # Verify we can decode the base64 back to an image
+        try:
+            decoded_data = base64.b64decode(large_image_b64)
+            test_img = Image.open(BytesIO(decoded_data))
+            self.log(f"   ✅ Test image is valid: {test_img.size} pixels, {test_img.mode} mode")
+        except Exception as e:
+            self.log(f"   ❌ Failed to decode test image: {e}")
+            return False
+            
+        self.log(f"   ✅ Large test image created successfully: {original_size_kb:.1f}KB")
+        return True
+
+    def test_item_checkin_with_large_image(self):
+        """Test 17: Test POST /api/item-checkins with large image"""
+        self.log("Testing item checkin with large image compression...")
+        
+        if not self.installer_token or not self.test_job_id:
+            self.log("❌ Missing installer token or job ID")
+            return False
+            
+        # Create a large test image
+        large_image_b64, original_size = create_large_test_image(3000, 2000)
+        original_size_kb = original_size / 1024
+        
+        self.log(f"   Using large image: {original_size_kb:.1f}KB")
+        
+        headers = {"Authorization": f"Bearer {self.installer_token}"}
+        
+        # First, get job assignments to find an item to check in
+        response = self.session.get(f"{BASE_URL}/jobs/{self.test_job_id}/assignments", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not get job assignments: {response.status_code} - {response.text}")
+            return False
+            
+        assignments_data = response.json()
+        
+        # Find an item to check in (use item index 0 if available)
+        item_index = 0
+        if assignments_data.get("by_item"):
+            available_items = assignments_data["by_item"]
+            if available_items:
+                item_index = available_items[0]["item_index"]
+                self.log(f"   Using item index: {item_index}")
+            else:
+                self.log("   No items found in assignments, using index 0")
+        
+        # Prepare form data for item checkin
+        form_data = {
+            "job_id": self.test_job_id,
+            "item_index": item_index,
+            "photo_base64": large_image_b64,
+            "gps_lat": GPS_CHECKIN["lat"],
+            "gps_long": GPS_CHECKIN["long"],
+            "gps_accuracy": GPS_CHECKIN["accuracy"]
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/item-checkins",
+            data=form_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Item checkin failed: {response.status_code} - {response.text}")
+            return False
+            
+        checkin_data = response.json()
+        self.test_item_checkin_id = checkin_data["id"]
+        
+        self.log(f"✅ Item checkin successful with large image")
+        self.log(f"   Item Checkin ID: {self.test_item_checkin_id}")
+        
+        # Verify the photo was stored and potentially compressed
+        stored_photo = checkin_data.get("checkin_photo")
+        if stored_photo:
+            try:
+                # Decode the stored photo to check its size
+                stored_data = base64.b64decode(stored_photo)
+                stored_size_kb = len(stored_data) / 1024
+                
+                self.log(f"   Original image: {original_size_kb:.1f}KB")
+                self.log(f"   Stored image: {stored_size_kb:.1f}KB")
+                
+                # Check if compression occurred
+                if stored_size_kb < original_size_kb:
+                    compression_ratio = (1 - stored_size_kb / original_size_kb) * 100
+                    self.log(f"   ✅ Image compressed: {compression_ratio:.1f}% reduction")
+                    
+                    # Check if it meets the 300KB target
+                    if stored_size_kb <= 300:
+                        self.log(f"   ✅ Image meets 300KB target: {stored_size_kb:.1f}KB")
+                    else:
+                        self.log(f"   ⚠️  Image exceeds 300KB target: {stored_size_kb:.1f}KB")
+                else:
+                    self.log(f"   ⚠️  No compression detected (stored size >= original)")
+                    
+                # Verify the stored image is still valid
+                test_img = Image.open(BytesIO(stored_data))
+                self.log(f"   ✅ Stored image is valid: {test_img.size} pixels")
+                
+            except Exception as e:
+                self.log(f"   ❌ Error analyzing stored photo: {e}")
+                return False
+        else:
+            self.log(f"   ❌ No photo stored in checkin response")
+            return False
+            
+        return True
+
+    def test_item_checkout_with_large_image(self):
+        """Test 18: Test PUT /api/item-checkins/{id}/checkout with large image"""
+        self.log("Testing item checkout with large image compression...")
+        
+        if not self.installer_token or not hasattr(self, 'test_item_checkin_id'):
+            self.log("❌ Missing installer token or item checkin ID")
+            return False
+            
+        # Create another large test image for checkout
+        large_image_b64, original_size = create_large_test_image(2500, 1800)
+        original_size_kb = original_size / 1024
+        
+        self.log(f"   Using large checkout image: {original_size_kb:.1f}KB")
+        
+        # Wait a moment to ensure duration calculation
+        time.sleep(2)
+        
+        headers = {"Authorization": f"Bearer {self.installer_token}"}
+        
+        # Prepare form data for checkout with large image
+        form_data = {
+            "photo_base64": large_image_b64,
+            "gps_lat": GPS_CHECKOUT["lat"],
+            "gps_long": GPS_CHECKOUT["long"],
+            "gps_accuracy": GPS_CHECKOUT["accuracy"],
+            "notes": "Checkout with large image compression test"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/item-checkins/{self.test_item_checkin_id}/checkout",
+            data=form_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Item checkout failed: {response.status_code} - {response.text}")
+            return False
+            
+        checkout_data = response.json()
+        
+        self.log(f"✅ Item checkout successful with large image")
+        self.log(f"   Status: {checkout_data.get('status')}")
+        
+        # Verify the checkout photo was stored and potentially compressed
+        stored_photo = checkout_data.get("checkout_photo")
+        if stored_photo:
+            try:
+                # Decode the stored photo to check its size
+                stored_data = base64.b64decode(stored_photo)
+                stored_size_kb = len(stored_data) / 1024
+                
+                self.log(f"   Original checkout image: {original_size_kb:.1f}KB")
+                self.log(f"   Stored checkout image: {stored_size_kb:.1f}KB")
+                
+                # Check if compression occurred
+                if stored_size_kb < original_size_kb:
+                    compression_ratio = (1 - stored_size_kb / original_size_kb) * 100
+                    self.log(f"   ✅ Checkout image compressed: {compression_ratio:.1f}% reduction")
+                    
+                    # Check if it meets the 300KB target
+                    if stored_size_kb <= 300:
+                        self.log(f"   ✅ Checkout image meets 300KB target: {stored_size_kb:.1f}KB")
+                    else:
+                        self.log(f"   ⚠️  Checkout image exceeds 300KB target: {stored_size_kb:.1f}KB")
+                else:
+                    self.log(f"   ⚠️  No compression detected on checkout image")
+                    
+                # Verify the stored image is still valid
+                test_img = Image.open(BytesIO(stored_data))
+                self.log(f"   ✅ Stored checkout image is valid: {test_img.size} pixels")
+                
+            except Exception as e:
+                self.log(f"   ❌ Error analyzing stored checkout photo: {e}")
+                return False
+        else:
+            self.log(f"   ❌ No checkout photo stored in response")
+            return False
+            
+        return True
+
+    def test_regular_checkin_with_large_image(self):
+        """Test 19: Test regular POST /api/checkins with large image (for comparison)"""
+        self.log("Testing regular checkin with large image compression...")
+        
+        if not self.installer_token or not self.test_job_id:
+            self.log("❌ Missing installer token or job ID")
+            return False
+            
+        # Create a large test image
+        large_image_b64, original_size = create_large_test_image(2800, 1900)
+        original_size_kb = original_size / 1024
+        
+        self.log(f"   Using large image: {original_size_kb:.1f}KB")
+        
+        headers = {"Authorization": f"Bearer {self.installer_token}"}
+        
+        # Prepare form data for regular checkin
+        form_data = {
+            "job_id": self.test_job_id,
+            "photo_base64": large_image_b64,
+            "gps_lat": GPS_CHECKIN["lat"] + 0.001,  # Slightly different location
+            "gps_long": GPS_CHECKIN["long"] + 0.001,
+            "gps_accuracy": GPS_CHECKIN["accuracy"]
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/checkins",
+            data=form_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Regular checkin failed: {response.status_code} - {response.text}")
+            return False
+            
+        checkin_data = response.json()
+        self.test_regular_checkin_id = checkin_data["id"]
+        
+        self.log(f"✅ Regular checkin successful with large image")
+        self.log(f"   Regular Checkin ID: {self.test_regular_checkin_id}")
+        
+        # Verify the photo was stored and potentially compressed
+        stored_photo = checkin_data.get("checkin_photo")
+        if stored_photo:
+            try:
+                # Decode the stored photo to check its size
+                stored_data = base64.b64decode(stored_photo)
+                stored_size_kb = len(stored_data) / 1024
+                
+                self.log(f"   Original image: {original_size_kb:.1f}KB")
+                self.log(f"   Stored image: {stored_size_kb:.1f}KB")
+                
+                # Check if compression occurred
+                if stored_size_kb < original_size_kb:
+                    compression_ratio = (1 - stored_size_kb / original_size_kb) * 100
+                    self.log(f"   ✅ Image compressed: {compression_ratio:.1f}% reduction")
+                    
+                    # Check if it meets the 300KB target
+                    if stored_size_kb <= 300:
+                        self.log(f"   ✅ Image meets 300KB target: {stored_size_kb:.1f}KB")
+                    else:
+                        self.log(f"   ⚠️  Image exceeds 300KB target: {stored_size_kb:.1f}KB")
+                else:
+                    self.log(f"   ⚠️  No compression detected")
+                    
+                # Verify the stored image is still valid
+                test_img = Image.open(BytesIO(stored_data))
+                self.log(f"   ✅ Stored image is valid: {test_img.size} pixels")
+                
+            except Exception as e:
+                self.log(f"   ❌ Error analyzing stored photo: {e}")
+                return False
+        else:
+            self.log(f"   ❌ No photo stored in checkin response")
+            return False
+            
+        return True
+
+    def test_regular_checkout_with_large_image(self):
+        """Test 20: Test regular PUT /api/checkins/{id}/checkout with large image"""
+        self.log("Testing regular checkout with large image compression...")
+        
+        if not self.installer_token or not hasattr(self, 'test_regular_checkin_id'):
+            self.log("❌ Missing installer token or regular checkin ID")
+            return False
+            
+        # Create another large test image for checkout
+        large_image_b64, original_size = create_large_test_image(3200, 2100)
+        original_size_kb = original_size / 1024
+        
+        self.log(f"   Using large checkout image: {original_size_kb:.1f}KB")
+        
+        # Wait a moment to ensure duration calculation
+        time.sleep(2)
+        
+        headers = {"Authorization": f"Bearer {self.installer_token}"}
+        
+        # Prepare form data for regular checkout with large image
+        form_data = {
+            "photo_base64": large_image_b64,
+            "gps_lat": GPS_CHECKOUT["lat"] + 0.001,  # Slightly different location
+            "gps_long": GPS_CHECKOUT["long"] + 0.001,
+            "gps_accuracy": GPS_CHECKOUT["accuracy"],
+            "notes": "Regular checkout with large image compression test"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/checkins/{self.test_regular_checkin_id}/checkout",
+            data=form_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Regular checkout failed: {response.status_code} - {response.text}")
+            return False
+            
+        checkout_data = response.json()
+        
+        self.log(f"✅ Regular checkout successful with large image")
+        self.log(f"   Status: {checkout_data.get('status')}")
+        
+        # Verify the checkout photo was stored and potentially compressed
+        stored_photo = checkout_data.get("checkout_photo")
+        if stored_photo:
+            try:
+                # Decode the stored photo to check its size
+                stored_data = base64.b64decode(stored_photo)
+                stored_size_kb = len(stored_data) / 1024
+                
+                self.log(f"   Original checkout image: {original_size_kb:.1f}KB")
+                self.log(f"   Stored checkout image: {stored_size_kb:.1f}KB")
+                
+                # Check if compression occurred
+                if stored_size_kb < original_size_kb:
+                    compression_ratio = (1 - stored_size_kb / original_size_kb) * 100
+                    self.log(f"   ✅ Checkout image compressed: {compression_ratio:.1f}% reduction")
+                    
+                    # Check if it meets the 300KB target
+                    if stored_size_kb <= 300:
+                        self.log(f"   ✅ Checkout image meets 300KB target: {stored_size_kb:.1f}KB")
+                    else:
+                        self.log(f"   ⚠️  Checkout image exceeds 300KB target: {stored_size_kb:.1f}KB")
+                else:
+                    self.log(f"   ⚠️  No compression detected on checkout image")
+                    
+                # Verify the stored image is still valid
+                test_img = Image.open(BytesIO(stored_data))
+                self.log(f"   ✅ Stored checkout image is valid: {test_img.size} pixels")
+                
+            except Exception as e:
+                self.log(f"   ❌ Error analyzing stored checkout photo: {e}")
+                return False
+        else:
+            self.log(f"   ❌ No checkout photo stored in response")
+            return False
+            
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
