@@ -515,8 +515,24 @@ const InstallerJobDetail = () => {
                               <span className="ml-2 text-foreground font-medium">{checkin.installed_m2 || 0}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Complexidade:</span>
-                              <span className="ml-2 text-foreground">{checkin.complexity_level}/5</span>
+                              <span className="text-muted-foreground">Tempo Líquido:</span>
+                              <span className="ml-2 text-foreground font-medium">{formatDuration(checkin.net_duration_minutes || checkin.duration_minutes)}</span>
+                            </div>
+                            {checkin.total_pause_minutes > 0 && (
+                              <>
+                                <div>
+                                  <span className="text-muted-foreground">Tempo Bruto:</span>
+                                  <span className="ml-2 text-foreground">{formatDuration(checkin.duration_minutes)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Pausas:</span>
+                                  <span className="ml-2 text-orange-400">{formatDuration(checkin.total_pause_minutes)}</span>
+                                </div>
+                              </>
+                            )}
+                            <div>
+                              <span className="text-muted-foreground">Produtividade:</span>
+                              <span className="ml-2 text-primary font-medium">{checkin.productivity_m2_h || 0} m²/h</span>
                             </div>
                           </div>
                         </div>
