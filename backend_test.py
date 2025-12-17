@@ -470,6 +470,157 @@ class FieldworkAPITest:
             
         return True
         
+    def test_google_calendar_login_endpoint(self):
+        """Test 9: Google Calendar login endpoint - should return authorization URL"""
+        self.log("Testing Google Calendar login endpoint...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/auth/google/login",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Google login endpoint failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Google login endpoint successful")
+        
+        # Verify response contains authorization URL
+        if "authorization_url" in data:
+            auth_url = data["authorization_url"]
+            self.log(f"   Authorization URL: {auth_url[:100]}...")
+            
+            # Verify URL contains expected Google OAuth parameters
+            expected_params = ["accounts.google.com", "client_id", "redirect_uri", "scope", "response_type=code"]
+            for param in expected_params:
+                if param not in auth_url:
+                    self.log(f"   ⚠️  Missing expected parameter in URL: {param}")
+                else:
+                    self.log(f"   ✅ Found expected parameter: {param}")
+                    
+            # Verify Google Calendar scope is included
+            if "calendar" in auth_url:
+                self.log(f"   ✅ Google Calendar scope included")
+            else:
+                self.log(f"   ⚠️  Google Calendar scope not found in URL")
+                
+        else:
+            self.log(f"   ❌ No authorization_url in response: {data}")
+            return False
+            
+        return True
+        
+    def test_google_calendar_status_endpoint(self):
+        """Test 10: Google Calendar status endpoint - should return connection status"""
+        self.log("Testing Google Calendar status endpoint...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/auth/google/status",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Google status endpoint failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Google status endpoint successful")
+        
+        # Verify response structure
+        expected_fields = ["connected"]
+        for field in expected_fields:
+            if field in data:
+                self.log(f"   ✅ Field '{field}' present: {data[field]}")
+            else:
+                self.log(f"   ❌ Missing expected field: {field}")
+                return False
+                
+        # Should initially be false (not connected)
+        if data.get("connected") == False:
+            self.log(f"   ✅ Initially not connected (expected)")
+        else:
+            self.log(f"   ⚠️  Connection status: {data.get('connected')} (may be connected from previous tests)")
+            
+        # Check for google_email field when connected
+        if data.get("connected") and "google_email" in data:
+            self.log(f"   ✅ Google email present when connected: {data.get('google_email')}")
+        elif not data.get("connected") and data.get("google_email") is None:
+            self.log(f"   ✅ No Google email when not connected (expected)")
+            
+        return True
+        
+    def test_google_calendar_events_unauthorized(self):
+        """Test 11: Google Calendar events endpoint - should return 401 when not connected"""
+        self.log("Testing Google Calendar events endpoint (unauthorized)...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        # Test POST /api/calendar/events (create event)
+        event_data = {
+            "title": "Test Event",
+            "description": "Test event for API testing",
+            "start_datetime": "2024-12-20T10:00:00Z",
+            "end_datetime": "2024-12-20T11:00:00Z",
+            "location": "Test Location"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/calendar/events",
+            json=event_data,
+            headers=headers
+        )
+        
+        # Should return 401 when Google Calendar is not connected
+        if response.status_code == 401:
+            self.log(f"✅ Calendar events POST correctly returns 401 when not connected")
+            
+            # Check error message
+            try:
+                error_data = response.json()
+                if "Google Calendar não conectado" in error_data.get("detail", ""):
+                    self.log(f"   ✅ Correct error message: {error_data.get('detail')}")
+                else:
+                    self.log(f"   ⚠️  Unexpected error message: {error_data.get('detail')}")
+            except:
+                self.log(f"   ⚠️  Could not parse error response")
+                
+        else:
+            self.log(f"❌ Expected 401, got {response.status_code} - {response.text}")
+            return False
+            
+        # Test GET /api/calendar/events (list events)
+        response = self.session.get(
+            f"{BASE_URL}/calendar/events",
+            headers=headers
+        )
+        
+        if response.status_code == 401:
+            self.log(f"✅ Calendar events GET correctly returns 401 when not connected")
+        else:
+            self.log(f"❌ Expected 401 for GET, got {response.status_code} - {response.text}")
+            return False
+            
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
@@ -485,7 +636,10 @@ class FieldworkAPITest:
             ("Check-out with Productivity Metrics", self.test_checkout_with_productivity_metrics),
             ("Check-in Details (Admin)", self.test_checkin_details_as_admin),
             ("Job Scheduling System", self.test_job_scheduling_system),
-            ("Productivity Report (Manager)", self.test_productivity_report)
+            ("Productivity Report (Manager)", self.test_productivity_report),
+            ("Google Calendar Login Endpoint", self.test_google_calendar_login_endpoint),
+            ("Google Calendar Status Endpoint", self.test_google_calendar_status_endpoint),
+            ("Google Calendar Events (Unauthorized)", self.test_google_calendar_events_unauthorized)
         ]
         
         results = []
