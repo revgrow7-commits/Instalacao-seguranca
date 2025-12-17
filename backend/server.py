@@ -1723,6 +1723,46 @@ async def get_item_checkins(
     
     return checkins
 
+
+@api_router.get("/item-checkins/all")
+async def get_all_item_checkins(
+    current_user: User = Depends(get_current_user)
+):
+    """Get all item check-ins with photos for reports (Admin/Manager only)"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    checkins = await db.item_checkins.find({}, {"_id": 0}).to_list(5000)
+    jobs_map = {}
+    installers_map = {}
+    
+    # Get all jobs and installers for enrichment
+    jobs = await db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1}).to_list(1000)
+    installers = await db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1}).to_list(100)
+    
+    for job in jobs:
+        jobs_map[job["id"]] = job
+    for installer in installers:
+        installers_map[installer["id"]] = installer
+    
+    # Enrich checkins with job and installer info
+    enriched_checkins = []
+    for c in checkins:
+        job = jobs_map.get(c.get("job_id"), {})
+        installer = installers_map.get(c.get("installer_id"), {})
+        
+        enriched = {
+            **c,
+            "job_title": job.get("title", "N/A"),
+            "client_name": job.get("client_name", "N/A"),
+            "installer_name": installer.get("full_name", "N/A")
+        }
+        enriched_checkins.append(enriched)
+    
+    # Sort by checkin_at descending (most recent first)
+    enriched_checkins.sort(key=lambda x: x.get("checkin_at", ""), reverse=True)
+    
+    return enriched_checkins
+
 @api_router.put("/item-checkins/{checkin_id}/checkout")
 async def complete_item_checkout(
     checkin_id: str,
