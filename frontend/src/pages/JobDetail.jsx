@@ -26,6 +26,7 @@ const JobDetail = () => {
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [checkins, setCheckins] = useState([]);
+  const [itemCheckins, setItemCheckins] = useState([]);
   
   // Estados para atribuição de itens
   const [showAssignItemsDialog, setShowAssignItemsDialog] = useState(false);
