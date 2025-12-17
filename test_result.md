@@ -438,3 +438,15 @@ agent_communication:
         - working: false
           agent: "testing"
           comment: "❌ AUTHENTICATION ISSUE PREVENTING TESTING: Multiple attempts to test the Job Detail page failed due to persistent authentication redirects to login page. Despite successful login with gerente@industriavisual.com/gerente123 credentials, navigation to job detail pages consistently redirects back to login. This suggests either: 1) Session management issues, 2) JWT token expiration problems, 3) Route protection issues, or 4) Backend authentication middleware problems. CRITICAL: Cannot verify the implemented job status features (active checkins, alerts, stalled items >3h) due to inability to access job detail pages. Backend logs show successful API calls but frontend authentication flow is broken."
+
+  - task: "Image Compression for Checkin/Checkout Photos"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented image compression for all check-in and check-out endpoints. Features: 1) compress_image_to_base64 function improved with resize capability (max 1200px), 2) compress_base64_image helper function added, 3) Target compression: max 300KB per image, 4) Applied to endpoints: POST /checkins, PUT /checkins/{id}/checkout, POST /item-checkins, PUT /item-checkins/{id}/checkout. Test showed 97.8% size reduction (13.7MB -> 300KB). Needs integration testing with actual photo uploads."
