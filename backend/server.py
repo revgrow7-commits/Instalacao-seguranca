@@ -432,11 +432,51 @@ class ItemCheckin(BaseModel):
     height_category: Optional[str] = None
     scenario_category: Optional[str] = None
     notes: Optional[str] = None
-    duration_minutes: Optional[int] = None
-    productivity_m2_h: Optional[float] = None
+    duration_minutes: Optional[int] = None  # Tempo bruto (total)
+    net_duration_minutes: Optional[int] = None  # Tempo líquido (descontando pausas)
+    total_pause_minutes: Optional[int] = None  # Total de tempo em pausa
+    productivity_m2_h: Optional[float] = None  # Produtividade calculada com tempo líquido
     product_name: Optional[str] = None
     family_name: Optional[str] = None
-    status: str = "in_progress"
+    status: str = "in_progress"  # in_progress, paused, completed
+
+
+class ItemPauseLog(BaseModel):
+    """Registro de pausas durante a execução de um item"""
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    item_checkin_id: str  # FK para ItemCheckin
+    job_id: str
+    item_index: int
+    installer_id: str
+    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    end_time: Optional[datetime] = None  # Nulo enquanto pausado
+    reason: str  # Motivo da pausa
+    duration_minutes: Optional[int] = None  # Calculado ao encerrar a pausa
+
+
+# Enum de motivos de pausa
+PAUSE_REASONS = [
+    "aguardando_cliente",
+    "chuva",
+    "falta_material", 
+    "almoco_intervalo",
+    "problema_acesso",
+    "problema_equipamento",
+    "aguardando_aprovacao",
+    "outro"
+]
+
+PAUSE_REASON_LABELS = {
+    "aguardando_cliente": "Aguardando Cliente",
+    "chuva": "Chuva/Intempérie",
+    "falta_material": "Falta de Material",
+    "almoco_intervalo": "Almoço/Intervalo",
+    "problema_acesso": "Problema de Acesso",
+    "problema_equipamento": "Problema com Equipamento",
+    "aguardando_aprovacao": "Aguardando Aprovação",
+    "outro": "Outro Motivo"
+}
 
 class CheckInCreate(BaseModel):
     job_id: str
