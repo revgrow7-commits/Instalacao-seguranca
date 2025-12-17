@@ -629,7 +629,179 @@ const Reports = () => {
             </div>
           )}
         </TabsContent>
+
+        {/* Photos Report */}
+        <TabsContent value="photos" className="space-y-6">
+          <Card className="bg-card border-white/5">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <Camera className="h-5 w-5 text-primary" />
+                Registro Fotográfico de Check-ins/Check-outs
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {filterItemCheckinsByDate(itemCheckins).length === 0 ? (
+                <div className="text-center py-12">
+                  <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">Nenhum registro fotográfico encontrado</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {filterItemCheckinsByDate(itemCheckins).map((checkin) => (
+                    <div key={checkin.id} className="bg-white/5 rounded-lg border border-white/10 p-4">
+                      <div className="flex flex-col md:flex-row gap-4">
+                        {/* Info Section */}
+                        <div className="flex-1 space-y-3">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <h4 className="text-white font-medium">{checkin.product_name || `Item ${checkin.item_index + 1}`}</h4>
+                              <p className="text-sm text-muted-foreground">{checkin.job_title}</p>
+                              <p className="text-xs text-muted-foreground">{checkin.client_name}</p>
+                            </div>
+                            <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                              checkin.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                              checkin.status === 'paused' ? 'bg-orange-500/20 text-orange-400' :
+                              'bg-blue-500/20 text-blue-400'
+                            }`}>
+                              {checkin.status === 'completed' ? 'Concluído' : 
+                               checkin.status === 'paused' ? 'Pausado' : 'Em Andamento'}
+                            </span>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                            <div>
+                              <span className="text-muted-foreground">Instalador:</span>
+                              <p className="text-white">{checkin.installer_name}</p>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Check-in:</span>
+                              <p className="text-white">{formatDateTime(checkin.checkin_at)}</p>
+                            </div>
+                            {checkin.checkout_at && (
+                              <div>
+                                <span className="text-muted-foreground">Check-out:</span>
+                                <p className="text-white">{formatDateTime(checkin.checkout_at)}</p>
+                              </div>
+                            )}
+                            {checkin.net_duration_minutes > 0 && (
+                              <div>
+                                <span className="text-muted-foreground">Tempo Líquido:</span>
+                                <p className="text-white">{formatDuration(checkin.net_duration_minutes)}</p>
+                                {checkin.total_pause_minutes > 0 && (
+                                  <p className="text-xs text-orange-400 flex items-center gap-1">
+                                    <Pause className="h-3 w-3" />
+                                    Pausas: {formatDuration(checkin.total_pause_minutes)}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* GPS Location */}
+                          {checkin.gps_lat && checkin.gps_long && (
+                            <a 
+                              href={`https://www.google.com/maps?q=${checkin.gps_lat},${checkin.gps_long}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                            >
+                              <MapPin className="h-3 w-3" />
+                              Ver localização do check-in
+                            </a>
+                          )}
+
+                          {checkin.notes && (
+                            <div className="bg-black/20 rounded p-2">
+                              <p className="text-xs text-muted-foreground">Observação:</p>
+                              <p className="text-sm text-white">{checkin.notes}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Photos Section */}
+                        <div className="flex gap-3 flex-wrap md:flex-nowrap">
+                          {checkin.checkin_photo && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground text-center">Check-in</p>
+                              <button
+                                onClick={() => openPhotoModal(checkin.checkin_photo, 'Check-in')}
+                                className="relative group"
+                              >
+                                <img 
+                                  src={getPhotoSrc(checkin.checkin_photo)} 
+                                  alt="Check-in" 
+                                  className="w-24 h-24 md:w-32 md:h-32 object-cover rounded-lg border border-white/20 hover:border-primary transition-colors"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                  <Image className="h-6 w-6 text-white" />
+                                </div>
+                              </button>
+                            </div>
+                          )}
+                          {checkin.checkout_photo && (
+                            <div className="space-y-1">
+                              <p className="text-xs text-muted-foreground text-center">Check-out</p>
+                              <button
+                                onClick={() => openPhotoModal(checkin.checkout_photo, 'Check-out')}
+                                className="relative group"
+                              >
+                                <img 
+                                  src={getPhotoSrc(checkin.checkout_photo)} 
+                                  alt="Check-out" 
+                                  className="w-24 h-24 md:w-32 md:h-32 object-cover rounded-lg border border-white/20 hover:border-primary transition-colors"
+                                />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                                  <Image className="h-6 w-6 text-white" />
+                                </div>
+                              </button>
+                            </div>
+                          )}
+                          {!checkin.checkin_photo && !checkin.checkout_photo && (
+                            <div className="w-32 h-32 bg-white/5 rounded-lg border border-white/10 flex items-center justify-center">
+                              <p className="text-xs text-muted-foreground text-center">Sem fotos</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
+
+      {/* Photo Modal */}
+      <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>
+        <DialogContent className="bg-card border-white/10 max-w-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Camera className="h-5 w-5 text-primary" />
+                Foto de {photoType}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setSelectedPhoto(null)}
+                className="text-muted-foreground hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </DialogTitle>
+          </DialogHeader>
+          {selectedPhoto && (
+            <div className="flex justify-center">
+              <img 
+                src={getPhotoSrc(selectedPhoto)} 
+                alt={photoType} 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
