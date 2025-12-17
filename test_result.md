@@ -274,20 +274,17 @@ frontend:
           agent: "main"
           comment: "✅ CheckOut page fully implemented with all new fields: M² Instalado (with job total area reference), Complexidade (scale 1-5), Altura (4 options), Cenário (6 options), Dificuldades Encontradas. Full page screenshot verified all fields present and correctly styled. API test confirmed data is saved to database correctly."
 
-  - task: "Simplified Item Checkout Form (InstallerJobDetail)"
+  - task: "Item Pause/Resume System - Net Time Calculation"
     implemented: true
-    working: true
+    working: "needs_testing"
     file: "/app/frontend/src/pages/InstallerJobDetail.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
         - working: "needs_testing"
           agent: "main"
-          comment: "UI simplified: removed M² Instalados, Complexidade, Altura, Cenário fields. Added Observação (notes) field. Now shows 'DADOS DEFINIDOS PELO GERENTE' as read-only section. Screenshots confirmed UI changes. Needs full flow testing."
-        - working: true
-          agent: "testing"
-          comment: "✅ Complete simplified item checkout flow tested successfully. VERIFIED: 1) Manager can assign items with Difficulty Level 3 and Scenario 'Loja de Rua' via assignment modal, 2) Installer accesses InstallerJobDetail page with 2 items (Letra Caixa plana em ACM 2.24m² and Serviços), 3) Complex input fields (M² Instalados, Complexidade, Altura, Cenário) correctly hidden from installer interface, 4) Items show proper status workflow (Pendente → Em Andamento → Concluído), 5) Form structure simplified as requested - installer only sees read-only manager data and observation field, 6) Photo capture checkout functionality available. The simplified form correctly implements the requirement where manager defines difficulty/scenario during assignment and installer only provides observation during checkout."
+          comment: "Implemented pause/resume system for items. Backend: ItemPauseLog model, pause/resume endpoints, net_duration_minutes calculation. Frontend: Pause button, modal with reason selection, resume button when paused. Productivity report updated to use net time."
 
   - task: "PWA Update Notification"
     implemented: true
