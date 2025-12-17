@@ -397,3 +397,15 @@ agent_communication:
         - working: true
           agent: "testing"
           comment: "✅ CALENDAR RESPONSIVENESS AND GOOGLE CALENDAR INTEGRATION UI FULLY TESTED AND WORKING: Comprehensive testing completed successfully on both desktop (1920x800) and mobile (375x812) viewports. DESKTOP TESTS: ✅ Google Calendar integration card visible with 'Conectar' button, ✅ Calendar grid displays properly with full weekday headers (Dom, Seg, Ter, Qua, Qui, Sex, Sáb), ✅ Job cards visible on calendar grid (4 jobs found), ✅ 'Próximos Jobs Agendados' section visible. MOBILE TESTS: ✅ Grid/List toggle buttons visible in top right (grid and list icons), ✅ Day headers show single letters (D, S, T, Q, Q, S, S) on mobile, ✅ Jobs show as dot indicators on mobile grid view (5 dots found), ✅ List view functionality working (shows 'Jobs desta Semana' when activated), ✅ Mobile page scrollable, ✅ Google Calendar card properly sized on mobile. All requested test scenarios from review completed successfully. Calendar page is fully responsive and Google Calendar integration UI is working correctly."
+
+  - task: "Forgot Password Functionality"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/frontend/src/pages/ForgotPassword.jsx, /app/frontend/src/pages/ResetPassword.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented forgot password functionality with: 1) POST /api/auth/forgot-password - sends reset email via Resend, 2) POST /api/auth/reset-password - validates token and resets password, 3) GET /api/auth/verify-reset-token - validates if token is valid, 4) PUT /api/users/{user_id}/reset-password - admin can reset any user password. Frontend: ForgotPassword.jsx, ResetPassword.jsx pages, Login.jsx updated with 'Esqueci minha senha' link. Needs testing of complete flow."
