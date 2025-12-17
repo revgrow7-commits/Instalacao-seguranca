@@ -2741,20 +2741,28 @@ async def get_productivity_report(
         # m² da API (não o reportado manualmente)
         item_m2 = item.get("total_area_m2", 0) or 0
         
-        # Tempo real de execução
-        checkout_at = checkin.get("checkout_at")
-        if isinstance(checkout_at, str):
-            checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
+        # Usar tempo LÍQUIDO se disponível, senão calcular bruto
+        net_duration_minutes = checkin.get("net_duration_minutes")
+        total_pause_minutes = checkin.get("total_pause_minutes", 0) or 0
         
-        # Garantir que ambos têm timezone
-        if checkin_at and checkin_at.tzinfo is None:
-            checkin_at = checkin_at.replace(tzinfo=timezone.utc)
-        if checkout_at and checkout_at.tzinfo is None:
-            checkout_at = checkout_at.replace(tzinfo=timezone.utc)
+        if net_duration_minutes is None:
+            # Fallback para cálculo bruto se não tiver tempo líquido
+            checkout_at = checkin.get("checkout_at")
+            if isinstance(checkout_at, str):
+                checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
+            
+            # Garantir que ambos têm timezone
+            if checkin_at and checkin_at.tzinfo is None:
+                checkin_at = checkin_at.replace(tzinfo=timezone.utc)
+            if checkout_at and checkout_at.tzinfo is None:
+                checkout_at = checkout_at.replace(tzinfo=timezone.utc)
+            
+            if checkin_at and checkout_at:
+                net_duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
+            else:
+                net_duration_minutes = 0
         
-        duration_minutes = 0
-        if checkin_at and checkout_at:
-            duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
+        duration_minutes = net_duration_minutes  # Usar tempo líquido para cálculos
         
         # Dados do instalador
         installer_id = checkin.get("installer_id")
@@ -2776,7 +2784,9 @@ async def get_productivity_report(
             "family_name": family_name,
             "m2_api": item_m2,
             "m2_reported": checkin.get("installed_m2", 0) or 0,
-            "duration_minutes": round(duration_minutes, 2),
+            "duration_minutes": round(duration_minutes, 2),  # Tempo líquido
+            "gross_duration_minutes": checkin.get("duration_minutes", 0) or 0,  # Tempo bruto
+            "pause_minutes": total_pause_minutes,  # Tempo de pausa
             "checkin_at": checkin_at.isoformat() if checkin_at else None,
             "checkout_at": checkout_at.isoformat() if checkout_at else None,
             "complexity_level": checkin.get("complexity_level"),
