@@ -694,6 +694,66 @@ const InstallerJobDetail = () => {
           </Button>
         </div>
       )}
+
+      {/* Pause Modal */}
+      <Dialog open={showPauseModal} onOpenChange={setShowPauseModal}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Pause className="h-5 w-5 text-orange-400" />
+              Pausar Item
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Informe o motivo da pausa. O tempo pausado não será contado na sua produtividade.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <Label className="text-sm text-muted-foreground">Motivo da Pausa *</Label>
+              <Select value={pauseReason} onValueChange={setPauseReason}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
+                  <SelectValue placeholder="Selecione o motivo" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  {Object.entries(PAUSE_REASON_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
+              <p className="text-xs text-orange-400">
+                <strong>Importante:</strong> O tempo em pausa será registrado e excluído do cálculo de produtividade (m²/h), 
+                garantindo que sua métrica seja justa e reflita apenas o tempo efetivamente trabalhado.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPauseModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handlePauseItem}
+              disabled={!pauseReason || processingItem !== null}
+              className="flex-1 bg-orange-500 hover:bg-orange-600"
+            >
+              {processingItem !== null ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+              ) : (
+                <Pause className="h-4 w-4 mr-2" />
+              )}
+              Confirmar Pausa
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
