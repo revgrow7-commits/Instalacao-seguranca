@@ -763,6 +763,161 @@ async def login(credentials: UserLogin):
 async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
+# ============ PASSWORD RECOVERY ============
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str
+
+@api_router.post("/auth/forgot-password")
+async def forgot_password(request: ForgotPasswordRequest):
+    """Send password reset email"""
+    # Find user by email
+    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    
+    if not user:
+        # Don't reveal if email exists or not for security
+        return {"message": "Se o email existir, você receberá um link para redefinir sua senha."}
+    
+    # Generate reset token
+    reset_token = secrets.token_urlsafe(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+    
+    # Store reset token in database
+    await db.password_resets.delete_many({"user_id": user['id']})  # Remove old tokens
+    await db.password_resets.insert_one({
+        "id": str(uuid.uuid4()),
+        "user_id": user['id'],
+        "token": reset_token,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Send email
+    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    
+    html_content = f"""
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #FF1F5A; margin: 0;">INDÚSTRIA VISUAL</h1>
+            <p style="color: #666; margin-top: 5px;">Transformamos ideias em realidade</p>
+        </div>
+        
+        <div style="background-color: #1a1a2e; color: white; padding: 30px; border-radius: 10px;">
+            <h2 style="margin-top: 0;">Redefinir Senha</h2>
+            <p>Olá {user.get('name', 'Usuário')},</p>
+            <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
+            <p>Clique no botão abaixo para criar uma nova senha:</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+                <a href="{reset_link}" 
+                   style="background-color: #FF1F5A; color: white; padding: 15px 30px; 
+                          text-decoration: none; border-radius: 5px; font-weight: bold;">
+                    Redefinir Senha
+                </a>
+            </div>
+            
+            <p style="color: #999; font-size: 12px;">
+                Este link expira em 1 hora.<br>
+                Se você não solicitou esta redefinição, ignore este email.
+            </p>
+        </div>
+        
+        <p style="color: #666; font-size: 12px; text-align: center; margin-top: 20px;">
+            © 2025 Indústria Visual. Todos os direitos reservados.
+        </p>
+    </div>
+    """
+    
+    try:
+        params = {
+            "from": SENDER_EMAIL,
+            "to": [request.email],
+            "subject": "Redefinir Senha - Indústria Visual",
+            "html": html_content
+        }
+        await asyncio.to_thread(resend.Emails.send, params)
+        logging.info(f"Password reset email sent to {request.email}")
+    except Exception as e:
+        logging.error(f"Failed to send password reset email: {str(e)}")
+        # Still return success message to not reveal if email exists
+    
+    return {"message": "Se o email existir, você receberá um link para redefinir sua senha."}
+
+@api_router.post("/auth/reset-password")
+async def reset_password(request: ResetPasswordRequest):
+    """Reset password using token from email"""
+    # Find reset token
+    reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
+    
+    if not reset_record:
+        raise HTTPException(status_code=400, detail="Token inválido ou expirado")
+    
+    # Check if token expired
+    expires_at = datetime.fromisoformat(reset_record['expires_at'])
+    if datetime.now(timezone.utc) > expires_at:
+        await db.password_resets.delete_one({"token": request.token})
+        raise HTTPException(status_code=400, detail="Token expirado. Solicite um novo link.")
+    
+    # Update user password
+    new_hash = get_password_hash(request.new_password)
+    result = await db.users.update_one(
+        {"id": reset_record['user_id']},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Delete used token
+    await db.password_resets.delete_one({"token": request.token})
+    
+    return {"message": "Senha alterada com sucesso!"}
+
+@api_router.get("/auth/verify-reset-token")
+async def verify_reset_token(token: str):
+    """Verify if a reset token is valid"""
+    reset_record = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    
+    if not reset_record:
+        return {"valid": False, "message": "Token inválido"}
+    
+    expires_at = datetime.fromisoformat(reset_record['expires_at'])
+    if datetime.now(timezone.utc) > expires_at:
+        await db.password_resets.delete_one({"token": token})
+        return {"valid": False, "message": "Token expirado"}
+    
+    return {"valid": True}
+
+@api_router.put("/users/{user_id}/reset-password")
+async def admin_reset_password(
+    user_id: str,
+    request: AdminResetPasswordRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Admin can reset any user's password"""
+    await require_role(current_user, [UserRole.ADMIN])
+    
+    # Find user
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    
+    # Update password
+    new_hash = get_password_hash(request.new_password)
+    await db.users.update_one(
+        {"id": user_id},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    return {"message": f"Senha do usuário {user.get('name')} redefinida com sucesso"}
+
 # ============ USER MANAGEMENT ROUTES ============
 
 @api_router.get("/users", response_model=List[User])
