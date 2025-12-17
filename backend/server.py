@@ -791,6 +791,41 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User deleted"}
 
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@api_router.post("/users/change-password")
+async def change_password(
+    password_data: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Change the current user's password"""
+    # Get user with password hash
+    user_doc = await db.users.find_one({"id": current_user.id})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, user_doc['password_hash']):
+        raise HTTPException(status_code=400, detail="Senha atual incorreta")
+    
+    # Validate new password
+    if len(password_data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres")
+    
+    # Hash and save new password
+    new_password_hash = get_password_hash(password_data.new_password)
+    await db.users.update_one(
+        {"id": current_user.id},
+        {"$set": {"password_hash": new_password_hash}}
+    )
+    
+    return {"message": "Senha alterada com sucesso"}
+
+
 # ============ HOLDPRINT & JOB ROUTES ============
 
 @api_router.get("/holdprint/jobs/{branch}")
