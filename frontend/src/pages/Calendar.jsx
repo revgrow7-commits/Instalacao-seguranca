@@ -317,6 +317,60 @@ const Calendar = () => {
             </Button>
           </div>
         </div>
+
+        {/* Google Calendar Integration */}
+        <Card className="bg-gradient-to-r from-blue-500/10 to-green-500/10 border-white/10">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M18.316 5.684H5.684v12.632h12.632V5.684z" fill="#fff"/>
+                    <path d="M6.842 11.368h3.79v1.264H6.842v-1.264zm0 2.526h3.79v1.264H6.842v-1.264zm4.42-2.526h3.79v1.264h-3.79v-1.264zm0 2.526h3.79v1.264h-3.79v-1.264z" fill="#4285F4"/>
+                    <path d="M5.684 18.316h12.632v1.263H5.684v-1.263z" fill="#34A853"/>
+                    <path d="M18.316 5.684v12.632h1.263V5.684h-1.263z" fill="#FBBC04"/>
+                    <path d="M5.684 5.684h12.632V4.42H5.684v1.264z" fill="#EA4335"/>
+                    <path d="M4.42 5.684h1.264v12.632H4.42V5.684z" fill="#4285F4"/>
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-white font-medium text-sm sm:text-base">Google Calendar</p>
+                  {checkingGoogleStatus ? (
+                    <p className="text-xs text-muted-foreground">Verificando...</p>
+                  ) : googleConnected ? (
+                    <p className="text-xs text-green-400 flex items-center gap-1">
+                      <Check className="h-3 w-3" /> Conectado como {googleEmail}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Sincronize seus jobs com sua agenda</p>
+                  )}
+                </div>
+              </div>
+              
+              {googleConnected ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={disconnectGoogleCalendar}
+                  className="border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Desconectar
+                </Button>
+              ) : (
+                <Button
+                  onClick={connectGoogleCalendar}
+                  size="sm"
+                  className="bg-white text-gray-900 hover:bg-gray-100"
+                  disabled={checkingGoogleStatus}
+                >
+                  <ExternalLink className="h-4 w-4 mr-1" />
+                  Conectar
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Calendar Grid (Desktop) or List View (Mobile) */}
