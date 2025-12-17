@@ -3408,12 +3408,10 @@ async def google_auth_status(current_user: User = Depends(get_current_user)):
     }
 
 @api_router.delete("/auth/google/disconnect")
-async def google_disconnect(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def google_disconnect(current_user: User = Depends(get_current_user)):
     """Disconnect Google Calendar from user account"""
-    current_user = await get_current_user(credentials)
-    
     await db.users.update_one(
-        {"id": current_user['id']},
+        {"id": current_user.id},
         {"$unset": {"google_tokens": "", "google_email": ""}}
     )
     
