@@ -63,15 +63,17 @@ const JobDetail = () => {
 
   const loadData = async () => {
     try {
-      const [jobRes, installersRes, checkinsRes] = await Promise.all([
+      const [jobRes, installersRes, checkinsRes, itemCheckinsRes] = await Promise.all([
         api.getJob(jobId),
         isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] }),
-        api.getCheckins(jobId)
+        api.getCheckins(jobId),
+        api.getItemCheckins(jobId)
       ]);
       
       setJob(jobRes.data);
       setInstallers(installersRes.data);
       setCheckins(checkinsRes.data);
+      setItemCheckins(itemCheckinsRes.data || []);
       setSelectedInstallers(jobRes.data.assigned_installers || []);
       
       if (jobRes.data.scheduled_date) {
@@ -95,6 +97,30 @@ const JobDetail = () => {
       setLoading(false);
     }
   };
+
+  // Função para verificar se um item está parado há mais de 3 horas
+  const isItemStalled = (checkin) => {
+    if (!checkin || checkin.status === 'completed') return false;
+    
+    const lastActivityTime = checkin.status === 'paused' 
+      ? new Date(checkin.paused_at || checkin.checkin_at)
+      : new Date(checkin.checkin_at);
+    
+    const now = new Date();
+    const hoursDiff = (now - lastActivityTime) / (1000 * 60 * 60);
+    
+    return hoursDiff >= 3;
+  };
+
+  // Função para obter o checkin de um item específico
+  const getItemCheckin = (itemIndex) => {
+    return itemCheckins.find(c => c.item_index === itemIndex);
+  };
+
+  // Contar itens com alerta
+  const stalledItemsCount = itemCheckins.filter(c => 
+    c.status !== 'completed' && isItemStalled(c)
+  ).length;
 
   const handleAssignInstallers = async () => {
     if (selectedInstallers.length === 0) {
