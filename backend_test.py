@@ -1268,7 +1268,12 @@ class FieldworkAPITest:
             ("Forgot Password Endpoint", self.test_forgot_password_endpoint),
             ("Verify Reset Token (Invalid)", self.test_verify_reset_token_invalid),
             ("Reset Password (Invalid Token)", self.test_reset_password_invalid_token),
-            ("Admin Reset User Password", self.test_admin_reset_user_password)
+            ("Admin Reset User Password", self.test_admin_reset_user_password),
+            ("Image Compression Function (Direct)", self.test_image_compression_function_direct),
+            ("Item Checkin with Large Image", self.test_item_checkin_with_large_image),
+            ("Item Checkout with Large Image", self.test_item_checkout_with_large_image),
+            ("Regular Checkin with Large Image", self.test_regular_checkin_with_large_image),
+            ("Regular Checkout with Large Image", self.test_regular_checkout_with_large_image)
         ]
         
         results = []
