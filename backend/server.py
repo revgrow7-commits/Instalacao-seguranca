@@ -1844,12 +1844,16 @@ async def complete_item_checkout(
     job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
     job_checkins = await db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0}).to_list(1000)
     
-    # Get all assigned item indices
+    # Get all assigned item indices (support both field names for compatibility)
     item_assignments = job.get("item_assignments", []) if job else []
     assigned_item_indices = set()
     for assignment in item_assignments:
-        for idx in assignment.get("item_indices", []):
-            assigned_item_indices.add(idx)
+        # Support both item_index (singular) and item_indices (plural)
+        if "item_index" in assignment:
+            assigned_item_indices.add(assignment["item_index"])
+        if "item_indices" in assignment:
+            for idx in assignment["item_indices"]:
+                assigned_item_indices.add(idx)
     
     # If no specific items assigned, consider all products
     if not assigned_item_indices:
