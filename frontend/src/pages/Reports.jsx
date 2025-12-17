@@ -174,6 +174,52 @@ const Reports = () => {
     });
   };
 
+  const filterItemCheckinsByDate = (checkinsList) => {
+    if (!startDate && !endDate) return checkinsList;
+    
+    return checkinsList.filter(checkin => {
+      const checkinDate = new Date(checkin.checkin_at);
+      const start = startDate ? new Date(startDate) : new Date(0);
+      const end = endDate ? new Date(endDate) : new Date();
+      end.setHours(23, 59, 59, 999);
+      
+      return checkinDate >= start && checkinDate <= end;
+    });
+  };
+
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatDuration = (minutes) => {
+    if (!minutes) return '0min';
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    if (hours > 0) {
+      return `${hours}h ${mins}min`;
+    }
+    return `${mins}min`;
+  };
+
+  const getPhotoSrc = (photoData) => {
+    if (!photoData) return null;
+    if (photoData.startsWith('data:image')) return photoData;
+    return `data:image/jpeg;base64,${photoData}`;
+  };
+
+  const openPhotoModal = (photo, type) => {
+    setSelectedPhoto(photo);
+    setPhotoType(type);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
