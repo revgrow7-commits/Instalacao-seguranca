@@ -883,11 +883,12 @@ const JobDetail = () => {
                         </div>
                       </div>
                       
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                        <div className="flex items-center gap-1 text-muted-foreground">
-                          <Play className="h-3 w-3" />
-                          <span>Início:</span>
-                          <span className="text-white">
+                      {/* Status com destaque vermelho */}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white font-bold text-sm shadow-lg">
+                          <Play className="h-4 w-4" />
+                          <span>Iniciado:</span>
+                          <span>
                             {new Date(checkin.checkin_at).toLocaleString('pt-BR', {
                               day: '2-digit',
                               month: '2-digit',
@@ -898,8 +899,8 @@ const JobDetail = () => {
                         </div>
                         
                         {checkin.status === 'paused' && checkin.paused_at && (
-                          <div className="flex items-center gap-1 text-orange-400">
-                            <Clock className="h-3 w-3" />
+                          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white font-bold text-sm shadow-lg">
+                            <Clock className="h-4 w-4" />
                             <span>Pausado:</span>
                             <span>
                               {new Date(checkin.paused_at).toLocaleString('pt-BR', {
@@ -913,9 +914,9 @@ const JobDetail = () => {
                         )}
                         
                         {isStalled && (
-                          <div className="flex items-center gap-1 text-red-400 font-bold">
-                            <AlertTriangle className="h-3 w-3" />
-                            <span>⚠️ Parado há {hoursSinceActivity}h</span>
+                          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-800 text-white font-bold text-sm shadow-lg animate-pulse">
+                            <AlertTriangle className="h-4 w-4" />
+                            <span>⚠️ PARADO HÁ {hoursSinceActivity}h</span>
                           </div>
                         )}
                       </div>
