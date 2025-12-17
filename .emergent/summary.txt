@@ -1,111 +1,107 @@
 <analysis>**original_problem_statement:**
-O usuário solicitou o desenvolvimento de um sistema PWA (Progressive Web App) para controlar a produtividade de instaladores.
+O usuário solicitou o desenvolvimento de um sistema PWA para controlar a produtividade de instaladores. Os requisitos incluem autenticação, integração com a API da Holdworks para buscar trabalhos, funcionalidades de check-in/out por item para instaladores (com fotos e GPS), um painel de gerenciamento para atribuir itens e definir métricas (dificuldade, cenário), e um sistema de relatórios de produtividade.
+
+A solicitação mais recente do usuário é para melhorar a responsividade da página do calendário e integrar a API do Gemini para permitir que os usuários salvem compromissos no Google Calendar.
 
 **PRODUCT REQUIREMENTS:**
 - **Autenticação:** Login com email/senha e painéis para perfis (Admin, Gerente, Instalador).
-- **Integração de API:** Buscar trabalhos (Jobs) da API externa da Holdworks, filtrando por não finalizados e dos últimos 7 dias.
+- **Integração de API:** Buscar trabalhos (Jobs) da API externa da Holdworks.
 - **Funcionalidades do Instalador:**
-    - Fazer check-in e check-out dos trabalhos.
-    - Capturar fotos (Base64) e localização GPS.
-    - No check-out, informar o **m² instalado**, o nível de **complexidade**, a **altura** e o **cenário** da instalação.
+    - Fazer check-in e check-out por item.
+    - Capturar fotos e localização GPS.
+    - Adicionar observações.
+    - Pausar e retomar a instalação de um item com justificativa.
 - **Funcionalidades do Gerente:**
-    - Visualizar um dashboard com métricas e check-ins.
-    - **Atribuir itens específicos de um job a um ou mais instaladores**, com cálculo automático do m² atribuído a cada um.
-    - Acessar relatórios detalhados com gráficos e filtros:
-        - **Relatório de Jobs:** Status, filtros, etc.
-        - **Relatório por Família de Produto:** Associar produtos da Holdprint a famílias pré-definidas (Adesivos, Lonas, etc.), exibindo m² e quantidade por família.
-        - **Relatório de Produtividade por Instalador:** Ranking de instaladores baseado nos m² informados no check-out e nas horas trabalhadas.
-    - Exportar relatórios para Excel.
-    - Visualizar detalhes dos jobs, incluindo o **m² total calculado por item e por job**.
-- **Sistema de Métricas de Produtividade:**
-    - Criar uma base de dados para registrar e analisar a produtividade das instalações, com base em famílias de produtos, complexidade, altura e cenário.
-- **Frontend:** Design responsivo.
+    - Visualizar um dashboard com métricas.
+    - Atribuir itens de um job a instaladores.
+    - Definir o **nível de dificuldade** e o **cenário** para cada item.
+    - Acessar relatórios detalhados com fotos e filtros.
+- **Sistema de Métricas:**
+    - Calcular a produtividade (m²/h) com base no **tempo líquido** (excluindo pausas) e nos dados de m² vindos da API da Holdprint.
+- **Integração com Calendário:**
+    - Usar a API do Gemini para permitir que os usuários salvem eventos do aplicativo no Google Calendar.
 
 **User's preferred language**: Portuguese (Brazil)
 
 **what currently exists?**
-Um aplicativo full-stack (FastAPI + React) que atende à maioria dos requisitos. O sistema possui autenticação JWT, integração com a API da Holdprint (filtrando jobs não finalizados dos últimos 7 dias) e funcionalidades distintas para Admin, Gerente e Instalador.
-
-**Funcionalidades Implementadas:**
-- **Cálculo de m²:** O sistema calcula e exibe automaticamente o m² por item e o m² total de cada job na página de detalhes.
-- **Atribuição de Itens:** Gerentes podem selecionar itens específicos de um job e atribuí-los a um ou mais instaladores através de um modal na página de detalhes do job. O sistema calcula e exibe o m² que cada instalador é responsável.
-- **Sistema de Métricas:** Uma nova página de Métricas foi criada, permitindo a criação de Famílias de Produtos e a visualização de dados de produtividade por complexidade, altura e cenário.
-- **Relatórios Avançados:**
-    - **Relatório por Família:** Uma página que analisa os jobs importados, classifica os produtos em famílias e exibe um resumo (total de produtos, m², etc.) por família.
-    - **Relatório por Instalador:** Uma página que exibe um ranking de produtividade dos instaladores, calculando .
-- **Correções de Bugs:** Resolvido um problema na importação de jobs onde o nome do cliente não era exibido corretamente.
+Um aplicativo full-stack (FastAPI + React) que implementa a maioria dos requisitos. O sistema possui autenticação JWT, integração com a API da Holdprint, e funcionalidades distintas para Admin, Gerente e Instalador. As funcionalidades mais recentes incluem um sistema de pausa/retomada para o tempo de trabalho do instalador, relatórios de produtividade baseados em tempo líquido, um relatório fotográfico para check-ins/outs, e uma funcionalidade para alteração de senha do usuário. A lógica de conclusão de jobs foi corrigida para garantir que todos os itens atribuídos estejam finalizados.
 
 **Last working item**:
-    - Last item agent was working: O agente estava implementando a solicitação do usuário para adicionar campos de **m² instalado**, **complexidade**, **altura** e **cenário** na página de **Check-Out do instalador**. O objetivo é que o instalador forneça esses dados ao finalizar um trabalho.
+    - Last item agent was working: Melhorar a responsividade da página do Calendário e integrar a API do Gemini para permitir que os usuários salvem compromissos no Google Calendar. O agente analisou o arquivo  e solicitou o playbook de integração para o Google Calendar.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? screenshot tool. O próximo agente deve: 1. Logar como instalador (). 2. Iniciar um job a partir do dashboard. 3. Navegar para a página de check-out (que deve estar acessível após o check-in). 4. Tirar um screenshot para verificar se os novos campos (m² Instalado, Complexidade, Altura, Cenário) estão visíveis e funcionais.
+    - Which testing method agent to use? frontend testing agent para a responsividade e backend testing agent para a integração com a API. A integração com o Google Calendar provavelmente exigirá testes manuais ou a configuração de credenciais de teste.
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: (P0) Completar a implementação e teste da página de Check-Out.
-  - Issue 2: (P0) O usuário não consegue ver as atualizações devido ao cache do PWA.
+  - Issue 1: (P0) Melhorar a responsividade da página do Calendário.
+  - Issue 2: (P0) Implementar a integração com Google Calendar via API do Gemini.
 
   Issues Detail:
   - Issue 1: 
-     - Attempted fixes: O agente modificou o backend () para aceitar os novos campos (, , , ) no endpoint de checkout e atualizou o frontend () para incluir os inputs no formulário. O trabalho foi interrompido antes que o agente pudesse testar visualmente a página de checkout.
+     - Attempted fixes: Nenhum ainda. A tarefa foi solicitada recentemente.
      - Next debug checklist: 
-        1. Seguir os passos de teste descritos em Last working item para confirmar que a UI do  foi atualizada corretamente.
-        2. Realizar um check-out completo, preenchendo os novos campos, e verificar se os dados são salvos corretamente no banco de dados (inspecionando a coleção ).
-        3. Verificar se o Relatório por Instalador é atualizado com os novos dados de .
-     - Why fix this issue and what will be achieved with the fix? A captura desses dados é a base para todo o sistema de métricas de produtividade real. Sem isso, os relatórios de produtividade do instalador permanecerão zerados.
+        1. Analisar o arquivo .
+        2. Usar classes do Tailwind CSS para ajustar o layout, tamanho das fontes e espaçamento para telas menores (ex: , , , ).
+        3. Garantir que a visualização do calendário (seja diária, semanal ou mensal) se adapte corretamente a diferentes larguras de tela.
+     - Why fix this issue and what will be achieved with the fix? Melhorar a usabilidade do calendário em dispositivos móveis.
+     - Status:  NOT STARTED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Frontend
+     - Blocked on other issue: Não
+
+  - Issue 2: 
+     - Attempted fixes: O agente solicitou o playbook de integração usando a ferramenta .
+     - Next debug checklist: 
+        1. Aguardar e analisar o playbook de integração para Google Calendar retornado pelo subagente.
+        2. Implementar um novo endpoint no backend () que utilize a API do Gemini para criar eventos no Google Calendar.
+        3. Adicionar uma função no frontend () para chamar esse novo endpoint.
+        4. No , adicionar um botão Salvar no Google Calendar em cada evento, que acionará a função da API.
+        5. Lidar com a autenticação do usuário com o Google, conforme as instruções do playbook.
+     - Why fix this issue and what will be achieved with the fix? Permitirá que os usuários sincronizem os agendamentos de trabalho do PWA com suas agendas pessoais no Google Calendar.
      - Status:  IN PROGRESS
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix? Both
-     - Blocked on other issue: Não
-  - Issue 2: 
-     - Attempted fixes: (Do handoff anterior) O agente tentou limpar o cache do build, reiniciar o servidor e renomear o cache no . Essas soluções foram temporárias.
-     - Next debug checklist: 
-        1. Revisar a estratégia de cache do  para implementar uma invalidação de cache mais agressiva.
-        2. Adicionar cabeçalhos  nos endpoints do  que servem os arquivos estáticos do frontend.
-        3. Implementar um botão de atualização no PWA que força a atualização do service worker e o recarregamento da página.
-     - Why fix this issue and what will be achieved with the fix? Este é um bloqueador crítico que impede o usuário de validar qualquer nova funcionalidade, tornando o ciclo de desenvolvimento ineficaz.
-     - Status:  NOT STARTED (nesta sessão)
-     - Is recurring issue? Y
-     - Should Test frontend/backend/both after fix? Frontend
-     - Blocked on other issue: Não
+     - Blocked on other issue: Aguardando a resposta do .
 
 **In progress Task List**:
 Nenhum.
 
 **Upcoming and Future Tasks**
     - **Upcoming Tasks:**
-        - **(P1) Funcionalidade de Edição de Usuário:** A página de usuários () existe, mas a funcionalidade de edição (alterar perfil, filial) precisa ser implementada.
-        - **(P2) Atribuição de Jobs e Agendamento (Backend):** O frontend para agendamento no calendário foi estruturado, mas a lógica de agendamento precisa ser implementada no backend.
-        - **(P3) Melhoria na Classificação de Produtos:** Permitir que o gerente corrija ou associe manualmente um produto não classificado a uma família, para melhorar a precisão do Relatório por Família.
+        - **(P1) Funcionalidade de Edição de Usuário:** Implementar a lógica de edição na página .
+        - **(P2) Lógica de Agendamento (Backend):** Implementar a lógica de agendamento de jobs no backend.
+        - **(P3) Melhoria na Classificação de Produtos:** Permitir que o gerente associe manualmente um produto não classificado a uma família.
     - **Future Tasks:**
-        - **(P4) Capacidades Offline (PWA):** Implementar funcionalidade offline robusta para permitir check-in/out sem conexão e sincronizar os dados posteriormente.
-        - **(P5) Machine Learning:** Usar os dados coletados na tabela  para calibrar automaticamente a matriz de tempo de instalação.
+        - **(P4) Capacidades Offline (PWA):** Implementar funcionalidade offline robusta para check-in/out.
+        - **(P5) Machine Learning:** Usar os dados coletados para calibrar a matriz de tempo de instalação.
 
 **Completed work in this session**
-- **Sistema de Métricas de Produtividade:**
-  - Criada a página  para visualizar e gerenciar famílias de produtos e analisar dados por complexidade, altura e cenário.
-- **Cálculo e Exibição de Área (m²):**
-  - Implementado o cálculo automático de m² por item e por job.
-  - A página de detalhes do job () foi atualizada para exibir a área total do job e a área de cada item.
-- **Sistema de Atribuição de Itens:**
-  - Gerentes agora podem atribuir itens específicos de um job a um ou mais instaladores.
-  - O sistema calcula e exibe o m² de responsabilidade de cada instalador.
-- **Relatórios Avançados:**
-  - Criada a página  para classificar produtos em famílias e analisar a distribuição.
-  - Criada a página  para exibir um ranking de produtividade dos instaladores.
-- **Filtro de Importação da Holdprint:**
-  - A importação agora busca apenas jobs não finalizados dos últimos 7 dias.
-- **Correção de Bug na Importação:**
-  - Corrigido o problema que fazia com que o nome do cliente não aparecesse nos jobs recém-importados.
-- **Refinamento da UI do :**
-  - Adicionados detalhes da Holdprint (OS, cliente) e removidos campos financeiros (valor, forma de pagamento) a pedido do usuário.
+- **Simplificação do Checkout do Instalador**: O formulário em  foi atualizado para remover campos de métricas e adicionar um campo de Observação, com teste de ponta a ponta.
+- **Melhorias de Responsividade Mobile**:
+    - Criada a página  com opções de logout e troca de conta.
+    - Melhorado o layout das páginas  (instalador) e  (gerente) para dispositivos móveis.
+- **Novo Relatório de Produtividade**:
+    - Criado o endpoint  e a página  que calculam a produtividade usando m² da API e o tempo líquido de trabalho.
+- **Sistema de Pausa e Tempo Líquido**:
+    - Implementado backend e frontend para permitir que instaladores pausem e retomem itens, com o tempo de pausa sendo descontado do cálculo de produtividade.
+- **Correção de Bug na Conclusão de Jobs**: Corrigida a lógica que marcava jobs como FINALIZADO incorretamente, mesmo com itens pendentes.
+- **Relatório Fotográfico de Check-in/out**: Adicionada uma nova aba na página de Relatórios () que exibe um histórico de todos os check-ins e check-outs com suas respectivas fotos.
+- **Funcionalidade de Alteração de Senha**: Implementada a funcionalidade completa para que os usuários possam alterar suas senhas na página de Perfil.
+- **Correção do Relatório de Produtividade por Instalador**: O endpoint  foi atualizado para usar  em vez da coleção obsoleta, garantindo a precisão dos dados.
 
 **Earlier issues found/mentioned but not fixed**
-   - **PWA Caching Issue:** O problema mais crítico, mencionado no handoff anterior, não foi abordado nesta sessão e continua sendo um bloqueador.
+   - **Issue 1**: As páginas  e  originais são agora obsoletas devido ao novo fluxo de check-in/out por item e deveriam ser removidas para evitar confusão.
+     - Debug checklist: 
+        1. Remover as rotas para  e  do arquivo .
+        2. Excluir os arquivos  e .
+        3. Verificar se há alguma referência restante a essas páginas no código e removê-las.
+     - Why to solve this issue and what will be achieved with this? Limpeza do código, remoção de funcionalidades legadas e prevenção de bugs futuros.
+     - Should Test frontend/backend/both after fix: Frontend
+     - Is recurring issue? N
 
 **Known issue recurrence from previous fork**
-  - None.
+  - **PWA Caching Issue:** Foi abordado em uma sessão anterior, mas pode ressurgir. Nenhum problema foi relatado nesta sessão.
 
 **Code Architecture**
 
@@ -116,77 +112,75 @@ Nenhum.
 - **Database**: MongoDB
 - **Styling**: Tailwind CSS, Shadcn/UI
 - **Authentication**: JWT
-- **Data Handling**: Fotos em Base64, Coordenadas GPS, Cálculo de m²
+- **State Management**: React Hooks
+- **Data/Time**: Uso de  para consistência.
 
 **key DB schema**
-  - **users**: 
-  - **jobs**: 
-  - **checkins**: 
-  - **product_families**: 
-  - **installed_products**:  (Estrutura usada na lógica de métricas)
+  - **item_checkins**: Status  foi adicionado. Armazena fotos, GPS e timestamps.
+  - **item_pause_logs**: (Nova coleção)  para rastrear pausas.
+  - **installed_products**: Lógica de cálculo atualizada para usar .
+  - **users**: Campo  agora pode ser atualizado.
 
 **changes in tech stack**
-  - None.
+  - **Pendente:** Adição da API do Gemini para integração com o Google Calendar.
 
 **All files of reference**
-- : Adicionados múltiplos modelos (ProductFamily, ItemAssignment) e endpoints (, , , , ). Endpoint de checkout foi modificado.
-- : Grande refatoração para incluir cálculo de m², UI de atribuição de itens e exibição das atribuições.
-- : Adicionados novos campos de formulário para m², complexidade, altura e cenário. **(Pendente de teste)**.
-- : Nova página para o dashboard de métricas.
-- : Nova página para o relatório por família.
-- : Nova página para o relatório de produtividade do instalador.
-- : Adicionadas as chamadas para os novos endpoints.
-- : Adicionadas as rotas para as novas páginas.
-- : Corrigida a exibição do nome do cliente nos cards.
-- : Adicionados botões para navegar para os novos relatórios.
+- : Adicionados múltiplos endpoints para pausa/retomada, novos relatórios, alteração de senha e busca de fotos. Lógica de cálculo de produtividade e conclusão de job foi atualizada.
+- : Interface atualizada com botões de pausa/retomada e um modal de justificativa.
+- : Nova página de relatório de produtividade.
+- : Adicionada uma aba para exibir registros fotográficos.
+- : Nova página para perfil do usuário e alteração de senha.
+- , : Melhorias de responsividade.
+- : Lógica de busca e exibição de dados corrigida.
+- : Adicionadas várias novas funções para os novos endpoints.
+- : Arquivo em análise para a próxima tarefa.
 
 **Areas that need refactoring**:
-- A lógica de API no frontend () está crescendo e poderia ser modularizada por recurso.
-- A lógica de captura de dados nos formulários (CheckIn, CheckOut, Registro de Instalação) é similar e poderia ser extraída para um custom hook compartilhado.
+-  continua sendo um arquivo monolítico e se beneficiaria de uma divisão por responsabilidades (rotas, modelos, serviços).
+- As páginas obsoletas  e  devem ser removidas do projeto.
 
 **key api endpoints**
-- : Atribui itens de um job a instaladores.
-- : Recalcula o m² de todos os jobs existentes.
-- : Retorna a análise de produtos classificados por família.
-- : Retorna o ranking de produtividade dos instaladores.
-- : Retorna as métricas gerais de produtividade.
-- : Cria as famílias de produto padrão.
-- : Modificado para aceitar , , , .
+- : Pausa um item.
+- : Retoma um item.
+- : Retorna dados para o novo relatório de produtividade.
+- : Busca todos os registros de item_checkin (usado no relatório de fotos).
+- : Permite que o usuário autenticado altere sua própria senha.
+- : (Lógica atualizada) Agora usa  para maior precisão.
 
 **Critical Info for New Agent**
-1.  **Finalizar a Tarefa Atual:** A prioridade máxima é concluir e testar a adição dos campos (, , , ) na página de **Check-Out**. Sem isso, a principal fonte de dados para as métricas de produtividade não funcionará.
-2.  **Resolver o Problema de Cache:** A segunda prioridade (e um bloqueador crítico) é resolver o problema de cache do PWA. Nenhuma nova funcionalidade pode ser validada pelo usuário até que isso seja corrigido.
-3.  **Credenciais de Teste:** As credenciais fornecidas (, , ) são funcionais e essenciais para testar os diferentes fluxos.
+1.  **Tarefa Imediata:** A prioridade é a tarefa de responsividade e integração do calendário. O agente anterior já solicitou o playbook de integração para o Google Calendar. Sua primeira ação deve ser analisar a resposta do subagente e planejar a implementação.
+2.  **Fonte da Verdade para Métricas:** Todas as métricas de produtividade (m²/h) agora são calculadas usando o **tempo líquido** (tempo total - tempo de pausa) dos  e a área () do item vinda da API da Holdprint. O input manual do instalador foi removido.
+3.  **Lógica de Conclusão:** Um job só é considerado FINALIZADO quando **todos** os seus itens atribuídos tiverem um  com status completed.
 
 **documents created in this job**
-  - None nesta sessão.
+  - None.
 
 **Last 10 User Messages and any pending user messages**
-1.  **crie um relatorio por familia...**: Concluído. O agente criou o relatório por família.
-2.  **preciso que seja calculado a largura pela altura...**: Concluído. O agente implementou o cálculo de m² por item/job e o relatório por instalador.
-3.  **crie um campo para o instalador informar o m2 instalado...**: Concluído. O agente implementou a atribuição de itens pelo gerente.
-4.  **conclua**: O agente estava no meio de uma implementação e foi instruído a continuar.
-5.  **teste uma atribuição...**: Concluído. O agente testou o fluxo completo de atribuição e check-in/out.
-6.  **crie um campo na pagina do instalador para ele inserir o m2 instalado...**: **EM ANDAMENTO**. Esta é a última solicitação do usuário e o item de trabalho atual. O agente adicionou os campos ao checkout, mas ainda não concluiu os testes.
-7.  **teste uma atribuição...**: O usuário pediu um teste completo. O agente executou um script de teste e mostrou o resultado.
-8.  **crie um campo na pagina do instalador para ele inserir o m2 instalado...**: Esta é a última e mais importante solicitação, definindo a tarefa atual.
-9.  **teste uma atribuição, selecione o instalador teste e faça o checkin com foto de todos os itens**: Concluído. O agente executou um teste simulado e mostrou o resultado no relatório do instalador.
-10. **crie um campo na pagina do instalador para ele inserir o m2 instalado, insira um campo também complexidade por altura por cenario busque essas variaveis da seção métricas**: Esta é a solicitação que está sendo trabalhada atualmente.
+- **User (msg 377):** Pediu para melhorar a responsividade do calendário e adicionar integração com Google Calendar via Gemini. (⚠️ **EM ANDAMENTO**).
+- **User (msg 348):** Pediu para corrigir o cálculo de produtividade para usar dados dos checkouts de itens da Holdprint. (✅ **Completo**).
+- **User (msg 326):** Pediu uma funcionalidade para o usuário alterar a própria senha. (✅ **Completo**).
+- **User (msg 269):** Pediu para exibir as fotos de check-in/out na seção de relatórios. (✅ **Completo**).
+- **User (msg 234, 238):** Apontou um bug onde um job aparecia como FINALIZADO com itens ainda pendentes. (✅ **Completo**).
+- **User (msg 163):** Solicitou a implementação de um sistema de Tempo Líquido com pausas para tornar a métrica de produtividade mais justa. (✅ **Completo**).
+- **User (msg 88):** Solicitou uma grande mudança no cálculo de produtividade para usar o m² da API e o tempo real de execução. (✅ **Completo**).
+- **User (msg 62):** Pediu para melhorar a responsividade da tela de detalhes do job do gerente. (✅ **Completo**).
+- **User (msg 25):** Pediu para melhorar a responsividade do dashboard do instalador e adicionar uma funcionalidade de perfil/logout. (✅ **Completo**).
 
 **Project Health Check:**
-- **Broken:** O mecanismo de atualização/cache do PWA continua quebrado, exigindo ações manuais do usuário para ver as mudanças.
-- **Mocked:** None.
+- **Broken:** None.
+- **Mocked:** A integração com Gemini/Google Calendar ainda não foi implementada.
 
 **3rd Party Integrations**
 - **Holdworks AI API**: Para importar a lista de trabalhos.
 - **Google Maps**: Usado para gerar links de localização a partir das coordenadas GPS.
 - **openpyxl**: Biblioteca Python para gerar arquivos Excel.
+- **Gemini API / Google Calendar**: Integração solicitada, em andamento.
 
 **Testing status**
-  - Testing agent used after significant changes: NO
+  - Testing agent used after significant changes: YES (usado para as funcionalidades de perfil, produtividade e pausa).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: Scripts de teste únicos () foram usados para verificações pontuais no backend.
-  - Known regressions: O problema de cache do PWA persiste e é o principal ponto de falha na experiência do usuário.
+  - Test files created: None
+  - Known regressions: Nenhuma nesta sessão.
 
 **Credentials to test flow:**
 - **Admin:**  / 
@@ -194,4 +188,4 @@ Nenhum.
 - **Instalador:**  / 
 
 **What agent forgot to execute**
-O agente não abordou o problema crítico de cache do PWA, que foi destacado no handoff inicial. Embora tenha entregue muitas funcionalidades, este problema técnico fundamental permanece sem solução e deve ser priorizado.</analysis>
+- A tarefa de remover as páginas obsoletas  e , que foi mencionada no handoff anterior, ainda não foi executada.</analysis>

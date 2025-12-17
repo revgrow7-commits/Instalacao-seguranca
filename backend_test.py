@@ -11,7 +11,7 @@ from datetime import datetime
 import time
 
 # Test configuration
-BASE_URL = "https://siteflow-14.preview.emergentagent.com/api"
+BASE_URL = "https://instalmonitor.preview.emergentagent.com/api"
 
 # Test credentials
 INSTALLER_CREDENTIALS = {
