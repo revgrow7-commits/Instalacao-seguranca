@@ -1942,12 +1942,17 @@ async def create_item_checkin(
     # Detect family
     family_id, family_name = await detect_product_family([product.get("name", "")])
     
+    # Compress photo if provided
+    compressed_photo = None
+    if photo_base64:
+        compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
+    
     # Create item checkin
     item_checkin = ItemCheckin(
         job_id=job_id,
         item_index=item_index,
         installer_id=installer["id"],
-        checkin_photo=photo_base64,
+        checkin_photo=compressed_photo,
         gps_lat=gps_lat,
         gps_long=gps_long,
         gps_accuracy=gps_accuracy,
