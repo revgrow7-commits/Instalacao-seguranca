@@ -621,6 +621,233 @@ class FieldworkAPITest:
             
         return True
 
+    def test_forgot_password_endpoint(self):
+        """Test 12: Forgot password endpoint - should send reset email"""
+        self.log("Testing forgot password endpoint...")
+        
+        # Test with valid email
+        forgot_data = {
+            "email": "revgrow7@gmail.com"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/auth/forgot-password",
+            json=forgot_data
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Forgot password failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Forgot password endpoint successful")
+        
+        # Verify response message (should be generic for security)
+        if "message" in data:
+            message = data["message"]
+            self.log(f"   Response message: {message}")
+            
+            # Should return success message even if email doesn't exist (security)
+            expected_phrases = ["receberá um link", "redefinir", "senha"]
+            if any(phrase in message.lower() for phrase in expected_phrases):
+                self.log(f"   ✅ Appropriate security message returned")
+            else:
+                self.log(f"   ⚠️  Unexpected message format")
+        else:
+            self.log(f"   ❌ No message in response: {data}")
+            return False
+            
+        # Test with non-existent email (should still return success for security)
+        forgot_data_invalid = {
+            "email": "nonexistent@example.com"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/auth/forgot-password",
+            json=forgot_data_invalid
+        )
+        
+        if response.status_code == 200:
+            self.log(f"   ✅ Non-existent email also returns success (security feature)")
+        else:
+            self.log(f"   ⚠️  Non-existent email returned different status: {response.status_code}")
+            
+        return True
+        
+    def test_verify_reset_token_invalid(self):
+        """Test 13: Verify reset token with invalid token - should return valid: false"""
+        self.log("Testing verify reset token with invalid token...")
+        
+        # Test with invalid token
+        response = self.session.get(
+            f"{BASE_URL}/auth/verify-reset-token?token=invalid_token_12345"
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Verify reset token failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Verify reset token endpoint successful")
+        
+        # Verify response structure
+        if "valid" in data:
+            is_valid = data["valid"]
+            self.log(f"   Token validity: {is_valid}")
+            
+            if is_valid == False:
+                self.log(f"   ✅ Invalid token correctly returns valid: false")
+            else:
+                self.log(f"   ❌ Invalid token should return valid: false, got: {is_valid}")
+                return False
+        else:
+            self.log(f"   ❌ No 'valid' field in response: {data}")
+            return False
+            
+        # Check for message field
+        if "message" in data:
+            message = data["message"]
+            self.log(f"   Message: {message}")
+            
+            if "inválido" in message.lower() or "invalid" in message.lower():
+                self.log(f"   ✅ Appropriate error message for invalid token")
+            else:
+                self.log(f"   ⚠️  Unexpected message for invalid token")
+        
+        return True
+        
+    def test_reset_password_invalid_token(self):
+        """Test 14: Reset password with invalid token - should return 400 error"""
+        self.log("Testing reset password with invalid token...")
+        
+        reset_data = {
+            "token": "invalid_token_12345",
+            "new_password": "newpassword123"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/auth/reset-password",
+            json=reset_data
+        )
+        
+        # Should return 400 for invalid token
+        if response.status_code == 400:
+            self.log(f"✅ Reset password correctly returns 400 for invalid token")
+            
+            try:
+                error_data = response.json()
+                if "detail" in error_data:
+                    error_message = error_data["detail"]
+                    self.log(f"   Error message: {error_message}")
+                    
+                    # Check for appropriate error message
+                    if "inválido" in error_message.lower() or "expirado" in error_message.lower():
+                        self.log(f"   ✅ Appropriate error message for invalid token")
+                    else:
+                        self.log(f"   ⚠️  Unexpected error message")
+                else:
+                    self.log(f"   ⚠️  No detail field in error response")
+            except:
+                self.log(f"   ⚠️  Could not parse error response")
+                
+        else:
+            self.log(f"❌ Expected 400, got {response.status_code} - {response.text}")
+            return False
+            
+        return True
+        
+    def test_admin_reset_user_password(self):
+        """Test 15: Admin reset user password - should work with admin auth"""
+        self.log("Testing admin reset user password...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # First, get list of users to find a user ID
+        response = self.session.get(f"{BASE_URL}/users", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not get users list: {response.status_code} - {response.text}")
+            return False
+            
+        users = response.json()
+        
+        if not users:
+            self.log(f"❌ No users found in system")
+            return False
+            
+        # Find a non-admin user to reset password for
+        target_user = None
+        for user in users:
+            if user.get("role") != "admin":
+                target_user = user
+                break
+                
+        if not target_user:
+            self.log(f"❌ No non-admin user found to test password reset")
+            return False
+            
+        user_id = target_user["id"]
+        user_name = target_user.get("name", "Unknown")
+        
+        self.log(f"   Testing password reset for user: {user_name} (ID: {user_id})")
+        
+        # Test admin reset password
+        reset_data = {
+            "new_password": "admin_reset_password_123"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/users/{user_id}/reset-password",
+            json=reset_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Admin password reset failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Admin password reset successful")
+        
+        # Verify response message
+        if "message" in data:
+            message = data["message"]
+            self.log(f"   Response message: {message}")
+            
+            if user_name in message and "redefinida" in message.lower():
+                self.log(f"   ✅ Appropriate success message")
+            else:
+                self.log(f"   ⚠️  Unexpected message format")
+        else:
+            self.log(f"   ❌ No message in response: {data}")
+            return False
+            
+        # Test that non-admin cannot use this endpoint
+        if self.installer_token:
+            self.log("   Testing that installer cannot use admin reset endpoint...")
+            
+            installer_headers = {"Authorization": f"Bearer {self.installer_token}"}
+            
+            response = self.session.put(
+                f"{BASE_URL}/users/{user_id}/reset-password",
+                json=reset_data,
+                headers=installer_headers
+            )
+            
+            if response.status_code == 403:
+                self.log(f"   ✅ Installer correctly denied access (403)")
+            else:
+                self.log(f"   ⚠️  Installer got unexpected status: {response.status_code}")
+                
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
