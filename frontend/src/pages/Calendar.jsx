@@ -5,7 +5,7 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users, MapPin } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users, MapPin, List, Grid3X3 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Calendar = () => {
@@ -14,8 +14,16 @@ const Calendar = () => {
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('month'); // month, week
+  const [viewMode, setViewMode] = useState('month'); // month, list
   const [selectedBranch, setSelectedBranch] = useState('all');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Detect mobile screen
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     if (isAdmin || isManager) {
