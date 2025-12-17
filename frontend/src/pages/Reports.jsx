@@ -35,15 +35,17 @@ const Reports = () => {
 
   const loadData = async () => {
     try {
-      const [jobsRes, checkinsRes, installersRes] = await Promise.all([
+      const [jobsRes, checkinsRes, installersRes, itemCheckinsRes] = await Promise.all([
         api.getJobs(),
         api.getCheckins(),
-        api.getInstallers()
+        api.getInstallers(),
+        api.getAllItemCheckins()
       ]);
       
       setJobs(jobsRes.data);
       setCheckins(checkinsRes.data);
       setInstallers(installersRes.data);
+      setItemCheckins(itemCheckinsRes.data);
     } catch (error) {
       toast.error('Erro ao carregar relatórios');
     } finally {
