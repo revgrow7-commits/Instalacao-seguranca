@@ -3396,11 +3396,9 @@ async def google_callback(code: str, state: str = None):
         )
 
 @api_router.get("/auth/google/status")
-async def google_auth_status(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def google_auth_status(current_user: User = Depends(get_current_user)):
     """Check if user has connected Google Calendar"""
-    current_user = await get_current_user(credentials)
-    
-    user = await db.users.find_one({"id": current_user['id']}, {"_id": 0, "google_tokens": 1, "google_email": 1})
+    user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "google_tokens": 1, "google_email": 1})
     
     has_google = user and user.get('google_tokens') and user['google_tokens'].get('access_token')
     
