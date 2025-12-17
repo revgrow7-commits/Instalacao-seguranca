@@ -152,12 +152,12 @@ const ProductivityReport = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <Label className="text-xs text-muted-foreground">Filtrar por</Label>
-              <Select value={filterBy} onValueChange={(v) => { setFilterBy(v); setFilterId(''); }}>
+              <Select value={filterBy || "all"} onValueChange={(v) => { setFilterBy(v === "all" ? "" : v); setFilterId(''); }}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-white/10">
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="installer">Instalador</SelectItem>
                   <SelectItem value="job">Job</SelectItem>
                   <SelectItem value="family">Família</SelectItem>
