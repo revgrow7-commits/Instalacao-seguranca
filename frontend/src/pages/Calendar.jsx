@@ -125,22 +125,60 @@ const Calendar = () => {
   const days = getDaysInMonth(currentDate);
   const monthName = currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
+  // Get jobs for current week (mobile list view)
+  const getWeekJobs = () => {
+    const startOfWeek = new Date(currentDate);
+    startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+    const endOfWeek = new Date(startOfWeek);
+    endOfWeek.setDate(startOfWeek.getDate() + 6);
+
+    return jobs.filter(job => {
+      const jobDate = new Date(job.scheduled_date);
+      return jobDate >= startOfWeek && jobDate <= endOfWeek &&
+        (selectedBranch === 'all' || job.branch === selectedBranch);
+    }).sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date));
+  };
+
   return (
-    <div className="p-4 md:p-8 space-y-6" data-testid="calendar-page">
+    <div className="p-3 sm:p-4 md:p-8 space-y-4 md:space-y-6" data-testid="calendar-page">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-heading font-bold text-white tracking-tight capitalize">
-            {monthName}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {jobs.filter(j => selectedBranch === 'all' || j.branch === selectedBranch).length} job(s) agendado(s)
-          </p>
+      <div className="flex flex-col gap-3 md:gap-4">
+        {/* Title and Counter */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl md:text-4xl font-heading font-bold text-white tracking-tight capitalize">
+              {monthName}
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              {jobs.filter(j => selectedBranch === 'all' || j.branch === selectedBranch).length} job(s) agendado(s)
+            </p>
+          </div>
+
+          {/* View Mode Toggle (Mobile) */}
+          <div className="flex md:hidden gap-1">
+            <Button
+              variant={viewMode === 'month' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setViewMode('month')}
+              className={viewMode === 'month' ? 'bg-primary' : 'border-white/20 text-white hover:bg-white/10'}
+            >
+              <Grid3X3 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="icon"
+              onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-primary' : 'border-white/20 text-white hover:bg-white/10'}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Controls */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center sm:justify-between">
           <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-            <SelectTrigger className="w-48 bg-white/5 border-white/10 text-white">
+            <SelectTrigger className="w-full sm:w-48 bg-white/5 border-white/10 text-white text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="bg-card border-white/10">
@@ -150,19 +188,19 @@ const Calendar = () => {
             </SelectContent>
           </Select>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 justify-center sm:justify-end">
             <Button
               variant="outline"
               size="icon"
               onClick={previousMonth}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-white/20 text-white hover:bg-white/10 h-9 w-9"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button
               variant="outline"
               onClick={() => setCurrentDate(new Date())}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-white/20 text-white hover:bg-white/10 text-sm px-3"
             >
               Hoje
             </Button>
@@ -170,7 +208,7 @@ const Calendar = () => {
               variant="outline"
               size="icon"
               onClick={nextMonth}
-              className="border-white/20 text-white hover:bg-white/10"
+              className="border-white/20 text-white hover:bg-white/10 h-9 w-9"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
