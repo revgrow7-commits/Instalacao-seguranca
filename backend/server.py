@@ -3295,6 +3295,276 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
 
+# ============ GOOGLE CALENDAR INTEGRATION ============
+
+@api_router.get("/auth/google/login")
+async def google_login(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Initiates Google OAuth flow for calendar access"""
+    current_user = await get_current_user(credentials)
+    
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google OAuth não configurado")
+    
+    # Store user_id in state to associate tokens later
+    state = f"{current_user['id']}"
+    
+    auth_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?"
+        f"client_id={GOOGLE_CLIENT_ID}&"
+        f"redirect_uri={GOOGLE_REDIRECT_URI}&"
+        f"response_type=code&"
+        f"scope={'%20'.join(GOOGLE_CALENDAR_SCOPES)}&"
+        f"access_type=offline&"
+        f"prompt=consent&"
+        f"state={state}"
+    )
+    
+    return {"authorization_url": auth_url}
+
+@api_router.get("/auth/google/callback")
+async def google_callback(code: str, state: str = None):
+    """Handles Google OAuth callback"""
+    try:
+        # Exchange code for tokens
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': GOOGLE_CLIENT_SECRET,
+                'redirect_uri': GOOGLE_REDIRECT_URI,
+                'grant_type': 'authorization_code'
+            }
+        )
+        
+        if token_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Falha ao obter tokens do Google")
+        
+        tokens = token_response.json()
+        
+        # Get user email from Google
+        userinfo_response = requests.get(
+            'https://www.googleapis.com/oauth2/v2/userinfo',
+            headers={'Authorization': f'Bearer {tokens["access_token"]}'}
+        )
+        
+        if userinfo_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Falha ao obter informações do usuário")
+        
+        google_user = userinfo_response.json()
+        google_email = google_user.get('email')
+        
+        # Find user by state (user_id) or by google email
+        user = None
+        if state:
+            user = await db.users.find_one({"id": state}, {"_id": 0})
+        
+        if not user:
+            user = await db.users.find_one({"email": google_email}, {"_id": 0})
+        
+        if not user:
+            # Close window with error
+            return RedirectResponse(
+                url=f"https://instalmonitor.preview.emergentagent.com/calendar?google_error=user_not_found"
+            )
+        
+        # Store Google tokens for this user
+        await db.users.update_one(
+            {"id": user['id']},
+            {"$set": {
+                "google_tokens": {
+                    "access_token": tokens.get('access_token'),
+                    "refresh_token": tokens.get('refresh_token'),
+                    "expires_in": tokens.get('expires_in'),
+                    "token_type": tokens.get('token_type'),
+                    "scope": tokens.get('scope'),
+                    "obtained_at": datetime.now(timezone.utc).isoformat()
+                },
+                "google_email": google_email
+            }}
+        )
+        
+        # Redirect back to calendar page with success
+        return RedirectResponse(
+            url=f"https://instalmonitor.preview.emergentagent.com/calendar?google_connected=true"
+        )
+        
+    except Exception as e:
+        logging.error(f"Google callback error: {str(e)}")
+        return RedirectResponse(
+            url=f"https://instalmonitor.preview.emergentagent.com/calendar?google_error=auth_failed"
+        )
+
+@api_router.get("/auth/google/status")
+async def google_auth_status(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Check if user has connected Google Calendar"""
+    current_user = await get_current_user(credentials)
+    
+    user = await db.users.find_one({"id": current_user['id']}, {"_id": 0, "google_tokens": 1, "google_email": 1})
+    
+    has_google = user and user.get('google_tokens') and user['google_tokens'].get('access_token')
+    
+    return {
+        "connected": has_google,
+        "google_email": user.get('google_email') if has_google else None
+    }
+
+@api_router.delete("/auth/google/disconnect")
+async def google_disconnect(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Disconnect Google Calendar from user account"""
+    current_user = await get_current_user(credentials)
+    
+    await db.users.update_one(
+        {"id": current_user['id']},
+        {"$unset": {"google_tokens": "", "google_email": ""}}
+    )
+    
+    return {"message": "Google Calendar desconectado com sucesso"}
+
+async def get_google_credentials(user_id: str):
+    """Get and refresh Google credentials for a user"""
+    user = await db.users.find_one({"id": user_id}, {"_id": 0, "google_tokens": 1})
+    
+    if not user or not user.get('google_tokens'):
+        return None
+    
+    tokens = user['google_tokens']
+    
+    creds = Credentials(
+        token=tokens.get('access_token'),
+        refresh_token=tokens.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=GOOGLE_CALENDAR_SCOPES
+    )
+    
+    # Refresh if expired
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(GoogleRequest())
+            # Update stored token
+            await db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "google_tokens.access_token": creds.token,
+                    "google_tokens.obtained_at": datetime.now(timezone.utc).isoformat()
+                }}
+            )
+        except Exception as e:
+            logging.error(f"Failed to refresh Google token: {str(e)}")
+            return None
+    
+    return creds
+
+@api_router.get("/calendar/events")
+async def get_google_calendar_events(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get events from user's Google Calendar"""
+    current_user = await get_current_user(credentials)
+    
+    google_creds = await get_google_credentials(current_user['id'])
+    if not google_creds:
+        raise HTTPException(status_code=401, detail="Google Calendar não conectado")
+    
+    try:
+        service = build('calendar', 'v3', credentials=google_creds)
+        
+        # Get events from now to 30 days ahead
+        now = datetime.now(timezone.utc).isoformat()
+        end = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+        
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            timeMax=end,
+            maxResults=50,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        
+        events = events_result.get('items', [])
+        
+        return {"events": events}
+        
+    except Exception as e:
+        logging.error(f"Error fetching Google Calendar events: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao buscar eventos: {str(e)}")
+
+class GoogleCalendarEventCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    start_datetime: str  # ISO format
+    end_datetime: str  # ISO format
+    location: Optional[str] = None
+
+@api_router.post("/calendar/events")
+async def create_google_calendar_event(
+    event_data: GoogleCalendarEventCreate,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Create an event in user's Google Calendar"""
+    current_user = await get_current_user(credentials)
+    
+    google_creds = await get_google_credentials(current_user['id'])
+    if not google_creds:
+        raise HTTPException(status_code=401, detail="Google Calendar não conectado")
+    
+    try:
+        service = build('calendar', 'v3', credentials=google_creds)
+        
+        event_body = {
+            'summary': event_data.title,
+            'description': event_data.description or '',
+            'start': {
+                'dateTime': event_data.start_datetime,
+                'timeZone': 'America/Sao_Paulo'
+            },
+            'end': {
+                'dateTime': event_data.end_datetime,
+                'timeZone': 'America/Sao_Paulo'
+            }
+        }
+        
+        if event_data.location:
+            event_body['location'] = event_data.location
+        
+        event = service.events().insert(
+            calendarId='primary',
+            body=event_body
+        ).execute()
+        
+        return {
+            "message": "Evento criado com sucesso no Google Calendar",
+            "event_id": event.get('id'),
+            "html_link": event.get('htmlLink')
+        }
+        
+    except Exception as e:
+        logging.error(f"Error creating Google Calendar event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar evento: {str(e)}")
+
+@api_router.delete("/calendar/events/{event_id}")
+async def delete_google_calendar_event(
+    event_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """Delete an event from user's Google Calendar"""
+    current_user = await get_current_user(credentials)
+    
+    google_creds = await get_google_credentials(current_user['id'])
+    if not google_creds:
+        raise HTTPException(status_code=401, detail="Google Calendar não conectado")
+    
+    try:
+        service = build('calendar', 'v3', credentials=google_creds)
+        service.events().delete(calendarId='primary', eventId=event_id).execute()
+        
+        return {"message": "Evento removido do Google Calendar"}
+        
+    except Exception as e:
+        logging.error(f"Error deleting Google Calendar event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao remover evento: {str(e)}")
+
 @api_router.get("/")
 async def root():
     return {"message": "INDÚSTRIA VISUAL API", "status": "online"}
