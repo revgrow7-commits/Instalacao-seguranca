@@ -325,6 +325,18 @@ frontend:
           agent: "testing"
           comment: "✅ Profile page fully functional and tested. Displays user name, role badge with proper colors (Instalador/Gerente), and email correctly. 'AÇÕES DA CONTA' section present with 'Trocar de Conta' and 'Sair da Conta' buttons. Account switching functionality works correctly - redirects to login page and allows switching between installer and manager accounts. Profile page correctly shows different user data after account switch. Logout functionality properly redirects to login page."
 
+  - task: "Productivity Report Page"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/ProductivityReport.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "New Productivity Report page implemented at /reports/productivity with tabs (Por Instalador, Por Job, Por Família, Por Item), filters, summary cards, and mobile responsiveness. Needs comprehensive testing of all functionality including navigation, filters, expandable details, and mobile view."
+
 metadata:
   created_by: "testing_agent"
   version: "1.0"
