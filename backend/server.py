@@ -2102,10 +2102,15 @@ async def complete_item_checkout(
         hours = net_duration_minutes / 60
         productivity_m2_h = round(installed_m2 / hours, 2)
     
+    # Compress checkout photo if provided
+    compressed_checkout_photo = None
+    if photo_base64:
+        compressed_checkout_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
+    
     # Update checkin with both gross and net times
     update_data = {
         "checkout_at": checkout_at.isoformat(),
-        "checkout_photo": photo_base64,
+        "checkout_photo": compressed_checkout_photo,
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
