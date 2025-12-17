@@ -3494,12 +3494,10 @@ class GoogleCalendarEventCreate(BaseModel):
 @api_router.post("/calendar/events")
 async def create_google_calendar_event(
     event_data: GoogleCalendarEventCreate,
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    current_user: User = Depends(get_current_user)
 ):
     """Create an event in user's Google Calendar"""
-    current_user = await get_current_user(credentials)
-    
-    google_creds = await get_google_credentials(current_user['id'])
+    google_creds = await get_google_credentials(current_user.id)
     if not google_creds:
         raise HTTPException(status_code=401, detail="Google Calendar não conectado")
     
