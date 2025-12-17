@@ -216,67 +216,138 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      <Card className="bg-card border-white/5">
-        <CardContent className="p-4">
-          {/* Weekday Headers */}
-          <div className="grid grid-cols-7 gap-2 mb-2">
-            {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day) => (
-              <div key={day} className="text-center text-sm font-semibold text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar Days */}
-          <div className="grid grid-cols-7 gap-2">
-            {days.map((date, index) => {
-              const dayJobs = date ? getJobsForDate(date) : [];
-              const isCurrentDay = isToday(date);
-
-              return (
-                <div
-                  key={index}
-                  className={`
-                    min-h-[100px] p-2 rounded-lg border transition-colors
-                    ${date ? 'bg-white/5 border-white/5 hover:border-primary/50' : 'bg-transparent border-transparent'}
-                    ${isCurrentDay ? 'border-primary bg-primary/10' : ''}
-                  `}
-                >
-                  {date && (
-                    <>
-                      <div className={`text-sm font-semibold mb-2 ${isCurrentDay ? 'text-primary' : 'text-white'}`}>
-                        {date.getDate()}
-                      </div>
-                      
-                      <div className="space-y-1">
-                        {dayJobs.map((job) => (
-                          <div
-                            key={job.id}
-                            onClick={() => navigate(`/jobs/${job.id}`)}
-                            className={`
-                              text-xs p-1 rounded cursor-pointer
-                              ${getStatusColor(job.status)} bg-opacity-20 border border-current
-                              hover:bg-opacity-30 transition-colors
-                              truncate
-                            `}
-                            title={job.title}
-                          >
-                            <div className="flex items-center gap-1">
-                              <CalendarIcon className="h-3 w-3 flex-shrink-0" />
-                              <span className="truncate">{job.title}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
+      {/* Calendar Grid (Desktop) or List View (Mobile) */}
+      {viewMode === 'month' ? (
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-2 sm:p-4">
+            {/* Weekday Headers */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+              {(isMobile ? ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'] : ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']).map((day, idx) => (
+                <div key={idx} className="text-center text-xs sm:text-sm font-semibold text-muted-foreground py-1 sm:py-2">
+                  {day}
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+
+            {/* Calendar Days */}
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {days.map((date, index) => {
+                const dayJobs = date ? getJobsForDate(date) : [];
+                const isCurrentDay = isToday(date);
+
+                return (
+                  <div
+                    key={index}
+                    className={`
+                      min-h-[50px] sm:min-h-[80px] md:min-h-[100px] p-1 sm:p-2 rounded-lg border transition-colors
+                      ${date ? 'bg-white/5 border-white/5 hover:border-primary/50' : 'bg-transparent border-transparent'}
+                      ${isCurrentDay ? 'border-primary bg-primary/10' : ''}
+                    `}
+                  >
+                    {date && (
+                      <>
+                        <div className={`text-xs sm:text-sm font-semibold mb-1 ${isCurrentDay ? 'text-primary' : 'text-white'}`}>
+                          {date.getDate()}
+                        </div>
+                        
+                        {/* Mobile: Show dot indicators */}
+                        <div className="sm:hidden flex flex-wrap gap-1">
+                          {dayJobs.slice(0, 3).map((job) => (
+                            <div
+                              key={job.id}
+                              onClick={() => navigate(`/jobs/${job.id}`)}
+                              className={`w-2 h-2 rounded-full cursor-pointer ${getStatusColor(job.status)}`}
+                              title={job.title}
+                            />
+                          ))}
+                          {dayJobs.length > 3 && (
+                            <span className="text-[10px] text-muted-foreground">+{dayJobs.length - 3}</span>
+                          )}
+                        </div>
+                        
+                        {/* Desktop: Show job cards */}
+                        <div className="hidden sm:block space-y-1">
+                          {dayJobs.slice(0, isMobile ? 1 : 2).map((job) => (
+                            <div
+                              key={job.id}
+                              onClick={() => navigate(`/jobs/${job.id}`)}
+                              className={`
+                                text-xs p-1 rounded cursor-pointer
+                                ${getStatusColor(job.status)} bg-opacity-20 border border-current
+                                hover:bg-opacity-30 transition-colors
+                                truncate
+                              `}
+                              title={job.title}
+                            >
+                              <div className="flex items-center gap-1">
+                                <CalendarIcon className="h-3 w-3 flex-shrink-0" />
+                                <span className="truncate text-[10px] md:text-xs">{job.title}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {dayJobs.length > 2 && (
+                            <div className="text-[10px] text-muted-foreground text-center">
+                              +{dayJobs.length - 2} mais
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        /* List View for Mobile */
+        <Card className="bg-card border-white/5">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-white text-base">Jobs desta Semana</CardTitle>
+          </CardHeader>
+          <CardContent className="p-2">
+            {getWeekJobs().length > 0 ? (
+              <div className="space-y-2">
+                {getWeekJobs().map((job) => (
+                  <div
+                    key={job.id}
+                    onClick={() => navigate(`/jobs/${job.id}`)}
+                    className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-white font-medium text-sm truncate">{job.title}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <CalendarIcon className="h-3 w-3" />
+                            {new Date(job.scheduled_date).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3" />
+                            {job.branch}
+                          </span>
+                        </div>
+                      </div>
+                      <span
+                        className={`
+                          px-2 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap
+                          ${getStatusColor(job.status)} bg-opacity-20 border border-current
+                        `}
+                      >
+                        {job.status === 'completed' ? 'OK' : job.status === 'in_progress' ? 'Exec.' : 'Pend.'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-6 text-sm">
+                Nenhum job agendado para esta semana
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Upcoming Jobs List */}
       <Card className="bg-card border-white/5">
