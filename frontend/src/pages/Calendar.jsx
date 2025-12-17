@@ -351,10 +351,10 @@ const Calendar = () => {
 
       {/* Upcoming Jobs List */}
       <Card className="bg-card border-white/5">
-        <CardHeader>
-          <CardTitle className="text-white">Próximos Jobs Agendados</CardTitle>
+        <CardHeader className="py-3 px-3 sm:px-6 sm:py-4">
+          <CardTitle className="text-white text-base sm:text-lg">Próximos Jobs Agendados</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-2 sm:px-6 pb-3 sm:pb-6">
           {jobs
             .filter(job => {
               const jobDate = new Date(job.scheduled_date);
@@ -366,35 +366,43 @@ const Calendar = () => {
               <div
                 key={job.id}
                 onClick={() => navigate(`/jobs/${job.id}`)}
-                className="flex items-center justify-between p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer mb-2"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer mb-2 gap-2"
               >
-                <div className="flex-1">
-                  <h3 className="text-white font-semibold">{job.title}</h3>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-white font-semibold text-sm sm:text-base truncate">{job.title}</h3>
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-muted-foreground">
                     <span className="flex items-center gap-1">
-                      <CalendarIcon className="h-3 w-3" />
-                      {new Date(job.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
-                      {new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      <CalendarIcon className="h-3 w-3 flex-shrink-0" />
+                      <span className="truncate">
+                        {new Date(job.scheduled_date).toLocaleDateString('pt-BR')}
+                        <span className="hidden sm:inline"> às {new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </span>
                     </span>
                     <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
+                      <MapPin className="h-3 w-3 flex-shrink-0" />
                       {job.branch}
                     </span>
                     {job.assigned_installers?.length > 0 && (
                       <span className="flex items-center gap-1">
-                        <Users className="h-3 w-3" />
-                        {job.assigned_installers.length} instalador(es)
+                        <Users className="h-3 w-3 flex-shrink-0" />
+                        {job.assigned_installers.length}
+                        <span className="hidden sm:inline"> instalador(es)</span>
                       </span>
                     )}
                   </div>
                 </div>
                 <span
                   className={`
-                    px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider
+                    self-start sm:self-center px-2 sm:px-3 py-1 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider whitespace-nowrap
                     ${getStatusColor(job.status)} bg-opacity-20 border border-current
                   `}
                 >
-                  {job.status === 'completed' ? 'Concluído' : job.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                  <span className="sm:hidden">
+                    {job.status === 'completed' ? 'OK' : job.status === 'in_progress' ? 'Exec.' : 'Pend.'}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {job.status === 'completed' ? 'Concluído' : job.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
+                  </span>
                 </span>
               </div>
             ))}
@@ -403,7 +411,7 @@ const Calendar = () => {
             const jobDate = new Date(job.scheduled_date);
             return jobDate >= new Date() && (selectedBranch === 'all' || job.branch === selectedBranch);
           }).length === 0 && (
-            <p className="text-center text-muted-foreground py-8">
+            <p className="text-center text-muted-foreground py-6 sm:py-8 text-sm">
               Nenhum job agendado para os próximos dias
             </p>
           )}
