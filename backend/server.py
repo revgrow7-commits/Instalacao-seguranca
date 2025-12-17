@@ -1555,10 +1555,13 @@ async def checkout(
         hours = duration_minutes / 60
         productivity_m2_h = round(installed_m2 / hours, 2)
     
-    # Update checkin with Base64 photo, GPS and metrics
+    # Compress checkout photo before storing
+    compressed_checkout_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
+    
+    # Update checkin with compressed Base64 photo, GPS and metrics
     update_data = {
         "checkout_at": checkout_at.isoformat(),
-        "checkout_photo": photo_base64,
+        "checkout_photo": compressed_checkout_photo,
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
