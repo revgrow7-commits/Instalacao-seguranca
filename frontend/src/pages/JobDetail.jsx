@@ -937,21 +937,29 @@ const JobDetail = () => {
       {(isAdmin || isManager) && assignments?.by_installer?.length > 0 && (
         <Card className="bg-card border-white/5">
           <CardHeader>
-            <CardTitle className="text-white flex items-center justify-between">
+            <CardTitle className="text-white flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
                 Atribuições por Instalador
               </div>
-              <span className="text-sm font-normal px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
-                {assignments.by_installer.reduce((acc, i) => acc + i.total_m2, 0).toFixed(2)} m² atribuídos
-              </span>
+              <div className="flex items-center gap-2">
+                {stalledItemsCount > 0 && (
+                  <span className="text-sm font-normal px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                    <AlertTriangle className="h-4 w-4" />
+                    {stalledItemsCount} item(s) parado(s)
+                  </span>
+                )}
+                <span className="text-sm font-normal px-3 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                  {assignments.by_installer.reduce((acc, i) => acc + i.total_m2, 0).toFixed(2)} m² atribuídos
+                </span>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {assignments.by_installer.map((installer) => (
                 <div key={installer.installer_id} className="p-4 rounded-lg bg-white/5 border border-white/10">
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                     <div className="flex items-center gap-2">
                       <User className="h-5 w-5 text-primary" />
                       <span className="text-white font-semibold">{installer.installer_name}</span>
@@ -964,22 +972,89 @@ const JobDetail = () => {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    {installer.items.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between text-sm p-2 rounded bg-white/5">
-                        <span className="text-white">{item.item_name}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-400 font-medium">{item.assigned_m2} m²</span>
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            item.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                            item.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
-                            'bg-gray-500/20 text-gray-400'
-                          }`}>
-                            {item.status === 'completed' ? 'Concluído' : 
-                             item.status === 'in_progress' ? 'Em andamento' : 'Pendente'}
-                          </span>
+                    {installer.items.map((item, idx) => {
+                      const itemCheckin = getItemCheckin(item.item_index);
+                      const isStalled = itemCheckin && isItemStalled(itemCheckin);
+                      
+                      return (
+                        <div 
+                          key={idx} 
+                          className={`p-2 sm:p-3 rounded text-sm ${
+                            isStalled 
+                              ? 'bg-red-500/10 border border-red-500/30' 
+                              : 'bg-white/5 border border-transparent'
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                              {isStalled && (
+                                <AlertTriangle className="h-4 w-4 text-red-400 flex-shrink-0" />
+                              )}
+                              <span className="text-white truncate">{item.item_name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-green-400 font-medium">{item.assigned_m2} m²</span>
+                              <span className={`px-2 py-0.5 rounded text-xs ${
+                                item.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                                item.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                                item.status === 'paused' ? 'bg-orange-500/20 text-orange-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {item.status === 'completed' ? 'Concluído' : 
+                                 item.status === 'in_progress' ? 'Em andamento' : 
+                                 item.status === 'paused' ? 'Pausado' : 'Pendente'}
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Info de check-in em andamento */}
+                          {itemCheckin && itemCheckin.status !== 'completed' && (
+                            <div className={`mt-2 pt-2 border-t ${isStalled ? 'border-red-500/30' : 'border-white/10'}`}>
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
+                                <div className="flex items-center gap-1 text-muted-foreground">
+                                  <Play className="h-3 w-3" />
+                                  <span>Iniciado:</span>
+                                  <span className="text-white">
+                                    {new Date(itemCheckin.checkin_at).toLocaleString('pt-BR', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      hour: '2-digit',
+                                      minute: '2-digit'
+                                    })}
+                                  </span>
+                                </div>
+                                
+                                {itemCheckin.status === 'paused' && itemCheckin.paused_at && (
+                                  <div className="flex items-center gap-1 text-orange-400">
+                                    <Clock className="h-3 w-3" />
+                                    <span>Pausado desde:</span>
+                                    <span>
+                                      {new Date(itemCheckin.paused_at).toLocaleString('pt-BR', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </span>
+                                  </div>
+                                )}
+                                
+                                {isStalled && (
+                                  <div className="flex items-center gap-1 text-red-400 font-medium">
+                                    <AlertTriangle className="h-3 w-3" />
+                                    <span>
+                                      Parado há {Math.floor((new Date() - new Date(
+                                        itemCheckin.status === 'paused' ? itemCheckin.paused_at : itemCheckin.checkin_at
+                                      )) / (1000 * 60 * 60))}h
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
