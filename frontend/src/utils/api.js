@@ -66,6 +66,18 @@ export const api = {
   getItemCheckins: (jobId) => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
   
+  // Item Pause/Resume
+  pauseItemCheckin: (checkinId, reason) => {
+    const formData = new FormData();
+    formData.append('reason', reason);
+    return axios.post(`${API_URL}/item-checkins/${checkinId}/pause`, formData, { 
+      headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
+    });
+  },
+  resumeItemCheckin: (checkinId) => axios.post(`${API_URL}/item-checkins/${checkinId}/resume`, {}, { headers: getAuthHeader() }),
+  getItemPauseLogs: (checkinId) => axios.get(`${API_URL}/item-checkins/${checkinId}/pauses`, { headers: getAuthHeader() }),
+  getPauseReasons: () => axios.get(`${API_URL}/pause-reasons`, { headers: getAuthHeader() }),
+  
   // Job by ID
   getJobById: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
   deleteJob: (jobId) => axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
