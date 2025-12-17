@@ -350,8 +350,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Calendar Responsiveness and Google Calendar Integration - COMPLETED"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
