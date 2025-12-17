@@ -351,7 +351,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Item Pause/Resume System - Net Time Calculation - COMPLETED"
+    - "Calendar Responsiveness and Google Calendar Integration - COMPLETED"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
