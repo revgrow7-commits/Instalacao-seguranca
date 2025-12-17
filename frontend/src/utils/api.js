@@ -11,6 +11,10 @@ export const api = {
   // Auth
   login: (email, password) => axios.post(`${API_URL}/auth/login`, { email, password }),
   getMe: () => axios.get(`${API_URL}/auth/me`, { headers: getAuthHeader() }),
+  forgotPassword: (email) => axios.post(`${API_URL}/auth/forgot-password`, { email }),
+  resetPassword: (token, newPassword) => axios.post(`${API_URL}/auth/reset-password`, { token, new_password: newPassword }),
+  verifyResetToken: (token) => axios.get(`${API_URL}/auth/verify-reset-token?token=${token}`),
+  adminResetPassword: (userId, newPassword) => axios.put(`${API_URL}/users/${userId}/reset-password`, { new_password: newPassword }, { headers: getAuthHeader() }),
 
   // Users
   getUsers: () => axios.get(`${API_URL}/users`, { headers: getAuthHeader() }),
