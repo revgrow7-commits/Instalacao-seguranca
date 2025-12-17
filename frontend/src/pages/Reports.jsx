@@ -365,14 +365,18 @@ const Reports = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-card border border-white/10">
+        <TabsList className="bg-card border border-white/10 flex-wrap">
           <TabsTrigger value="jobs" className="data-[state=active]:bg-primary">
             <Briefcase className="h-4 w-4 mr-2" />
-            Relatório por Job ({filteredJobs.length})
+            Por Job ({filteredJobs.length})
           </TabsTrigger>
           <TabsTrigger value="installers" className="data-[state=active]:bg-primary">
             <Users className="h-4 w-4 mr-2" />
-            Relatório por Instalador ({installers.length})
+            Por Instalador ({installers.length})
+          </TabsTrigger>
+          <TabsTrigger value="photos" className="data-[state=active]:bg-primary">
+            <Camera className="h-4 w-4 mr-2" />
+            Fotos Check-in/out ({filterItemCheckinsByDate(itemCheckins).length})
           </TabsTrigger>
         </TabsList>
 
