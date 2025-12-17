@@ -541,10 +541,17 @@ const InstallerJobDetail = () => {
                       {status === 'in_progress' && (
                         <div className="space-y-4">
                           <div className="bg-blue-500/10 rounded-lg p-3">
-                            <p className="text-sm text-blue-400 flex items-center gap-2">
-                              <Clock className="h-4 w-4" />
-                              Check-in realizado. Adicione uma observação e finalize o check-out.
-                            </p>
+                            <div className="flex items-center justify-between">
+                              <p className="text-sm text-blue-400 flex items-center gap-2">
+                                <Clock className="h-4 w-4" />
+                                Em execução: {formatDuration(getElapsedTime(checkin))}
+                              </p>
+                              {pauseLogs[index]?.total_pause_minutes > 0 && (
+                                <span className="text-xs text-orange-400">
+                                  Pausado: {formatDuration(pauseLogs[index].total_pause_minutes)}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
                           {/* Info definida pelo Gerente (somente leitura) */}
@@ -597,17 +604,69 @@ const InstallerJobDetail = () => {
                             />
                           </div>
 
+                          {/* Action Buttons */}
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleOpenPauseModal(index)}
+                              disabled={isProcessing}
+                              variant="outline"
+                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                            >
+                              <Pause className="h-4 w-4 mr-2" />
+                              Pausar
+                            </Button>
+                            <Button
+                              onClick={() => handleFileSelect(index, 'checkout')}
+                              disabled={isProcessing}
+                              className="flex-1 bg-green-600 hover:bg-green-700"
+                            >
+                              {isProcessing ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                              ) : (
+                                <Camera className="h-4 w-4 mr-2" />
+                              )}
+                              Finalizar
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Estado PAUSADO */}
+                      {status === 'paused' && (
+                        <div className="space-y-4">
+                          <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/30">
+                            <div className="flex items-center gap-2 text-orange-400 mb-2">
+                              <Pause className="h-4 w-4" />
+                              <span className="font-medium">Item Pausado</span>
+                            </div>
+                            {pauseLogs[index]?.active_pause && (
+                              <div className="text-sm">
+                                <p className="text-muted-foreground">
+                                  Motivo: <span className="text-orange-300">{PAUSE_REASON_LABELS[pauseLogs[index].active_pause.reason] || pauseLogs[index].active_pause.reason}</span>
+                                </p>
+                                <p className="text-muted-foreground">
+                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[index].active_pause.start_time)) / 60000))}</span>
+                                </p>
+                              </div>
+                            )}
+                            {pauseLogs[index]?.total_pause_minutes > 0 && (
+                              <p className="text-xs text-muted-foreground mt-2">
+                                Tempo total em pausa: {formatDuration(pauseLogs[index].total_pause_minutes + (pauseLogs[index].active_pause ? Math.floor((new Date() - new Date(pauseLogs[index].active_pause.start_time)) / 60000) : 0))}
+                              </p>
+                            )}
+                          </div>
+
                           <Button
-                            onClick={() => handleFileSelect(index, 'checkout')}
+                            onClick={() => handleResumeItem(index)}
                             disabled={isProcessing}
                             className="w-full bg-green-600 hover:bg-green-700"
                           >
                             {isProcessing ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                             ) : (
-                              <Camera className="h-4 w-4 mr-2" />
+                              <Play className="h-4 w-4 mr-2" />
                             )}
-                            Fazer Check-out (Tirar Foto)
+                            Retomar Trabalho
                           </Button>
                         </div>
                       )}
