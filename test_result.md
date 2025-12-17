@@ -348,7 +348,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Productivity Report Page"
+    - "Productivity Report Page - COMPLETED"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
