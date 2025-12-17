@@ -422,12 +422,15 @@ agent_communication:
 
   - task: "Job Status with Active Item Checkins and Alerts"
     implemented: true
-    working: "needs_testing"
+    working: false
     file: "/app/frontend/src/pages/JobDetail.jsx"
-    stuck_count: 0
+    stuck_count: 1
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
           comment: "Implemented job status improvements: 1) Shows items with active checkins including start date/time and status (in_progress, paused), 2) Red alert for items stalled for more than 3 hours without activity, 3) New 'Itens em Execução' card showing all active checkins with timestamps, 4) Alert counter in 'Atribuições por Instalador' section showing number of stalled items. Uses itemCheckins state loaded from API. Needs testing with jobs that have active checkins."
+        - working: false
+          agent: "testing"
+          comment: "❌ AUTHENTICATION ISSUE PREVENTING TESTING: Multiple attempts to test the Job Detail page failed due to persistent authentication redirects to login page. Despite successful login with gerente@industriavisual.com/gerente123 credentials, navigation to job detail pages consistently redirects back to login. This suggests either: 1) Session management issues, 2) JWT token expiration problems, 3) Route protection issues, or 4) Backend authentication middleware problems. CRITICAL: Cannot verify the implemented job status features (active checkins, alerts, stalled items >3h) due to inability to access job detail pages. Backend logs show successful API calls but frontend authentication flow is broken."
