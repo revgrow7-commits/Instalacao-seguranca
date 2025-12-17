@@ -100,6 +100,15 @@ export const api = {
   // Reports
   getReportByFamily: () => axios.get(`${API_URL}/reports/by-family`, { headers: getAuthHeader() }),
   getReportByInstaller: () => axios.get(`${API_URL}/reports/by-installer`, { headers: getAuthHeader() }),
+  getProductivityReport: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.filter_by) queryParams.append('filter_by', params.filter_by);
+    if (params.filter_id) queryParams.append('filter_id', params.filter_id);
+    if (params.date_from) queryParams.append('date_from', params.date_from);
+    if (params.date_to) queryParams.append('date_to', params.date_to);
+    const queryString = queryParams.toString();
+    return axios.get(`${API_URL}/reports/productivity${queryString ? '?' + queryString : ''}`, { headers: getAuthHeader() });
+  },
   classifyJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/classify-products`, {}, { headers: getAuthHeader() }),
   recalculateJobAreas: () => axios.post(`${API_URL}/jobs/recalculate-areas`, {}, { headers: getAuthHeader() }),
   exportReports: () => axios.get(`${API_URL}/reports/export`, { 
