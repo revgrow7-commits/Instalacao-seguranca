@@ -17,6 +17,7 @@ export const api = {
   createUser: (data) => axios.post(`${API_URL}/auth/register`, data, { headers: getAuthHeader() }),
   updateUser: (userId, data) => axios.put(`${API_URL}/users/${userId}`, data, { headers: getAuthHeader() }),
   deleteUser: (userId) => axios.delete(`${API_URL}/users/${userId}`, { headers: getAuthHeader() }),
+  changePassword: (currentPassword, newPassword) => axios.post(`${API_URL}/users/change-password`, { current_password: currentPassword, new_password: newPassword }, { headers: getAuthHeader() }),
 
   // Installers
   getInstallers: () => axios.get(`${API_URL}/installers`, { headers: getAuthHeader() }),
