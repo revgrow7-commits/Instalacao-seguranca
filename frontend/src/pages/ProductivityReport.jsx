@@ -356,7 +356,7 @@ const ProductivityReport = () => {
                       </button>
                       {expandedInstallers[inst.installer_id] && inst.records?.length > 0 && (
                         <div className="border-t border-white/10 p-3 space-y-2 bg-black/20">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Últimas execuções</p>
+                          <p className="text-xs text-muted-foreground uppercase tracking-wide">Últimas execuções (Tempo Líquido)</p>
                           {inst.records.slice(0, 10).map((rec, i) => (
                             <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-white/5 last:border-0">
                               <div>
@@ -365,6 +365,9 @@ const ProductivityReport = () => {
                               </div>
                               <div className="text-right">
                                 <p className="text-white text-xs">{rec.m2_api} m² • {formatDuration(rec.duration_minutes)}</p>
+                                {rec.pause_minutes > 0 && (
+                                  <p className="text-xs text-orange-400">Pausas: {formatDuration(rec.pause_minutes)}</p>
+                                )}
                               </div>
                             </div>
                           ))}
