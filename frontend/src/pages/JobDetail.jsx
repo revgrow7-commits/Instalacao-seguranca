@@ -809,6 +809,124 @@ const JobDetail = () => {
         </Card>
       </div>
 
+      {/* Status dos Itens em Andamento */}
+      {(isAdmin || isManager) && itemCheckins.filter(c => c.status !== 'completed').length > 0 && (
+        <Card className={`border-white/5 ${stalledItemsCount > 0 ? 'bg-red-500/5 border-red-500/30' : 'bg-card'}`}>
+          <CardHeader className="p-4 md:p-6 pb-2 md:pb-4">
+            <CardTitle className="text-white flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 text-base md:text-lg">
+                <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                Itens em Execução
+              </div>
+              {stalledItemsCount > 0 && (
+                <span className="text-sm font-normal px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse">
+                  <AlertTriangle className="h-4 w-4" />
+                  {stalledItemsCount} alerta(s)
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 md:p-6 pt-0">
+            <div className="space-y-3">
+              {itemCheckins
+                .filter(c => c.status !== 'completed')
+                .sort((a, b) => {
+                  // Mostrar itens parados primeiro
+                  const aStalled = isItemStalled(a);
+                  const bStalled = isItemStalled(b);
+                  if (aStalled && !bStalled) return -1;
+                  if (!aStalled && bStalled) return 1;
+                  return 0;
+                })
+                .map((checkin) => {
+                  const installer = installers.find(i => i.id === checkin.installer_id);
+                  const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                  const product = products[checkin.item_index];
+                  const isStalled = isItemStalled(checkin);
+                  
+                  const lastActivityTime = checkin.status === 'paused' 
+                    ? new Date(checkin.paused_at || checkin.checkin_at)
+                    : new Date(checkin.checkin_at);
+                  const hoursSinceActivity = Math.floor((new Date() - lastActivityTime) / (1000 * 60 * 60));
+                  
+                  return (
+                    <div 
+                      key={checkin.id} 
+                      className={`p-3 rounded-lg border ${
+                        isStalled 
+                          ? 'bg-red-500/10 border-red-500/40' 
+                          : 'bg-white/5 border-white/10'
+                      }`}
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isStalled && (
+                            <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0 animate-pulse" />
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-white font-medium truncate text-sm">
+                              {product?.name || `Item ${checkin.item_index + 1}`}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {installer?.full_name || 'Instalador não identificado'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            checkin.status === 'in_progress' 
+                              ? 'bg-yellow-500/20 text-yellow-400' 
+                              : 'bg-orange-500/20 text-orange-400'
+                          }`}>
+                            {checkin.status === 'in_progress' ? 'Em andamento' : 'Pausado'}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <Play className="h-3 w-3" />
+                          <span>Início:</span>
+                          <span className="text-white">
+                            {new Date(checkin.checkin_at).toLocaleString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                        
+                        {checkin.status === 'paused' && checkin.paused_at && (
+                          <div className="flex items-center gap-1 text-orange-400">
+                            <Clock className="h-3 w-3" />
+                            <span>Pausado:</span>
+                            <span>
+                              {new Date(checkin.paused_at).toLocaleString('pt-BR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          </div>
+                        )}
+                        
+                        {isStalled && (
+                          <div className="flex items-center gap-1 text-red-400 font-bold">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>⚠️ Parado há {hoursSinceActivity}h</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Produtos/Itens do Job - com área calculada */}
       {(job.products_with_area?.length > 0 || (job.holdprint_data?.products && job.holdprint_data.products.length > 0)) && (
         <Card className="bg-card border-white/5">
