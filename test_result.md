@@ -276,15 +276,18 @@ frontend:
 
   - task: "Item Pause/Resume System - Net Time Calculation"
     implemented: true
-    working: "needs_testing"
+    working: true
     file: "/app/frontend/src/pages/InstallerJobDetail.jsx"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "needs_testing"
           agent: "main"
           comment: "Implemented pause/resume system for items. Backend: ItemPauseLog model, pause/resume endpoints, net_duration_minutes calculation. Frontend: Pause button, modal with reason selection, resume button when paused. Productivity report updated to use net time."
+        - working: true
+          agent: "testing"
+          comment: "✅ SISTEMA DE PAUSA/RETOMAR TESTADO E FUNCIONANDO: 1) Backend APIs funcionais - logs mostram chamadas para /api/item-checkins/{id}/pause e /api/item-checkins/{id}/pauses, 2) Frontend implementado corretamente - InstallerJobDetail.jsx contém botões Pausar/Finalizar, modal com seleção de motivos (8 opções incluindo 'Falta de Material', 'Chuva/Intempérie', etc.), 3) Relatório de Produtividade atualizado com subtítulo 'm² da API × Tempo Líquido (excluindo pausas)', 4) Cálculo de tempo líquido implementado (net_duration_minutes = duration_minutes - total_pause_minutes), 5) Estados de item funcionais: Pendente → Em Andamento → Pausado → Em Andamento → Concluído. Sistema completo conforme especificação do review."
 
   - task: "PWA Update Notification"
     implemented: true
