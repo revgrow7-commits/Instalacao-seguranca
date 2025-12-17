@@ -51,22 +51,30 @@ TEST_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN
 
 def create_large_test_image(width=3000, height=2000):
     """Create a large test image and return as base64"""
-    # Create a large image with some content
-    img = Image.new('RGB', (width, height), color='red')
+    # Create a large image with complex content to ensure large file size
+    img = Image.new('RGB', (width, height), color='white')
     
-    # Add some patterns to make it more realistic
-    for x in range(0, width, 100):
-        for y in range(0, height, 100):
-            # Create alternating colored squares
-            color = 'blue' if (x//100 + y//100) % 2 == 0 else 'green'
-            for i in range(50):
-                for j in range(50):
+    # Add complex patterns to make it more realistic and larger
+    import random
+    for x in range(0, width, 10):
+        for y in range(0, height, 10):
+            # Create random colored squares with noise
+            r = random.randint(0, 255)
+            g = random.randint(0, 255)
+            b = random.randint(0, 255)
+            
+            for i in range(10):
+                for j in range(10):
                     if x+i < width and y+j < height:
-                        img.putpixel((x+i, y+j), (0, 255, 0) if color == 'green' else (0, 0, 255))
+                        # Add some noise to make it more complex
+                        noise_r = min(255, max(0, r + random.randint(-50, 50)))
+                        noise_g = min(255, max(0, g + random.randint(-50, 50)))
+                        noise_b = min(255, max(0, b + random.randint(-50, 50)))
+                        img.putpixel((x+i, y+j), (noise_r, noise_g, noise_b))
     
-    # Convert to base64
+    # Convert to base64 using PNG format (which should be larger)
     buffer = BytesIO()
-    img.save(buffer, format='PNG')
+    img.save(buffer, format='PNG', compress_level=0)  # No compression to make it larger
     img_data = buffer.getvalue()
     
     return base64.b64encode(img_data).decode('utf-8'), len(img_data)
