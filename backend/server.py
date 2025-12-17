@@ -3298,15 +3298,13 @@ async def export_reports(current_user: User = Depends(get_current_user)):
 # ============ GOOGLE CALENDAR INTEGRATION ============
 
 @api_router.get("/auth/google/login")
-async def google_login(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def google_login(current_user: User = Depends(get_current_user)):
     """Initiates Google OAuth flow for calendar access"""
-    current_user = await get_current_user(credentials)
-    
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth não configurado")
     
     # Store user_id in state to associate tokens later
-    state = f"{current_user['id']}"
+    state = f"{current_user.id}"
     
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
