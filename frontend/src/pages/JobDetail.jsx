@@ -1125,15 +1125,29 @@ const JobDetail = () => {
                             </div>
                           </div>
                           
-                          {/* Info de check-in em andamento */}
+                          {/* Info de check-in em andamento - DESTAQUE */}
                           {itemCheckin && itemCheckin.status !== 'completed' && (
-                            <div className={`mt-2 pt-2 border-t ${isStalled ? 'border-red-500/30' : 'border-white/10'}`}>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs">
-                                <div className="flex items-center gap-1 text-muted-foreground">
-                                  <Play className="h-3 w-3" />
-                                  <span>Iniciado:</span>
-                                  <span className="text-white">
-                                    {new Date(itemCheckin.checkin_at).toLocaleString('pt-BR', {
+                            <div className="mt-3">
+                              {/* Status Iniciado - Destaque Vermelho */}
+                              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 text-white font-bold text-sm shadow-lg">
+                                <Play className="h-4 w-4" />
+                                <span>Iniciado:</span>
+                                <span className="text-white font-bold">
+                                  {new Date(itemCheckin.checkin_at).toLocaleString('pt-BR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </span>
+                              </div>
+                              
+                              {itemCheckin.status === 'paused' && itemCheckin.paused_at && (
+                                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-600 text-white font-bold text-sm shadow-lg ml-2 mt-2 sm:mt-0">
+                                  <Clock className="h-4 w-4" />
+                                  <span>Pausado:</span>
+                                  <span>
+                                    {new Date(itemCheckin.paused_at).toLocaleString('pt-BR', {
                                       day: '2-digit',
                                       month: '2-digit',
                                       hour: '2-digit',
@@ -1141,33 +1155,18 @@ const JobDetail = () => {
                                     })}
                                   </span>
                                 </div>
-                                
-                                {itemCheckin.status === 'paused' && itemCheckin.paused_at && (
-                                  <div className="flex items-center gap-1 text-orange-400">
-                                    <Clock className="h-3 w-3" />
-                                    <span>Pausado desde:</span>
-                                    <span>
-                                      {new Date(itemCheckin.paused_at).toLocaleString('pt-BR', {
-                                        day: '2-digit',
-                                        month: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </span>
-                                  </div>
-                                )}
-                                
-                                {isStalled && (
-                                  <div className="flex items-center gap-1 text-red-400 font-medium">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    <span>
-                                      Parado há {Math.floor((new Date() - new Date(
-                                        itemCheckin.status === 'paused' ? itemCheckin.paused_at : itemCheckin.checkin_at
-                                      )) / (1000 * 60 * 60))}h
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
+                              )}
+                              
+                              {isStalled && (
+                                <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-800 text-white font-bold text-sm shadow-lg ml-2 mt-2 sm:mt-0 animate-pulse">
+                                  <AlertTriangle className="h-4 w-4" />
+                                  <span>
+                                    ⚠️ PARADO HÁ {Math.floor((new Date() - new Date(
+                                      itemCheckin.status === 'paused' ? itemCheckin.paused_at : itemCheckin.checkin_at
+                                    )) / (1000 * 60 * 60))}h
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
