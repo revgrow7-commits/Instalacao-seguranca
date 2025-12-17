@@ -1,22 +1,29 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users, MapPin, List, Grid3X3 } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Users, MapPin, List, Grid3X3, ExternalLink, Check, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Calendar = () => {
   const { isAdmin, isManager } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('month'); // month, list
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  
+  // Google Calendar state
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleEmail, setGoogleEmail] = useState(null);
+  const [syncingJob, setSyncingJob] = useState(null);
+  const [checkingGoogleStatus, setCheckingGoogleStatus] = useState(true);
 
   // Detect mobile screen
   useEffect(() => {
@@ -24,6 +31,43 @@ const Calendar = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Check for Google OAuth callback params
+  useEffect(() => {
+    const googleConnectedParam = searchParams.get('google_connected');
+    const googleError = searchParams.get('google_error');
+    
+    if (googleConnectedParam === 'true') {
+      toast.success('Google Calendar conectado com sucesso!');
+      setSearchParams({});
+      checkGoogleStatus();
+    } else if (googleError) {
+      if (googleError === 'user_not_found') {
+        toast.error('Usuário não encontrado. Faça login novamente.');
+      } else {
+        toast.error('Erro ao conectar com o Google Calendar');
+      }
+      setSearchParams({});
+    }
+  }, [searchParams, setSearchParams]);
+
+  // Check Google connection status on mount
+  useEffect(() => {
+    checkGoogleStatus();
+  }, []);
+
+  const checkGoogleStatus = async () => {
+    try {
+      setCheckingGoogleStatus(true);
+      const response = await api.getGoogleAuthStatus();
+      setGoogleConnected(response.data.connected);
+      setGoogleEmail(response.data.google_email);
+    } catch (error) {
+      console.error('Error checking Google status:', error);
+    } finally {
+      setCheckingGoogleStatus(false);
+    }
+  };
 
   useEffect(() => {
     if (isAdmin || isManager) {
