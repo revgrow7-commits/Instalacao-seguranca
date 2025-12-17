@@ -49,6 +49,28 @@ GPS_CHECKOUT = {
 # Small 1x1 pixel Base64 image for testing
 TEST_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
 
+def create_large_test_image(width=3000, height=2000):
+    """Create a large test image and return as base64"""
+    # Create a large image with some content
+    img = Image.new('RGB', (width, height), color='red')
+    
+    # Add some patterns to make it more realistic
+    for x in range(0, width, 100):
+        for y in range(0, height, 100):
+            # Create alternating colored squares
+            color = 'blue' if (x//100 + y//100) % 2 == 0 else 'green'
+            for i in range(50):
+                for j in range(50):
+                    if x+i < width and y+j < height:
+                        img.putpixel((x+i, y+j), (0, 255, 0) if color == 'green' else (0, 0, 255))
+    
+    # Convert to base64
+    buffer = BytesIO()
+    img.save(buffer, format='PNG')
+    img_data = buffer.getvalue()
+    
+    return base64.b64encode(img_data).decode('utf-8'), len(img_data)
+
 class FieldworkAPITest:
     def __init__(self):
         self.installer_token = None
