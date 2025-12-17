@@ -419,3 +419,15 @@ agent_communication:
         - working: true
           agent: "testing"
           comment: "✅ FORGOT PASSWORD UI TESTING COMPLETED SUCCESSFULLY: Comprehensive UI testing completed for all 4 test scenarios from review request. 1) LOGIN PAGE: ✅ 'Esqueci minha senha' link visible next to 'Senha' label, ✅ Link correctly navigates to /forgot-password. 2) FORGOT PASSWORD PAGE: ✅ Logo 'INDÚSTRIA VISUAL' displayed, ✅ Title 'Esqueceu sua senha?' present, ✅ Email input field functional, ✅ 'Enviar Link de Recuperação' button working, ✅ 'Voltar para Login' link present, ✅ Success message with green checkmark appears after submitting email 'revgrow7@gmail.com'. 3) RESET PASSWORD - INVALID TOKEN: ✅ Red X icon displayed, ✅ 'Link Inválido ou Expirado' message shown, ✅ 'Solicitar Novo Link' button present, ✅ 'Voltar para Login' link working. 4) MOBILE RESPONSIVENESS (375x812): ✅ Form properly sized and centered, ✅ All elements (logo, title, email input, submit button) visible and functional on mobile viewport. All UI components working perfectly with proper styling and responsive design. Complete forgot password workflow UI is production-ready."
+
+  - task: "Job Status with Active Item Checkins and Alerts"
+    implemented: true
+    working: "needs_testing"
+    file: "/app/frontend/src/pages/JobDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Implemented job status improvements: 1) Shows items with active checkins including start date/time and status (in_progress, paused), 2) Red alert for items stalled for more than 3 hours without activity, 3) New 'Itens em Execução' card showing all active checkins with timestamps, 4) Alert counter in 'Atribuições por Instalador' section showing number of stalled items. Uses itemCheckins state loaded from API. Needs testing with jobs that have active checkins."
