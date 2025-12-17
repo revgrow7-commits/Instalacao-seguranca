@@ -9,6 +9,9 @@ import json
 import base64
 from datetime import datetime
 import time
+from PIL import Image
+from io import BytesIO
+import os
 
 # Test configuration
 BASE_URL = "https://instalmonitor.preview.emergentagent.com/api"
