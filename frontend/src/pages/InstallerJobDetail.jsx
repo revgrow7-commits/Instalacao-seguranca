@@ -6,12 +6,25 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { 
   ArrowLeft, Package, MapPin, Camera, Check, Clock, 
   Ruler, AlertCircle, CheckCircle2, PlayCircle, 
-  Square, ChevronDown, ChevronUp, Upload
+  Square, ChevronDown, ChevronUp, Upload, Pause, Play
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+const PAUSE_REASON_LABELS = {
+  "aguardando_cliente": "Aguardando Cliente",
+  "chuva": "Chuva/Intempérie",
+  "falta_material": "Falta de Material",
+  "almoco_intervalo": "Almoço/Intervalo",
+  "problema_acesso": "Problema de Acesso",
+  "problema_equipamento": "Problema com Equipamento",
+  "aguardando_aprovacao": "Aguardando Aprovação",
+  "outro": "Outro Motivo"
+};
 
 const InstallerJobDetail = () => {
   const { jobId } = useParams();
@@ -19,12 +32,18 @@ const InstallerJobDetail = () => {
   const { user } = useAuth();
   const [job, setJob] = useState(null);
   const [itemCheckins, setItemCheckins] = useState({});
+  const [pauseLogs, setPauseLogs] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedItem, setExpandedItem] = useState(null);
   const [processingItem, setProcessingItem] = useState(null);
   const [gpsLocation, setGpsLocation] = useState(null);
   const [gpsError, setGpsError] = useState(null);
   const fileInputRef = useRef({});
+  
+  // Pause modal state
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pauseItemIndex, setPauseItemIndex] = useState(null);
+  const [pauseReason, setPauseReason] = useState('');
 
   // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
