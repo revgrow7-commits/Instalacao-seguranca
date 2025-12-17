@@ -2541,6 +2541,12 @@ async def get_productivity_report(
         if isinstance(checkout_at, str):
             checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
         
+        # Garantir que ambos têm timezone
+        if checkin_at and checkin_at.tzinfo is None:
+            checkin_at = checkin_at.replace(tzinfo=timezone.utc)
+        if checkout_at and checkout_at.tzinfo is None:
+            checkout_at = checkout_at.replace(tzinfo=timezone.utc)
+        
         duration_minutes = 0
         if checkin_at and checkout_at:
             duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
