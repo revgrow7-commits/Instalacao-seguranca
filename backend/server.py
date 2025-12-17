@@ -2784,14 +2784,6 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
         },
         "by_installer": installer_report
     }
-        "summary": {
-            "total_installers": len(installer_report),
-            "total_area_m2_all": round(total_area_all, 2),
-            "total_hours_all": round(total_hours_all, 2),
-            "avg_productivity_m2_h": round(total_area_all / total_hours_all, 2) if total_hours_all > 0 else 0
-        },
-        "by_installer": installer_report
-    }
 
 
 @api_router.get("/reports/productivity")
