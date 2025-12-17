@@ -2467,6 +2467,342 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
         "by_installer": installer_report
     }
 
+
+@api_router.get("/reports/productivity")
+async def get_productivity_report(
+    filter_by: Optional[str] = Query(None, description="Filter type: installer, job, family, item"),
+    filter_id: Optional[str] = Query(None, description="ID to filter by"),
+    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Relatório de produtividade completo.
+    
+    Calcula produtividade usando:
+    - m² da API (definido no job/item)
+    - Tempo real de execução (check-in até check-out)
+    
+    Filtros disponíveis:
+    - installer: por instalador
+    - job: por job
+    - family: por família de produto
+    - item: por item específico
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Buscar dados necessários
+    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
+    item_checkins = await db.item_checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
+    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
+    legacy_checkins = await db.checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
+    
+    # Criar mapas para lookup rápido
+    jobs_map = {job["id"]: job for job in jobs}
+    installers_map = {inst["id"]: inst for inst in installers}
+    
+    # Estruturas para agregação
+    by_installer = {}
+    by_job = {}
+    by_family = {}
+    by_item = {}
+    
+    # Processar item_checkins (novo sistema)
+    for checkin in item_checkins:
+        job = jobs_map.get(checkin.get("job_id"))
+        if not job:
+            continue
+        
+        # Aplicar filtro de data
+        checkin_at = checkin.get("checkin_at")
+        if isinstance(checkin_at, str):
+            checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+        
+        if date_from:
+            start_date = datetime.fromisoformat(date_from + "T00:00:00+00:00")
+            if checkin_at and checkin_at < start_date:
+                continue
+        
+        if date_to:
+            end_date = datetime.fromisoformat(date_to + "T23:59:59+00:00")
+            if checkin_at and checkin_at > end_date:
+                continue
+        
+        # Obter dados do item
+        products = job.get("products_with_area", [])
+        item_index = checkin.get("item_index", 0)
+        item = products[item_index] if item_index < len(products) else {}
+        
+        # m² da API (não o reportado manualmente)
+        item_m2 = item.get("total_area_m2", 0) or 0
+        
+        # Tempo real de execução
+        checkout_at = checkin.get("checkout_at")
+        if isinstance(checkout_at, str):
+            checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
+        
+        duration_minutes = 0
+        if checkin_at and checkout_at:
+            duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
+        
+        # Dados do instalador
+        installer_id = checkin.get("installer_id")
+        installer = installers_map.get(installer_id, {})
+        installer_name = installer.get("full_name", "Desconhecido")
+        
+        # Dados da família
+        family_name = item.get("family_name", "Não Classificado")
+        
+        # Dados do registro
+        record = {
+            "job_id": job.get("id"),
+            "job_title": job.get("title"),
+            "client_name": job.get("client_name") or job.get("holdprint_data", {}).get("customerName"),
+            "installer_id": installer_id,
+            "installer_name": installer_name,
+            "item_name": item.get("name", f"Item {item_index + 1}"),
+            "item_index": item_index,
+            "family_name": family_name,
+            "m2_api": item_m2,
+            "m2_reported": checkin.get("installed_m2", 0) or 0,
+            "duration_minutes": round(duration_minutes, 2),
+            "checkin_at": checkin_at.isoformat() if checkin_at else None,
+            "checkout_at": checkout_at.isoformat() if checkout_at else None,
+            "complexity_level": checkin.get("complexity_level"),
+            "scenario_category": checkin.get("scenario_category"),
+            "notes": checkin.get("notes")
+        }
+        
+        # Aplicar filtros
+        if filter_by == "installer" and filter_id and installer_id != filter_id:
+            continue
+        if filter_by == "job" and filter_id and job.get("id") != filter_id:
+            continue
+        if filter_by == "family" and filter_id and family_name != filter_id:
+            continue
+        
+        # Agregar por instalador
+        if installer_id not in by_installer:
+            by_installer[installer_id] = {
+                "installer_id": installer_id,
+                "installer_name": installer_name,
+                "branch": installer.get("branch"),
+                "total_m2": 0,
+                "total_minutes": 0,
+                "items_count": 0,
+                "jobs": set(),
+                "records": []
+            }
+        by_installer[installer_id]["total_m2"] += item_m2
+        by_installer[installer_id]["total_minutes"] += duration_minutes
+        by_installer[installer_id]["items_count"] += 1
+        by_installer[installer_id]["jobs"].add(job.get("id"))
+        by_installer[installer_id]["records"].append(record)
+        
+        # Agregar por job
+        job_id = job.get("id")
+        if job_id not in by_job:
+            by_job[job_id] = {
+                "job_id": job_id,
+                "job_title": job.get("title"),
+                "client_name": job.get("client_name") or job.get("holdprint_data", {}).get("customerName"),
+                "total_m2_api": job.get("area_m2", 0) or 0,
+                "total_m2_executed": 0,
+                "total_minutes": 0,
+                "items_count": 0,
+                "installers": set(),
+                "records": []
+            }
+        by_job[job_id]["total_m2_executed"] += item_m2
+        by_job[job_id]["total_minutes"] += duration_minutes
+        by_job[job_id]["items_count"] += 1
+        by_job[job_id]["installers"].add(installer_id)
+        by_job[job_id]["records"].append(record)
+        
+        # Agregar por família
+        if family_name not in by_family:
+            by_family[family_name] = {
+                "family_name": family_name,
+                "total_m2": 0,
+                "total_minutes": 0,
+                "items_count": 0,
+                "jobs": set(),
+                "installers": set(),
+                "records": []
+            }
+        by_family[family_name]["total_m2"] += item_m2
+        by_family[family_name]["total_minutes"] += duration_minutes
+        by_family[family_name]["items_count"] += 1
+        by_family[family_name]["jobs"].add(job.get("id"))
+        by_family[family_name]["installers"].add(installer_id)
+        by_family[family_name]["records"].append(record)
+        
+        # Agregar por item
+        item_key = f"{job_id}:{item_index}"
+        if item_key not in by_item:
+            by_item[item_key] = {
+                "job_id": job_id,
+                "job_title": job.get("title"),
+                "item_index": item_index,
+                "item_name": item.get("name", f"Item {item_index + 1}"),
+                "family_name": family_name,
+                "m2_api": item_m2,
+                "total_minutes": 0,
+                "executions": 0,
+                "installers": set(),
+                "records": []
+            }
+        by_item[item_key]["total_minutes"] += duration_minutes
+        by_item[item_key]["executions"] += 1
+        by_item[item_key]["installers"].add(installer_id)
+        by_item[item_key]["records"].append(record)
+    
+    # Processar legacy checkins (sistema antigo de job-level)
+    for checkin in legacy_checkins:
+        job = jobs_map.get(checkin.get("job_id"))
+        if not job:
+            continue
+        
+        # Aplicar filtro de data
+        checkin_at = checkin.get("checkin_at")
+        if isinstance(checkin_at, str):
+            checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+        
+        if date_from:
+            start_date = datetime.fromisoformat(date_from + "T00:00:00+00:00")
+            if checkin_at and checkin_at < start_date:
+                continue
+        
+        if date_to:
+            end_date = datetime.fromisoformat(date_to + "T23:59:59+00:00")
+            if checkin_at and checkin_at > end_date:
+                continue
+        
+        # m² da API (área total do job)
+        job_m2 = job.get("area_m2", 0) or 0
+        
+        # Tempo real
+        duration_minutes = checkin.get("duration_minutes", 0) or 0
+        
+        # Dados do instalador
+        installer_id = checkin.get("installer_id")
+        installer = installers_map.get(installer_id, {})
+        installer_name = installer.get("full_name", "Desconhecido")
+        
+        # Aplicar filtros
+        if filter_by == "installer" and filter_id and installer_id != filter_id:
+            continue
+        if filter_by == "job" and filter_id and job.get("id") != filter_id:
+            continue
+        
+        # Agregar por instalador (adicionar ao existente ou criar novo)
+        if installer_id not in by_installer:
+            by_installer[installer_id] = {
+                "installer_id": installer_id,
+                "installer_name": installer_name,
+                "branch": installer.get("branch"),
+                "total_m2": 0,
+                "total_minutes": 0,
+                "items_count": 0,
+                "jobs": set(),
+                "records": []
+            }
+        by_installer[installer_id]["total_m2"] += checkin.get("installed_m2", 0) or 0
+        by_installer[installer_id]["total_minutes"] += duration_minutes
+        by_installer[installer_id]["items_count"] += 1
+        by_installer[installer_id]["jobs"].add(job.get("id"))
+    
+    # Calcular produtividade e converter sets para listas
+    def calc_productivity(total_m2, total_minutes):
+        if total_minutes > 0 and total_m2 > 0:
+            hours = total_minutes / 60
+            return round(total_m2 / hours, 2)
+        return 0
+    
+    # Preparar resposta por instalador
+    installer_results = []
+    for data in by_installer.values():
+        data["jobs"] = list(data["jobs"])
+        data["jobs_count"] = len(data["jobs"])
+        data["productivity_m2_h"] = calc_productivity(data["total_m2"], data["total_minutes"])
+        data["avg_minutes_per_m2"] = round(data["total_minutes"] / data["total_m2"], 2) if data["total_m2"] > 0 else 0
+        data["total_hours"] = round(data["total_minutes"] / 60, 2)
+        data["total_m2"] = round(data["total_m2"], 2)
+        data["records"] = data["records"][:50]  # Limitar registros
+        installer_results.append(data)
+    
+    installer_results.sort(key=lambda x: x["productivity_m2_h"], reverse=True)
+    
+    # Preparar resposta por job
+    job_results = []
+    for data in by_job.values():
+        data["installers"] = list(data["installers"])
+        data["installers_count"] = len(data["installers"])
+        data["productivity_m2_h"] = calc_productivity(data["total_m2_executed"], data["total_minutes"])
+        data["completion_percent"] = round((data["total_m2_executed"] / data["total_m2_api"]) * 100, 1) if data["total_m2_api"] > 0 else 0
+        data["total_hours"] = round(data["total_minutes"] / 60, 2)
+        data["total_m2_executed"] = round(data["total_m2_executed"], 2)
+        data["records"] = data["records"][:50]
+        job_results.append(data)
+    
+    job_results.sort(key=lambda x: x["total_m2_executed"], reverse=True)
+    
+    # Preparar resposta por família
+    family_results = []
+    for data in by_family.values():
+        data["jobs"] = list(data["jobs"])
+        data["installers"] = list(data["installers"])
+        data["jobs_count"] = len(data["jobs"])
+        data["installers_count"] = len(data["installers"])
+        data["productivity_m2_h"] = calc_productivity(data["total_m2"], data["total_minutes"])
+        data["avg_minutes_per_m2"] = round(data["total_minutes"] / data["total_m2"], 2) if data["total_m2"] > 0 else 0
+        data["total_hours"] = round(data["total_minutes"] / 60, 2)
+        data["total_m2"] = round(data["total_m2"], 2)
+        data["records"] = data["records"][:50]
+        family_results.append(data)
+    
+    family_results.sort(key=lambda x: x["total_m2"], reverse=True)
+    
+    # Preparar resposta por item
+    item_results = []
+    for data in by_item.values():
+        data["installers"] = list(data["installers"])
+        data["installers_count"] = len(data["installers"])
+        data["productivity_m2_h"] = calc_productivity(data["m2_api"], data["total_minutes"])
+        data["avg_minutes_per_execution"] = round(data["total_minutes"] / data["executions"], 2) if data["executions"] > 0 else 0
+        data["total_hours"] = round(data["total_minutes"] / 60, 2)
+        data["records"] = data["records"][:20]
+        item_results.append(data)
+    
+    item_results.sort(key=lambda x: x["m2_api"], reverse=True)
+    
+    # Calcular totais gerais
+    total_m2 = sum(i["total_m2"] for i in installer_results)
+    total_minutes = sum(i["total_minutes"] for i in by_installer.values())
+    total_hours = round(total_minutes / 60, 2)
+    
+    return {
+        "summary": {
+            "total_m2": round(total_m2, 2),
+            "total_hours": total_hours,
+            "total_items": sum(i["items_count"] for i in installer_results),
+            "total_jobs": len(by_job),
+            "total_installers": len(by_installer),
+            "avg_productivity_m2_h": calc_productivity(total_m2, total_minutes),
+            "avg_minutes_per_m2": round(total_minutes / total_m2, 2) if total_m2 > 0 else 0,
+            "filters_applied": {
+                "filter_by": filter_by,
+                "filter_id": filter_id,
+                "date_from": date_from,
+                "date_to": date_to
+            }
+        },
+        "by_installer": installer_results if not filter_by or filter_by == "installer" else [],
+        "by_job": job_results if not filter_by or filter_by == "job" else [],
+        "by_family": family_results if not filter_by or filter_by == "family" else [],
+        "by_item": item_results[:100] if not filter_by or filter_by == "item" else []
+    }
+
 @api_router.get("/metrics")
 async def get_metrics(current_user: User = Depends(get_current_user)):
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
