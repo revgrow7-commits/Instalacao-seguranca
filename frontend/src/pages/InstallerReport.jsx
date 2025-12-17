@@ -270,12 +270,12 @@ const InstallerReport = () => {
               <div>
                 <h4 className="text-white font-medium">Como funciona o cálculo de produtividade</h4>
                 <p className="text-sm text-muted-foreground mt-1">
-                  A produtividade é calculada com base nos metros quadrados (m²) reportados pelo instalador no check-out 
-                  dividido pelo tempo total trabalhado (em horas). Quanto maior o valor, mais produtivo é o instalador.
+                  A produtividade é calculada com base nos metros quadrados (m²) dos itens concluídos (dados da Holdprint) 
+                  dividido pelo tempo líquido trabalhado (descontando pausas). Quanto maior o valor, mais produtivo é o instalador.
                 </p>
                 <div className="mt-3 p-3 bg-white/5 rounded-lg">
                   <p className="text-xs text-muted-foreground">Fórmula:</p>
-                  <p className="text-white font-mono">Produtividade = m² Reportados ÷ Horas Trabalhadas</p>
+                  <p className="text-white font-mono">Produtividade = m² dos Itens Concluídos ÷ Horas Líquidas Trabalhadas</p>
                 </div>
               </div>
             </div>
