@@ -468,11 +468,10 @@ const Calendar = () => {
                 {getWeekJobs().map((job) => (
                   <div
                     key={job.id}
-                    onClick={() => navigate(`/jobs/${job.id}`)}
-                    className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors cursor-pointer"
+                    className="p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/jobs/${job.id}`)}>
                         <h3 className="text-white font-medium text-sm truncate">{job.title}</h3>
                         <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
@@ -485,14 +484,35 @@ const Calendar = () => {
                           </span>
                         </div>
                       </div>
-                      <span
-                        className={`
-                          px-2 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap
-                          ${getStatusColor(job.status)} bg-opacity-20 border border-current
-                        `}
-                      >
-                        {job.status === 'completed' ? 'OK' : job.status === 'in_progress' ? 'Exec.' : 'Pend.'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        {googleConnected && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              syncJobToGoogleCalendar(job);
+                            }}
+                            disabled={syncingJob === job.id}
+                            title="Adicionar ao Google Calendar"
+                          >
+                            {syncingJob === job.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <ExternalLink className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+                        <span
+                          className={`
+                            px-2 py-1 rounded-full text-[10px] font-bold uppercase whitespace-nowrap
+                            ${getStatusColor(job.status)} bg-opacity-20 border border-current
+                          `}
+                        >
+                          {job.status === 'completed' ? 'OK' : job.status === 'in_progress' ? 'Exec.' : 'Pend.'}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ))}
