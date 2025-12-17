@@ -866,7 +866,11 @@ class FieldworkAPITest:
             ("Productivity Report (Manager)", self.test_productivity_report),
             ("Google Calendar Login Endpoint", self.test_google_calendar_login_endpoint),
             ("Google Calendar Status Endpoint", self.test_google_calendar_status_endpoint),
-            ("Google Calendar Events (Unauthorized)", self.test_google_calendar_events_unauthorized)
+            ("Google Calendar Events (Unauthorized)", self.test_google_calendar_events_unauthorized),
+            ("Forgot Password Endpoint", self.test_forgot_password_endpoint),
+            ("Verify Reset Token (Invalid)", self.test_verify_reset_token_invalid),
+            ("Reset Password (Invalid Token)", self.test_reset_password_invalid_token),
+            ("Admin Reset User Password", self.test_admin_reset_user_password)
         ]
         
         results = []
