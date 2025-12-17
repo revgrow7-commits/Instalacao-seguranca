@@ -3454,11 +3454,9 @@ async def get_google_credentials(user_id: str):
     return creds
 
 @api_router.get("/calendar/events")
-async def get_google_calendar_events(credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_google_calendar_events(current_user: User = Depends(get_current_user)):
     """Get events from user's Google Calendar"""
-    current_user = await get_current_user(credentials)
-    
-    google_creds = await get_google_credentials(current_user['id'])
+    google_creds = await get_google_credentials(current_user.id)
     if not google_creds:
         raise HTTPException(status_code=401, detail="Google Calendar não conectado")
     
