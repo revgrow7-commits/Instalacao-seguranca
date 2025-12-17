@@ -2665,13 +2665,14 @@ async def recalculate_job_areas(current_user: User = Depends(get_current_user)):
 async def get_report_by_installer(current_user: User = Depends(get_current_user)):
     """
     Relatório de produtividade por instalador.
-    Mostra m² instalados, jobs realizados, tempo médio por m².
+    Usa item_checkins (check-ins por item) para calcular m² instalados e tempo líquido.
+    Produtividade = m² total / horas líquidas trabalhadas
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Buscar dados
     installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
-    checkins = await db.checkins.find({}, {"_id": 0}).to_list(10000)
+    item_checkins = await db.item_checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
     jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
     
     # Mapear jobs por ID
@@ -2683,74 +2684,91 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     for installer in installers:
         installer_id = installer["id"]
         
-        # Checkins deste instalador
-        installer_checkins = [c for c in checkins if c.get("installer_id") == installer_id]
+        # Item checkins completados deste instalador
+        installer_checkins = [c for c in item_checkins if c.get("installer_id") == installer_id]
         
-        # Calcular métricas
-        total_checkins = len(installer_checkins)
-        completed_checkins = [c for c in installer_checkins if c.get("status") == "completed"]
-        total_duration_min = sum(c.get("duration_minutes", 0) or 0 for c in completed_checkins)
-        total_m2_reported = sum(c.get("installed_m2", 0) or 0 for c in completed_checkins)
+        # Calcular métricas usando tempo LÍQUIDO
+        completed_count = len(installer_checkins)
+        
+        # Total de tempo líquido (descontando pausas)
+        total_net_duration_min = 0
+        total_m2_installed = 0
+        
+        for checkin in installer_checkins:
+            # Usar tempo líquido se disponível, senão usar tempo bruto
+            net_minutes = checkin.get("net_duration_minutes") or checkin.get("duration_minutes") or 0
+            total_net_duration_min += net_minutes
+            
+            # m² do item (da API da Holdprint)
+            job = jobs_map.get(checkin.get("job_id"))
+            if job:
+                products = job.get("products_with_area", [])
+                item_index = checkin.get("item_index", 0)
+                if item_index < len(products):
+                    item = products[item_index]
+                    item_m2 = item.get("total_area_m2", 0) or 0
+                    total_m2_installed += item_m2
         
         # Jobs únicos trabalhados
         job_ids = set(c.get("job_id") for c in installer_checkins if c.get("job_id"))
         jobs_worked = len(job_ids)
         
-        # Área total dos jobs trabalhados (estimada)
-        total_job_area_m2 = 0
+        # Detalhes dos jobs trabalhados
         jobs_details = []
         for job_id in job_ids:
             job = jobs_map.get(job_id)
             if job:
                 job_area = job.get("area_m2", 0) or 0
-                total_job_area_m2 += job_area
                 
                 # Checkins deste instalador neste job
-                job_checkins = [c for c in installer_checkins if c.get("job_id") == job_id]
-                job_duration = sum(c.get("duration_minutes", 0) or 0 for c in job_checkins if c.get("status") == "completed")
-                job_m2_reported = sum(c.get("installed_m2", 0) or 0 for c in job_checkins if c.get("status") == "completed")
+                job_item_checkins = [c for c in installer_checkins if c.get("job_id") == job_id]
+                
+                # Tempo líquido total neste job
+                job_net_duration = sum(c.get("net_duration_minutes") or c.get("duration_minutes") or 0 for c in job_item_checkins)
+                
+                # m² instalados neste job (somar área dos itens concluídos)
+                job_m2_installed = 0
+                products = job.get("products_with_area", [])
+                for checkin in job_item_checkins:
+                    item_index = checkin.get("item_index", 0)
+                    if item_index < len(products):
+                        job_m2_installed += products[item_index].get("total_area_m2", 0) or 0
                 
                 jobs_details.append({
                     "job_id": job_id,
                     "job_title": job.get("title"),
                     "client": job.get("client_name") or job.get("holdprint_data", {}).get("customerName"),
                     "job_area_m2": job_area,
-                    "duration_min": job_duration,
-                    "m2_reported": job_m2_reported,
+                    "duration_min": round(job_net_duration, 2),
+                    "m2_installed": round(job_m2_installed, 2),
                     "status": job.get("status"),
-                    "checkins_count": len(job_checkins)
+                    "items_completed": len(job_item_checkins)
                 })
         
-        # Produtividade (m²/hora)
+        # Produtividade (m²/hora) usando tempo LÍQUIDO
         productivity_m2_h = 0
-        if total_duration_min > 0 and total_m2_reported > 0:
-            productivity_m2_h = round((total_m2_reported / (total_duration_min / 60)), 2)
-        
-        # Tempo médio por m²
-        avg_time_per_m2 = 0
-        if total_m2_reported > 0:
-            avg_time_per_m2 = round(total_duration_min / total_m2_reported, 2)
+        total_hours = total_net_duration_min / 60 if total_net_duration_min > 0 else 0
+        if total_hours > 0 and total_m2_installed > 0:
+            productivity_m2_h = round(total_m2_installed / total_hours, 2)
         
         installer_data = {
             "installer_id": installer_id,
             "full_name": installer.get("full_name"),
             "branch": installer.get("branch"),
             "metrics": {
-                "total_checkins": total_checkins,
-                "completed_checkins": len(completed_checkins),
+                "items_completed": completed_count,
+                "completed_checkins": completed_count,
                 "jobs_worked": jobs_worked,
-                "total_duration_hours": round(total_duration_min / 60, 2),
-                "total_m2_reported": total_m2_reported,
-                "total_job_area_m2": round(total_job_area_m2, 2),
-                "productivity_m2_h": productivity_m2_h,
-                "avg_time_per_m2_min": avg_time_per_m2
+                "total_duration_hours": round(total_hours, 2),
+                "total_m2_reported": round(total_m2_installed, 2),
+                "productivity_m2_h": productivity_m2_h
             },
-            "jobs": sorted(jobs_details, key=lambda x: x.get("job_area_m2", 0), reverse=True)[:20]
+            "jobs": sorted(jobs_details, key=lambda x: x.get("m2_installed", 0), reverse=True)[:20]
         }
         
         installer_report.append(installer_data)
     
-    # Ordenar por produtividade
+    # Ordenar por produtividade (maior primeiro)
     installer_report.sort(key=lambda x: x["metrics"]["productivity_m2_h"], reverse=True)
     
     # Totais gerais
@@ -2758,6 +2776,14 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     total_hours_all = sum(i["metrics"]["total_duration_hours"] for i in installer_report)
     
     return {
+        "summary": {
+            "total_installers": len(installer_report),
+            "total_area_m2_all": round(total_area_all, 2),
+            "total_hours_all": round(total_hours_all, 2),
+            "avg_productivity_m2_h": round(total_area_all / total_hours_all, 2) if total_hours_all > 0 else 0
+        },
+        "by_installer": installer_report
+    }
         "summary": {
             "total_installers": len(installer_report),
             "total_area_m2_all": round(total_area_all, 2),
