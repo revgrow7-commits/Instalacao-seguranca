@@ -345,9 +345,7 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Mobile Responsiveness for InstallerDashboard - COMPLETED"
-    - "Profile Page Implementation - COMPLETED"
-    - "Account switching and logout functionality - COMPLETED"
+    - "Productivity Report Page"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
