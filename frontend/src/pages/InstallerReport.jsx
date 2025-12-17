@@ -189,16 +189,16 @@ const InstallerReport = () => {
                             <p className="text-white font-bold">{installer.metrics.jobs_worked}</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Check-ins</p>
-                            <p className="text-white font-bold">{installer.metrics.completed_checkins}</p>
+                            <p className="text-xs text-muted-foreground">Itens</p>
+                            <p className="text-white font-bold">{installer.metrics.items_completed || installer.metrics.completed_checkins}</p>
                           </div>
                           <div className="text-right">
                             <p className="text-xs text-muted-foreground">Horas</p>
                             <p className="text-white font-bold">{installer.metrics.total_duration_hours}h</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs text-muted-foreground">m² Reportados</p>
-                            <p className="text-green-400 font-bold text-lg">{installer.metrics.total_m2_reported}</p>
+                            <p className="text-xs text-muted-foreground">m² Instalados</p>
+                            <p className="text-green-400 font-bold text-lg">{installer.metrics.total_m2_reported?.toLocaleString('pt-BR')}</p>
                           </div>
                           <div className="text-right bg-primary/20 px-3 py-2 rounded-lg border border-primary/30">
                             <p className="text-xs text-primary">Produtividade</p>
