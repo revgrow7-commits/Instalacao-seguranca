@@ -205,6 +205,16 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/reports/productivity"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <ProductivityReport />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/installer/job/:jobId"
         element={
           <ProtectedRoute>
