@@ -1491,13 +1491,16 @@ async def create_checkin(
     if existing:
         raise HTTPException(status_code=400, detail="Already checked in")
     
-    # Create checkin with Base64 photo and GPS
+    # Compress photo before storing
+    compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
+    
+    # Create checkin with compressed Base64 photo and GPS
     checkin_id = str(uuid.uuid4())
     checkin = CheckIn(
         id=checkin_id,
         job_id=job_id,
         installer_id=installer['id'],
-        checkin_photo=photo_base64,
+        checkin_photo=compressed_photo,
         gps_lat=gps_lat,
         gps_long=gps_long,
         gps_accuracy=gps_accuracy
