@@ -38,6 +38,12 @@ const Sidebar = () => {
       roles: ['admin', 'manager']
     },
     {
+      name: 'Produtividade',
+      href: '/reports/productivity',
+      icon: BarChart3,
+      roles: ['admin', 'manager']
+    },
+    {
       name: 'Relatórios',
       href: '/reports',
       icon: FileText,
