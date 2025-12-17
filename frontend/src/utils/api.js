@@ -129,6 +129,14 @@ export const api = {
     headers: getAuthHeader(),
     responseType: 'blob'
   }),
+
+  // Google Calendar
+  getGoogleAuthUrl: () => axios.get(`${API_URL}/auth/google/login`, { headers: getAuthHeader() }),
+  getGoogleAuthStatus: () => axios.get(`${API_URL}/auth/google/status`, { headers: getAuthHeader() }),
+  disconnectGoogle: () => axios.delete(`${API_URL}/auth/google/disconnect`, { headers: getAuthHeader() }),
+  getGoogleCalendarEvents: () => axios.get(`${API_URL}/calendar/events`, { headers: getAuthHeader() }),
+  createGoogleCalendarEvent: (data) => axios.post(`${API_URL}/calendar/events`, data, { headers: getAuthHeader() }),
+  deleteGoogleCalendarEvent: (eventId) => axios.delete(`${API_URL}/calendar/events/${eventId}`, { headers: getAuthHeader() }),
 };
 
 export default api;
