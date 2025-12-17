@@ -1812,7 +1812,7 @@ async def complete_item_checkout(
     
     await db.item_checkins.update_one({"id": checkin_id}, {"$set": update_data})
     
-    # Register installed product
+    # Register installed product with NET time
     job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
     if job:
         products = job.get("products_with_area", [])
@@ -1832,7 +1832,7 @@ async def complete_item_checkout(
             complexity_level=complexity_level or 1,
             height_category=height_category or "terreo",
             scenario_category=scenario_category or "loja_rua",
-            actual_time_min=duration_minutes,
+            actual_time_min=net_duration_minutes,  # Usar tempo LÍQUIDO
             productivity_m2_h=productivity_m2_h,
             cause_notes=notes
         )
@@ -1850,6 +1850,143 @@ async def complete_item_checkout(
     # Return updated checkin
     result = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     return result
+
+
+@api_router.post("/item-checkins/{checkin_id}/pause")
+async def pause_item_checkin(
+    checkin_id: str,
+    reason: str = Form(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Pause an item checkin and log the reason"""
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Only installers can pause item checkouts")
+    
+    # Get checkin
+    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Item check-in not found")
+    
+    if checkin["status"] == "completed":
+        raise HTTPException(status_code=400, detail="Cannot pause a completed item")
+    
+    if checkin["status"] == "paused":
+        raise HTTPException(status_code=400, detail="Item is already paused")
+    
+    # Create pause log
+    pause_log = ItemPauseLog(
+        item_checkin_id=checkin_id,
+        job_id=checkin["job_id"],
+        item_index=checkin["item_index"],
+        installer_id=checkin["installer_id"],
+        reason=reason
+    )
+    
+    await db.item_pause_logs.insert_one(pause_log.model_dump())
+    
+    # Update checkin status to paused
+    await db.item_checkins.update_one(
+        {"id": checkin_id},
+        {"$set": {"status": "paused"}}
+    )
+    
+    return {
+        "message": "Item paused successfully",
+        "pause_id": pause_log.id,
+        "reason": reason,
+        "start_time": pause_log.start_time.isoformat()
+    }
+
+
+@api_router.post("/item-checkins/{checkin_id}/resume")
+async def resume_item_checkin(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Resume a paused item checkin"""
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Only installers can resume item checkouts")
+    
+    # Get checkin
+    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Item check-in not found")
+    
+    if checkin["status"] != "paused":
+        raise HTTPException(status_code=400, detail="Item is not paused")
+    
+    # Find the active pause log
+    active_pause = await db.item_pause_logs.find_one({
+        "item_checkin_id": checkin_id,
+        "end_time": None
+    }, {"_id": 0})
+    
+    if not active_pause:
+        raise HTTPException(status_code=400, detail="No active pause found")
+    
+    # Calculate pause duration
+    end_time = datetime.now(timezone.utc)
+    start_time = active_pause['start_time']
+    if isinstance(start_time, str):
+        start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+    if start_time.tzinfo is None:
+        start_time = start_time.replace(tzinfo=timezone.utc)
+    
+    pause_duration = int((end_time - start_time).total_seconds() / 60)
+    
+    # Update pause log
+    await db.item_pause_logs.update_one(
+        {"id": active_pause["id"]},
+        {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
+    )
+    
+    # Update checkin status back to in_progress
+    await db.item_checkins.update_one(
+        {"id": checkin_id},
+        {"$set": {"status": "in_progress"}}
+    )
+    
+    return {
+        "message": "Item resumed successfully",
+        "pause_duration_minutes": pause_duration,
+        "resumed_at": end_time.isoformat()
+    }
+
+
+@api_router.get("/item-checkins/{checkin_id}/pauses")
+async def get_item_pause_logs(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Get all pause logs for an item checkin"""
+    pause_logs = await db.item_pause_logs.find(
+        {"item_checkin_id": checkin_id},
+        {"_id": 0}
+    ).to_list(100)
+    
+    # Add reason labels
+    for log in pause_logs:
+        log["reason_label"] = PAUSE_REASON_LABELS.get(log.get("reason"), log.get("reason"))
+    
+    # Calculate total pause time
+    total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs if p.get("duration_minutes"))
+    active_pause = next((p for p in pause_logs if p.get("end_time") is None), None)
+    
+    return {
+        "pauses": pause_logs,
+        "total_pause_minutes": total_pause_minutes,
+        "has_active_pause": active_pause is not None,
+        "active_pause": active_pause
+    }
+
+
+@api_router.get("/pause-reasons")
+async def get_pause_reasons():
+    """Get list of valid pause reasons"""
+    return {
+        "reasons": PAUSE_REASONS,
+        "labels": PAUSE_REASON_LABELS
+    }
 
 # ============ INSTALLER ROUTES ============
 
