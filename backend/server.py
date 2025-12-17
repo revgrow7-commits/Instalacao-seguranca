@@ -44,6 +44,12 @@ HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
 HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
 HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 
+# Google OAuth Config
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://instalmonitor.preview.emergentagent.com/api/auth/google/callback')
+GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email']
+
 # ============ CATÁLOGO DE PRODUTOS HOLDPRINT ============
 # Mapeamento de produtos para famílias - usado para associação automática
 
