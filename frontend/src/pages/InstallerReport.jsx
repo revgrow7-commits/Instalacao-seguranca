@@ -226,9 +226,9 @@ const InstallerReport = () => {
                             <span>Job</span>
                             <span>Cliente</span>
                             <span className="text-center">Área Job (m²)</span>
-                            <span className="text-center">m² Reportados</span>
+                            <span className="text-center">m² Instalados</span>
                             <span className="text-center">Tempo (min)</span>
-                            <span className="text-center">Check-ins</span>
+                            <span className="text-center">Itens</span>
                           </div>
                           {installer.jobs.map((job, jobIndex) => (
                             <div key={jobIndex} className="grid grid-cols-6 gap-2 text-sm py-2 border-b border-white/5">
@@ -242,13 +242,13 @@ const InstallerReport = () => {
                                 {job.job_area_m2?.toLocaleString('pt-BR') || '-'}
                               </span>
                               <span className="text-center text-green-400 font-medium">
-                                {job.m2_reported || '-'}
+                                {job.m2_installed?.toLocaleString('pt-BR') || '-'}
                               </span>
                               <span className="text-center text-white">
                                 {job.duration_min || '-'}
                               </span>
                               <span className="text-center text-white">
-                                {job.checkins_count}
+                                {job.items_completed || job.checkins_count || 0}
                               </span>
                             </div>
                           ))}
