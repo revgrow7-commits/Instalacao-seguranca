@@ -129,7 +129,7 @@ const ProductivityReport = () => {
               Relatório de Produtividade
             </h1>
             <p className="text-xs md:text-sm text-muted-foreground mt-1">
-              m² da API × Tempo real (check-in/out)
+              m² da API × Tempo Líquido (excluindo pausas)
             </p>
           </div>
         </div>
