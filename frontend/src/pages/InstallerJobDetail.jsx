@@ -89,10 +89,24 @@ const InstallerJobDetail = () => {
       // Load item checkins
       const checkinsRes = await api.getItemCheckins(jobId);
       const checkinsMap = {};
-      checkinsRes.data.forEach(c => {
+      const pauseLogsMap = {};
+      
+      for (const c of checkinsRes.data) {
         checkinsMap[c.item_index] = c;
-      });
+        
+        // Load pause logs for each checkin
+        if (c.status === 'in_progress' || c.status === 'paused') {
+          try {
+            const pauseRes = await api.getItemPauseLogs(c.id);
+            pauseLogsMap[c.item_index] = pauseRes.data;
+          } catch (e) {
+            pauseLogsMap[c.item_index] = { pauses: [], total_pause_minutes: 0 };
+          }
+        }
+      }
+      
       setItemCheckins(checkinsMap);
+      setPauseLogs(pauseLogsMap);
     } catch (error) {
       toast.error('Erro ao carregar job');
       console.error(error);
