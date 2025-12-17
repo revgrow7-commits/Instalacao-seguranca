@@ -302,11 +302,6 @@ const InstallerJobDetail = () => {
     const now = new Date();
     return Math.floor((now - start) / 60000);
   };
-      case 'completed': return 'Concluído';
-      case 'in_progress': return 'Em Andamento';
-      default: return 'Pendente';
-    }
-  };
 
   const getCompletedItemsCount = () => {
     return Object.values(itemCheckins).filter(c => c.status === 'completed').length;
