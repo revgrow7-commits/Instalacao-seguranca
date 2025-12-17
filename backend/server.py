@@ -1737,7 +1737,7 @@ async def complete_item_checkout(
     notes: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
-    """Complete checkout for a specific item"""
+    """Complete checkout for a specific item, calculating net time (excluding pauses)"""
     if current_user.role != UserRole.INSTALLER:
         raise HTTPException(status_code=403, detail="Only installers can complete item checkouts")
     
@@ -1749,7 +1749,26 @@ async def complete_item_checkout(
     if checkin["status"] == "completed":
         raise HTTPException(status_code=400, detail="Item already checked out")
     
-    # Calculate duration
+    # If currently paused, end the pause first
+    if checkin["status"] == "paused":
+        active_pause = await db.item_pause_logs.find_one({
+            "item_checkin_id": checkin_id,
+            "end_time": None
+        }, {"_id": 0})
+        if active_pause:
+            end_time = datetime.now(timezone.utc)
+            start_time = active_pause['start_time']
+            if isinstance(start_time, str):
+                start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            if start_time.tzinfo is None:
+                start_time = start_time.replace(tzinfo=timezone.utc)
+            pause_duration = int((end_time - start_time).total_seconds() / 60)
+            await db.item_pause_logs.update_one(
+                {"id": active_pause["id"]},
+                {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
+            )
+    
+    # Calculate total duration (gross time)
     checkin_at = checkin['checkin_at']
     if isinstance(checkin_at, str):
         checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
@@ -1759,13 +1778,20 @@ async def complete_item_checkout(
     checkout_at = datetime.now(timezone.utc)
     duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
     
-    # Calculate productivity
+    # Calculate total pause time
+    pause_logs = await db.item_pause_logs.find({"item_checkin_id": checkin_id}, {"_id": 0}).to_list(100)
+    total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs)
+    
+    # Calculate net time (working time)
+    net_duration_minutes = max(0, duration_minutes - total_pause_minutes)
+    
+    # Calculate productivity using NET time (tempo líquido)
     productivity_m2_h = None
-    if installed_m2 and installed_m2 > 0 and duration_minutes > 0:
-        hours = duration_minutes / 60
+    if installed_m2 and installed_m2 > 0 and net_duration_minutes > 0:
+        hours = net_duration_minutes / 60
         productivity_m2_h = round(installed_m2 / hours, 2)
     
-    # Update checkin
+    # Update checkin with both gross and net times
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         "checkout_photo": photo_base64,
@@ -1777,8 +1803,10 @@ async def complete_item_checkout(
         "height_category": height_category,
         "scenario_category": scenario_category,
         "notes": notes,
-        "duration_minutes": duration_minutes,
-        "productivity_m2_h": productivity_m2_h,
+        "duration_minutes": duration_minutes,  # Tempo bruto
+        "net_duration_minutes": net_duration_minutes,  # Tempo líquido
+        "total_pause_minutes": total_pause_minutes,  # Total de pausas
+        "productivity_m2_h": productivity_m2_h,  # Calculado com tempo líquido
         "status": "completed"
     }
     
