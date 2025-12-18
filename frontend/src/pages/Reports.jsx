@@ -658,7 +658,7 @@ const Reports = () => {
             </Card>
           ) : (
             <div className="space-y-4">
-              {installers.map((installer) => {
+              {paginatedInstallers.map((installer) => {
                 const stats = calculateInstallerStats(installer.id);
                 const installerJobs = jobs.filter(j => j.assigned_installers?.includes(installer.id));
                 
