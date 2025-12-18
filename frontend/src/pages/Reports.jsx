@@ -900,6 +900,14 @@ const Reports = () => {
                       </div>
                     </div>
                   ))}
+                  
+                  {/* Paginação */}
+                  <Pagination
+                    currentPage={photosPage}
+                    totalPages={totalPhotosPages}
+                    onPageChange={setPhotosPage}
+                    label={`${filteredItemCheckins.length} registros`}
+                  />
                 </div>
               )}
             </CardContent>
