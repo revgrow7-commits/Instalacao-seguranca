@@ -516,7 +516,7 @@ const Reports = () => {
             </Card>
           ) : (
             <div className="space-y-4">
-              {filteredJobs.map((job) => {
+              {paginatedJobs.map((job) => {
                 const jobCheckins = getJobCheckins(job.id);
                 const completedCheckins = jobCheckins.filter(c => c.status === 'completed');
                 const totalDuration = completedCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
