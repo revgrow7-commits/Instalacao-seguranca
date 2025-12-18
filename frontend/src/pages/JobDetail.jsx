@@ -1162,9 +1162,13 @@ const JobDetail = () => {
                                 <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-red-800 text-white font-bold text-sm shadow-lg ml-2 mt-2 sm:mt-0 animate-pulse">
                                   <AlertTriangle className="h-4 w-4" />
                                   <span>
-                                    ⚠️ PARADO HÁ {Math.floor((new Date() - new Date(
-                                      itemCheckin.status === 'paused' ? itemCheckin.paused_at : itemCheckin.checkin_at
-                                    )) / (1000 * 60 * 60))}h
+                                    ⚠️ PARADO HÁ {(() => {
+                                      const refTime = itemCheckin.status === 'paused' && itemCheckin.paused_at 
+                                        ? new Date(itemCheckin.paused_at) 
+                                        : new Date(itemCheckin.checkin_at);
+                                      const hours = Math.floor((new Date() - refTime) / (1000 * 60 * 60));
+                                      return isNaN(hours) ? '?' : hours;
+                                    })()}h
                                   </span>
                                 </div>
                               )}
