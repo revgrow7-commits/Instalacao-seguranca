@@ -204,7 +204,7 @@ const Reports = () => {
     });
   };
 
-  const filterItemCheckinsByDate = (checkinsList) => {
+  const filterItemCheckinsByDate = useCallback((checkinsList) => {
     if (!startDate && !endDate) return checkinsList;
     
     return checkinsList.filter(checkin => {
@@ -215,7 +215,41 @@ const Reports = () => {
       
       return checkinDate >= start && checkinDate <= end;
     });
-  };
+  }, [startDate, endDate]);
+
+  // Dados filtrados com memoização para evitar recálculos
+  const filteredJobs = useMemo(() => filterJobsByDate(jobs), [jobs, startDate, endDate]);
+  const filteredItemCheckins = useMemo(() => filterItemCheckinsByDate(itemCheckins), [itemCheckins, filterItemCheckinsByDate]);
+  
+  // Paginação de Jobs
+  const paginatedJobs = useMemo(() => {
+    const start = (jobsPage - 1) * ITEMS_PER_PAGE;
+    return filteredJobs.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredJobs, jobsPage]);
+  
+  const totalJobsPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+  
+  // Paginação de Instaladores
+  const paginatedInstallers = useMemo(() => {
+    const start = (installersPage - 1) * ITEMS_PER_PAGE;
+    return installers.slice(start, start + ITEMS_PER_PAGE);
+  }, [installers, installersPage]);
+  
+  const totalInstallersPages = Math.ceil(installers.length / ITEMS_PER_PAGE);
+  
+  // Paginação de Fotos
+  const paginatedPhotos = useMemo(() => {
+    const start = (photosPage - 1) * ITEMS_PER_PAGE;
+    return filteredItemCheckins.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredItemCheckins, photosPage]);
+  
+  const totalPhotosPages = Math.ceil(filteredItemCheckins.length / ITEMS_PER_PAGE);
+
+  // Reset página quando filtros mudam
+  useEffect(() => {
+    setJobsPage(1);
+    setPhotosPage(1);
+  }, [startDate, endDate]);
 
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
