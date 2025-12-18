@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -7,8 +7,11 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar, Download, Layers, User, Camera, Image, X, MapPin, Pause } from 'lucide-react';
+import { FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, Calendar, Download, Layers, User, Camera, Image, X, MapPin, Pause, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Constante para itens por página
+const ITEMS_PER_PAGE = 10;
 
 const Reports = () => {
   const navigate = useNavigate();
@@ -18,12 +21,18 @@ const Reports = () => {
   const [itemCheckins, setItemCheckins] = useState([]);
   const [installers, setInstallers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeTab, setActiveTab] = useState('jobs');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoType, setPhotoType] = useState('');
+  
+  // Paginação
+  const [jobsPage, setJobsPage] = useState(1);
+  const [installersPage, setInstallersPage] = useState(1);
+  const [photosPage, setPhotosPage] = useState(1);
 
   useEffect(() => {
     if (!isAdmin && !isManager) {
@@ -33,25 +42,46 @@ const Reports = () => {
     loadData();
   }, [isAdmin, isManager, navigate]);
 
+  // Carregar dados básicos (sem fotos pesadas)
   const loadData = async () => {
     try {
-      const [jobsRes, checkinsRes, installersRes, itemCheckinsRes] = await Promise.all([
+      const [jobsRes, checkinsRes, installersRes] = await Promise.all([
         api.getJobs(),
         api.getCheckins(),
-        api.getInstallers(),
-        api.getAllItemCheckins()
+        api.getInstallers()
       ]);
       
       setJobs(jobsRes.data);
       setCheckins(checkinsRes.data);
       setInstallers(installersRes.data);
-      setItemCheckins(itemCheckinsRes.data);
     } catch (error) {
       toast.error('Erro ao carregar relatórios');
     } finally {
       setLoading(false);
     }
   };
+
+  // Carregar fotos apenas quando a aba de fotos for acessada
+  const loadPhotosData = useCallback(async () => {
+    if (itemCheckins.length > 0) return; // Já carregado
+    
+    setLoadingPhotos(true);
+    try {
+      const itemCheckinsRes = await api.getAllItemCheckins();
+      setItemCheckins(itemCheckinsRes.data);
+    } catch (error) {
+      toast.error('Erro ao carregar fotos');
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }, [itemCheckins.length]);
+
+  // Carregar fotos quando a aba de fotos for selecionada
+  useEffect(() => {
+    if (activeTab === 'photos') {
+      loadPhotosData();
+    }
+  }, [activeTab, loadPhotosData]);
 
   const handleExportExcel = async () => {
     setExporting(true);
