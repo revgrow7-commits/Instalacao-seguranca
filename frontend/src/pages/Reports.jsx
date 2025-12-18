@@ -501,7 +501,7 @@ const Reports = () => {
           </TabsTrigger>
           <TabsTrigger value="photos" className="data-[state=active]:bg-primary">
             <Camera className="h-4 w-4 mr-2" />
-            Fotos Check-in/out ({filterItemCheckinsByDate(itemCheckins).length})
+            Fotos Check-in/out ({filteredItemCheckins.length})
           </TabsTrigger>
         </TabsList>
 
