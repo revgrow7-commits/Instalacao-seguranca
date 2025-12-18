@@ -635,6 +635,14 @@ const Reports = () => {
                   </Card>
                 );
               })}
+              
+              {/* Paginação de Jobs */}
+              <Pagination
+                currentPage={jobsPage}
+                totalPages={totalJobsPages}
+                onPageChange={setJobsPage}
+                label={`${filteredJobs.length} jobs`}
+              />
             </div>
           )}
         </TabsContent>
