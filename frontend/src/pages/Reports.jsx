@@ -759,6 +759,14 @@ const Reports = () => {
                   </Card>
                 );
               })}
+              
+              {/* Paginação de Instaladores */}
+              <Pagination
+                currentPage={installersPage}
+                totalPages={totalInstallersPages}
+                onPageChange={setInstallersPage}
+                label={`${installers.length} instaladores`}
+              />
             </div>
           )}
         </TabsContent>
