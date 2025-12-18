@@ -1181,7 +1181,199 @@ const JobDetail = () => {
         </Card>
       )}
 
-      {/* Itens de Produção */}
+      {/* Histórico de Execução - Itens Concluídos */}
+      {itemCheckins.filter(c => c.status === 'completed').length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Histórico de Execução ({itemCheckins.filter(c => c.status === 'completed').length} concluído(s))
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {itemCheckins
+                .filter(c => c.status === 'completed')
+                .sort((a, b) => new Date(b.checkout_at) - new Date(a.checkout_at))
+                .map((checkin) => {
+                  const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                  const product = products[checkin.item_index];
+                  const installer = installers.find(i => i.id === checkin.installer_id);
+                  
+                  return (
+                    <div
+                      key={checkin.id}
+                      className="p-4 rounded-lg bg-white/5 border border-green-500/20"
+                    >
+                      {/* Cabeçalho com nome do item e instalador */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <div>
+                          <h4 className="text-white font-bold text-base">
+                            {product?.name || checkin.product_name || `Item ${checkin.item_index + 1}`}
+                          </h4>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                            <User className="h-4 w-4" />
+                            <span className="text-green-400 font-medium">
+                              {installer?.full_name || 'Instalador'}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 text-sm font-bold border border-green-500/30">
+                          ✓ Concluído
+                        </span>
+                      </div>
+
+                      {/* Fotos de Check-in e Checkout lado a lado */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        {/* Foto Check-in */}
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium">📷 Foto Check-in</p>
+                          {checkin.checkin_photo ? (
+                            <div className="relative group">
+                              <img 
+                                src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
+                                alt="Check-in"
+                                className="w-full h-32 object-cover rounded-lg border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(`data:image/jpeg;base64,${checkin.checkin_photo}`, '_blank')}
+                              />
+                              <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-xs text-white">
+                                Check-in
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-full h-32 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground">Sem foto</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Foto Checkout */}
+                        <div className="space-y-2">
+                          <p className="text-xs text-muted-foreground font-medium">📷 Foto Checkout</p>
+                          {checkin.checkout_photo ? (
+                            <div className="relative group">
+                              <img 
+                                src={`data:image/jpeg;base64,${checkin.checkout_photo}`}
+                                alt="Checkout"
+                                className="w-full h-32 object-cover rounded-lg border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => window.open(`data:image/jpeg;base64,${checkin.checkout_photo}`, '_blank')}
+                              />
+                              <div className="absolute bottom-1 left-1 px-2 py-0.5 bg-black/70 rounded text-xs text-white">
+                                Checkout
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-full h-32 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center">
+                              <span className="text-xs text-muted-foreground">Sem foto</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Horários e Tempo de Produção */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                        <div className="bg-blue-500/10 rounded-lg p-2 border border-blue-500/20">
+                          <p className="text-[10px] text-blue-400 font-medium">🕐 Check-in</p>
+                          <p className="text-white font-bold text-sm">
+                            {new Date(checkin.checkin_at).toLocaleString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                        
+                        <div className="bg-green-500/10 rounded-lg p-2 border border-green-500/20">
+                          <p className="text-[10px] text-green-400 font-medium">🕐 Checkout</p>
+                          <p className="text-white font-bold text-sm">
+                            {checkin.checkout_at ? new Date(checkin.checkout_at).toLocaleString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : '-'}
+                          </p>
+                        </div>
+                        
+                        <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                          <p className="text-[10px] text-yellow-400 font-medium">⏱️ Tempo Líquido</p>
+                          <p className="text-white font-bold text-sm">
+                            {checkin.net_duration_minutes 
+                              ? `${Math.floor(checkin.net_duration_minutes / 60)}h ${checkin.net_duration_minutes % 60}min`
+                              : checkin.duration_minutes 
+                                ? `${Math.floor(checkin.duration_minutes / 60)}h ${checkin.duration_minutes % 60}min`
+                                : '-'
+                            }
+                          </p>
+                        </div>
+                        
+                        <div className="bg-primary/10 rounded-lg p-2 border border-primary/20">
+                          <p className="text-[10px] text-primary font-medium">📐 Área</p>
+                          <p className="text-white font-bold text-sm">
+                            {checkin.installed_m2 || product?.total_area_m2 || '-'} m²
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Complexidades */}
+                      {(checkin.height_category || checkin.scenario_category || checkin.complexity_level) && (
+                        <div className="mb-4">
+                          <p className="text-xs text-muted-foreground font-medium mb-2">🔧 Complexidades Atribuídas</p>
+                          <div className="flex flex-wrap gap-2">
+                            {checkin.height_category && (
+                              <span className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                                Altura: {checkin.height_category === 'terreo' ? 'Térreo' : 
+                                         checkin.height_category === 'escada_andaime' ? 'Escada/Andaime' :
+                                         checkin.height_category === 'plataforma_cesta' ? 'Plataforma/Cesta' :
+                                         checkin.height_category}
+                              </span>
+                            )}
+                            {checkin.scenario_category && (
+                              <span className="px-2 py-1 text-xs rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
+                                Cenário: {checkin.scenario_category === 'loja_rua' ? 'Loja de Rua' :
+                                          checkin.scenario_category === 'loja_shopping' ? 'Loja de Shopping' :
+                                          checkin.scenario_category === 'supermercado' ? 'Supermercado' :
+                                          checkin.scenario_category === 'industria_deposito' ? 'Indústria/Depósito' :
+                                          checkin.scenario_category === 'outdoor_externo' ? 'Outdoor/Externo' :
+                                          checkin.scenario_category}
+                              </span>
+                            )}
+                            {checkin.complexity_level && (
+                              <span className="px-2 py-1 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30">
+                                Dificuldade: {checkin.complexity_level}/5
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Observações */}
+                      {checkin.notes && (
+                        <div className="bg-white/5 rounded-lg p-3 border border-white/10">
+                          <p className="text-xs text-muted-foreground font-medium mb-1">📝 Observações</p>
+                          <p className="text-white text-sm">{checkin.notes}</p>
+                        </div>
+                      )}
+
+                      {/* Produtividade */}
+                      {checkin.productivity_m2_h && (
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Produtividade:</span>
+                          <span className="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs font-bold">
+                            {checkin.productivity_m2_h} m²/h
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Itens de Produção Original (Holdprint) */}
       {job.holdprint_data?.production?.items && job.holdprint_data.production.items.length > 0 && (
         <Card className="bg-card border-white/5">
           <CardHeader>
