@@ -759,20 +759,30 @@ const Reports = () => {
         <TabsContent value="photos" className="space-y-6">
           <Card className="bg-card border-white/5">
             <CardHeader>
-              <CardTitle className="text-white flex items-center gap-2">
-                <Camera className="h-5 w-5 text-primary" />
-                Registro Fotográfico de Check-ins/Check-outs
+              <CardTitle className="text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Camera className="h-5 w-5 text-primary" />
+                  Registro Fotográfico de Check-ins/Check-outs
+                </div>
+                <span className="text-sm font-normal text-muted-foreground">
+                  {filteredItemCheckins.length} registro(s)
+                </span>
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {filterItemCheckinsByDate(itemCheckins).length === 0 ? (
+              {loadingPhotos ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-12 w-12 mx-auto text-primary mb-4 animate-spin" />
+                  <p className="text-muted-foreground">Carregando registros fotográficos...</p>
+                </div>
+              ) : filteredItemCheckins.length === 0 ? (
                 <div className="text-center py-12">
                   <Image className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground">Nenhum registro fotográfico encontrado</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {filterItemCheckinsByDate(itemCheckins).map((checkin) => (
+                  {paginatedPhotos.map((checkin) => (
                     <div key={checkin.id} className="bg-white/5 rounded-lg border border-white/10 p-4">
                       <div className="flex flex-col md:flex-row gap-4">
                         {/* Info Section */}
