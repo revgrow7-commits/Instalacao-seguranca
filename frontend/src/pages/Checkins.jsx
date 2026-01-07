@@ -239,6 +239,16 @@ const Checkins = () => {
                   </div>
                 )}
 
+                {/* Product Info */}
+                {checkin.product_name && (
+                  <div className="text-xs text-muted-foreground bg-white/5 px-2 py-1 rounded">
+                    <span className="text-white">{checkin.product_name}</span>
+                    {checkin.installed_m2 && (
+                      <span className="ml-2 text-primary">({checkin.installed_m2} m²)</span>
+                    )}
+                  </div>
+                )}
+
                 {/* View Details Button */}
                 <Button
                   onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
