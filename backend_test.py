@@ -1526,7 +1526,11 @@ class FieldworkAPITest:
             ("Item Checkin with Large Image", self.test_item_checkin_with_large_image),
             ("Item Checkout with Large Image", self.test_item_checkout_with_large_image),
             ("Regular Checkin with Large Image", self.test_regular_checkin_with_large_image),
-            ("Regular Checkout with Large Image", self.test_regular_checkout_with_large_image)
+            ("Regular Checkout with Large Image", self.test_regular_checkout_with_large_image),
+            ("Holdprint Fetch POA Jobs", self.test_holdprint_fetch_poa_jobs),
+            ("Holdprint Fetch SP Jobs", self.test_holdprint_fetch_sp_jobs),
+            ("Holdprint Batch Import POA", self.test_holdprint_batch_import_poa),
+            ("Holdprint Batch Import SP", self.test_holdprint_batch_import_sp)
         ]
         
         results = []
