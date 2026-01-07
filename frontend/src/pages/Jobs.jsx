@@ -152,10 +152,8 @@ const Jobs = () => {
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
     
-    // Filtro de mês baseado na data (prioridade: scheduled_date > holdprint_data.deliveryNeeded > created_at)
-    let matchesMonth = true;
-    if (monthFilter !== 'all') {
-      // Tenta pegar a melhor data disponível
+    // Obter a data do job para filtros
+    const getJobDate = () => {
       let dateString = job.scheduled_date;
       if (!dateString && job.holdprint_data?.deliveryNeeded) {
         dateString = job.holdprint_data.deliveryNeeded;
@@ -166,9 +164,33 @@ const Jobs = () => {
       if (!dateString) {
         dateString = job.created_at;
       }
-      
-      const jobDate = dateString ? new Date(dateString) : null;
-      
+      return dateString ? new Date(dateString) : null;
+    };
+    
+    const jobDate = getJobDate();
+    
+    // Filtro de intervalo de datas (tem prioridade sobre filtro de mês)
+    let matchesDateRange = true;
+    if (startDateFilter || endDateFilter) {
+      if (jobDate && !isNaN(jobDate.getTime())) {
+        if (startDateFilter) {
+          const startDate = new Date(startDateFilter);
+          startDate.setHours(0, 0, 0, 0);
+          if (jobDate < startDate) matchesDateRange = false;
+        }
+        if (endDateFilter) {
+          const endDate = new Date(endDateFilter);
+          endDate.setHours(23, 59, 59, 999);
+          if (jobDate > endDate) matchesDateRange = false;
+        }
+      } else {
+        matchesDateRange = false; // Se não tem data válida, não mostra no filtro de datas
+      }
+    }
+    
+    // Filtro de mês (só aplica se não houver filtro de datas)
+    let matchesMonth = true;
+    if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
       if (jobDate && !isNaN(jobDate.getTime())) {
         if (monthFilter === 'current') {
           const now = new Date();
@@ -180,7 +202,7 @@ const Jobs = () => {
                         jobDate.getFullYear() === year;
         }
       } else {
-        matchesMonth = monthFilter === 'all'; // Se não tem data válida, só mostra se filtro for 'all'
+        matchesMonth = false;
       }
     }
     
