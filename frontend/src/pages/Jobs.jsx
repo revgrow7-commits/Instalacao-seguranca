@@ -92,7 +92,11 @@ const Jobs = () => {
                          job.client_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
-    return matchesSearch && matchesStatus && matchesBranch;
+    
+    // Não exibir jobs finalizados
+    const isFinalized = job.status === 'completed' || job.status === 'finalizado';
+    
+    return matchesSearch && matchesStatus && matchesBranch && !isFinalized;
   });
 
   if (loading) {
