@@ -20,10 +20,13 @@ const Jobs = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
   const [monthFilter, setMonthFilter] = useState('current'); // 'all', 'current', 'YYYY-MM'
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState(null);
+  const [markingNoInstall, setMarkingNoInstall] = useState(null);
 
   // Generate month options for the last 6 months
   const getMonthOptions = () => {
