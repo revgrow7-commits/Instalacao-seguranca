@@ -45,7 +45,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 # Holdprint API Keys
 HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
 HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-HOLDPRINT_API_URL = "https://api.holdworks.ai/api/v1/jobs"
+HOLDPRINT_API_URL = "https://holdprintwebapi-prod.azurewebsites.net/api-key/jobs/data"
 
 # Google OAuth Config
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
@@ -716,7 +716,7 @@ async def fetch_holdprint_jobs(branch: str):
     if not api_key:
         raise HTTPException(status_code=500, detail=f"API key not configured for branch {branch}")
     
-    headers = {"x-system-key": api_key}
+    headers = {"x-api-key": api_key}
     
     # Período fixo: 1 a 7 de Janeiro de 2026
     start_date_str = "2026-01-01"
