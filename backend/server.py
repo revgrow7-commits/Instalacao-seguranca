@@ -710,7 +710,7 @@ def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimens
         return base64_string
 
 async def fetch_holdprint_jobs(branch: str):
-    """Fetch jobs from Holdprint API - últimos 7 dias, excluindo finalizados"""
+    """Fetch jobs from Holdprint API - últimos 30 dias, excluindo finalizados"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
@@ -718,9 +718,9 @@ async def fetch_holdprint_jobs(branch: str):
     
     headers = {"x-api-key": api_key}
     
-    # Calcular datas: últimos 7 dias
+    # Calcular datas: últimos 30 dias
     end_date = datetime.now(timezone.utc)
-    start_date = end_date - timedelta(days=7)
+    start_date = end_date - timedelta(days=30)
     
     # Formatar datas no padrão YYYY-MM-DD
     start_date_str = start_date.strftime("%Y-%m-%d")
@@ -750,7 +750,7 @@ async def fetch_holdprint_jobs(branch: str):
         # Filtrar jobs NÃO finalizados (isFinalized = false ou não existe)
         filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
         
-        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} não finalizados (últimos 7 dias: {start_date_str} a {end_date_str})")
+        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} não finalizados (últimos 30 dias: {start_date_str} a {end_date_str})")
         
         return filtered_jobs
     except requests.RequestException as e:
