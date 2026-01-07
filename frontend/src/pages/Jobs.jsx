@@ -128,16 +128,24 @@ const Jobs = () => {
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
     
-    // Filtro de mês baseado na data de criação ou agendamento
+    // Filtro de mês baseado na data (prioridade: scheduled_date > holdprint_data.deliveryNeeded > created_at)
     let matchesMonth = true;
     if (monthFilter !== 'all') {
-      const jobDate = job.scheduled_date 
-        ? new Date(job.scheduled_date) 
-        : job.created_at 
-          ? new Date(job.created_at)
-          : null;
+      // Tenta pegar a melhor data disponível
+      let dateString = job.scheduled_date;
+      if (!dateString && job.holdprint_data?.deliveryNeeded) {
+        dateString = job.holdprint_data.deliveryNeeded;
+      }
+      if (!dateString && job.holdprint_data?.creationTime) {
+        dateString = job.holdprint_data.creationTime;
+      }
+      if (!dateString) {
+        dateString = job.created_at;
+      }
       
-      if (jobDate) {
+      const jobDate = dateString ? new Date(dateString) : null;
+      
+      if (jobDate && !isNaN(jobDate.getTime())) {
         if (monthFilter === 'current') {
           const now = new Date();
           matchesMonth = jobDate.getMonth() === now.getMonth() && 
@@ -148,7 +156,7 @@ const Jobs = () => {
                         jobDate.getFullYear() === year;
         }
       } else {
-        matchesMonth = monthFilter === 'all'; // Se não tem data, só mostra se filtro for 'all'
+        matchesMonth = monthFilter === 'all'; // Se não tem data válida, só mostra se filtro for 'all'
       }
     }
     
