@@ -19,10 +19,26 @@ const Jobs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
+  const [monthFilter, setMonthFilter] = useState('current'); // 'all', 'current', 'YYYY-MM'
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
   const [deletingJobId, setDeletingJobId] = useState(null);
+
+  // Generate month options for the last 6 months
+  const getMonthOptions = () => {
+    const options = [];
+    const now = new Date();
+    for (let i = 0; i < 6; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+    }
+    return options;
+  };
+
+  const monthOptions = getMonthOptions();
 
   useEffect(() => {
     loadJobs();
