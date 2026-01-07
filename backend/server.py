@@ -45,7 +45,7 @@ ACCESS_TOKEN_EXPIRE_DAYS = 7
 # Holdprint API Keys
 HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
 HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
+HOLDPRINT_API_URL = "https://api.holdworks.ai/api/v1/jobs"
 
 # Google OAuth Config
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
