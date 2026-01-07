@@ -232,7 +232,6 @@ const Jobs = () => {
                 <SelectItem value="aguardando">🟡 AGUARDANDO</SelectItem>
                 <SelectItem value="instalando">🔵 INSTALANDO</SelectItem>
                 <SelectItem value="pausado">🟠 PAUSADO</SelectItem>
-                <SelectItem value="finalizado">🟢 FINALIZADO</SelectItem>
                 <SelectItem value="atrasado">🔴 ATRASADO</SelectItem>
               </SelectContent>
             </Select>
