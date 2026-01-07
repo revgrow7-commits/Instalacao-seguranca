@@ -558,29 +558,52 @@ const Jobs = () => {
                   </div>
                 )}
 
-                {/* Delete Button - Only for Admin/Manager */}
+                {/* Action Buttons - Only for Admin/Manager */}
                 {(isAdmin || isManager) && (
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteJob(job.id, job.title);
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2 border-red-500/50 text-red-500 hover:bg-red-500/10"
-                    disabled={deletingJobId === job.id}
-                  >
-                    {deletingJobId === job.id ? (
-                      <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full mr-2" />
-                    ) : (
-                      <Trash2 className="h-4 w-4 mr-2" />
-                    )}
-                    Excluir Job
-                  </Button>
+                  <div className="flex gap-2 mt-2">
+                    {/* No Installation Button */}
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMarkNoInstallation(job.id, job.title);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
+                      disabled={markingNoInstall === job.id}
+                    >
+                      {markingNoInstall === job.id ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full mr-2" />
+                      ) : (
+                        <Ban className="h-4 w-4 mr-2" />
+                      )}
+                      Sem Instalação
+                    </Button>
+
+                    {/* Delete Button */}
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteJob(job.id, job.title);
+                      }}
+                      variant="outline"
+                      size="sm"
+                      className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10"
+                      disabled={deletingJobId === job.id}
+                    >
+                      {deletingJobId === job.id ? (
+                        <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full mr-2" />
+                      ) : (
+                        <Trash2 className="h-4 w-4 mr-2" />
+                      )}
+                      Excluir
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>
