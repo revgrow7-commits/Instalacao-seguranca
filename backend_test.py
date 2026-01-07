@@ -1263,6 +1263,242 @@ class FieldworkAPITest:
             
         return True
 
+    def test_holdprint_fetch_poa_jobs(self):
+        """Test 21: Fetch POA jobs from Holdprint API"""
+        self.log("Testing Holdprint API - Fetch POA jobs...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/holdprint/jobs/POA",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Holdprint POA jobs fetch failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Holdprint POA jobs fetch successful")
+        
+        # Verify response structure
+        if "success" in data and "jobs" in data:
+            success = data["success"]
+            jobs = data["jobs"]
+            
+            self.log(f"   Success: {success}")
+            self.log(f"   Jobs found: {len(jobs)}")
+            
+            if jobs:
+                # Verify job structure
+                first_job = jobs[0]
+                required_fields = ["id", "title", "customerName"]
+                
+                for field in required_fields:
+                    if field in first_job:
+                        self.log(f"   ✅ Job has required field '{field}': {first_job.get(field)}")
+                    else:
+                        self.log(f"   ❌ Job missing required field: {field}")
+                        return False
+                        
+                # Check for production status if available
+                if "production" in first_job and "status" in first_job["production"]:
+                    self.log(f"   ✅ Production status available: {first_job['production']['status']}")
+                else:
+                    self.log(f"   ⚠️  Production status not found in job structure")
+                    
+            else:
+                self.log(f"   ⚠️  No jobs returned from POA branch")
+                
+        else:
+            self.log(f"   ❌ Invalid response structure: {data}")
+            return False
+            
+        return True
+
+    def test_holdprint_fetch_sp_jobs(self):
+        """Test 22: Fetch SP jobs from Holdprint API"""
+        self.log("Testing Holdprint API - Fetch SP jobs...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/holdprint/jobs/SP",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Holdprint SP jobs fetch failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Holdprint SP jobs fetch successful")
+        
+        # Verify response structure
+        if "success" in data and "jobs" in data:
+            success = data["success"]
+            jobs = data["jobs"]
+            
+            self.log(f"   Success: {success}")
+            self.log(f"   Jobs found: {len(jobs)}")
+            
+            if jobs:
+                # Verify job structure
+                first_job = jobs[0]
+                required_fields = ["id", "title", "customerName"]
+                
+                for field in required_fields:
+                    if field in first_job:
+                        self.log(f"   ✅ Job has required field '{field}': {first_job.get(field)}")
+                    else:
+                        self.log(f"   ❌ Job missing required field: {field}")
+                        return False
+                        
+                # Check for production status if available
+                if "production" in first_job and "status" in first_job["production"]:
+                    self.log(f"   ✅ Production status available: {first_job['production']['status']}")
+                else:
+                    self.log(f"   ⚠️  Production status not found in job structure")
+                    
+            else:
+                self.log(f"   ⚠️  No jobs returned from SP branch")
+                
+        else:
+            self.log(f"   ❌ Invalid response structure: {data}")
+            return False
+            
+        return True
+
+    def test_holdprint_batch_import_poa(self):
+        """Test 23: Batch import POA jobs from Holdprint"""
+        self.log("Testing Holdprint API - Batch import POA jobs...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # Use the correct endpoint based on the backend code
+        import_data = {
+            "branch": "POA"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/jobs/import-all",
+            json=import_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Holdprint POA batch import failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Holdprint POA batch import successful")
+        
+        # Verify response structure
+        expected_fields = ["success", "imported", "skipped", "total"]
+        for field in expected_fields:
+            if field in data:
+                self.log(f"   ✅ {field}: {data[field]}")
+            else:
+                self.log(f"   ❌ Missing field in response: {field}")
+                return False
+                
+        # Check for errors
+        if "errors" in data:
+            errors = data["errors"]
+            if errors:
+                self.log(f"   ⚠️  Import errors: {len(errors)}")
+                for error in errors[:3]:  # Show first 3 errors
+                    self.log(f"      - {error}")
+            else:
+                self.log(f"   ✅ No import errors")
+                
+        # Verify import results make sense
+        imported = data.get("imported", 0)
+        skipped = data.get("skipped", 0)
+        total = data.get("total", 0)
+        
+        if imported + skipped == total:
+            self.log(f"   ✅ Import counts are consistent: {imported} imported + {skipped} skipped = {total} total")
+        else:
+            self.log(f"   ⚠️  Import counts inconsistent: {imported} + {skipped} ≠ {total}")
+            
+        return True
+
+    def test_holdprint_batch_import_sp(self):
+        """Test 24: Batch import SP jobs from Holdprint"""
+        self.log("Testing Holdprint API - Batch import SP jobs...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # Use the correct endpoint based on the backend code
+        import_data = {
+            "branch": "SP"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/jobs/import-all",
+            json=import_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Holdprint SP batch import failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Holdprint SP batch import successful")
+        
+        # Verify response structure
+        expected_fields = ["success", "imported", "skipped", "total"]
+        for field in expected_fields:
+            if field in data:
+                self.log(f"   ✅ {field}: {data[field]}")
+            else:
+                self.log(f"   ❌ Missing field in response: {field}")
+                return False
+                
+        # Check for errors
+        if "errors" in data:
+            errors = data["errors"]
+            if errors:
+                self.log(f"   ⚠️  Import errors: {len(errors)}")
+                for error in errors[:3]:  # Show first 3 errors
+                    self.log(f"      - {error}")
+            else:
+                self.log(f"   ✅ No import errors")
+                
+        # Verify import results make sense
+        imported = data.get("imported", 0)
+        skipped = data.get("skipped", 0)
+        total = data.get("total", 0)
+        
+        if imported + skipped == total:
+            self.log(f"   ✅ Import counts are consistent: {imported} imported + {skipped} skipped = {total} total")
+        else:
+            self.log(f"   ⚠️  Import counts inconsistent: {imported} + {skipped} ≠ {total}")
+            
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
