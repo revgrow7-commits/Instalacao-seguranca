@@ -716,7 +716,7 @@ async def fetch_holdprint_jobs(branch: str):
     if not api_key:
         raise HTTPException(status_code=500, detail=f"API key not configured for branch {branch}")
     
-    headers = {"x-api-key": api_key}
+    headers = {"x-system-key": api_key}
     
     # Período fixo: 1 a 7 de Janeiro de 2026
     start_date_str = "2026-01-01"
