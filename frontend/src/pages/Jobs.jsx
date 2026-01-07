@@ -188,11 +188,16 @@ const Jobs = () => {
                     className="bg-primary hover:bg-primary/90"
                   >
                     {loadingHoldprint ? (
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      <>
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                        Importando Jobs...
+                      </>
                     ) : (
-                      <Search className="mr-2 h-4 w-4" />
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Buscar e Importar Jobs
+                      </>
                     )}
-                    Buscar Jobs
                   </Button>
                 </div>
 
