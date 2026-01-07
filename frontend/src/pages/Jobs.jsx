@@ -60,8 +60,41 @@ const Jobs = () => {
     setLoadingHoldprint(true);
     try {
       const response = await api.getHoldprintJobs(selectedBranch);
-      setHoldprintJobs(response.data.jobs || []);
-      toast.success(`${response.data.jobs?.length || 0} jobs encontrados em ${selectedBranch}`);
+      const holdprintJobsList = response.data.jobs || [];
+      setHoldprintJobs(holdprintJobsList);
+      
+      // Importar automaticamente todos os jobs
+      if (holdprintJobsList.length > 0) {
+        let imported = 0;
+        let skipped = 0;
+        
+        for (const job of holdprintJobsList) {
+          try {
+            await api.createJob({
+              holdprint_job_id: job.id.toString(),
+              branch: selectedBranch
+            });
+            imported++;
+          } catch (error) {
+            // Job já existe, apenas pula
+            skipped++;
+          }
+        }
+        
+        if (imported > 0) {
+          toast.success(`${imported} job(s) importado(s) com sucesso!`);
+          loadJobs(); // Recarregar lista de jobs
+        }
+        if (skipped > 0 && imported === 0) {
+          toast.info(`Todos os ${skipped} jobs já estavam importados`);
+        } else if (skipped > 0) {
+          toast.info(`${skipped} job(s) já existiam`);
+        }
+        
+        setShowImportDialog(false);
+      } else {
+        toast.info('Nenhum job encontrado para importar');
+      }
     } catch (error) {
       toast.error('Erro ao buscar jobs da Holdprint');
     } finally {
