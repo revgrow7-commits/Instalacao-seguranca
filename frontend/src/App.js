@@ -12,8 +12,7 @@ import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Users from './pages/Users';
 import Calendar from './pages/Calendar';
-import CheckIn from './pages/CheckIn';
-import CheckOut from './pages/CheckOut';
+// Removed obsolete imports: CheckIn, CheckOut (replaced by InstallerJobDetail item-based flow)
 import CheckinViewer from './pages/CheckinViewer';
 import Checkins from './pages/Checkins';
 import Reports from './pages/Reports';
@@ -142,22 +141,8 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/checkin/:jobId"
-        element={
-          <ProtectedRoute>
-            <CheckIn />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/checkout/:checkinId"
-        element={
-          <ProtectedRoute>
-            <CheckOut />
-          </ProtectedRoute>
-        }
-      />
+      {/* Removed obsolete routes: /checkin/:jobId and /checkout/:checkinId
+          These were replaced by the item-based check-in/out flow in InstallerJobDetail */}
       <Route
         path="/checkin-viewer/:checkinId"
         element={
