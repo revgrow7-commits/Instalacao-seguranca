@@ -59,44 +59,30 @@ const Jobs = () => {
   const loadHoldprintJobs = async () => {
     setLoadingHoldprint(true);
     try {
-      const response = await api.getHoldprintJobs(selectedBranch);
-      const holdprintJobsList = response.data.jobs || [];
-      setHoldprintJobs(holdprintJobsList);
+      // Usar o endpoint de importação em lote
+      const response = await api.importAllJobs(selectedBranch);
       
-      // Importar automaticamente todos os jobs
-      if (holdprintJobsList.length > 0) {
-        let imported = 0;
-        let skipped = 0;
-        
-        for (const job of holdprintJobsList) {
-          try {
-            await api.createJob({
-              holdprint_job_id: job.id.toString(),
-              branch: selectedBranch
-            });
-            imported++;
-          } catch (error) {
-            // Job já existe, apenas pula
-            skipped++;
-          }
-        }
-        
-        if (imported > 0) {
-          toast.success(`${imported} job(s) importado(s) com sucesso!`);
-          loadJobs(); // Recarregar lista de jobs
-        }
-        if (skipped > 0 && imported === 0) {
-          toast.info(`Todos os ${skipped} jobs já estavam importados`);
-        } else if (skipped > 0) {
-          toast.info(`${skipped} job(s) já existiam`);
-        }
-        
-        setShowImportDialog(false);
-      } else {
+      const { imported, skipped, total } = response.data;
+      
+      if (imported > 0) {
+        toast.success(`${imported} job(s) importado(s) com sucesso!`);
+        loadJobs(); // Recarregar lista de jobs
+      }
+      
+      if (skipped > 0 && imported === 0) {
+        toast.info(`Todos os ${skipped} jobs já estavam importados`);
+      } else if (skipped > 0) {
+        toast.info(`${skipped} job(s) já existiam`);
+      }
+      
+      if (imported === 0 && skipped === 0) {
         toast.info('Nenhum job encontrado para importar');
       }
+      
+      setShowImportDialog(false);
     } catch (error) {
-      toast.error('Erro ao buscar jobs da Holdprint');
+      toast.error('Erro ao importar jobs da Holdprint');
+      console.error(error);
     } finally {
       setLoadingHoldprint(false);
     }
