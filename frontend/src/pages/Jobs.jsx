@@ -128,10 +128,34 @@ const Jobs = () => {
     const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
     const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
     
+    // Filtro de mês baseado na data de criação ou agendamento
+    let matchesMonth = true;
+    if (monthFilter !== 'all') {
+      const jobDate = job.scheduled_date 
+        ? new Date(job.scheduled_date) 
+        : job.created_at 
+          ? new Date(job.created_at)
+          : null;
+      
+      if (jobDate) {
+        if (monthFilter === 'current') {
+          const now = new Date();
+          matchesMonth = jobDate.getMonth() === now.getMonth() && 
+                        jobDate.getFullYear() === now.getFullYear();
+        } else {
+          const [year, month] = monthFilter.split('-').map(Number);
+          matchesMonth = jobDate.getMonth() === month - 1 && 
+                        jobDate.getFullYear() === year;
+        }
+      } else {
+        matchesMonth = monthFilter === 'all'; // Se não tem data, só mostra se filtro for 'all'
+      }
+    }
+    
     // Não exibir jobs finalizados
     const isFinalized = job.status === 'completed' || job.status === 'finalizado';
     
-    return matchesSearch && matchesStatus && matchesBranch && !isFinalized;
+    return matchesSearch && matchesStatus && matchesBranch && matchesMonth && !isFinalized;
   });
 
   if (loading) {
