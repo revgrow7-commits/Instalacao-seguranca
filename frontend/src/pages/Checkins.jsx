@@ -31,20 +31,21 @@ const Checkins = () => {
   const loadData = async () => {
     try {
       const [checkinsRes, jobsRes, installersRes] = await Promise.all([
-        api.getCheckins(),
+        api.getAllItemCheckins(), // Changed to get item_checkins instead of old checkins
         api.getJobs(),
         api.getInstallers()
       ]);
       
       // Sort by most recent
       const sortedCheckins = checkinsRes.data.sort((a, b) => 
-        new Date(b.checkin_at) - new Date(a.checkin_at)
+        new Date(b.checkin_at || b.started_at) - new Date(a.checkin_at || a.started_at)
       );
       
       setCheckins(sortedCheckins);
       setJobs(jobsRes.data);
       setInstallers(installersRes.data);
     } catch (error) {
+      console.error('Error loading checkins:', error);
       toast.error('Erro ao carregar check-ins');
     } finally {
       setLoading(false);
