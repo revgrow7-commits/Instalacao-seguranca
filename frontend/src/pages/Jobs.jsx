@@ -467,17 +467,34 @@ const Jobs = () => {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => (
+          {filteredJobs.map((job) => {
+            // Get job number from holdprint_data or code
+            const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
+            // Get start date
+            const startDate = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime;
+            const formattedStartDate = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : null;
+            
+            return (
             <Card
               key={job.id}
-              onClick={() => navigate(`/jobs/${job.id}`)}
-              className="bg-card border-white/5 hover:border-primary/50 transition-colors cursor-pointer"
+              className="bg-card border-white/5 hover:border-primary/50 transition-colors"
               data-testid={`job-card-${job.id}`}
             >
-              <CardHeader>
+              <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg text-white line-clamp-2">
+                    {/* Job Number */}
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
+                        <Hash className="h-3 w-3" />
+                        {jobNumber}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{job.branch || 'N/A'}</span>
+                    </div>
+                    <CardTitle 
+                      className="text-lg text-white line-clamp-2 cursor-pointer hover:text-primary transition-colors"
+                      onClick={() => navigate(`/jobs/${job.id}`)}
+                    >
                       {job.title}
                     </CardTitle>
                   </div>
@@ -509,6 +526,14 @@ const Jobs = () => {
                   <Users className="h-4 w-4 mr-2" />
                   {job.holdprint_data?.customerName || job.client_name}
                 </div>
+
+                {/* Start Date */}
+                {formattedStartDate && (
+                  <div className="flex items-center text-sm text-muted-foreground">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <span>Início: <span className="text-white font-medium">{formattedStartDate}</span></span>
+                  </div>
+                )}
 
                 {job.client_address && (
                   <div className="flex items-start text-sm text-muted-foreground">
