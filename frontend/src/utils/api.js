@@ -28,6 +28,7 @@ export const api = {
   updateInstaller: (installerId, data) => axios.put(`${API_URL}/installers/${installerId}`, data, { headers: getAuthHeader() }),
 
   // Holdprint & Jobs
+  importAllJobs: (branch) => axios.post(`${API_URL}/jobs/import-all`, { branch }, { headers: getAuthHeader() }),
   getHoldprintJobs: (branch) => axios.get(`${API_URL}/holdprint/jobs/${branch}`, { headers: getAuthHeader() }),
   createJob: (data) => axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() }),
   getJobs: () => axios.get(`${API_URL}/jobs`, { headers: getAuthHeader() }),
