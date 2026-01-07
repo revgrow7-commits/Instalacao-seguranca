@@ -7,7 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, Download, Trash2 } from 'lucide-react';
+import { Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, Download, Trash2, Ban, Hash } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Jobs = () => {
