@@ -75,6 +75,27 @@ const Jobs = () => {
     }
   };
 
+  const handleMarkNoInstallation = async (jobId, jobTitle) => {
+    if (!window.confirm(`Marcar o job "${jobTitle}" como SEM INSTALAÇÃO?\n\nO status será alterado para "finalizado" e não aparecerá mais na lista.`)) {
+      return;
+    }
+    
+    try {
+      setMarkingNoInstall(jobId);
+      await api.updateJob(jobId, { 
+        status: 'finalizado',
+        no_installation: true,
+        notes: 'Job marcado como sem instalação'
+      });
+      toast.success('Job marcado como sem instalação');
+      loadJobs();
+    } catch (error) {
+      toast.error('Erro ao marcar job');
+    } finally {
+      setMarkingNoInstall(null);
+    }
+  };
+
   const loadHoldprintJobs = async () => {
     setLoadingHoldprint(true);
     try {
