@@ -346,10 +346,19 @@ const Jobs = () => {
           <CardContent className="py-12 text-center">
             <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              {searchTerm || statusFilter !== 'all' || branchFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || branchFilter !== 'all' || monthFilter !== 'all'
                 ? 'Nenhum job encontrado com os filtros aplicados'
                 : 'Nenhum job importado ainda. Importe jobs da Holdprint para começar.'}
             </p>
+            {monthFilter === 'current' && jobs.length > 0 && (
+              <Button 
+                variant="link" 
+                className="mt-2 text-primary"
+                onClick={() => setMonthFilter('all')}
+              >
+                Ver todos os meses
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
