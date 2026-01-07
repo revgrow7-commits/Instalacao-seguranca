@@ -311,6 +311,22 @@ const Jobs = () => {
               </SelectContent>
             </Select>
 
+            <Select value={monthFilter} onValueChange={setMonthFilter}>
+              <SelectTrigger className="w-full md:w-48 bg-white/5 border-white/10 text-white">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-white/10">
+                <SelectItem value="current">📅 Mês Atual</SelectItem>
+                <SelectItem value="all">📋 Todos os Meses</SelectItem>
+                {monthOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Button
               variant="outline"
               onClick={loadJobs}
