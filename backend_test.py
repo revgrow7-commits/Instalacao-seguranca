@@ -14,7 +14,7 @@ from io import BytesIO
 import os
 
 # Test configuration
-BASE_URL = "https://instalmonitor.preview.emergentagent.com/api"
+BASE_URL = "https://job-progress-1.preview.emergentagent.com/api"
 
 # Test credentials
 INSTALLER_CREDENTIALS = {
