@@ -326,7 +326,8 @@ const Jobs = () => {
 
       {/* Filters */}
       <Card className="bg-card border-white/5">
-        <CardContent className="p-4">
+        <CardContent className="p-4 space-y-4">
+          {/* First row - Search and main filters */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
@@ -342,7 +343,7 @@ const Jobs = () => {
             </div>
 
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-48 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="w-full md:w-40 bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
@@ -355,29 +356,13 @@ const Jobs = () => {
             </Select>
 
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="w-full md:w-48 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="w-full md:w-40 bg-white/5 border-white/10 text-white">
                 <SelectValue placeholder="Filial" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
                 <SelectItem value="all">Todas as Filiais</SelectItem>
                 <SelectItem value="SP">São Paulo</SelectItem>
                 <SelectItem value="POA">Porto Alegre</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <Select value={monthFilter} onValueChange={setMonthFilter}>
-              <SelectTrigger className="w-full md:w-48 bg-white/5 border-white/10 text-white">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="current">📅 Mês Atual</SelectItem>
-                <SelectItem value="all">📋 Todos os Meses</SelectItem>
-                {monthOptions.map(opt => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
               </SelectContent>
             </Select>
 
@@ -390,6 +375,71 @@ const Jobs = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
+          </div>
+
+          {/* Second row - Date filters */}
+          <div className="flex flex-col md:flex-row gap-4 items-end">
+            <div className="flex-1 md:flex-none">
+              <label className="text-xs text-muted-foreground mb-1 block">Data Início</label>
+              <Input
+                type="date"
+                value={startDateFilter}
+                onChange={(e) => {
+                  setStartDateFilter(e.target.value);
+                  if (e.target.value) setMonthFilter('all');
+                }}
+                className="w-full md:w-40 bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="flex-1 md:flex-none">
+              <label className="text-xs text-muted-foreground mb-1 block">Data Fim</label>
+              <Input
+                type="date"
+                value={endDateFilter}
+                onChange={(e) => {
+                  setEndDateFilter(e.target.value);
+                  if (e.target.value) setMonthFilter('all');
+                }}
+                className="w-full md:w-40 bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            
+            <Select value={monthFilter} onValueChange={(value) => {
+              setMonthFilter(value);
+              if (value !== 'all') {
+                setStartDateFilter('');
+                setEndDateFilter('');
+              }
+            }}>
+              <SelectTrigger className="w-full md:w-44 bg-white/5 border-white/10 text-white">
+                <Calendar className="h-4 w-4 mr-2" />
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-white/10">
+                <SelectItem value="current">📅 Mês Atual</SelectItem>
+                <SelectItem value="all">📋 Todos</SelectItem>
+                {monthOptions.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {(startDateFilter || endDateFilter) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setStartDateFilter('');
+                  setEndDateFilter('');
+                  setMonthFilter('current');
+                }}
+                className="text-muted-foreground hover:text-white"
+              >
+                Limpar datas
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
