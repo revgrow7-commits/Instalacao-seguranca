@@ -209,7 +209,7 @@ const Jobs = () => {
     // Não exibir jobs finalizados
     const isFinalized = job.status === 'completed' || job.status === 'finalizado';
     
-    return matchesSearch && matchesStatus && matchesBranch && matchesMonth && !isFinalized;
+    return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isFinalized;
   });
 
   if (loading) {
