@@ -2241,6 +2241,60 @@ async def complete_item_checkout(
     if checkin["status"] == "completed":
         raise HTTPException(status_code=400, detail="Item already checked out")
     
+    # ============ GPS DISTANCE VALIDATION ============
+    location_alert = None
+    auto_paused = False
+    distance_meters = 0
+    
+    checkin_lat = checkin.get("gps_lat")
+    checkin_long = checkin.get("gps_long")
+    
+    if checkin_lat and checkin_long and gps_lat and gps_long:
+        distance_meters = calculate_gps_distance(checkin_lat, checkin_long, gps_lat, gps_long)
+        
+        if distance_meters > MAX_CHECKOUT_DISTANCE_METERS:
+            # Log the location alert
+            location_log = {
+                "id": str(uuid.uuid4()),
+                "item_checkin_id": checkin_id,
+                "job_id": checkin.get("job_id"),
+                "installer_id": checkin.get("installer_id"),
+                "event_type": "location_alert",
+                "checkin_lat": checkin_lat,
+                "checkin_long": checkin_long,
+                "checkout_lat": gps_lat,
+                "checkout_long": gps_long,
+                "distance_meters": round(distance_meters, 2),
+                "max_allowed_meters": MAX_CHECKOUT_DISTANCE_METERS,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "action_taken": "auto_pause"
+            }
+            await db.location_alerts.insert_one(location_log)
+            
+            # Auto-pause the check-in if not already paused
+            if checkin["status"] != "paused":
+                pause_reason = f"Saiu do local sem justificar (distância: {round(distance_meters)}m)"
+                pause_log = {
+                    "id": str(uuid.uuid4()),
+                    "item_checkin_id": checkin_id,
+                    "reason": pause_reason,
+                    "start_time": datetime.now(timezone.utc).isoformat(),
+                    "end_time": datetime.now(timezone.utc).isoformat(),  # Immediately end since we're checking out
+                    "duration_minutes": 0,
+                    "auto_generated": True
+                }
+                await db.item_pause_logs.insert_one(pause_log)
+                auto_paused = True
+            
+            location_alert = {
+                "type": "location_exceeded",
+                "message": f"Checkout realizado a {round(distance_meters)}m do local do check-in (máximo: {MAX_CHECKOUT_DISTANCE_METERS}m)",
+                "distance_meters": round(distance_meters, 2),
+                "auto_paused": auto_paused
+            }
+            logging.warning(f"Location alert: Installer {checkin.get('installer_id')} checked out {round(distance_meters)}m from check-in location")
+    # ============ END GPS VALIDATION ============
+    
     # If currently paused, end the pause first
     if checkin["status"] == "paused":
         active_pause = await db.item_pause_logs.find_one({
