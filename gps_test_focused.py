@@ -13,9 +13,9 @@ from datetime import datetime
 BASE_URL = "https://installer-metrics.preview.emergentagent.com/api"
 
 # Test credentials
-MANAGER_CREDENTIALS = {
-    "email": "gerente@industriavisual.com",
-    "password": "gerente123"
+ADMIN_CREDENTIALS = {
+    "email": "admin@industriavisual.com",
+    "password": "admin123"
 }
 
 INSTALLER_CREDENTIALS = {
