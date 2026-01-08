@@ -158,26 +158,44 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
               )}
             </Button>
 
+            {/* Justify Button - Show when scheduled and late */}
+            {isScheduled && isLate && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onJustify(job);
+                }}
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 text-xs border-red-500/50 text-red-400 hover:bg-red-500/10"
+              >
+                <MessageSquareWarning className="h-3 w-3 mr-1" />
+                Justificar
+              </Button>
+            )}
+
             {/* Finalize Without Installation Button */}
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                onFinalize(job);
-              }}
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
-              disabled={isLoading === job.id}
-            >
-              {isLoading === job.id ? (
-                <div className="animate-spin h-3 w-3 border-2 border-orange-400 border-t-transparent rounded-full" />
-              ) : (
-                <>
-                  <Ban className="h-3 w-3 mr-1" />
-                  S/ Instalação
-                </>
-              )}
-            </Button>
+            {!isLate && (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFinalize(job);
+                }}
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                disabled={isLoading === job.id}
+              >
+                {isLoading === job.id ? (
+                  <div className="animate-spin h-3 w-3 border-2 border-orange-400 border-t-transparent rounded-full" />
+                ) : (
+                  <>
+                    <Ban className="h-3 w-3 mr-1" />
+                    S/ Instalação
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         )}
       </CardContent>
