@@ -17,11 +17,18 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      await api.forgotPassword(email);
-      setEmailSent(true);
-      toast.success('Email enviado com sucesso!');
+      const response = await api.forgotPassword(email);
+      const data = response.data;
+      
+      if (data.error_type === 'test_mode') {
+        // Email service is in test mode
+        toast.error('O serviço de email está em modo de teste. Entre em contato com o administrador.');
+      } else {
+        setEmailSent(true);
+        toast.success('Solicitação enviada com sucesso!');
+      }
     } catch (error) {
-      toast.error('Erro ao enviar email. Tente novamente.');
+      toast.error('Erro ao enviar solicitação. Tente novamente.');
     } finally {
       setLoading(false);
     }
