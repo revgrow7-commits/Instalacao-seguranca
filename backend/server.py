@@ -898,11 +898,19 @@ async def forgot_password(request: ForgotPasswordRequest):
         }
         await asyncio.to_thread(resend.Emails.send, params)
         logging.info(f"Password reset email sent to {request.email}")
+        return {"message": "Se o email existir, você receberá um link para redefinir sua senha.", "email_sent": True}
     except Exception as e:
-        logging.error(f"Failed to send password reset email: {str(e)}")
+        error_message = str(e)
+        logging.error(f"Failed to send password reset email: {error_message}")
+        # Check if it's a Resend test account limitation
+        if "testing emails" in error_message.lower() or "verify a domain" in error_message.lower():
+            return {
+                "message": "O serviço de email está em modo de teste. Entre em contato com o administrador para redefinir sua senha.",
+                "email_sent": False,
+                "error_type": "test_mode"
+            }
         # Still return success message to not reveal if email exists
-    
-    return {"message": "Se o email existir, você receberá um link para redefinir sua senha."}
+        return {"message": "Se o email existir, você receberá um link para redefinir sua senha.", "email_sent": False}
 
 @api_router.post("/auth/reset-password")
 async def reset_password(request: ResetPasswordRequest):
