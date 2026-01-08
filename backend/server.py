@@ -1907,20 +1907,28 @@ async def get_checkin_details(
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
+    # First try to find in old checkins collection
     checkin = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    
+    # If not found, try item_checkins collection
+    if not checkin:
+        checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
     
-    # Get installer info
-    installer = await db.installers.find_one({"id": checkin['installer_id']}, {"_id": 0})
+    # Get installer info - try both collections
+    installer = await db.installers.find_one({"id": checkin.get('installer_id')}, {"_id": 0})
+    if not installer:
+        installer = await db.users.find_one({"id": checkin.get('installer_id')}, {"_id": 0, "password_hash": 0})
     
     # Get job info
-    job = await db.jobs.find_one({"id": checkin['job_id']}, {"_id": 0})
+    job = await db.jobs.find_one({"id": checkin.get('job_id')}, {"_id": 0})
     
     return {
         "checkin": checkin,
-        "installer": installer,
-        "job": job
+        "installer": installer or {"full_name": checkin.get('installer_name', 'N/A'), "email": ""},
+        "job": job or {"title": checkin.get('job_title', 'N/A'), "client_name": ""}
     }
 
 @api_router.delete("/checkins/{checkin_id}")
