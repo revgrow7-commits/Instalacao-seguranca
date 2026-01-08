@@ -116,29 +116,88 @@ const InstallerJobDetail = () => {
   };
 
   const handleFileSelect = async (itemIndex, type) => {
+    // For mobile devices, use native file input with camera capture
+    // This bypasses getUserMedia permission issues
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    input.capture = 'environment';
+    
+    // Detect if mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+      // On mobile, use capture attribute to open camera directly
+      // 'environment' opens rear camera, 'user' opens front camera
+      input.setAttribute('capture', 'environment');
+    }
     
     input.onchange = async (e) => {
-      const file = e.target.files[0];
+      const file = e.target.files?.[0];
       if (file) {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-          const base64 = event.target.result;
+        try {
+          // Compress image before converting to base64
+          const compressedBase64 = await compressImage(file);
           
           if (type === 'checkin') {
-            await handleItemCheckin(itemIndex, base64);
+            await handleItemCheckin(itemIndex, compressedBase64);
           } else {
-            await handleItemCheckout(itemIndex, base64);
+            await handleItemCheckout(itemIndex, compressedBase64);
           }
-        };
-        reader.readAsDataURL(file);
+        } catch (error) {
+          console.error('Error processing image:', error);
+          toast.error('Erro ao processar imagem. Tente novamente.');
+        }
       }
     };
     
+    // Reset input to allow selecting same file again
+    input.value = '';
     input.click();
+  };
+
+  // Helper function to compress images
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1024;
+          const MAX_HEIGHT = 1024;
+          
+          let width = img.width;
+          let height = img.height;
+          
+          // Calculate new dimensions
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 with compression
+          const base64 = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(base64);
+        };
+        img.onerror = reject;
+        img.src = event.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleItemCheckin = async (itemIndex, photoBase64) => {
