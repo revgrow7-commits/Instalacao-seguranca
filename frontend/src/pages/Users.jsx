@@ -118,6 +118,21 @@ const Users = () => {
     setShowDeleteDialog(true);
   };
 
+  const handleToggleActive = async (user) => {
+    try {
+      await api.updateUser(user.id, { is_active: !user.is_active });
+      toast.success(user.is_active ? 'Usuário desativado!' : 'Usuário ativado!');
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao alterar status do usuário');
+    }
+  };
+
+  const filteredUsers = users.filter(user => 
+    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const resetForm = () => {
     setFormData({
       name: '',
