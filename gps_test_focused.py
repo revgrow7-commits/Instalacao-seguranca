@@ -465,7 +465,7 @@ class GPSLocationTest:
         self.log("=" * 60)
         
         tests = [
-            ("Manager Login", self.test_manager_login),
+            ("Admin Login", self.test_admin_login),
             ("Installer Login", self.test_installer_login),
             ("Location Alerts Endpoint (Initial)", self.test_location_alerts_endpoint_empty),
             ("GPS Distance Calculation Logic", self.test_gps_distance_calculation_verification),
