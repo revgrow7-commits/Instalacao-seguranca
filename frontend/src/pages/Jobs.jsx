@@ -69,7 +69,9 @@ const Jobs = () => {
       toast.success('Job excluído com sucesso');
       loadJobs();
     } catch (error) {
-      toast.error('Erro ao excluir job');
+      console.error('Error deleting job:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      toast.error(`Erro ao excluir job: ${errorMsg}`);
     } finally {
       setDeletingJobId(null);
     }
