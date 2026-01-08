@@ -110,6 +110,13 @@ const InstallerDashboard = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8" data-testid="installer-dashboard">
+      {/* Notification Permission Modal */}
+      <NotificationPermissionModal 
+        isOpen={showNotificationModal}
+        onClose={() => setShowNotificationModal(false)}
+        onComplete={handleNotificationComplete}
+      />
+      
       {/* Header */}
       <div>
         <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">
