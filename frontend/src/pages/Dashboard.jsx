@@ -54,6 +54,14 @@ const Dashboard = () => {
         } catch (e) {
           console.log('Could not load pending checkins:', e);
         }
+        
+        // Load location alerts
+        try {
+          const locationRes = await api.getLocationAlerts();
+          setLocationAlerts(locationRes.data || []);
+        } catch (e) {
+          console.log('Could not load location alerts:', e);
+        }
       }
     } catch (error) {
       toast.error('Erro ao carregar dados do dashboard');
