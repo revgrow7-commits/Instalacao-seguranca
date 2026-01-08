@@ -426,6 +426,34 @@ const Users = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {formData.role === 'installer' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-phone" className="text-white">Telefone</Label>
+                  <Input
+                    id="edit-phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    className="bg-white/5 border-white/10 text-white"
+                    placeholder="(51) 99999-9999"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="edit-branch" className="text-white">Filial</Label>
+                  <Select value={formData.branch} onValueChange={(value) => setFormData({ ...formData, branch: value })}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10">
+                      <SelectItem value="POA">Porto Alegre</SelectItem>
+                      <SelectItem value="SP">São Paulo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
 
           <DialogFooter className="mt-6">
