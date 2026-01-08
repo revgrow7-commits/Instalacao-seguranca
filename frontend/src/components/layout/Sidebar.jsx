@@ -38,27 +38,15 @@ const Sidebar = () => {
       roles: ['admin', 'manager']
     },
     {
-      name: 'Produtividade',
-      href: '/reports/productivity',
-      icon: BarChart3,
-      roles: ['admin', 'manager']
-    },
-    {
       name: 'Relatórios',
       href: '/reports',
-      icon: FileText,
+      icon: BarChart3,
       roles: ['admin', 'manager']
     },
     {
       name: 'Calendário',
       href: '/calendar',
       icon: Calendar,
-      roles: ['admin', 'manager']
-    },
-    {
-      name: 'Métricas',
-      href: '/metrics',
-      icon: BarChart3,
       roles: ['admin', 'manager']
     },
     {
