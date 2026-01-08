@@ -323,16 +323,17 @@ const Users = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Users List */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {users.map((user) => {
+        {filteredUsers.map((user) => {
           const installer = installers.find(i => i.user_id === user.id);
           return (
             <Card
               key={user.id}
-              className="bg-card border-white/5 hover:border-primary/50 transition-colors"
+              className={`bg-card border-white/5 hover:border-primary/50 transition-colors ${!user.is_active ? 'opacity-60' : ''}`}
               data-testid={`user-card-${user.id}`}
             >
               <CardHeader>
@@ -343,6 +344,14 @@ const Users = () => {
                       <CardTitle className="text-lg text-white">{user.name}</CardTitle>
                       <p className="text-sm text-muted-foreground mt-1">{user.email}</p>
                     </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">{user.is_active ? 'Ativo' : 'Inativo'}</span>
+                    <Switch
+                      checked={user.is_active !== false}
+                      onCheckedChange={() => handleToggleActive(user)}
+                      className="data-[state=checked]:bg-green-500"
+                    />
                   </div>
                 </div>
               </CardHeader>
