@@ -36,11 +36,12 @@ const JobCardSkeleton = () => (
 );
 
 // Mini Job Card Component for better performance
-const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, isAdmin, isManager, isLoading }) => {
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, isAdmin, isManager, isLoading }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
   const startDate = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime;
   const formattedStartDate = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : null;
   const isScheduled = !!job.scheduled_date;
+  const isLate = job.scheduled_date && new Date(job.scheduled_date) < new Date() && job.status !== 'completed' && job.status !== 'finalizado';
   
   const getStatusStyle = () => {
     switch (job.status) {
