@@ -1313,6 +1313,12 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     if "notes" in job_update:
         update_data["notes"] = job_update["notes"]
     
+    if "cancelled_at" in job_update:
+        update_data["cancelled_at"] = job_update["cancelled_at"]
+    
+    if "exclude_from_metrics" in job_update:
+        update_data["exclude_from_metrics"] = job_update["exclude_from_metrics"]
+    
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
