@@ -101,8 +101,8 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
           </div>
         </div>
         
-        {/* Actions */}
-        <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Actions - Always visible */}
+        <div className="flex gap-2 mt-3">
           <Button
             onClick={() => onView(checkin.id)}
             variant="outline"
@@ -117,6 +117,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
             variant="outline"
             size="sm"
             className="h-7 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+            title="Arquivar"
           >
             <Archive className="h-3 w-3" />
           </Button>
@@ -125,6 +126,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
             variant="outline"
             size="sm"
             className="h-7 text-xs border-red-500/50 text-red-400 hover:bg-red-500/10"
+            title="Excluir"
           >
             <Trash2 className="h-3 w-3" />
           </Button>
