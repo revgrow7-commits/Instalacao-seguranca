@@ -2418,8 +2418,14 @@ async def complete_item_checkout(
     if all_assigned_completed and len(assigned_item_indices) > 0:
         await db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
     
-    # Return updated checkin
+    # Return updated checkin with location alert if any
     result = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    
+    # Add location alert to response if distance exceeded
+    if location_alert:
+        result["location_alert"] = location_alert
+        result["checkout_distance_meters"] = round(distance_meters, 2)
+    
     return result
 
 
