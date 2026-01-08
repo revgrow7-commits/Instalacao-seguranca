@@ -143,6 +143,21 @@ export const api = {
   getGoogleCalendarEvents: () => axios.get(`${API_URL}/calendar/events`, { headers: getAuthHeader() }),
   createGoogleCalendarEvent: (data) => axios.post(`${API_URL}/calendar/events`, data, { headers: getAuthHeader() }),
   deleteGoogleCalendarEvent: (eventId) => axios.delete(`${API_URL}/calendar/events/${eventId}`, { headers: getAuthHeader() }),
+
+  // Push Notifications
+  getVapidPublicKey: () => axios.get(`${API_URL}/notifications/vapid-public-key`),
+  subscribeToNotifications: (subscription) => axios.post(`${API_URL}/notifications/subscribe`, subscription, { headers: getAuthHeader() }),
+  unsubscribeFromNotifications: () => axios.delete(`${API_URL}/notifications/unsubscribe`, { headers: getAuthHeader() }),
+  getNotificationStatus: () => axios.get(`${API_URL}/notifications/status`, { headers: getAuthHeader() }),
+  sendNotification: (data) => axios.post(`${API_URL}/notifications/send`, data, { headers: getAuthHeader() }),
+  checkScheduleConflicts: (installerId, date, time, excludeJobId = null) => {
+    let url = `${API_URL}/notifications/check-schedule-conflicts?installer_id=${installerId}&date=${date}&time=${time}`;
+    if (excludeJobId) url += `&exclude_job_id=${excludeJobId}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
+  getPendingCheckins: () => axios.get(`${API_URL}/notifications/pending-checkins`, { headers: getAuthHeader() }),
+  sendLateAlerts: () => axios.post(`${API_URL}/notifications/send-late-alerts`, {}, { headers: getAuthHeader() }),
+  notifyJobScheduled: (jobId) => axios.post(`${API_URL}/notifications/notify-job-scheduled?job_id=${jobId}`, {}, { headers: getAuthHeader() }),
 };
 
 export default api;
