@@ -42,7 +42,31 @@ const CheckinViewer = () => {
     );
   }
 
-  const { checkin, installer, job } = data;
+  // Check if data exists and has required fields
+  if (!data) {
+    return (
+      <div className="min-h-screen bg-background p-4 md:p-8">
+        <Button
+          variant="ghost"
+          onClick={() => navigate(-1)}
+          className="text-white hover:text-primary mb-4"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar
+        </Button>
+        <Card className="bg-card border-white/5">
+          <CardContent className="py-12 text-center">
+            <p className="text-muted-foreground">Check-in não encontrado</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Handle both old checkin format and new item_checkin format
+  const checkin = data.checkin || data;
+  const installer = data.installer || { full_name: data.installer_name || 'N/A', email: '' };
+  const job = data.job || { title: data.job_title || 'N/A', client_name: '' };
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8 space-y-6">
