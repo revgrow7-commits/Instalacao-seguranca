@@ -3754,7 +3754,11 @@ async def google_auth_status(current_user: User = Depends(get_current_user)):
     """Check if user has connected Google Calendar"""
     user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "google_tokens": 1, "google_email": 1})
     
-    has_google = user and user.get('google_tokens') and user['google_tokens'].get('access_token')
+    has_google = False
+    if user and user.get('google_tokens'):
+        tokens = user.get('google_tokens')
+        if isinstance(tokens, dict) and tokens.get('access_token'):
+            has_google = True
     
     return {
         "connected": has_google,
