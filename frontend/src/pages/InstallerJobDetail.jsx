@@ -253,7 +253,17 @@ const InstallerJobDetail = () => {
       formData.append('scenario_category', scenarioCategory);
       formData.append('notes', checkoutForm.notes);
 
-      await api.completeItemCheckout(checkin.id, formData);
+      const response = await api.completeItemCheckout(checkin.id, formData);
+      
+      // Check for location alert
+      if (response.data?.location_alert) {
+        const alert = response.data.location_alert;
+        toast.warning(
+          `⚠️ Alerta de Localização!\n${alert.message}\n\nUm registro foi criado automaticamente.`,
+          { duration: 8000 }
+        );
+      }
+      
       toast.success('Check-out do item realizado!');
       
       // Reset form
