@@ -8,7 +8,8 @@ import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../components/ui/alert-dialog';
-import { Users as UsersIcon, Plus, Edit, Trash2, UserPlus, Shield, Wrench } from 'lucide-react';
+import { Switch } from '../components/ui/switch';
+import { Users as UsersIcon, Plus, Edit, Trash2, UserPlus, Shield, Wrench, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Users = () => {
