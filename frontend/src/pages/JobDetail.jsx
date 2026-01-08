@@ -465,7 +465,7 @@ const JobDetail = () => {
                 <div>
                   <Label className="text-white mb-2 block">1. Selecione os Itens</Label>
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2">
-                    {(job?.products_with_area || job?.holdprint_data?.products || []).map((product, index) => {
+                    {getJobProducts().map((product, index) => {
                       const itemAssignment = getItemAssignment(index);
                       const isAssigned = !!itemAssignment;
                       
