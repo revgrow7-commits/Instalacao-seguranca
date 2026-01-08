@@ -15,11 +15,9 @@ import Calendar from './pages/Calendar';
 // Removed obsolete imports: CheckIn, CheckOut (replaced by InstallerJobDetail item-based flow)
 import CheckinViewer from './pages/CheckinViewer';
 import Checkins from './pages/Checkins';
-import Reports from './pages/Reports';
-import Metrics from './pages/Metrics';
+import UnifiedReports from './pages/UnifiedReports';
 import FamilyReport from './pages/FamilyReport';
 import InstallerReport from './pages/InstallerReport';
-import ProductivityReport from './pages/ProductivityReport';
 import Profile from './pages/Profile';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
