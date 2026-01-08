@@ -10,9 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { 
   Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, 
   Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
-  Clock, CheckCircle
+  Clock, CheckCircle, MessageSquareWarning, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
 
 // Skeleton loader for cards
 const JobCardSkeleton = () => (
