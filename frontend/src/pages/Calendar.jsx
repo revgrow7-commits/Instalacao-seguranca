@@ -220,8 +220,30 @@ const Calendar = () => {
     setDraggedJob(null);
   };
 
+  const checkConflicts = async (installerId, date) => {
+    if (!installerId || installerId === 'none') return null;
+    try {
+      const response = await api.checkScheduleConflicts(installerId, date, scheduleTime);
+      return response.data;
+    } catch (error) {
+      console.error('Error checking conflicts:', error);
+      return null;
+    }
+  };
+
   const handleScheduleJob = async () => {
     if (!selectedJob || !scheduleDate) return;
+    
+    // Check for conflicts if installer is selected
+    if (selectedInstaller && selectedInstaller !== 'none') {
+      const conflicts = await checkConflicts(selectedInstaller, scheduleDate);
+      if (conflicts && conflicts.has_conflict) {
+        const confirmSchedule = window.confirm(
+          `⚠️ Conflito de Horário!\n\n${conflicts.message}\n\nJobs conflitantes:\n${conflicts.conflicting_jobs.map(j => `- ${j.title}`).join('\n')}\n\nDeseja agendar mesmo assim?`
+        );
+        if (!confirmSchedule) return;
+      }
+    }
     
     setScheduling(true);
     try {
@@ -229,7 +251,7 @@ const Calendar = () => {
       
       const updateData = {
         scheduled_date: dateTime.toISOString(),
-        assigned_installers: selectedInstaller ? [selectedInstaller] : []
+        assigned_installers: selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : []
       };
       
       await api.updateJob(selectedJob.id, updateData);
@@ -241,6 +263,15 @@ const Calendar = () => {
           scheduled_date: dateTime.toISOString(),
           assigned_installers: updateData.assigned_installers
         }, true);
+      }
+      
+      // Send push notification to assigned installers
+      if (updateData.assigned_installers.length > 0) {
+        try {
+          await api.notifyJobScheduled(selectedJob.id);
+        } catch (e) {
+          console.log('Could not send push notification:', e);
+        }
       }
       
       toast.success('Job agendado com sucesso!');
