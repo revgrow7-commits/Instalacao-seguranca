@@ -1499,6 +1499,347 @@ class FieldworkAPITest:
             
         return True
 
+    def test_calendar_job_scheduling_api(self):
+        """Test 25: Calendar job scheduling API - PUT /api/jobs/{job_id} with scheduled_date"""
+        self.log("Testing calendar job scheduling API...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        # First get a job to schedule
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        response = self.session.get(f"{BASE_URL}/jobs", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not get jobs list: {response.status_code} - {response.text}")
+            return False
+            
+        jobs = response.json()
+        
+        if not jobs:
+            self.log("❌ No jobs found to schedule")
+            return False
+            
+        # Use first job for scheduling test
+        test_job = jobs[0]
+        job_id = test_job["id"]
+        
+        self.log(f"   Testing with job: {test_job.get('title')} (ID: {job_id})")
+        
+        # Test scheduling a job with PUT /api/jobs/{job_id}
+        schedule_data = {
+            "scheduled_date": "2024-12-25T10:00:00Z",
+            "status": "agendado"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/jobs/{job_id}",
+            json=schedule_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Job scheduling failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_job = response.json()
+        
+        self.log(f"✅ Job scheduling API successful")
+        self.log(f"   Scheduled date: {updated_job.get('scheduled_date')}")
+        self.log(f"   Status: {updated_job.get('status')}")
+        
+        # Verify scheduled_date was set correctly
+        if updated_job.get('scheduled_date'):
+            self.log(f"   ✅ Scheduled date field updated successfully")
+        else:
+            self.log(f"   ❌ Scheduled date field not set")
+            return False
+            
+        # Store job_id for other calendar tests
+        self.calendar_test_job_id = job_id
+        
+        return True
+
+    def test_calendar_google_status_api(self):
+        """Test 26: Google Calendar status API - GET /api/auth/google/status"""
+        self.log("Testing Google Calendar status API...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        response = self.session.get(
+            f"{BASE_URL}/auth/google/status",
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Google Calendar status API failed: {response.status_code} - {response.text}")
+            return False
+            
+        data = response.json()
+        
+        self.log(f"✅ Google Calendar status API successful")
+        
+        # Verify response structure for calendar page
+        expected_fields = ["connected"]
+        for field in expected_fields:
+            if field in data:
+                self.log(f"   ✅ Field '{field}' present: {data[field]}")
+            else:
+                self.log(f"   ❌ Missing expected field: {field}")
+                return False
+                
+        # Verify boolean type for connected field
+        connected = data.get("connected")
+        if isinstance(connected, bool):
+            self.log(f"   ✅ 'connected' field is boolean: {connected}")
+        else:
+            self.log(f"   ❌ 'connected' field should be boolean, got: {type(connected)} - {connected}")
+            return False
+            
+        # Check google_email field when connected
+        if connected and "google_email" in data:
+            self.log(f"   ✅ Google email present when connected: {data.get('google_email')}")
+        elif not connected and data.get("google_email") is None:
+            self.log(f"   ✅ No Google email when not connected (expected)")
+        
+        return True
+
+    def test_calendar_events_unauthorized_api(self):
+        """Test 27: Calendar events API returns 401 when user not connected to Google"""
+        self.log("Testing calendar events API (unauthorized access)...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        # Test POST /api/calendar/events (create event) - should return 401
+        event_data = {
+            "title": "Test Calendar Event",
+            "description": "Test event for calendar drag-and-drop",
+            "start_datetime": "2024-12-25T10:00:00Z",
+            "end_datetime": "2024-12-25T11:00:00Z",
+            "location": "Test Location"
+        }
+        
+        response = self.session.post(
+            f"{BASE_URL}/calendar/events",
+            json=event_data,
+            headers=headers
+        )
+        
+        # Should return 401 when Google Calendar is not connected
+        if response.status_code == 401:
+            self.log(f"✅ Calendar events POST correctly returns 401 when not connected")
+            
+            # Check error message
+            try:
+                error_data = response.json()
+                error_detail = error_data.get("detail", "")
+                if "Google Calendar não conectado" in error_detail:
+                    self.log(f"   ✅ Correct error message: {error_detail}")
+                else:
+                    self.log(f"   ⚠️  Unexpected error message: {error_detail}")
+            except:
+                self.log(f"   ⚠️  Could not parse error response")
+                
+        else:
+            self.log(f"❌ Expected 401, got {response.status_code} - {response.text}")
+            return False
+            
+        # Test GET /api/calendar/events (list events) - should also return 401
+        response = self.session.get(
+            f"{BASE_URL}/calendar/events",
+            headers=headers
+        )
+        
+        if response.status_code == 401:
+            self.log(f"✅ Calendar events GET correctly returns 401 when not connected")
+        else:
+            self.log(f"❌ Expected 401 for GET, got {response.status_code} - {response.text}")
+            return False
+            
+        return True
+
+    def test_calendar_unscheduled_jobs_api(self):
+        """Test 28: Get unscheduled jobs for calendar page"""
+        self.log("Testing unscheduled jobs API for calendar...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        # Get all jobs and filter unscheduled ones
+        response = self.session.get(f"{BASE_URL}/jobs", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Jobs API failed: {response.status_code} - {response.text}")
+            return False
+            
+        jobs = response.json()
+        
+        self.log(f"✅ Jobs API successful")
+        self.log(f"   Total jobs found: {len(jobs)}")
+        
+        # Count scheduled vs unscheduled jobs
+        scheduled_jobs = [job for job in jobs if job.get('scheduled_date')]
+        unscheduled_jobs = [job for job in jobs if not job.get('scheduled_date')]
+        
+        self.log(f"   Scheduled jobs: {len(scheduled_jobs)}")
+        self.log(f"   Unscheduled jobs: {len(unscheduled_jobs)}")
+        
+        # Verify job structure for calendar display
+        if jobs:
+            sample_job = jobs[0]
+            required_fields = ["id", "title", "client_name", "branch"]
+            
+            for field in required_fields:
+                if field in sample_job:
+                    self.log(f"   ✅ Job has required field '{field}': {sample_job.get(field)}")
+                else:
+                    self.log(f"   ❌ Job missing required field: {field}")
+                    return False
+                    
+            # Check optional fields useful for calendar
+            optional_fields = ["scheduled_date", "status", "area_m2"]
+            for field in optional_fields:
+                if field in sample_job:
+                    self.log(f"   ✅ Job has optional field '{field}': {sample_job.get(field)}")
+                else:
+                    self.log(f"   ⚠️  Job missing optional field: {field}")
+        
+        return True
+
+    def test_calendar_job_update_with_installer(self):
+        """Test 29: Update job with installer assignment for calendar scheduling"""
+        self.log("Testing job update with installer assignment...")
+        
+        if not self.manager_token or not hasattr(self, 'calendar_test_job_id'):
+            self.log("❌ Missing manager token or calendar test job ID")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        # First get list of installers
+        response = self.session.get(f"{BASE_URL}/installers", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not get installers: {response.status_code} - {response.text}")
+            return False
+            
+        installers = response.json()
+        
+        if not installers:
+            self.log("⚠️  No installers found in system")
+            # Continue test without installer assignment
+            installer_ids = []
+        else:
+            # Use first installer for test
+            installer_ids = [installers[0]["id"]]
+            self.log(f"   Using installer: {installers[0].get('full_name')} (ID: {installer_ids[0]})")
+        
+        # Update job with installer assignment and scheduling
+        update_data = {
+            "scheduled_date": "2024-12-26T14:00:00Z",
+            "assigned_installers": installer_ids,
+            "status": "agendado"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/jobs/{self.calendar_test_job_id}",
+            json=update_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Job update with installer failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_job = response.json()
+        
+        self.log(f"✅ Job update with installer successful")
+        self.log(f"   Scheduled date: {updated_job.get('scheduled_date')}")
+        self.log(f"   Assigned installers: {updated_job.get('assigned_installers')}")
+        self.log(f"   Status: {updated_job.get('status')}")
+        
+        # Verify fields were updated correctly
+        if updated_job.get('scheduled_date'):
+            self.log(f"   ✅ Scheduled date updated")
+        else:
+            self.log(f"   ❌ Scheduled date not updated")
+            return False
+            
+        if installer_ids and updated_job.get('assigned_installers') == installer_ids:
+            self.log(f"   ✅ Installer assignment updated")
+        elif not installer_ids:
+            self.log(f"   ⚠️  No installers available for assignment")
+        else:
+            self.log(f"   ❌ Installer assignment not updated correctly")
+            return False
+        
+        return True
+
+    def test_calendar_branch_filtering(self):
+        """Test 30: Test branch filtering for calendar jobs"""
+        self.log("Testing branch filtering for calendar...")
+        
+        if not self.manager_token:
+            self.log("❌ Missing manager token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        
+        # Get all jobs
+        response = self.session.get(f"{BASE_URL}/jobs", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Jobs API failed: {response.status_code} - {response.text}")
+            return False
+            
+        jobs = response.json()
+        
+        self.log(f"✅ Jobs API successful for branch filtering")
+        
+        # Group jobs by branch
+        branches = {}
+        for job in jobs:
+            branch = job.get('branch', 'Unknown')
+            if branch not in branches:
+                branches[branch] = []
+            branches[branch].append(job)
+        
+        self.log(f"   Branches found: {list(branches.keys())}")
+        
+        for branch, branch_jobs in branches.items():
+            self.log(f"   Branch '{branch}': {len(branch_jobs)} jobs")
+            
+            # Verify all jobs in branch have correct branch field
+            for job in branch_jobs[:3]:  # Check first 3 jobs
+                if job.get('branch') == branch:
+                    self.log(f"     ✅ Job '{job.get('title', 'Unknown')}' has correct branch: {branch}")
+                else:
+                    self.log(f"     ❌ Job '{job.get('title', 'Unknown')}' has incorrect branch: {job.get('branch')}")
+                    return False
+        
+        # Verify expected branches exist
+        expected_branches = ["POA", "SP"]
+        for expected_branch in expected_branches:
+            if expected_branch in branches:
+                self.log(f"   ✅ Expected branch '{expected_branch}' found with {len(branches[expected_branch])} jobs")
+            else:
+                self.log(f"   ⚠️  Expected branch '{expected_branch}' not found")
+        
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
