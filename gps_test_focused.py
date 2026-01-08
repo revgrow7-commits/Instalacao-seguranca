@@ -35,31 +35,31 @@ TEST_IMAGE_BASE64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mN
 
 class GPSLocationTest:
     def __init__(self):
-        self.manager_token = None
+        self.admin_token = None
         self.installer_token = None
         self.session = requests.Session()
         
     def log(self, message):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
         
-    def test_manager_login(self):
-        """Login as manager"""
-        self.log("Testing manager login...")
+    def test_admin_login(self):
+        """Login as admin"""
+        self.log("Testing admin login...")
         
         response = self.session.post(
             f"{BASE_URL}/auth/login",
-            json=MANAGER_CREDENTIALS
+            json=ADMIN_CREDENTIALS
         )
         
         if response.status_code != 200:
-            self.log(f"❌ Manager login failed: {response.status_code} - {response.text}")
+            self.log(f"❌ Admin login failed: {response.status_code} - {response.text}")
             return False
             
         data = response.json()
-        self.manager_token = data["access_token"]
+        self.admin_token = data["access_token"]
         user_info = data.get("user", {})
         
-        self.log(f"✅ Manager login successful")
+        self.log(f"✅ Admin login successful")
         self.log(f"   User: {user_info.get('name')} ({user_info.get('email')})")
         return True
 
