@@ -998,9 +998,9 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
     await require_role(current_user, [UserRole.ADMIN])
     
     # Update user
-    update_data = {k: v for k, v in user_data.items() if k not in ['id', 'created_at', 'password']}
+    update_data = {k: v for k, v in user_data.items() if k not in ['id', 'created_at', 'password', 'phone', 'branch']}
     
-    if 'password' in user_data:
+    if user_data.get('password'):
         update_data['password_hash'] = get_password_hash(user_data['password'])
     
     result = await db.users.find_one_and_update(
@@ -1012,6 +1012,22 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
     
     if not result:
         raise HTTPException(status_code=404, detail="User not found")
+    
+    # Update installer data if applicable
+    if user_data.get('role') == 'installer':
+        installer_update = {}
+        if 'phone' in user_data:
+            installer_update['phone'] = user_data['phone']
+        if 'branch' in user_data:
+            installer_update['branch'] = user_data['branch']
+        if 'name' in user_data:
+            installer_update['full_name'] = user_data['name']
+        
+        if installer_update:
+            await db.installers.update_one(
+                {"user_id": user_id},
+                {"$set": installer_update}
+            )
     
     if isinstance(result['created_at'], str):
         result['created_at'] = datetime.fromisoformat(result['created_at'])
