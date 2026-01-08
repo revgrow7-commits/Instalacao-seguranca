@@ -2576,7 +2576,7 @@ class FieldworkAPITest:
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
-        self.log("USERS PAGE ENHANCED FUNCTIONALITY - BACKEND API TEST SUITE")
+        self.log("GPS LOCATION VALIDATION & BACKEND API TEST SUITE")
         self.log("=" * 60)
         
         tests = [
