@@ -161,6 +161,9 @@ export const api = {
   
   // Location Alerts
   getLocationAlerts: () => axios.get(`${API_URL}/location-alerts`, { headers: getAuthHeader() }),
+  
+  // Job Justification
+  submitJobJustification: (jobId, data) => axios.post(`${API_URL}/jobs/${jobId}/justify`, data, { headers: getAuthHeader() }),
 };
 
 export default api;
