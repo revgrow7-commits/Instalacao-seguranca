@@ -16,15 +16,15 @@ Do not modify this section.
   ✅ Branch Filtering (Jobs properly grouped by POA/SP branches)
   ✅ Job Update with Installer Assignment (scheduled_date + assigned_installers)
 
-- **Test Scenarios** (Frontend - NOT TESTED):
-  1. Page loads correctly with calendar grid and unscheduled jobs list
-  2. Drag-and-drop job to a date opens schedule dialog
-  3. Schedule dialog has date, time, installer selection
-  4. Scheduling a job updates the calendar and shows success toast
-  5. Google Calendar integration button shows correct status (connected/disconnected)
-  6. List view toggle works correctly
-  7. Month navigation works correctly
-  8. Filter by branch works correctly
+- **Test Scenarios** (Frontend - TESTED):
+  1. ✅ Page loads correctly with calendar grid and unscheduled jobs list
+  2. ❌ Drag-and-drop job to a date opens schedule dialog (ISSUE: Dialog not opening)
+  3. ⚠️ Schedule dialog has date, time, installer selection (Cannot test due to #2)
+  4. ⚠️ Scheduling a job updates the calendar and shows success toast (Cannot test due to #2)
+  5. ✅ Google Calendar integration button shows correct status (connected/disconnected)
+  6. ✅ List view toggle works correctly
+  7. ✅ Month navigation works correctly
+  8. ⚠️ Filter by branch works correctly (Branch filter visible but not tested)
 
 ### Backend API Status
 - **Job Scheduling**: ✅ WORKING - PUT /api/jobs/{job_id} correctly updates scheduled_date field
