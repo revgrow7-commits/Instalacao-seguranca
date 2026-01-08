@@ -427,11 +427,11 @@ class GPSLocationTest:
         """Test 7: Dashboard endpoints should work correctly"""
         self.log("Testing dashboard endpoints...")
         
-        if not self.manager_token:
-            self.log("❌ Missing manager token")
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
             return False
             
-        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
         
         # Test the main endpoints the dashboard would use
         endpoints_to_test = [
