@@ -712,12 +712,12 @@ const Calendar = () => {
             
             <div>
               <label className="text-sm text-muted-foreground mb-1 block">Instalador</label>
-              <Select value={selectedInstaller} onValueChange={setSelectedInstaller}>
+              <Select value={selectedInstaller || 'none'} onValueChange={(val) => setSelectedInstaller(val === 'none' ? '' : val)}>
                 <SelectTrigger className="bg-white/5 border-white/10 text-white">
                   <SelectValue placeholder="Selecione um instalador" />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-white/10">
-                  <SelectItem value="">Nenhum (definir depois)</SelectItem>
+                  <SelectItem value="none">Nenhum (definir depois)</SelectItem>
                   {installers.map(inst => (
                     <SelectItem key={inst.id} value={inst.id}>
                       {inst.full_name}
