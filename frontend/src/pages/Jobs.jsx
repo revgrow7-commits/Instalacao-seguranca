@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -6,30 +6,206 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../components/ui/dialog';
-import { Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, Download, Trash2, Ban, Hash } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { 
+  Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, 
+  Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
+  Clock, CheckCircle
+} from 'lucide-react';
 import { toast } from 'sonner';
+
+// Skeleton loader for cards
+const JobCardSkeleton = () => (
+  <Card className="bg-card border-white/5 animate-pulse">
+    <CardHeader className="pb-2">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="h-5 bg-white/10 rounded w-16"></div>
+        <div className="h-4 bg-white/10 rounded w-10"></div>
+      </div>
+      <div className="h-6 bg-white/10 rounded w-3/4"></div>
+    </CardHeader>
+    <CardContent className="space-y-3">
+      <div className="h-4 bg-white/10 rounded w-full"></div>
+      <div className="h-4 bg-white/10 rounded w-2/3"></div>
+      <div className="flex gap-2 mt-2">
+        <div className="h-8 bg-white/10 rounded flex-1"></div>
+        <div className="h-8 bg-white/10 rounded flex-1"></div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// Mini Job Card Component for better performance
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, isAdmin, isManager, isLoading }) => {
+  const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
+  const startDate = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime;
+  const formattedStartDate = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : null;
+  const isScheduled = !!job.scheduled_date;
+  
+  const getStatusStyle = () => {
+    switch (job.status) {
+      case 'completed':
+      case 'finalizado':
+        return 'bg-green-500/20 text-green-400 border-green-500/30';
+      case 'in_progress':
+      case 'instalando':
+        return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+      case 'pausado':
+        return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'atrasado':
+        return 'bg-red-500/20 text-red-400 border-red-500/30';
+      default:
+        return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
+    }
+  };
+
+  const getStatusLabel = () => {
+    switch (job.status) {
+      case 'completed':
+      case 'finalizado':
+        return 'FINALIZADO';
+      case 'in_progress':
+      case 'instalando':
+        return 'INSTALANDO';
+      case 'pausado':
+        return 'PAUSADO';
+      case 'atrasado':
+        return 'ATRASADO';
+      default:
+        return 'AGUARDANDO';
+    }
+  };
+
+  return (
+    <Card className="bg-card border-white/5 hover:border-primary/30 transition-all duration-200 group">
+      <CardContent className="p-4">
+        {/* Header Row */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
+              <Hash className="h-3 w-3" />
+              {jobNumber}
+            </span>
+            <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">
+              {job.branch || 'N/A'}
+            </span>
+          </div>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getStatusStyle()}`}>
+            {getStatusLabel()}
+          </span>
+        </div>
+
+        {/* Title - Clickable */}
+        <h3 
+          onClick={() => onNavigate(job.id)}
+          className="text-sm font-medium text-white line-clamp-2 mb-2 cursor-pointer hover:text-primary transition-colors"
+        >
+          {job.title}
+        </h3>
+
+        {/* Client */}
+        <div className="flex items-center text-xs text-muted-foreground mb-2">
+          <Users className="h-3 w-3 mr-1.5 flex-shrink-0" />
+          <span className="truncate">{job.holdprint_data?.customerName || job.client_name}</span>
+        </div>
+
+        {/* Date Row */}
+        <div className="flex items-center gap-3 text-xs mb-3">
+          {formattedStartDate && (
+            <div className="flex items-center text-muted-foreground">
+              <Clock className="h-3 w-3 mr-1" />
+              {formattedStartDate}
+            </div>
+          )}
+          {isScheduled && (
+            <div className="flex items-center text-green-400">
+              <CalendarCheck className="h-3 w-3 mr-1" />
+              Agendado
+            </div>
+          )}
+        </div>
+
+        {/* Action Buttons */}
+        {(isAdmin || isManager) && (
+          <div className="flex gap-2 pt-2 border-t border-white/5">
+            {/* Schedule Button */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onSchedule(job);
+              }}
+              variant="outline"
+              size="sm"
+              className={`flex-1 h-8 text-xs ${
+                isScheduled 
+                  ? 'border-green-500/50 text-green-400 hover:bg-green-500/10' 
+                  : 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10'
+              }`}
+            >
+              {isScheduled ? (
+                <>
+                  <CalendarCheck className="h-3 w-3 mr-1" />
+                  Agendado
+                </>
+              ) : (
+                <>
+                  <CalendarPlus className="h-3 w-3 mr-1" />
+                  Agendar
+                </>
+              )}
+            </Button>
+
+            {/* Finalize Without Installation Button */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onFinalize(job);
+              }}
+              variant="outline"
+              size="sm"
+              className="flex-1 h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+              disabled={isLoading === job.id}
+            >
+              {isLoading === job.id ? (
+                <div className="animate-spin h-3 w-3 border-2 border-orange-400 border-t-transparent rounded-full" />
+              ) : (
+                <>
+                  <Ban className="h-3 w-3 mr-1" />
+                  S/ Instalação
+                </>
+              )}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+});
+
+JobCard.displayName = 'JobCard';
 
 const Jobs = () => {
   const { user, isAdmin, isManager } = useAuth();
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
-  const [holdprintJobs, setHoldprintJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
-  const [monthFilter, setMonthFilter] = useState('current'); // 'all', 'current', 'YYYY-MM'
+  const [monthFilter, setMonthFilter] = useState('current');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
-  const [deletingJobId, setDeletingJobId] = useState(null);
-  const [markingNoInstall, setMarkingNoInstall] = useState(null);
+  const [processingJobId, setProcessingJobId] = useState(null);
+  const [visibleCount, setVisibleCount] = useState(12);
+  const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [scheduleDate, setScheduleDate] = useState('');
 
-  // Generate month options for the last 6 months
-  const getMonthOptions = () => {
+  // Generate month options
+  const monthOptions = useMemo(() => {
     const options = [];
     const now = new Date();
     for (let i = 0; i < 6; i++) {
@@ -39,15 +215,14 @@ const Jobs = () => {
       options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
     }
     return options;
-  };
-
-  const monthOptions = getMonthOptions();
+  }, []);
 
   useEffect(() => {
     loadJobs();
   }, []);
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
+    setLoading(true);
     try {
       const response = await api.getJobs();
       setJobs(response.data);
@@ -56,61 +231,17 @@ const Jobs = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDeleteJob = async (jobId, jobTitle) => {
-    if (!window.confirm(`Tem certeza que deseja excluir o job "${jobTitle}"?\n\nIsso também excluirá todos os check-ins relacionados. Esta ação não pode ser desfeita.`)) {
-      return;
-    }
-    
-    try {
-      setDeletingJobId(jobId);
-      await api.deleteJob(jobId);
-      toast.success('Job excluído com sucesso');
-      loadJobs();
-    } catch (error) {
-      console.error('Error deleting job:', error);
-      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
-      toast.error(`Erro ao excluir job: ${errorMsg}`);
-    } finally {
-      setDeletingJobId(null);
-    }
-  };
-
-  const handleMarkNoInstallation = async (jobId, jobTitle) => {
-    if (!window.confirm(`Marcar o job "${jobTitle}" como SEM INSTALAÇÃO?\n\nO status será alterado para "finalizado" e não aparecerá mais na lista.`)) {
-      return;
-    }
-    
-    try {
-      setMarkingNoInstall(jobId);
-      await api.updateJob(jobId, { 
-        status: 'finalizado',
-        no_installation: true,
-        notes: 'Job marcado como sem instalação'
-      });
-      toast.success('Job marcado como sem instalação');
-      loadJobs();
-    } catch (error) {
-      console.error('Error marking job:', error);
-      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
-      toast.error(`Erro ao marcar job: ${errorMsg}`);
-    } finally {
-      setMarkingNoInstall(null);
-    }
-  };
+  }, []);
 
   const loadHoldprintJobs = async () => {
     setLoadingHoldprint(true);
     try {
-      // Usar o endpoint de importação em lote
       const response = await api.importAllJobs(selectedBranch);
-      
-      const { imported, skipped, total } = response.data;
+      const { imported, skipped } = response.data;
       
       if (imported > 0) {
         toast.success(`${imported} job(s) importado(s) com sucesso!`);
-        loadJobs(); // Recarregar lista de jobs
+        loadJobs();
       }
       
       if (skipped > 0 && imported === 0) {
@@ -125,242 +256,276 @@ const Jobs = () => {
       
       setShowImportDialog(false);
     } catch (error) {
-      toast.error('Erro ao importar jobs da Holdprint');
-      console.error(error);
+      console.error('Error importing jobs:', error);
+      toast.error('Erro ao importar jobs');
     } finally {
       setLoadingHoldprint(false);
     }
   };
 
-  const importJob = async (holdprintJob) => {
+  const handleFinalizeNoInstallation = async (job) => {
+    const confirmed = window.confirm(
+      `Finalizar "${job.title}" como SEM INSTALAÇÃO?\n\n` +
+      `⚠️ Este job será:\n` +
+      `• Marcado como "cancelado"\n` +
+      `• Removido das métricas\n` +
+      `• Não aparecerá mais na lista\n\n` +
+      `Esta ação não pode ser desfeita.`
+    );
+    
+    if (!confirmed) return;
+    
     try {
-      await api.createJob({
-        holdprint_job_id: holdprintJob.id.toString(),
-        branch: selectedBranch
+      setProcessingJobId(job.id);
+      await api.updateJob(job.id, { 
+        status: 'cancelado',
+        no_installation: true,
+        cancelled_at: new Date().toISOString(),
+        exclude_from_metrics: true,
+        notes: 'Job finalizado sem instalação - dados excluídos das métricas'
       });
-      toast.success('Job importado com sucesso!');
-      loadJobs();
-      setShowImportDialog(false);
+      toast.success('Job finalizado sem instalação');
+      setJobs(prev => prev.filter(j => j.id !== job.id));
     } catch (error) {
-      if (error.response?.status === 400) {
-        toast.error('Job já foi importado');
-      } else {
-        toast.error('Erro ao importar job');
-      }
+      console.error('Error finalizing job:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      toast.error(`Erro: ${errorMsg}`);
+    } finally {
+      setProcessingJobId(null);
     }
   };
 
-  const filteredJobs = jobs.filter(job => {
-    const matchesSearch = job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         job.client_name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
-    const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
+  const handleOpenScheduleDialog = (job) => {
+    setSelectedJob(job);
+    setScheduleDate(job.scheduled_date ? job.scheduled_date.split('T')[0] : '');
+    setShowScheduleDialog(true);
+  };
+
+  const handleScheduleJob = async () => {
+    if (!selectedJob) return;
     
-    // Obter a data do job para filtros
-    const getJobDate = () => {
-      let dateString = job.scheduled_date;
-      if (!dateString && job.holdprint_data?.deliveryNeeded) {
-        dateString = job.holdprint_data.deliveryNeeded;
-      }
-      if (!dateString && job.holdprint_data?.creationTime) {
-        dateString = job.holdprint_data.creationTime;
-      }
-      if (!dateString) {
-        dateString = job.created_at;
-      }
-      return dateString ? new Date(dateString) : null;
-    };
-    
-    const jobDate = getJobDate();
-    
-    // Filtro de intervalo de datas (tem prioridade sobre filtro de mês)
-    let matchesDateRange = true;
-    if (startDateFilter || endDateFilter) {
-      if (jobDate && !isNaN(jobDate.getTime())) {
-        if (startDateFilter) {
-          const startDate = new Date(startDateFilter);
-          startDate.setHours(0, 0, 0, 0);
-          if (jobDate < startDate) matchesDateRange = false;
-        }
-        if (endDateFilter) {
-          const endDate = new Date(endDateFilter);
-          endDate.setHours(23, 59, 59, 999);
-          if (jobDate > endDate) matchesDateRange = false;
-        }
-      } else {
-        matchesDateRange = false; // Se não tem data válida, não mostra no filtro de datas
-      }
+    try {
+      setProcessingJobId(selectedJob.id);
+      await api.updateJob(selectedJob.id, { 
+        scheduled_date: scheduleDate ? new Date(scheduleDate).toISOString() : null
+      });
+      
+      toast.success(scheduleDate ? 'Job agendado com sucesso!' : 'Agendamento removido');
+      
+      setJobs(prev => prev.map(j => 
+        j.id === selectedJob.id 
+          ? { ...j, scheduled_date: scheduleDate ? new Date(scheduleDate).toISOString() : null }
+          : j
+      ));
+      
+      setShowScheduleDialog(false);
+      setSelectedJob(null);
+      setScheduleDate('');
+    } catch (error) {
+      console.error('Error scheduling job:', error);
+      toast.error('Erro ao agendar job');
+    } finally {
+      setProcessingJobId(null);
     }
-    
-    // Filtro de mês (só aplica se não houver filtro de datas)
-    let matchesMonth = true;
-    if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
-      if (jobDate && !isNaN(jobDate.getTime())) {
-        if (monthFilter === 'current') {
-          const now = new Date();
-          matchesMonth = jobDate.getMonth() === now.getMonth() && 
-                        jobDate.getFullYear() === now.getFullYear();
+  };
+
+  // Memoized filtered jobs
+  const filteredJobs = useMemo(() => {
+    return jobs.filter(job => {
+      const matchesSearch = !searchTerm || 
+        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (job.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+      const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
+      
+      // Get job date
+      const getJobDate = () => {
+        const dateString = job.scheduled_date || 
+          job.holdprint_data?.deliveryNeeded || 
+          job.holdprint_data?.creationTime || 
+          job.created_at;
+        return dateString ? new Date(dateString) : null;
+      };
+      
+      const jobDate = getJobDate();
+      
+      // Date range filter
+      let matchesDateRange = true;
+      if (startDateFilter || endDateFilter) {
+        if (jobDate && !isNaN(jobDate.getTime())) {
+          if (startDateFilter) {
+            const startDate = new Date(startDateFilter);
+            startDate.setHours(0, 0, 0, 0);
+            if (jobDate < startDate) matchesDateRange = false;
+          }
+          if (endDateFilter) {
+            const endDate = new Date(endDateFilter);
+            endDate.setHours(23, 59, 59, 999);
+            if (jobDate > endDate) matchesDateRange = false;
+          }
         } else {
-          const [year, month] = monthFilter.split('-').map(Number);
-          matchesMonth = jobDate.getMonth() === month - 1 && 
-                        jobDate.getFullYear() === year;
+          matchesDateRange = false;
         }
-      } else {
-        matchesMonth = false;
       }
-    }
-    
-    // Não exibir jobs finalizados
-    const isFinalized = job.status === 'completed' || job.status === 'finalizado';
-    
-    return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isFinalized;
-  });
+      
+      // Month filter
+      let matchesMonth = true;
+      if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
+        if (jobDate && !isNaN(jobDate.getTime())) {
+          if (monthFilter === 'current') {
+            const now = new Date();
+            matchesMonth = jobDate.getMonth() === now.getMonth() && 
+                          jobDate.getFullYear() === now.getFullYear();
+          } else {
+            const [year, month] = monthFilter.split('-').map(Number);
+            matchesMonth = jobDate.getMonth() === month - 1 && 
+                          jobDate.getFullYear() === year;
+          }
+        } else {
+          matchesMonth = false;
+        }
+      }
+      
+      // Hide finalized/cancelled jobs
+      const isHidden = ['completed', 'finalizado', 'cancelado'].includes(job.status);
+      
+      return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
+    });
+  }, [jobs, searchTerm, statusFilter, branchFilter, startDateFilter, endDateFilter, monthFilter]);
+
+  const loadMore = () => setVisibleCount(prev => prev + 12);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="loading-pulse text-primary text-2xl font-heading">Carregando...</div>
+      <div className="p-4 md:p-8 space-y-6">
+        <div className="h-10 bg-white/10 rounded w-48 animate-pulse"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {[...Array(8)].map((_, i) => <JobCardSkeleton key={i} />)}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6" data-testid="jobs-page">
+    <div className="p-4 md:p-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-4xl font-heading font-bold text-white tracking-tight">Jobs</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-3xl font-heading font-bold text-white tracking-tight">
+            Jobs
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
             {filteredJobs.length} job(s) encontrado(s)
           </p>
         </div>
 
         {(isAdmin || isManager) && (
-          <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-            <DialogTrigger asChild>
-              <Button
-                className="bg-primary hover:bg-primary/90 neon-glow"
-                data-testid="import-jobs-button"
-              >
-                <Download className="mr-2 h-5 w-5" />
-                Importar da Holdprint
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto bg-card border-white/10">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-heading text-white">Importar Jobs da Holdprint</DialogTitle>
-                <DialogDescription className="text-muted-foreground">
-                  Selecione a filial e busque os jobs disponíveis
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 mt-4">
-                <div className="flex gap-4">
-                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-white/10">
-                      <SelectItem value="SP">São Paulo</SelectItem>
-                      <SelectItem value="POA">Porto Alegre</SelectItem>
-                    </SelectContent>
-                  </Select>
-
-                  <Button
-                    onClick={loadHoldprintJobs}
-                    disabled={loadingHoldprint}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    {loadingHoldprint ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Importando Jobs...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        Buscar e Importar Jobs
-                      </>
-                    )}
-                  </Button>
-                </div>
-
-                {holdprintJobs.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">
-                      {holdprintJobs.length} jobs encontrados em {selectedBranch}
-                    </p>
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {holdprintJobs.map((job) => (
-                        <Card
-                          key={job.id}
-                          className="bg-card/50 border-white/5 hover:border-primary/50 transition-colors"
-                        >
-                          <CardContent className="p-4">
-                            <div className="flex items-start justify-between gap-4">
-                              <div className="flex-1">
-                                <h3 className="text-white font-semibold">{job.title}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">
-                                  Cliente: {job.customerName || 'N/A'}
-                                </p>
-                                <p className="text-xs text-muted-foreground mt-1">
-                                  Código: {job.code}
-                                </p>
-                              </div>
-                              <Button
-                                size="sm"
-                                onClick={() => importJob(job)}
-                                className="bg-primary hover:bg-primary/90"
-                              >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Importar
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+          <div className="flex gap-2">
+            <Button
+              onClick={loadJobs}
+              variant="outline"
+              size="sm"
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Atualizar
+            </Button>
+            <Button
+              onClick={() => setShowImportDialog(true)}
+              className="bg-primary hover:bg-primary/90"
+              size="sm"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Importar Holdprint
+            </Button>
+          </div>
         )}
+      </div>
+
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-primary/20">
+              <Briefcase className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">{filteredJobs.length}</p>
+              <p className="text-[10px] text-muted-foreground">Total</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-yellow-500/20">
+              <Clock className="h-4 w-4 text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">
+                {filteredJobs.filter(j => j.status === 'aguardando' || j.status === 'pending').length}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Aguardando</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-blue-500/20">
+              <Users className="h-4 w-4 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">
+                {filteredJobs.filter(j => j.status === 'instalando' || j.status === 'in_progress').length}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Instalando</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-green-500/20">
+              <CalendarCheck className="h-4 w-4 text-green-400" />
+            </div>
+            <div>
+              <p className="text-xl font-bold text-white">
+                {filteredJobs.filter(j => j.scheduled_date).length}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Agendados</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters */}
       <Card className="bg-card border-white/5">
         <CardContent className="p-4 space-y-4">
-          {/* First row - Search and main filters */}
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por título ou cliente..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 bg-white/5 border-white/10 text-white"
-                  data-testid="search-input"
-                />
-              </div>
+          {/* First row */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por título ou cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-white/5 border-white/10 text-white h-9"
+              />
             </div>
-
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-40 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="aguardando">🟡 AGUARDANDO</SelectItem>
-                <SelectItem value="instalando">🔵 INSTALANDO</SelectItem>
-                <SelectItem value="pausado">🟠 PAUSADO</SelectItem>
-                <SelectItem value="atrasado">🔴 ATRASADO</SelectItem>
+                <SelectItem value="aguardando">🟡 Aguardando</SelectItem>
+                <SelectItem value="instalando">🔵 Instalando</SelectItem>
+                <SelectItem value="pausado">🟠 Pausado</SelectItem>
+                <SelectItem value="atrasado">🔴 Atrasado</SelectItem>
               </SelectContent>
             </Select>
-
             <Select value={branchFilter} onValueChange={setBranchFilter}>
-              <SelectTrigger className="w-full md:w-40 bg-white/5 border-white/10 text-white">
+              <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
                 <SelectValue placeholder="Filial" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
@@ -369,22 +534,12 @@ const Jobs = () => {
                 <SelectItem value="POA">Porto Alegre</SelectItem>
               </SelectContent>
             </Select>
-
-            <Button
-              variant="outline"
-              onClick={loadJobs}
-              className="border-primary/50 text-primary hover:bg-primary/10"
-              data-testid="refresh-button"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Atualizar
-            </Button>
           </div>
 
           {/* Second row - Date filters */}
-          <div className="flex flex-col md:flex-row gap-4 items-end">
-            <div className="flex-1 md:flex-none">
-              <label className="text-xs text-muted-foreground mb-1 block">Data Início</label>
+          <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Data Início</label>
               <Input
                 type="date"
                 value={startDateFilter}
@@ -392,11 +547,11 @@ const Jobs = () => {
                   setStartDateFilter(e.target.value);
                   if (e.target.value) setMonthFilter('all');
                 }}
-                className="w-full md:w-40 bg-white/5 border-white/10 text-white"
+                className="w-36 bg-white/5 border-white/10 text-white h-9"
               />
             </div>
-            <div className="flex-1 md:flex-none">
-              <label className="text-xs text-muted-foreground mb-1 block">Data Fim</label>
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Data Fim</label>
               <Input
                 type="date"
                 value={endDateFilter}
@@ -404,10 +559,9 @@ const Jobs = () => {
                   setEndDateFilter(e.target.value);
                   if (e.target.value) setMonthFilter('all');
                 }}
-                className="w-full md:w-40 bg-white/5 border-white/10 text-white"
+                className="w-36 bg-white/5 border-white/10 text-white h-9"
               />
             </div>
-            
             <Select value={monthFilter} onValueChange={(value) => {
               setMonthFilter(value);
               if (value !== 'all') {
@@ -415,8 +569,8 @@ const Jobs = () => {
                 setEndDateFilter('');
               }
             }}>
-              <SelectTrigger className="w-full md:w-44 bg-white/5 border-white/10 text-white">
-                <Calendar className="h-4 w-4 mr-2" />
+              <SelectTrigger className="w-40 bg-white/5 border-white/10 text-white h-9">
+                <Calendar className="h-3 w-3 mr-2" />
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
@@ -429,7 +583,6 @@ const Jobs = () => {
                 ))}
               </SelectContent>
             </Select>
-
             {(startDateFilter || endDateFilter) && (
               <Button
                 variant="ghost"
@@ -439,7 +592,7 @@ const Jobs = () => {
                   setEndDateFilter('');
                   setMonthFilter('current');
                 }}
-                className="text-muted-foreground hover:text-white"
+                className="text-muted-foreground hover:text-white h-9"
               >
                 Limpar datas
               </Button>
@@ -448,7 +601,7 @@ const Jobs = () => {
         </CardContent>
       </Card>
 
-      {/* Jobs List */}
+      {/* Jobs Grid */}
       {filteredJobs.length === 0 ? (
         <Card className="bg-card border-white/5">
           <CardContent className="py-12 text-center">
@@ -470,146 +623,128 @@ const Jobs = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredJobs.map((job) => {
-            // Get job number from holdprint_data or code
-            const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
-            // Get start date
-            const startDate = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime;
-            const formattedStartDate = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : null;
-            
-            return (
-            <Card
-              key={job.id}
-              className="bg-card border-white/5 hover:border-primary/50 transition-colors"
-              data-testid={`job-card-${job.id}`}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    {/* Job Number */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
-                        <Hash className="h-3 w-3" />
-                        {jobNumber}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{job.branch || 'N/A'}</span>
-                    </div>
-                    <CardTitle 
-                      className="text-lg text-white line-clamp-2 cursor-pointer hover:text-primary transition-colors"
-                      onClick={() => navigate(`/jobs/${job.id}`)}
-                    >
-                      {job.title}
-                    </CardTitle>
-                  </div>
-                  <span
-                    className={
-                      `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider whitespace-nowrap border ${
-                        job.status === 'completed' || job.status === 'finalizado'
-                          ? 'bg-green-500/20 text-green-500 border-green-500/20'
-                          : job.status === 'in_progress' || job.status === 'instalando'
-                          ? 'bg-blue-500/20 text-blue-500 border-blue-500/20'
-                          : job.status === 'pausado'
-                          ? 'bg-orange-500/20 text-orange-500 border-orange-500/20'
-                          : job.status === 'atrasado'
-                          ? 'bg-red-500/20 text-red-500 border-red-500/20'
-                          : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'
-                      }`
-                    }
-                  >
-                    {job.status === 'completed' || job.status === 'finalizado' ? 'FINALIZADO' : 
-                     job.status === 'in_progress' || job.status === 'instalando' ? 'INSTALANDO' :
-                     job.status === 'pausado' ? 'PAUSADO' :
-                     job.status === 'atrasado' ? 'ATRASADO' :
-                     job.status === 'pending' || job.status === 'aguardando' ? 'AGUARDANDO' : job.status?.toUpperCase()}
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center text-sm text-muted-foreground">
-                  <Users className="h-4 w-4 mr-2" />
-                  {job.holdprint_data?.customerName || job.client_name}
-                </div>
-
-                {/* Start Date */}
-                {formattedStartDate && (
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    <span>Início: <span className="text-white font-medium">{formattedStartDate}</span></span>
-                  </div>
-                )}
-
-                {job.client_address && (
-                  <div className="flex items-start text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4 mr-2 mt-0.5 flex-shrink-0" />
-                    <span className="line-clamp-2">{job.client_address}</span>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                  <span className="text-xs text-muted-foreground">Filial: {job.branch}</span>
-                  {job.assigned_installers?.length > 0 && (
-                    <span className="text-xs text-primary font-medium">
-                      {job.assigned_installers.length} instalador(es)
-                    </span>
-                  )}
-                </div>
-
-                {job.scheduled_date && (
-                  <div className="flex items-center text-xs text-primary">
-                    <Calendar className="h-3 w-3 mr-1" />
-                    Agendado: {new Date(job.scheduled_date).toLocaleDateString('pt-BR')}
-                  </div>
-                )}
-
-                {/* Action Buttons - Only for Admin/Manager */}
-                {(isAdmin || isManager) && (
-                  <div className="flex gap-2 mt-2">
-                    {/* No Installation Button */}
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleMarkNoInstallation(job.id, job.title);
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-orange-500/50 text-orange-500 hover:bg-orange-500/10"
-                      disabled={markingNoInstall === job.id}
-                    >
-                      {markingNoInstall === job.id ? (
-                        <div className="animate-spin h-4 w-4 border-2 border-orange-500 border-t-transparent rounded-full mr-2" />
-                      ) : (
-                        <Ban className="h-4 w-4 mr-2" />
-                      )}
-                      Sem Instalação
-                    </Button>
-
-                    {/* Delete Button */}
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteJob(job.id, job.title);
-                      }}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 border-red-500/50 text-red-500 hover:bg-red-500/10"
-                      disabled={deletingJobId === job.id}
-                    >
-                      {deletingJobId === job.id ? (
-                        <div className="animate-spin h-4 w-4 border-2 border-red-500 border-t-transparent rounded-full mr-2" />
-                      ) : (
-                        <Trash2 className="h-4 w-4 mr-2" />
-                      )}
-                      Excluir
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          );
-          })}
-        </div>
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredJobs.slice(0, visibleCount).map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onNavigate={(id) => navigate(`/jobs/${id}`)}
+                onFinalize={handleFinalizeNoInstallation}
+                onSchedule={handleOpenScheduleDialog}
+                isAdmin={isAdmin}
+                isManager={isManager}
+                isLoading={processingJobId}
+              />
+            ))}
+          </div>
+          
+          {/* Load More */}
+          {visibleCount < filteredJobs.length && (
+            <div className="flex justify-center mt-6">
+              <Button
+                onClick={loadMore}
+                variant="outline"
+                className="border-white/20 text-white hover:bg-white/5"
+              >
+                <ChevronDown className="h-4 w-4 mr-2" />
+                Carregar mais ({filteredJobs.length - visibleCount} restantes)
+              </Button>
+            </div>
+          )}
+        </>
       )}
+
+      {/* Import Dialog */}
+      <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Importar Jobs da Holdprint</DialogTitle>
+            <DialogDescription>
+              Selecione a filial para buscar e importar os jobs automaticamente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+              <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                <SelectValue placeholder="Selecione a filial" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-white/10">
+                <SelectItem value="SP">São Paulo</SelectItem>
+                <SelectItem value="POA">Porto Alegre</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={loadHoldprintJobs}
+              disabled={loadingHoldprint}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              {loadingHoldprint ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Importando...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Buscar e Importar Jobs
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Schedule Dialog */}
+      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white">Agendar Job</DialogTitle>
+            <DialogDescription>
+              {selectedJob?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">Data de Agendamento</label>
+              <Input
+                type="date"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={handleScheduleJob}
+                disabled={processingJobId === selectedJob?.id}
+                className="flex-1 bg-primary hover:bg-primary/90"
+              >
+                {processingJobId === selectedJob?.id ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                ) : scheduleDate ? (
+                  <>
+                    <CalendarCheck className="h-4 w-4 mr-2" />
+                    Confirmar Agendamento
+                  </>
+                ) : (
+                  <>
+                    <Ban className="h-4 w-4 mr-2" />
+                    Remover Agendamento
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowScheduleDialog(false)}
+                className="border-white/20 text-white hover:bg-white/5"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
