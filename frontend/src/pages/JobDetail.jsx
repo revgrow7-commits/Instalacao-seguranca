@@ -506,7 +506,7 @@ const JobDetail = () => {
                     <p className="text-sm text-green-400 mt-2">
                       {selectedItems.length} item(s) selecionado(s) - Total: {
                         selectedItems.reduce((acc, idx) => {
-                          const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                          const products = getJobProducts();
                           return acc + (products[idx]?.total_area_m2 || 0);
                         }, 0).toFixed(2)
                       } m²
