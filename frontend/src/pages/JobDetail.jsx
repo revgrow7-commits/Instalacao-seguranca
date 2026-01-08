@@ -940,13 +940,13 @@ const JobDetail = () => {
       )}
 
       {/* Produtos/Itens do Job - com área calculada */}
-      {(job.products_with_area?.length > 0 || (job.holdprint_data?.products && job.holdprint_data.products.length > 0)) && (
+      {getJobProducts().length > 0 && (
         <Card className="bg-card border-white/5">
           <CardHeader>
             <CardTitle className="text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Package className="h-5 w-5 text-primary" />
-                Produtos / Itens ({job.products_with_area?.length || job.holdprint_data?.products?.length || 0})
+                Produtos / Itens ({getJobProducts().length})
               </div>
               {job.area_m2 > 0 && (
                 <span className="text-sm font-normal px-3 py-1 rounded-full bg-primary/20 text-primary border border-primary/30">
@@ -958,7 +958,7 @@ const JobDetail = () => {
           <CardContent>
             <div className="space-y-4">
               {/* Usar products_with_area se disponível, senão holdprint_data.products */}
-              {(job.products_with_area?.length > 0 ? job.products_with_area : job.holdprint_data?.products || []).map((product, index) => {
+              {getJobProducts().map((product, index) => {
                 // Se for do products_with_area, já tem os dados calculados
                 const isCalculated = job.products_with_area?.length > 0;
                 
