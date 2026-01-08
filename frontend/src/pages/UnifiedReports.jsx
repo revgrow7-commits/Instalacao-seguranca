@@ -497,6 +497,7 @@ const UnifiedReports = () => {
                   const jobCheckins = itemCheckins.filter(c => c.job_id === job.id);
                   const completedItems = jobCheckins.filter(c => c.status === 'completed').length;
                   const totalM2 = jobCheckins.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
+                  const totalMinutes = jobCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
                   
                   return (
                     <div key={job.id} className="border border-white/5 rounded-lg overflow-hidden">
@@ -516,10 +517,14 @@ const UnifiedReports = () => {
                           <p className="text-white font-medium truncate">{job.title}</p>
                           <p className="text-xs text-muted-foreground">{job.client_name}</p>
                         </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
+                        <div className="flex items-center gap-6">
+                          <div className="text-right hidden md:block">
                             <p className="text-white font-bold">{totalM2.toFixed(1)} m²</p>
                             <p className="text-xs text-muted-foreground">{completedItems} itens</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-orange-400 font-bold">{formatDuration(totalMinutes)}</p>
+                            <p className="text-xs text-muted-foreground">Tempo total</p>
                           </div>
                           {expandedJobs[job.id] ? (
                             <ChevronUp className="h-5 w-5 text-muted-foreground" />
@@ -531,7 +536,7 @@ const UnifiedReports = () => {
                       
                       {expandedJobs[job.id] && (
                         <div className="p-4 pt-0 border-t border-white/5 bg-white/5">
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-center">
                             <div>
                               <p className="text-lg font-bold text-white">{job.items?.length || 0}</p>
                               <p className="text-xs text-muted-foreground">Total Itens</p>
@@ -543,6 +548,10 @@ const UnifiedReports = () => {
                             <div>
                               <p className="text-lg font-bold text-blue-400">{totalM2.toFixed(2)} m²</p>
                               <p className="text-xs text-muted-foreground">Área Instalada</p>
+                            </div>
+                            <div>
+                              <p className="text-lg font-bold text-orange-400">{formatDuration(totalMinutes)}</p>
+                              <p className="text-xs text-muted-foreground">Tempo Total</p>
                             </div>
                             <div>
                               <p className="text-lg font-bold text-purple-400">{formatDate(job.created_at)}</p>
