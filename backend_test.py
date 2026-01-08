@@ -1871,7 +1871,13 @@ class FieldworkAPITest:
             ("Holdprint Fetch POA Jobs", self.test_holdprint_fetch_poa_jobs),
             ("Holdprint Fetch SP Jobs", self.test_holdprint_fetch_sp_jobs),
             ("Holdprint Batch Import POA", self.test_holdprint_batch_import_poa),
-            ("Holdprint Batch Import SP", self.test_holdprint_batch_import_sp)
+            ("Holdprint Batch Import SP", self.test_holdprint_batch_import_sp),
+            ("Calendar Job Scheduling API", self.test_calendar_job_scheduling_api),
+            ("Calendar Google Status API", self.test_calendar_google_status_api),
+            ("Calendar Events Unauthorized API", self.test_calendar_events_unauthorized_api),
+            ("Calendar Unscheduled Jobs API", self.test_calendar_unscheduled_jobs_api),
+            ("Calendar Job Update with Installer", self.test_calendar_job_update_with_installer),
+            ("Calendar Branch Filtering", self.test_calendar_branch_filtering)
         ]
         
         results = []
