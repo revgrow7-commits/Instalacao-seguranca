@@ -166,17 +166,7 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <MainLayout>
-              <Reports />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/metrics"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <Metrics />
+              <UnifiedReports />
             </MainLayout>
           </ProtectedRoute>
         }
@@ -201,15 +191,15 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      {/* Redirect old productivity route to unified reports */}
       <Route
         path="/reports/productivity"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <ProductivityReport />
-            </MainLayout>
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/reports" replace />}
+      />
+      {/* Redirect old metrics route to unified reports */}
+      <Route
+        path="/metrics"
+        element={<Navigate to="/reports" replace />}
       />
       <Route
         path="/installer/job/:jobId"
