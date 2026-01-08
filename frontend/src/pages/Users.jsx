@@ -190,11 +190,22 @@ const Users = () => {
         <div>
           <h1 className="text-4xl font-heading font-bold text-white tracking-tight">Usuários</h1>
           <p className="text-muted-foreground mt-2">
-            Gerencie usuários e permissões do sistema
+            Gerencie usuários e permissões do sistema ({users.length} usuários)
           </p>
         </div>
 
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <div className="flex gap-3 items-center">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar usuário..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 bg-white/5 border-white/10 text-white w-64"
+            />
+          </div>
+          
+          <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button
               className="bg-primary hover:bg-primary/90 neon-glow"
