@@ -591,7 +591,23 @@ const UnifiedReports = () => {
           {/* Filters */}
           <Card className="bg-card border-white/5">
             <CardContent className="p-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Job</Label>
+                  <Select value={selectedJob} onValueChange={setSelectedJob}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10 max-h-60">
+                      <SelectItem value="all">Todos os Jobs</SelectItem>
+                      {jobs.slice(0, 50).map(job => (
+                        <SelectItem key={job.id} value={job.id}>
+                          #{job.holdprint_data?.code || job.code || job.id?.slice(0,6)} - {job.title?.substring(0, 25)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Instalador</Label>
                   <Select value={selectedInstaller} onValueChange={setSelectedInstaller}>
@@ -634,6 +650,9 @@ const UnifiedReports = () => {
                   </Button>
                 </div>
               </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                {filteredPhotos.length} foto(s) encontrada(s)
+              </p>
             </CardContent>
           </Card>
 
