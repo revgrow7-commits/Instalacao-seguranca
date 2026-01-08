@@ -142,11 +142,11 @@ class GPSLocationTest:
         """Test 3: Verify item checkins have GPS fields"""
         self.log("Testing item checkins GPS structure...")
         
-        if not self.manager_token:
-            self.log("❌ Missing manager token")
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
             return False
             
-        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
         
         response = self.session.get(
             f"{BASE_URL}/item-checkins",
