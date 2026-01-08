@@ -4067,6 +4067,179 @@ async def delete_google_calendar_event(
         raise HTTPException(status_code=500, detail=f"Erro ao remover evento: {str(e)}")
 
 
+# ==================== JOB JUSTIFICATION ====================
+
+class JobJustificationRequest(BaseModel):
+    reason: str
+    type: str  # no_checkin, no_checkout, cancelled, rescheduled, other
+    job_title: str
+    job_code: str
+
+# Emails to notify when job is justified
+NOTIFICATION_EMAILS = ["bruno@industriavisual.com.br", "marcelo@industriavisual.com.br"]
+
+@api_router.post("/jobs/{job_id}/justify")
+async def submit_job_justification(
+    job_id: str,
+    justification: JobJustificationRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """Submit justification for a job that wasn't completed and notify managers"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Get job
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    # Get justification type label
+    type_labels = {
+        "no_checkin": "Check-in não realizado",
+        "no_checkout": "Check-out não realizado",
+        "cancelled": "Job cancelado pelo cliente",
+        "rescheduled": "Job reagendado",
+        "other": "Outro motivo"
+    }
+    type_label = type_labels.get(justification.type, justification.type)
+    
+    # Create justification record
+    justification_record = {
+        "id": str(uuid.uuid4()),
+        "job_id": job_id,
+        "job_title": justification.job_title,
+        "job_code": justification.job_code,
+        "type": justification.type,
+        "type_label": type_label,
+        "reason": justification.reason,
+        "submitted_by": current_user.id,
+        "submitted_by_name": current_user.name,
+        "submitted_by_email": current_user.email,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.job_justifications.insert_one(justification_record)
+    
+    # Update job status
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "status": "justificado",
+            "justification": justification_record,
+            "justified_at": datetime.now(timezone.utc).isoformat(),
+            "exclude_from_metrics": True
+        }}
+    )
+    
+    # Send email notifications
+    try:
+        scheduled_date = job.get("scheduled_date", "")
+        if scheduled_date:
+            try:
+                dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                scheduled_date = dt.strftime("%d/%m/%Y às %H:%M")
+            except:
+                pass
+        
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
+                .content {{ background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }}
+                .footer {{ background: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; }}
+                .highlight {{ background: #fef3c7; padding: 10px; border-left: 4px solid #f59e0b; margin: 15px 0; }}
+                .info-row {{ display: flex; padding: 8px 0; border-bottom: 1px solid #e5e7eb; }}
+                .info-label {{ font-weight: bold; width: 150px; }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h2 style="margin: 0;">⚠️ Job Justificado</h2>
+                    <p style="margin: 5px 0 0 0; opacity: 0.9;">Notificação de job não realizado</p>
+                </div>
+                <div class="content">
+                    <div class="highlight">
+                        <strong>Motivo:</strong> {justification.reason}
+                    </div>
+                    
+                    <h3>Detalhes do Job</h3>
+                    <div class="info-row">
+                        <span class="info-label">Código:</span>
+                        <span>#{justification.job_code}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Título:</span>
+                        <span>{justification.job_title}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Tipo:</span>
+                        <span>{type_label}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Data Agendada:</span>
+                        <span>{scheduled_date or 'Não informada'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cliente:</span>
+                        <span>{job.get('holdprint_data', {}).get('customerName') or job.get('client_name') or 'N/A'}</span>
+                    </div>
+                    
+                    <h3>Justificado por</h3>
+                    <div class="info-row">
+                        <span class="info-label">Nome:</span>
+                        <span>{current_user.name}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Email:</span>
+                        <span>{current_user.email}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Data/Hora:</span>
+                        <span>{datetime.now(timezone.utc).strftime("%d/%m/%Y às %H:%M")} UTC</span>
+                    </div>
+                </div>
+                <div class="footer">
+                    <p>Esta é uma notificação automática do sistema Indústria Visual.</p>
+                    <p>Acesse o sistema para mais detalhes.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        
+        params = {
+            "from": SENDER_EMAIL,
+            "to": NOTIFICATION_EMAILS,
+            "subject": f"⚠️ Job Justificado: #{justification.job_code} - {justification.job_title}",
+            "html": html_content
+        }
+        
+        await asyncio.to_thread(resend.Emails.send, params)
+        logging.info(f"Justification email sent for job {job_id} to {NOTIFICATION_EMAILS}")
+        
+    except Exception as e:
+        logging.error(f"Failed to send justification email: {str(e)}")
+        # Don't fail the request if email fails
+    
+    return {
+        "message": "Justificativa registrada com sucesso",
+        "justification_id": justification_record["id"],
+        "emails_sent_to": NOTIFICATION_EMAILS
+    }
+
+@api_router.get("/job-justifications")
+async def get_job_justifications(current_user: User = Depends(get_current_user)):
+    """Get all job justifications (admin/manager only)"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    justifications = await db.job_justifications.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    return justifications
+
+
 # ==================== PUSH NOTIFICATIONS ====================
 
 class PushSubscription(BaseModel):
