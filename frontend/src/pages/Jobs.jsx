@@ -203,6 +203,13 @@ const Jobs = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
+  
+  // Justification dialog states
+  const [showJustifyDialog, setShowJustifyDialog] = useState(false);
+  const [justifyJob, setJustifyJob] = useState(null);
+  const [justifyReason, setJustifyReason] = useState('');
+  const [justifyType, setJustifyType] = useState('no_checkin'); // no_checkin, no_checkout, cancelled
+  const [sendingJustification, setSendingJustification] = useState(false);
 
   // Generate month options
   const monthOptions = useMemo(() => {
