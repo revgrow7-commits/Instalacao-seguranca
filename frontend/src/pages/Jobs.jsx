@@ -92,7 +92,9 @@ const Jobs = () => {
       toast.success('Job marcado como sem instalação');
       loadJobs();
     } catch (error) {
-      toast.error('Erro ao marcar job');
+      console.error('Error marking job:', error);
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      toast.error(`Erro ao marcar job: ${errorMsg}`);
     } finally {
       setMarkingNoInstall(null);
     }
