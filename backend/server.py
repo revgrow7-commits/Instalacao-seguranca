@@ -2429,6 +2429,31 @@ async def complete_item_checkout(
     return result
 
 
+@api_router.get("/location-alerts")
+async def get_location_alerts(
+    current_user: User = Depends(get_current_user)
+):
+    """Get all location alerts (admin/manager only)"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    alerts = await db.location_alerts.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    # Enrich with job and installer info
+    enriched = []
+    for alert in alerts:
+        job = await db.jobs.find_one({"id": alert.get("job_id")}, {"_id": 0, "title": 1, "client_name": 1})
+        installer = await db.installers.find_one({"id": alert.get("installer_id")}, {"_id": 0, "full_name": 1})
+        
+        enriched.append({
+            **alert,
+            "job_title": job.get("title") if job else "N/A",
+            "client_name": job.get("client_name") if job else "N/A",
+            "installer_name": installer.get("full_name") if installer else "N/A"
+        })
+    
+    return enriched
+
+
 @api_router.post("/item-checkins/{checkin_id}/pause")
 async def pause_item_checkin(
     checkin_id: str,
