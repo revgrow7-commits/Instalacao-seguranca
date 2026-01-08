@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2 } from 'lucide-react';
+import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2, Bell, AlertTriangle } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
@@ -13,8 +13,10 @@ const Dashboard = () => {
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
+  const [pendingCheckins, setPendingCheckins] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sendingAlerts, setSendingAlerts] = useState(false);
 
   useEffect(() => {
     // Redirect installers to their specific dashboard
@@ -43,11 +45,31 @@ const Dashboard = () => {
           new Date(b.checkin_at) - new Date(a.checkin_at)
         );
         setCheckins(sortedCheckins.slice(0, 6));
+        
+        // Load pending check-ins (late alerts)
+        try {
+          const pendingRes = await api.getPendingCheckins();
+          setPendingCheckins(pendingRes.data.pending_checkins || []);
+        } catch (e) {
+          console.log('Could not load pending checkins:', e);
+        }
       }
     } catch (error) {
       toast.error('Erro ao carregar dados do dashboard');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendLateAlerts = async () => {
+    setSendingAlerts(true);
+    try {
+      const response = await api.sendLateAlerts();
+      toast.success(response.data.message);
+    } catch (error) {
+      toast.error('Erro ao enviar alertas');
+    } finally {
+      setSendingAlerts(false);
     }
   };
 
