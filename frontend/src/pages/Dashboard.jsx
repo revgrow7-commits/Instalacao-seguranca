@@ -176,6 +176,53 @@ const Dashboard = () => {
         </div>
       )}
 
+      {/* Late Check-in Alerts - Admin & Manager only */}
+      {(isAdmin || isManager) && pendingCheckins.length > 0 && (
+        <Card className="bg-red-500/10 border-red-500/30">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              <CardTitle className="text-lg text-red-500">
+                Check-ins Atrasados ({pendingCheckins.length})
+              </CardTitle>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleSendLateAlerts}
+              disabled={sendingAlerts}
+              className="border-red-500/50 text-red-500 hover:bg-red-500/10"
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              {sendingAlerts ? 'Enviando...' : 'Enviar Alertas'}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {pendingCheckins.slice(0, 5).map((job) => (
+                <div 
+                  key={job.id}
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors"
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                >
+                  <div>
+                    <p className="text-white font-medium">{job.title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {job.installers_info?.map(i => i.full_name).join(', ') || 'Sem instalador'}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-2 py-1 bg-red-500/20 text-red-500 rounded text-sm font-bold">
+                      {job.minutes_late} min atrasado
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Check-ins - Admin & Manager only */}
       {(isAdmin || isManager) && (
         <div>
