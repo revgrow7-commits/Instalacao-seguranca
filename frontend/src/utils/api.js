@@ -158,6 +158,9 @@ export const api = {
   getPendingCheckins: () => axios.get(`${API_URL}/notifications/pending-checkins`, { headers: getAuthHeader() }),
   sendLateAlerts: () => axios.post(`${API_URL}/notifications/send-late-alerts`, {}, { headers: getAuthHeader() }),
   notifyJobScheduled: (jobId) => axios.post(`${API_URL}/notifications/notify-job-scheduled?job_id=${jobId}`, {}, { headers: getAuthHeader() }),
+  
+  // Location Alerts
+  getLocationAlerts: () => axios.get(`${API_URL}/location-alerts`, { headers: getAuthHeader() }),
 };
 
 export default api;
