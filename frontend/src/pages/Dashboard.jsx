@@ -232,6 +232,42 @@ const Dashboard = () => {
         </Card>
       )}
 
+      {/* Location Alerts - Admin & Manager only */}
+      {(isAdmin || isManager) && locationAlerts.length > 0 && (
+        <Card className="bg-orange-500/10 border-orange-500/30">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-orange-500" />
+              <CardTitle className="text-lg text-orange-500">
+                Alertas de Localização ({locationAlerts.length})
+              </CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {locationAlerts.slice(0, 5).map((alert) => (
+                <div 
+                  key={alert.id}
+                  className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                >
+                  <div>
+                    <p className="text-white font-medium">{alert.job_title}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {alert.installer_name} • {new Date(alert.created_at).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className="px-2 py-1 bg-orange-500/20 text-orange-500 rounded text-sm font-bold">
+                      {alert.distance_meters}m do local
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Check-ins - Admin & Manager only */}
       {(isAdmin || isManager) && (
         <div>
