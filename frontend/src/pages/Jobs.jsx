@@ -811,6 +811,92 @@ const Jobs = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Justification Dialog */}
+      <Dialog open={showJustifyDialog} onOpenChange={setShowJustifyDialog}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle className="h-6 w-6 text-red-500" />
+              <DialogTitle className="text-xl text-white">Justificar Job Não Realizado</DialogTitle>
+            </div>
+            <DialogDescription className="text-muted-foreground">
+              {justifyJob && (
+                <>
+                  <span className="font-mono text-primary">#{justifyJob.holdprint_data?.code || justifyJob.id?.slice(0, 8)}</span>
+                  {' - '}
+                  {justifyJob.title}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* Justification Type */}
+            <div className="space-y-2">
+              <Label className="text-white">Tipo de Justificativa *</Label>
+              <Select value={justifyType} onValueChange={setJustifyType}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="no_checkin">Check-in não realizado</SelectItem>
+                  <SelectItem value="no_checkout">Check-out não realizado</SelectItem>
+                  <SelectItem value="cancelled">Job cancelado pelo cliente</SelectItem>
+                  <SelectItem value="rescheduled">Job reagendado</SelectItem>
+                  <SelectItem value="other">Outro motivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Reason */}
+            <div className="space-y-2">
+              <Label className="text-white">Motivo / Justificativa *</Label>
+              <Textarea
+                value={justifyReason}
+                onChange={(e) => setJustifyReason(e.target.value)}
+                placeholder="Descreva o motivo pelo qual o job não foi realizado..."
+                className="bg-white/5 border-white/10 text-white min-h-[100px]"
+              />
+            </div>
+
+            {/* Info about notification */}
+            <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+              <p className="text-xs text-blue-400">
+                📧 Uma notificação será enviada para Bruno e Marcelo com os detalhes da justificativa.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowJustifyDialog(false);
+                setJustifyJob(null);
+                setJustifyReason('');
+              }}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitJustification}
+              disabled={sendingJustification || !justifyReason.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {sendingJustification ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Enviando...
+                </>
+              ) : (
+                'Enviar e Finalizar Job'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
