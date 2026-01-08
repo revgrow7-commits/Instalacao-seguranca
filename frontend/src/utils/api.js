@@ -72,6 +72,7 @@ export const api = {
   getItemCheckins: (jobId) => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
   getAllItemCheckins: () => axios.get(`${API_URL}/item-checkins/all`, { headers: getAuthHeader() }),
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
+  archiveItemCheckin: (checkinId) => axios.put(`${API_URL}/item-checkins/${checkinId}/archive`, {}, { headers: getAuthHeader() }),
   
   // Item Pause/Resume
   pauseItemCheckin: (checkinId, reason) => {
