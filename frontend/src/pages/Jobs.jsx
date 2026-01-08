@@ -697,6 +697,7 @@ const Jobs = () => {
                 onNavigate={(id) => navigate(`/jobs/${id}`)}
                 onFinalize={handleFinalizeNoInstallation}
                 onSchedule={handleOpenScheduleDialog}
+                onJustify={handleOpenJustifyDialog}
                 isAdmin={isAdmin}
                 isManager={isManager}
                 isLoading={processingJobId}
