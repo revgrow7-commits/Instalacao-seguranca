@@ -638,33 +638,82 @@ const UnifiedReports = () => {
           </Card>
 
           {/* Photos Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {filteredPhotos.slice((photosPage - 1) * 24, photosPage * 24).map(checkin => (
-              <Card key={checkin.id} className="bg-card border-white/5 overflow-hidden group cursor-pointer">
-                <div 
-                  className="aspect-square relative"
-                  onClick={() => {
-                    setSelectedPhoto(checkin.checkin_photo || checkin.checkout_photo);
-                    setPhotoType(checkin.checkin_photo ? 'Check-in' : 'Check-out');
-                  }}
-                >
-                  {checkin.checkin_photo && (
-                    <img
-                      src={checkin.checkin_photo.startsWith('data:') ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
-                      alt="Check-in"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-                    <div className="text-xs">
-                      <p className="text-white font-medium truncate">{checkin.installer_name}</p>
-                      <p className="text-muted-foreground">{formatDate(checkin.checkin_at)}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {filteredPhotos.slice((photosPage - 1) * 24, photosPage * 24).map(checkin => {
+              // Find job info
+              const job = jobs.find(j => j.id === checkin.job_id);
+              const jobCode = job?.holdprint_data?.code || job?.code || checkin.job_id?.slice(0, 6);
+              const jobTitle = checkin.job_title || job?.title || 'Job';
+              const photo = checkin.checkin_photo || checkin.checkout_photo;
+              const photoType = checkin.checkout_photo ? 'checkout' : 'checkin';
+              
+              return (
+                <Card key={checkin.id} className="bg-card border-white/5 overflow-hidden group">
+                  {/* Job Header */}
+                  <div className="px-3 py-2 bg-primary/10 border-b border-white/5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-mono text-primary bg-primary/20 px-2 py-0.5 rounded">
+                        #{jobCode}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded ${
+                        photoType === 'checkout' 
+                          ? 'bg-green-500/20 text-green-400' 
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {photoType === 'checkout' ? 'SAÍDA' : 'ENTRADA'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-white truncate mt-1" title={jobTitle}>
+                      {jobTitle.length > 30 ? jobTitle.substring(0, 30) + '...' : jobTitle}
+                    </p>
+                  </div>
+                  
+                  {/* Photo */}
+                  <div 
+                    className="aspect-square relative cursor-pointer"
+                    onClick={() => {
+                      setSelectedPhoto(photo);
+                      setPhotoType(`${photoType === 'checkout' ? 'Check-out' : 'Check-in'} - Job #${jobCode}: ${jobTitle}`);
+                    }}
+                  >
+                    {photo && (
+                      <img
+                        src={photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`}
+                        alt={`${photoType}_job_${jobCode}_${jobTitle.replace(/\s+/g, '_').substring(0, 20)}`}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+                      <div className="w-full">
+                        <p className="text-white font-medium text-sm truncate">{checkin.installer_name}</p>
+                        <p className="text-muted-foreground text-xs">{formatDate(checkin.checkin_at)}</p>
+                        {checkin.product_name && (
+                          <p className="text-primary text-xs truncate mt-1">{checkin.product_name}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Card>
-            ))}
+                  
+                  {/* Footer Info */}
+                  <div className="px-3 py-2 bg-white/5 border-t border-white/5">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground truncate flex-1">
+                        {checkin.installer_name}
+                      </span>
+                      <span className="text-muted-foreground ml-2">
+                        {formatDate(checkin.checkin_at)}
+                      </span>
+                    </div>
+                    {checkin.installed_m2 && (
+                      <div className="text-xs text-primary mt-1">
+                        {checkin.installed_m2.toFixed(2)} m² | {checkin.duration_minutes || 0}min
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              );
+            })}
           </div>
 
           {/* Photos Pagination */}
