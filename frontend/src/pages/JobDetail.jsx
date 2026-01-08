@@ -1211,7 +1211,7 @@ const JobDetail = () => {
                 .filter(c => c.status === 'completed')
                 .sort((a, b) => new Date(b.checkout_at) - new Date(a.checkout_at))
                 .map((checkin) => {
-                  const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                  const products = getJobProducts();
                   const product = products[checkin.item_index];
                   const installer = installers.find(i => i.id === checkin.installer_id);
                   
