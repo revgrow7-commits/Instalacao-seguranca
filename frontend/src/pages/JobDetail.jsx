@@ -57,6 +57,17 @@ const JobDetail = () => {
     { value: 'veiculo', label: '06 - Veículo' }
   ];
 
+  // Helper function to get products from job (handles empty array vs undefined)
+  const getJobProducts = () => {
+    if (job?.products_with_area && job.products_with_area.length > 0) {
+      return job.products_with_area;
+    }
+    if (job?.holdprint_data?.products && job.holdprint_data.products.length > 0) {
+      return job.holdprint_data.products;
+    }
+    return [];
+  };
+
   useEffect(() => {
     loadData();
   }, [jobId]);
