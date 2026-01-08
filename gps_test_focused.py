@@ -371,11 +371,11 @@ class GPSLocationTest:
         """Test 6: Verify location alerts appear in GET /api/location-alerts"""
         self.log("Testing location alerts endpoint after alert creation...")
         
-        if not self.manager_token:
-            self.log("❌ Missing manager token")
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
             return False
             
-        headers = {"Authorization": f"Bearer {self.manager_token}"}
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
         
         response = self.session.get(
             f"{BASE_URL}/location-alerts",
