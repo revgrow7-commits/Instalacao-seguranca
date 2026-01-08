@@ -2581,6 +2581,13 @@ class FieldworkAPITest:
         
         tests = [
             ("Admin Login", self.test_login_admin),
+            ("GPS Location Alerts - Empty Initially", self.test_gps_location_alerts_endpoint_empty),
+            ("GPS Distance Calculation Logic", self.test_gps_distance_calculation_logic),
+            ("Item Checkins GPS Structure", self.test_item_checkins_gps_structure),
+            ("Checkout Within 500m - Normal Flow", self.test_checkout_within_500m_normal_flow),
+            ("Checkout Beyond 500m - With Alert", self.test_checkout_beyond_500m_with_alert),
+            ("Location Alerts After Creation", self.test_location_alerts_after_creation),
+            ("Dashboard Loading With Alerts", self.test_dashboard_loading_with_alerts),
             ("Users Page - Admin Login and Load", self.test_users_page_admin_login_and_load),
             ("Users Page - Toggle Active/Inactive", self.test_user_toggle_active_inactive),
             ("Users Page - Update Installer with Phone and Branch", self.test_update_installer_with_phone_and_branch),
