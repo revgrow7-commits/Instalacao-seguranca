@@ -3844,13 +3844,15 @@ class GoogleCalendarEventCreate(BaseModel):
     start_datetime: str  # ISO format
     end_datetime: str  # ISO format
     location: Optional[str] = None
+    attendees: Optional[List[str]] = None  # List of email addresses
+    send_notifications: Optional[bool] = True  # Send email invites to attendees
 
 @api_router.post("/calendar/events")
 async def create_google_calendar_event(
     event_data: GoogleCalendarEventCreate,
     current_user: User = Depends(get_current_user)
 ):
-    """Create an event in user's Google Calendar"""
+    """Create an event in user's Google Calendar with optional email invites"""
     google_creds = await get_google_credentials(current_user.id)
     if not google_creds:
         raise HTTPException(status_code=401, detail="Google Calendar não conectado")
@@ -3874,15 +3876,24 @@ async def create_google_calendar_event(
         if event_data.location:
             event_body['location'] = event_data.location
         
+        # Add attendees for email invitations
+        if event_data.attendees and len(event_data.attendees) > 0:
+            event_body['attendees'] = [{'email': email} for email in event_data.attendees]
+            logging.info(f"Adding {len(event_data.attendees)} attendees to calendar event")
+        
+        # Create the event with sendUpdates parameter for email notifications
         event = service.events().insert(
             calendarId='primary',
-            body=event_body
+            body=event_body,
+            sendUpdates='all' if event_data.send_notifications and event_data.attendees else 'none'
         ).execute()
         
+        attendees_count = len(event_data.attendees) if event_data.attendees else 0
         return {
             "message": "Evento criado com sucesso no Google Calendar",
             "event_id": event.get('id'),
-            "html_link": event.get('htmlLink')
+            "html_link": event.get('htmlLink'),
+            "attendees_notified": attendees_count if event_data.send_notifications else 0
         }
         
     except Exception as e:
