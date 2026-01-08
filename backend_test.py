@@ -1840,6 +1840,321 @@ class FieldworkAPITest:
         
         return True
 
+    def test_users_page_admin_login_and_load(self):
+        """Test 1: Login as Admin and Load Users Page"""
+        self.log("Testing admin login and users page load...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # Test GET /api/users
+        response = self.session.get(f"{BASE_URL}/users", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Users API failed: {response.status_code} - {response.text}")
+            return False
+            
+        users = response.json()
+        
+        self.log(f"✅ Users API successful - Found {len(users)} users")
+        
+        # Verify users have required fields including is_active
+        if users:
+            first_user = users[0]
+            required_fields = ["id", "email", "name", "role", "is_active"]
+            
+            for field in required_fields:
+                if field in first_user:
+                    self.log(f"   ✅ User has required field '{field}': {first_user.get(field)}")
+                else:
+                    self.log(f"   ❌ User missing required field: {field}")
+                    return False
+                    
+            # Store a user ID for further testing
+            self.test_user_id = first_user["id"]
+            self.log(f"   Using user for testing: {first_user.get('name')} (ID: {self.test_user_id})")
+        else:
+            self.log("❌ No users found")
+            return False
+            
+        return True
+
+    def test_user_toggle_active_inactive(self):
+        """Test 2: User Toggle Active/Inactive"""
+        self.log("Testing user toggle active/inactive...")
+        
+        if not self.admin_token or not hasattr(self, 'test_user_id'):
+            self.log("❌ Missing admin token or test user ID")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # First get current user status
+        response = self.session.get(f"{BASE_URL}/users", headers=headers)
+        if response.status_code != 200:
+            self.log(f"❌ Could not get users: {response.status_code}")
+            return False
+            
+        users = response.json()
+        test_user = next((u for u in users if u["id"] == self.test_user_id), None)
+        if not test_user:
+            self.log(f"❌ Test user not found")
+            return False
+            
+        original_status = test_user.get("is_active", True)
+        self.log(f"   Original user status: is_active = {original_status}")
+        
+        # Test deactivating user
+        update_data = {"is_active": False}
+        
+        response = self.session.put(
+            f"{BASE_URL}/users/{self.test_user_id}",
+            json=update_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ User deactivation failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_user = response.json()
+        
+        if updated_user.get("is_active") == False:
+            self.log(f"   ✅ User successfully deactivated: is_active = {updated_user.get('is_active')}")
+        else:
+            self.log(f"   ❌ User deactivation failed: is_active = {updated_user.get('is_active')}")
+            return False
+            
+        # Test reactivating user
+        update_data = {"is_active": True}
+        
+        response = self.session.put(
+            f"{BASE_URL}/users/{self.test_user_id}",
+            json=update_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ User reactivation failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_user = response.json()
+        
+        if updated_user.get("is_active") == True:
+            self.log(f"   ✅ User successfully reactivated: is_active = {updated_user.get('is_active')}")
+        else:
+            self.log(f"   ❌ User reactivation failed: is_active = {updated_user.get('is_active')}")
+            return False
+            
+        self.log(f"✅ User toggle active/inactive test successful")
+        return True
+
+    def test_update_installer_with_phone_and_branch(self):
+        """Test 3: Update Installer with Phone and Branch"""
+        self.log("Testing update installer with phone and branch...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # First get list of installers
+        response = self.session.get(f"{BASE_URL}/installers", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not get installers: {response.status_code} - {response.text}")
+            return False
+            
+        installers = response.json()
+        
+        if not installers:
+            self.log("❌ No installers found")
+            return False
+            
+        # Pick first installer for testing
+        test_installer = installers[0]
+        installer_user_id = test_installer.get("user_id")
+        
+        if not installer_user_id:
+            self.log("❌ Installer has no user_id")
+            return False
+            
+        self.log(f"   Testing with installer: {test_installer.get('full_name')} (User ID: {installer_user_id})")
+        
+        # Test updating installer user with phone and branch
+        update_data = {
+            "name": "Bruno Updated",
+            "email": "bruno@industriavisual.ind.br",
+            "role": "installer",
+            "phone": "(51) 98888-7777",
+            "branch": "SP"
+        }
+        
+        response = self.session.put(
+            f"{BASE_URL}/users/{installer_user_id}",
+            json=update_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Installer update failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_user = response.json()
+        
+        self.log(f"✅ Installer user update successful")
+        self.log(f"   Updated name: {updated_user.get('name')}")
+        
+        # Verify installer data was updated
+        response = self.session.get(f"{BASE_URL}/installers", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ Could not verify installer update: {response.status_code}")
+            return False
+            
+        updated_installers = response.json()
+        updated_installer = next((i for i in updated_installers if i["user_id"] == installer_user_id), None)
+        
+        if updated_installer:
+            self.log(f"   ✅ Installer data updated:")
+            self.log(f"      Phone: {updated_installer.get('phone')}")
+            self.log(f"      Branch: {updated_installer.get('branch')}")
+            self.log(f"      Full Name: {updated_installer.get('full_name')}")
+            
+            # Verify phone and branch were updated
+            if updated_installer.get('phone') == "(51) 98888-7777":
+                self.log(f"   ✅ Phone updated correctly")
+            else:
+                self.log(f"   ❌ Phone not updated: expected '(51) 98888-7777', got '{updated_installer.get('phone')}'")
+                return False
+                
+            if updated_installer.get('branch') == "SP":
+                self.log(f"   ✅ Branch updated correctly")
+            else:
+                self.log(f"   ❌ Branch not updated: expected 'SP', got '{updated_installer.get('branch')}'")
+                return False
+        else:
+            self.log(f"   ❌ Updated installer not found")
+            return False
+            
+        return True
+
+    def test_password_reset_via_api(self):
+        """Test 4: Password Reset via API"""
+        self.log("Testing password reset via API...")
+        
+        if not self.admin_token or not hasattr(self, 'test_user_id'):
+            self.log("❌ Missing admin token or test user ID")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        # Test password reset via PUT /api/users/{user_id}
+        update_data = {"password": "newpassword123"}
+        
+        response = self.session.put(
+            f"{BASE_URL}/users/{self.test_user_id}",
+            json=update_data,
+            headers=headers
+        )
+        
+        if response.status_code != 200:
+            self.log(f"❌ Password reset failed: {response.status_code} - {response.text}")
+            return False
+            
+        updated_user = response.json()
+        
+        self.log(f"✅ Password reset via API successful")
+        self.log(f"   User: {updated_user.get('name')}")
+        
+        # Test that user can login with new password
+        # First get user email
+        response = self.session.get(f"{BASE_URL}/users", headers=headers)
+        if response.status_code != 200:
+            self.log(f"❌ Could not get user email: {response.status_code}")
+            return False
+            
+        users = response.json()
+        test_user = next((u for u in users if u["id"] == self.test_user_id), None)
+        if not test_user:
+            self.log(f"❌ Test user not found for login verification")
+            return False
+            
+        user_email = test_user.get("email")
+        
+        # Test login with new password
+        login_data = {
+            "email": user_email,
+            "password": "newpassword123"
+        }
+        
+        response = self.session.post(f"{BASE_URL}/auth/login", json=login_data)
+        
+        if response.status_code == 200:
+            self.log(f"   ✅ User can login with new password")
+            
+            # Reset password back to original for other tests
+            reset_data = {"password": "admin123"}  # Assuming original password
+            
+            response = self.session.put(
+                f"{BASE_URL}/users/{self.test_user_id}",
+                json=reset_data,
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                self.log(f"   ✅ Password reset back to original")
+            else:
+                self.log(f"   ⚠️  Could not reset password back: {response.status_code}")
+                
+        else:
+            self.log(f"   ❌ User cannot login with new password: {response.status_code} - {response.text}")
+            return False
+            
+        return True
+
+    def test_get_users_api_with_is_active(self):
+        """Test 5: Get Users API with is_active field"""
+        self.log("Testing GET /api/users with is_active field...")
+        
+        if not self.admin_token:
+            self.log("❌ Missing admin token")
+            return False
+            
+        headers = {"Authorization": f"Bearer {self.admin_token}"}
+        
+        response = self.session.get(f"{BASE_URL}/users", headers=headers)
+        
+        if response.status_code != 200:
+            self.log(f"❌ GET /api/users failed: {response.status_code} - {response.text}")
+            return False
+            
+        users = response.json()
+        
+        self.log(f"✅ GET /api/users successful - Found {len(users)} users")
+        
+        # Verify all users have is_active field
+        users_with_is_active = 0
+        for user in users:
+            if "is_active" in user:
+                users_with_is_active += 1
+                self.log(f"   User '{user.get('name')}': is_active = {user.get('is_active')}")
+            else:
+                self.log(f"   ❌ User '{user.get('name')}' missing is_active field")
+                return False
+                
+        if users_with_is_active == len(users):
+            self.log(f"   ✅ All {users_with_is_active} users have is_active field")
+        else:
+            self.log(f"   ❌ Only {users_with_is_active}/{len(users)} users have is_active field")
+            return False
+            
+        return True
+
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
