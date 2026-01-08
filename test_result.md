@@ -50,6 +50,34 @@ Do not modify this section.
 - **Google Integration**: Proper 401 handling when Google Calendar not connected
 - **Job Structure**: All required fields (id, title, client_name, branch, scheduled_date) present
 
+## Frontend Testing Results (January 8, 2026)
+### ✅ WORKING COMPONENTS:
+- **Login Flow**: Manager credentials (gerente@industriavisual.com / gerente123) working
+- **Calendar Page Load**: Title "Calendário de Instalações" displays correctly
+- **UI Components**: All major UI elements present and functional
+  - "Jobs Não Agendados (70)" section with 10 visible draggable jobs
+  - Calendar grid with 35 cells showing January 2026
+  - "Conectar Google" button (not connected state)
+  - "Atualizar" button functional
+  - Month navigation arrows present
+- **View Toggle**: Grid/List view toggle working correctly
+- **Mobile Responsiveness**: Calendar usable on mobile (375x812 viewport)
+- **Data Loading**: 70 unscheduled jobs and 10 scheduled jobs loaded correctly
+- **Existing Scheduled Jobs**: Yellow bars visible on calendar dates 16, 20
+
+### ❌ CRITICAL ISSUE FOUND:
+- **Drag-and-Drop Dialog**: Schedule dialog does not open when dragging jobs to calendar dates
+  - Drag events are being dispatched but dialog is not triggered
+  - This prevents the core scheduling functionality from working
+  - Jobs are draggable (draggable="true" attribute present)
+  - Calendar cells are present but drop handlers may not be working correctly
+
+### ⚠️ UNABLE TO TEST (Due to drag-drop issue):
+- Schedule dialog content validation
+- Job scheduling flow
+- Success toast messages
+- Calendar update after scheduling
+
 ## Credentials
 - Admin: admin@industriavisual.com / admin123
 - Manager: gerente@industriavisual.com / gerente123
