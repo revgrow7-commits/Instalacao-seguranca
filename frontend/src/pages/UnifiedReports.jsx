@@ -63,19 +63,24 @@ const UnifiedReports = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [jobsRes, checkinsRes, itemCheckinsRes, installersRes, productivityRes] = await Promise.all([
+      const [jobsRes, itemCheckinsRes, installersRes] = await Promise.all([
         api.getJobs(),
-        api.getCheckins(),
         api.getAllItemCheckins(),
-        api.getInstallers(),
-        api.getProductivityReport({})
+        api.getInstallers()
       ]);
       
-      setJobs(jobsRes.data);
-      setCheckins(checkinsRes.data);
-      setItemCheckins(itemCheckinsRes.data);
-      setInstallers(installersRes.data);
-      setProductivityReport(productivityRes.data);
+      setJobs(jobsRes.data || []);
+      setItemCheckins(itemCheckinsRes.data || []);
+      setInstallers(installersRes.data || []);
+      
+      // Load old checkins separately (may fail)
+      try {
+        const checkinsRes = await api.getCheckins();
+        setCheckins(checkinsRes.data || []);
+      } catch {
+        setCheckins([]);
+      }
+      
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Erro ao carregar relatórios');
