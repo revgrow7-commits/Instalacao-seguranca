@@ -302,6 +302,43 @@ const Jobs = () => {
     }
   };
 
+  // Open justification dialog
+  const handleOpenJustifyDialog = (job) => {
+    setJustifyJob(job);
+    setJustifyReason('');
+    setJustifyType('no_checkin');
+    setShowJustifyDialog(true);
+  };
+
+  // Submit justification
+  const handleSubmitJustification = async () => {
+    if (!justifyJob || !justifyReason.trim()) {
+      toast.error('Por favor, informe o motivo da justificativa');
+      return;
+    }
+
+    setSendingJustification(true);
+    try {
+      await api.submitJobJustification(justifyJob.id, {
+        reason: justifyReason,
+        type: justifyType,
+        job_title: justifyJob.title,
+        job_code: justifyJob.holdprint_data?.code || justifyJob.code || justifyJob.id?.slice(0, 8)
+      });
+      
+      toast.success('Justificativa enviada e job finalizado!');
+      setShowJustifyDialog(false);
+      setJustifyJob(null);
+      setJustifyReason('');
+      loadJobs();
+    } catch (error) {
+      console.error('Error submitting justification:', error);
+      toast.error('Erro ao enviar justificativa');
+    } finally {
+      setSendingJustification(false);
+    }
+  };
+
   const handleOpenScheduleDialog = (job) => {
     setSelectedJob(job);
     setScheduleDate(job.scheduled_date ? job.scheduled_date.split('T')[0] : '');
