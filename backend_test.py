@@ -2158,13 +2158,18 @@ class FieldworkAPITest:
     def run_all_tests(self):
         """Run complete test suite"""
         self.log("=" * 60)
-        self.log("FIELDWORK PWA - BACKEND API TEST SUITE")
+        self.log("USERS PAGE ENHANCED FUNCTIONALITY - BACKEND API TEST SUITE")
         self.log("=" * 60)
         
         tests = [
+            ("Admin Login", self.test_login_admin),
+            ("Users Page - Admin Login and Load", self.test_users_page_admin_login_and_load),
+            ("Users Page - Toggle Active/Inactive", self.test_user_toggle_active_inactive),
+            ("Users Page - Update Installer with Phone and Branch", self.test_update_installer_with_phone_and_branch),
+            ("Users Page - Password Reset via API", self.test_password_reset_via_api),
+            ("Users Page - Get Users API with is_active", self.test_get_users_api_with_is_active),
             ("Installer Login", self.test_login_installer),
             ("Manager Login", self.test_login_manager),
-            ("Admin Login", self.test_login_admin),
             ("List Installer Jobs", self.test_list_installer_jobs),
             ("Check-in with GPS & Photo", self.test_checkin_with_gps_photo),
             ("Check-out with Productivity Metrics", self.test_checkout_with_productivity_metrics),
