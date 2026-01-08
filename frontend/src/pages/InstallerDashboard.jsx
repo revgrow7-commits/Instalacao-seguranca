@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import NotificationPermissionModal from '../components/NotificationPermissionModal';
 
 const InstallerDashboard = () => {
   const { user } = useAuth();
@@ -13,10 +14,24 @@ const InstallerDashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
 
   useEffect(() => {
     loadData();
+    // Show notification modal after a short delay
+    const timer = setTimeout(() => {
+      const hasAskedForNotifications = localStorage.getItem('notification_asked');
+      if (!hasAskedForNotifications) {
+        setShowNotificationModal(true);
+      }
+    }, 2000);
+    return () => clearTimeout(timer);
   }, []);
+
+  const handleNotificationComplete = (accepted) => {
+    localStorage.setItem('notification_asked', 'true');
+    setShowNotificationModal(false);
+  };
 
   const loadData = async () => {
     try {
