@@ -606,7 +606,7 @@ const JobDetail = () => {
                     <p className="text-sm text-muted-foreground">
                       Cada instalador receberá: {
                         (selectedItems.reduce((acc, idx) => {
-                          const products = job?.products_with_area || job?.holdprint_data?.products || [];
+                          const products = getJobProducts();
                           return acc + (products[idx]?.total_area_m2 || 0);
                         }, 0) / selectedItemInstallers.length).toFixed(2)
                       } m² (dividido igualmente)
