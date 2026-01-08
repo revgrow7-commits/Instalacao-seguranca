@@ -1980,6 +1980,27 @@ async def delete_item_checkin(
     
     return {"message": "Item check-in deleted successfully"}
 
+@api_router.put("/item-checkins/{checkin_id}/archive")
+async def archive_item_checkin(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Archive an item check-in - Only admin and managers"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Check if item checkin exists
+    checkin = await db.item_checkins.find_one({"id": checkin_id})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Item check-in not found")
+    
+    # Archive the item checkin
+    await db.item_checkins.update_one(
+        {"id": checkin_id},
+        {"$set": {"archived": True, "archived_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    return {"message": "Item check-in archived successfully"}
+
 # ============ ITEM CHECK-IN/OUT ROUTES (per item) ============
 
 @api_router.post("/item-checkins")
