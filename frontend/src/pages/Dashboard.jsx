@@ -14,6 +14,7 @@ const Dashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [pendingCheckins, setPendingCheckins] = useState([]);
+  const [locationAlerts, setLocationAlerts] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
