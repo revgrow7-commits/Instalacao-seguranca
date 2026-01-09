@@ -27,6 +27,12 @@ const BottomNav = () => {
     },
     {
       name: 'Calendário',
+      href: '/installer/calendar',
+      icon: Calendar,
+      roles: ['installer']
+    },
+    {
+      name: 'Calendário',
       href: '/calendar',
       icon: Calendar,
       roles: ['admin', 'manager']
