@@ -376,11 +376,17 @@ const InstallerCalendar = () => {
                   return (
                     <div
                       key={job.id}
-                      onClick={() => navigate(`/installer/jobs/${job.id}`)}
+                      onClick={() => {
+                        if (isMine) {
+                          navigate(`/installer/jobs/${job.id}`);
+                        } else {
+                          toast.info('Este job está atribuído a outro instalador');
+                        }
+                      }}
                       className={`p-3 rounded-lg cursor-pointer transition-colors ${
                         isMine 
                           ? 'bg-primary/20 border border-primary/30 hover:bg-primary/30' 
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                          : 'bg-white/5 border border-white/10 opacity-60'
                       }`}
                     >
                       <div className="flex items-start justify-between gap-2">
