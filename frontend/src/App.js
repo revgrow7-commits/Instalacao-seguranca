@@ -22,6 +22,7 @@ import InstallerReport from './pages/InstallerReport';
 import Profile from './pages/Profile';
 import LojaFaixaPreta from './pages/LojaFaixaPreta';
 import GamificationReport from './pages/GamificationReport';
+import CoinDemo from './pages/CoinDemo';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import UpdateNotification from './components/UpdateNotification';
