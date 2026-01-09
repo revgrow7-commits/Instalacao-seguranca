@@ -47,6 +47,7 @@ export const api = {
   }, { headers: getAuthHeader() }),
   getJobAssignments: (jobId) => axios.get(`${API_URL}/jobs/${jobId}/assignments`, { headers: getAuthHeader() }),
   updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
+  getTeamCalendarJobs: () => axios.get(`${API_URL}/jobs/team-calendar`, { headers: getAuthHeader() }),
 
   // Check-ins
   createCheckin: (formData) => axios.post(`${API_URL}/checkins`, formData, { 
