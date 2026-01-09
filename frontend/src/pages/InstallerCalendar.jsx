@@ -508,10 +508,19 @@ const InstallerCalendar = () => {
                 return (
                   <Card 
                     key={job.id} 
-                    className={`bg-card cursor-pointer hover:border-primary/50 transition-colors ${
+                    className={`bg-card transition-colors ${
                       isPast ? 'opacity-60' : ''
-                    } ${isMine ? 'border-primary/50 ring-1 ring-primary/20' : 'border-white/5'}`}
-                    onClick={() => navigate(`/installer/jobs/${job.id}`)}
+                    } ${isMine 
+                      ? 'border-primary/50 ring-1 ring-primary/20 cursor-pointer hover:border-primary/70' 
+                      : 'border-white/5 opacity-60'
+                    }`}
+                    onClick={() => {
+                      if (isMine) {
+                        navigate(`/installer/jobs/${job.id}`);
+                      } else {
+                        toast.info('Este job está atribuído a outro instalador');
+                      }
+                    }}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
