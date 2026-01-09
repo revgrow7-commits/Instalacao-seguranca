@@ -2,174 +2,191 @@
 O usuário solicitou o desenvolvimento de um sistema PWA para controlar a produtividade de instaladores. Os requisitos iniciais incluíam autenticação, integração com a API da Holdworks, funcionalidades de check-in/out, um painel de gerenciamento e relatórios.
 
 Durante a sessão, o usuário solicitou as seguintes funcionalidades, melhorias e correções:
-1.  **Corrigir a integração com a API da Holdprint**, que estava quebrada.
-2.  **Limpar o código**, removendo páginas de check-in/out obsoletas.
-3.  **Filtrar a tela de Jobs** para mostrar apenas os jobs do mês atual por padrão.
-4.  **Adicionar novas funcionalidades à tela de Jobs**: um botão Sem Instalação, um filtro de datas, e exibir o número e a data de início do job nos cards.
-5.  **Investigar por que a seção de Check-ins estava vazia**.
-6.  **Refatorar a página de Check-ins** para melhorar o carregamento, adicionar botões de excluir/arquivar e dividir a tela em cards de check-in e checkout.
-7.  **Corrigir um erro ao excluir um job**.
-8.  **Refatorar a UX da página de Jobs** para um carregamento mais rápido, substituir o botão de exclusão por Finalizar sem Instalação e adicionar um botão para agendamento direto no card.
-9.  **Corrigir um erro de acesso à câmera** em dispositivos móveis.
-10. **Unificar os menus Relatórios e Produtividade**, consolidando KPIs semelhantes.
-11. **Melhorar a seção de fotos nos relatórios**, adicionando o número do job e renomeando a imagem para incluir o nome do job.
-12. **Corrigir um erro na página de visualização de detalhes do check-in** ().
-13. **Incluir o tempo total de instalação** na aba Jobs dentro dos relatórios.
-14. **Sincronizar o envio de e-mails do Google Calendar** e criar um calendário visual de agendamentos com drag-and-drop para todos os instaladores.
-
-**PRODUCT REQUIREMENTS:**
-- **Integração de API Holdprint:** Buscar trabalhos (Jobs) da API externa. **Corrigido:** A integração foi consertada. O URL correto () foi identificado e implementado, e a funcionalidade foi testada e validada.
-- **Funcionalidades do Gerente:**
-    - Visualizar um dashboard com métricas e status de jobs. **Modificado:** A página de  foi completamente refatorada com estatísticas, filtros avançados (data, mês), e ações rápidas (agendar, cancelar). A página de  foi refatorada com lazy loading, paginação, e novas ações. As páginas de  e  foram unificadas em uma única tela com KPIs consolidados e múltiplas abas (, , , ).
-- **Funcionalidades do Instalador:**
-    - Fazer check-in/out por item. **Corrigido:** O acesso à câmera em dispositivos móveis foi melhorado para ser mais robusto e compatível.
-- **Calendário:**
-    - **Em Progresso:** Uma nova página de calendário com drag-and-drop e sincronização de e-mails do Google Calendar está sendo implementada.
+- Correção da atribuição de itens na página de detalhes do Job.
+- Correção de um erro de carregamento do Dashboard para um usuário específico.
+- Investigação e correção de falhas no envio de e-mails de redefinição de senha (problema com a API Resend).
+- Melhoria da página de gerenciamento de Usuários (edição, busca, ativação/desativação).
+- Implementação de um sistema de notificações push para instaladores (novos agendamentos, check-ins atrasados, conflitos).
+- Implementação de monitoramento por GPS (geofencing) para alertar se o checkout for feito longe do local do check-in.
+- Implementação de um sistema para o gerente justificar jobs não realizados, com notificação por e-mail.
+- Correção de um erro onde os relatórios em Excel eram gerados em branco.
+- Adição de um filtro por família de produtos nos relatórios.
+- Criação de um calendário geral para que todos os instaladores possam ver os jobs da equipe.
+- Alteração do Dashboard do gerente para substituir Check-ins Recentes por Check-ins em Atraso/Pausados.
+- Correção do erro gerado pela alteração acima no Dashboard.
+- Investigação de um erro de conexão com o Google Calendar.
 
 **User's preferred language**: Portuguese (Brazil)
 
 **what currently exists?**
-Um aplicativo full-stack (FastAPI + React) com autenticação JWT, integração com a API da Holdprint (agora funcional), e funcionalidades para Admin/Gerente/Instalador. A integração com a Holdprint foi investigada a fundo, descobrindo que a documentação oficial estava desatualizada e o domínio correto era . A página de  foi refatorada duas vezes, incluindo filtros de data, estatísticas, lazy loading, e botões para agendamento (com dialog) e cancelamento de jobs. A página de  também foi otimizada com abas, lazy loading, paginação e novas ações (arquivar/excluir). As seções de Relatórios e Produtividade foram unificadas em uma nova página  com KPIs consolidados e múltiplas abas. O erro de acesso à câmera no mobile foi corrigido.
+Um aplicativo PWA full-stack (FastAPI + React) com autenticação JWT, integração funcional com a API da Holdprint e funcionalidades para diferentes perfis de usuário (Admin, Gerente, Instalador).
+
+O sistema inclui:
+- **Páginas Refatoradas:** ,  e  com filtros, estatísticas e lazy loading.
+- **Calendário de Agendamento ():** Funcionalidade de arrastar e soltar (drag-and-drop) para agendamento, com verificação de conflitos de horário. A integração com o Google Calendar está implementada, mas bloqueada.
+- **Gerenciamento de Usuários ():** Página aprimorada com busca, filtros, modal de edição completo (incluindo telefone/filial para instaladores) e um toggle para ativar/desativar usuários.
+- **Sistema de Notificações Push:** A infraestrutura básica (VAPID keys, service worker, endpoints de subscrição) foi implementada para futuras notificações.
+- **Monitoramento GPS (Geofencing):** O backend agora verifica a distância entre o check-in e o checkout. Se for maior que 500m, um alerta é gerado e o job é pausado automaticamente. Um novo card no dashboard do gerente exibe esses alertas.
+- **Sistema de Justificativa:** Gerentes podem justificar jobs agendados e não realizados através de um botão na página , que abre um dialog e dispara uma notificação por e-mail (envio de e-mail bloqueado).
+- **Relatórios:** A exportação para Excel foi corrigida e agora inclui todos os dados relevantes. A página de relatórios () agora possui um filtro por família de produtos.
+- **Calendário da Equipe ():** Uma nova página read-only para instaladores visualizarem todos os jobs agendados da equipe.
+- **Dashboard do Gerente:** Foi modificado para incluir cards de alertas, mas está atualmente com um erro de renderização.
 
 **Last working item**:
-    - Last item agent was working: O agente estava implementando um calendário visual compartilhado para todos os instaladores com funcionalidade de drag-and-drop para agendamentos e sincronização de e-mails via Google Calendar. O agente sobrescreveu o arquivo  com uma nova implementação e estava prestes a verificar e ajustar o backend para suportar o envio de convites por e-mail.
+    - Last item agent was working: O agente estava corrigindo um erro na página . A modificação para substituir a seção Check-ins Recentes por Check-ins em Atraso e Pausados (solicitada pelo usuário) quebrou a página, pois o agente removeu a variável de estado  mas deixou referências a ela no código. O usuário reportou o erro e o agente estava prestes a remover as referências restantes.
     - Status: IN PROGRESS
     - Agent Testing Done: N
-    - Which testing method agent to use? both
+    - Which testing method agent to use? screenshot tool
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-Nenhum bug pendente foi identificado. O agente estava trabalhando em uma nova feature.
+  - Issue 1: (P0) Corrigir erro de renderização no Dashboard do gerente.
+  - Issue 2: (P1) Erro de conexão com Google Calendar.
+  - Issue 3: (P2) Envio de e-mail via Resend está em modo de teste.
+  
+  Issues Detail:
+  - Issue 1: 
+     - Attempted fixes: O agente identificou a causa (referências órfãs à variável de estado  em ) mas não chegou a aplicar a correção.
+     - Next debug checklist: 
+       1. Localizar e remover todas as referências restantes à variável  no arquivo .
+       2. Garantir que as novas variáveis de estado ( e ) sejam usadas corretamente para renderizar a nova seção.
+       3. Tirar um screenshot da página  após a correção para verificar se ela carrega corretamente.
+     - Why fix this issue and what will be achieved with the fix? O Dashboard é uma página principal para gerentes e administradores e está atualmente inacessível. A correção restaurará a funcionalidade da página.
+     - Status:  IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Frontend
+     - Blocked on other issue: Não
+  - Issue 2: 
+     - Attempted fixes: O agente diagnosticou o erro  como um problema de configuração no Google Cloud Console (provavelmente faltando URIs de redirecionamento autorizados). Nenhuma correção foi aplicada pois depende de uma ação do usuário.
+     - Next debug checklist: Aguardar que o usuário confirme a configuração correta das credenciais OAuth no Google Cloud Console.
+     - Why fix this issue and what will be achieved with the fix? Permitirá a sincronização de eventos de agendamento com o Google Calendar, incluindo o envio de convites, completando uma feature importante do calendário.
+     - Status:  BLOCKED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Both
+     - Blocked on other issue: Não. Bloqueado pelo usuário.
+  - Issue 3: 
+     - Attempted fixes: O agente identificou que a conta Resend está em modo de teste, o que impede o envio de e-mails para domínios não verificados. Foi implementada uma mensagem de erro clara no frontend. O usuário forneceu uma nova chave e um e-mail, mas o problema persistiu pois o domínio não está verificado no Resend.
+     - Next debug checklist: Aguardar que o usuário verifique o domínio () em sua conta Resend.
+     - Why fix this issue and what will be achieved with the fix? Habilitará o envio de e-mails para funcionalidades críticas como Esqueci minha Senha e Notificação de Justificativa de Job.
+     - Status:  BLOCKED
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix? Backend
+     - Blocked on other issue: Não. Bloqueado pelo usuário.
 
 **In progress Task List**:
-  - Task 1: (P0) Finalizar a implementação do calendário visual com drag-and-drop e sincronização de e-mails do Google Calendar.
-
- Task Detail:
-  - Task 1: 
-     - Where to resume: 
-        1. Revisar o arquivo  que foi sobrescrito para garantir que o código está completo e funcional.
-        2. Verificar o arquivo  e modificar os endpoints do Google Calendar ( e ) para adicionar a funcionalidade de enviar convites por e-mail para os participantes ().
-        3. Implementar a lógica de drag-and-drop no frontend para atualizar a data de agendamento de um job ().
-        4. Testar o fluxo completo: arrastar um job, confirmar a alteração, e verificar se o evento no Google Calendar é atualizado e os convites são enviados.
-     - What will be achieved with this? Uma visão centralizada de todos os agendamentos para os instaladores e gerenciamento simplificado de eventos através de drag-and-drop, com notificações automáticas via Google Calendar.
-     - Status:  IN PROGRESS
-     - Should Test frontend/backend/both after fix? Both
-     - Blocked on something: Não
+Nenhum.
 
 **Upcoming and Future Tasks**
-    - **Upcoming Tasks:**
-        - **(P1) Funcionalidade de Edição de Usuário:** Implementar a lógica de edição na página .
-        - **(P2) Melhoria na Classificação de Produtos:** Permitir que o gerente associe manualmente um produto não classificado a uma família de produtos.
-    - **Future Tasks:**
-        - **(P3) Capacidades Offline (PWA):** Implementar funcionalidade offline robusta para check-in/out.
-        - **(P4) Machine Learning:** Usar os dados coletados para calibrar a matriz de tempo de instalação.
+    **Upcoming Tasks:**
+    - **(P1) Finalizar Notificações Push:** A infraestrutura está pronta, mas é preciso implementar e testar os gatilhos para cada tipo de notificação (novo agendamento, check-in atrasado). O modal de permissão no frontend também precisa ser verificado, pois não apareceu no teste do agente.
+    - **(P2) Melhoria na Classificação de Produtos:** Implementar uma funcionalidade para o gerente associar manualmente um produto não classificado a uma família de produtos.
+    
+    **Future Tasks:**
+    - **(P3) Capacidades Offline (PWA):** Implementar funcionalidade offline robusta para check-in/out.
+    - **(P4) Machine Learning:** Usar os dados coletados para calibrar a matriz de tempo de instalação.
 
 **Completed work in this session**
-- **Correção da API Holdprint**: A integração foi totalmente corrigida. O agente investigou, descobriu que o URL da documentação estava desatualizado (), e confirmou que o domínio correto é . A funcionalidade foi testada com o testing agent.
-- **Refatoração da Página de Jobs ()**:
-    - Adicionados filtros de data (início/fim) e de mês.
-    - Exibição do número do job () e da data de início em cada card.
-    - Implementado um botão Agendar que abre um dialog para definir a data e atualiza o status do job para Agendado.
-    - O botão Excluir foi substituído por S/ Instalação, que cancela o job e o exclui das métricas.
-    - A performance foi melhorada com lazy loading, paginação e componentes memoizados.
-- **Refatoração da Página de Check-ins ()**:
-    - A página foi corrigida para buscar dados da coleção .
-    - A UI foi completamente refeita com cards de estatísticas, abas (, , ), lazy loading e paginação.
-    - Adicionados botões para Arquivar e Excluir registros.
-- **Unificação dos Relatórios ()**:
-    - As páginas Relatórios e Produtividade foram unificadas em uma nova página com KPIs consolidados.
-    - A nova página inclui abas para , ,  e .
-    - A aba  foi atualizada para exibir o tempo total de instalação de cada job.
-    - A aba  foi melhorada para exibir o número e nome do job em cada foto.
-- **Correção da Câmera no Mobile**: O erro de permissão ao acessar a câmera em dispositivos móveis foi corrigido usando uma abordagem mais robusta com  e .
-- **Correção do **: Corrigido um erro de renderização que ocorria quando os dados de check-in ainda não estavam carregados.
-- **Limpeza de Código**: As páginas obsoletas  e  e suas rotas foram removidas do projeto.
+- **Correção (JobDetail):** Corrigido o bug que impedia a exibição de produtos/itens no diálogo de atribuição.
+- **Correção (Dashboard):** Resolvido um erro de carregamento do dashboard para um usuário específico, que era causado por credenciais inválidas.
+- **Correção (Relatórios):** Corrigido o bug que fazia a exportação de relatórios em Excel gerar um arquivo vazio. O endpoint agora busca dados da coleção correta ().
+- **Melhoria (Esqueci a Senha):** Adicionada uma mensagem de erro clara para o usuário informando que o serviço de e-mail está em modo de teste, e confirmado que o fluxo de reset manual de senha pelo admin funciona como alternativa.
+- **Feature (Usuários):** A página de gerenciamento de usuários foi aprimorada com busca, toggle de status (ativo/inativo) e campos de telefone/filial no modal de edição de instaladores.
+- **Feature (Geofencing):** Implementado o monitoramento de localização no checkout, que cria um alerta e pausa o job se a distância do check-in for > 500m.
+- **Feature (Justificativa):** Adicionada a funcionalidade para gerentes justificarem jobs não realizados, com um dialog e notificação por e-mail (envio pendente de verificação do domínio).
+- **Feature (Filtro de Relatórios):** Adicionado um filtro por Família de Produto na página de relatórios unificados.
+- **Feature (Calendário da Equipe):** Criada uma nova página de calendário () para que os instaladores visualizem todos os jobs agendados.
 
 **Earlier issues found/mentioned but not fixed**
-Nenhum. A questão de remover as páginas obsoletas foi resolvida nesta sessão.
+Nenhum.
 
 **Known issue recurrence from previous fork**
-  - **Password Reset for Testing:** O agente precisou resetar as senhas dos usuários de teste (, , ) várias vezes, pois o login falhava. Isso parece ser um artefato do ambiente de teste que o próximo agente deve estar ciente.
+  - **Password Reset for Testing:** O agente precisou resetar as senhas de usuários de teste (, ) para prosseguir com os testes. O próximo agente deve estar ciente de que isso pode ser necessário novamente.
 
 **Code Architecture**
-no_installationcancelled_atexclude_from_metrics
+
 
 **Key Technical Concepts**
-- **Backend**: FastAPI, Pydantic.
-- **Frontend**: React.js, Tailwind CSS, Shadcn/UI (Tabs, Dialog, Card, etc.), Axios.
-- **Performance**: Lazy loading (), Paginação (Carregar mais),  para otimização de renderização.
-- **API Investigation**: Uso de , ,  para diagnosticar problemas de DNS e identificar a migração da infraestrutura da API da Holdworks.
-- **Mobile Development**: Uso de  com o atributo  para acesso direto à câmera de forma compatível.
+- **Push Notifications:** Implementação com Web Push API, VAPID Keys e Service Workers.
+- **Geolocation:** Uso da fórmula de Haversine no backend para calcular a distância entre coordenadas GPS.
+- **3rd Party Integrations:** Interação com Resend (identificada limitação de modo de teste) e Google Calendar (identificado erro de configuração).
+- **Backend (FastAPI):** Criação de múltiplos novos endpoints, correção de lógica em endpoints existentes (exportação, atualização de usuário) e adição de novas dependências ().
+- **Frontend (React):** Criação de novos componentes (modais, hooks), páginas e refatoração significativa de páginas existentes (, , ).
 
 **key DB schema**
-  - **jobs**: Adicionados campos  (datetime),  (bool),  (str),  (datetime),  (bool).
-  - **item_checkins**: Adicionado campo  (bool).
+  - **users**: O campo  foi implementado e está funcional.
+  - **item_checkins**: Adicionado um campo  para registrar quando o checkout ocorre fora do perímetro. Um log de pausa também é criado.
+  - **jobs**: Adicionado um campo  para armazenar o motivo pelo qual um job agendado não foi realizado.
 
 **changes in tech stack**
-Nenhuma nova dependência de tecnologia foi adicionada, mas o uso de componentes Shadcn/UI foi expandido.
+  - **Backend:** Adicionada a dependência  para notificações push.
 
 **All files of reference**
-- : Principal arquivo de backend, modificado para corrigir a API da Holdprint e adicionar novos campos/endpoints.
-- : Página central para gerentes, completamente refatorada para UX e funcionalidade.
-- : Página de visualização de check-ins, completamente refatorada para performance e UX.
-- : Nova página que consolida métricas e relatórios.
-- : Onde a correção da câmera foi aplicada.
-- : Arquivo que foi sobrescrito para a nova implementação de calendário.
-- : Modificado para refletir a nova estrutura de navegação.
-- : Onde as rotas foram atualizadas.
+- : Arquivo crítico para a próxima tarefa de correção de bug.
+- : Arquivo central do backend, extensivamente modificado.
+- : Página de gerenciamento de usuários, agora com novas funcionalidades.
+- : Página de relatórios, com novo filtro.
+- : Nova página de calendário para instaladores.
 
 **Areas that need refactoring**:
--  continua sendo um arquivo monolítico. A separação da lógica em diferentes arquivos (rotas, serviços, modelos) melhoraria a manutenção.
-- O recém-sobrescrito  precisa ser revisado, finalizado e testado.
+-  permanece um arquivo monolítico. A separação da lógica em rotas, serviços e modelos melhoraria a manutenibilidade.
+- A lógica para categorizar famílias de produtos está no frontend () e é baseada em . Isso poderia ser movido para o backend e se tornar um sistema de classificação mais robusto.
 
 **key api endpoints**
-- **Holdprint (Corrigido)**:  agora usa a URL .
-- **Jobs (Modificado)**:  agora aceita , , , , .
-- **Check-ins (Novo)**:  para arquivar um registro de check-in.
-- **Check-ins (Corrigido)**:  agora busca dados da coleção .
+- **NOVOS:**
+  - : Fornece a chave pública VAPID para o frontend.
+  - : Salva a subscrição de push notification do usuário.
+  - : Registra a justificativa de um job e tenta enviar um e-mail.
+  - : Retorna a lista de alertas de geofencing.
+- **MODIFICADOS:**
+  - : Agora suporta a atualização de ,  e .
+  - : Adicionada a lógica de verificação de distância (geofencing).
+  - : Corrigido para buscar da coleção  e incluir mais colunas.
+  - : Permissão ajustada para permitir acesso de leitura para instaladores.
 
 **Critical Info for New Agent**
-1.  **Holdprint API URL**: A documentação da Holdworks está **desatualizada**. O URL correto da API é , não o que está na documentação deles (). O sistema já está configurado corretamente.
-2.  **Problema de Login para Teste**: Durante o desenvolvimento, as senhas dos usuários de teste podem precisar ser resetadas, pois o login pode falhar inesperadamente. O agente anterior usou um script para resetar as senhas para o padrão (, , ).
-3.  **Calendário em Andamento**: A implementação da nova página de calendário () foi iniciada, mas não concluída. O arquivo foi sobrescrito e pode estar em um estado instável. A tarefa precisa ser retomada a partir daí.
+- **Tarefa Imediata:** A prioridade máxima é consertar o erro de renderização na página do Dashboard () causado por referências a uma variável de estado removida ().
+- **Integrações Bloqueadas:** Não tente corrigir as integrações do **Google Calendar** ou **Resend**. Ambas estão bloqueadas e dependem de ações do usuário (configuração no Google Cloud e verificação de domínio no Resend, respectivamente). O aplicativo possui tratamentos de erro e alternativas funcionais (reset manual de senha).
+- **Credenciais de Teste:** As senhas dos usuários de teste (, , etc.) podem expirar ou falhar. Esteja preparado para resetá-las usando o script do agente anterior ou manualmente através do painel de admin, se necessário.
 
 **documents and test reports created in this job**
-  - : Foi atualizado para incluir os testes da API da Holdprint.
+  - : Atualizado com os resultados dos testes de backend para as novas funcionalidades.
 
-**Last 10 User Messages and any pending HUMAN messages**
-- **User (msg 298):** Solicitou uma refatoração completa da página de Jobs para melhorar o UX, substituir o botão de exclusão, e adicionar um botão de agendamento. (CONCLUÍDO)
-- **User (msg 333):** Reportou um erro ao acessar a câmera pelo celular. (CONCLUÍDO)
-- **User (msg 362):** Solicitou unificar os menus Relatórios e Produtividade. (CONCLUÍDO)
-- **User (msg 406):** Pediu para adicionar o número do job e melhorar o nome das imagens na seção de fotos dos relatórios. (CONCLUÍDO)
-- **User (msg 425):** Reportou um erro na página de visualização de detalhes do check-in. (CONCLUÍDO)
-- **User (msg 446):** Pediu para incluir o tempo total de instalação na aba Jobs dos relatórios. (CONCLUÍDO)
-- **User (msg 457):** Solicitou a sincronização de e-mails do Google Calendar e a criação de um calendário visual com drag-and-drop. (EM ANDAMENTO)
-- **User (msg 288):** Solicitou a correção do erro ao excluir um job. (CONCLUÍDO)
-- **User (msg 263):** Reportou um erro ao excluir um job. (CONCLUÍDO)
-- **User (msg 228):** Pediu para refatorar a página de check-ins. (CONCLUÍDO)
+**Last 10 User Messages and any pending HUMAN messages** 
+ - : verifique o erro - Reportou o bug no Dashboard após a última modificação do agente. **(PENDENTE)**
+ - : Solicitou a troca da seção Check-ins Recentes por Em Atraso/Pausados no Dashboard. **(EM ANDAMENTO)**
+ - : Solicitou um calendário geral para a equipe de instaladores. **(CONCLUÍDO)**
+ - : Reportou que o relatório Excel estava vindo em branco. **(CONCLUÍDO)**
+ - : Solicitou a correção do relatório Excel e a adição de um filtro por família de produtos. **(CONCLUÍDO)**
+ - : Solicitou a funcionalidade de justificar jobs não realizados, com notificação por e-mail. **(CONCLUÍDO)**
+ - : Solicitou a funcionalidade de geofencing por GPS no checkout. **(CONCLUÍDO)**
+ - : Adiou a configuração do Google Calendar e pediu para priorizar as notificações push. **(CONCLUÍDO)**
+ - : erro ao conectar calendario. **(BLOQUEADO)**
+ - : Perguntou a senha do admin. **(RESPONDIDO)**
 
 **Project Health Check:**
-- **Broken:** Nenhum.
-- **Mocked:** Nenhum.
+- **Broken**: A página  está com um erro de renderização e não carrega.
+- **Mocked**: Nenhuma.
 
 **3rd Party Integrations**
 - **Holdworks API**: Para importar a lista de trabalhos. (Status: **Funcional**)
-- **Google Maps**: Usado para gerar links de localização.
-- **openpyxl**: Para gerar arquivos Excel.
-- **Google Calendar API**: Integrado para criar eventos. A funcionalidade de envio de convites por e-mail está pendente.
-- **Resend**: Integrado para enviar emails de recuperação de senha.
-- **Pillow**: Usado no backend para compactação de imagens.
+- **Google Maps**: Usado para gerar links de localização. (Status: **Funcional**)
+- **openpyxl**: Para gerar arquivos Excel. (Status: **Funcional**)
+- **Google Calendar API**: Integrado para criar eventos. (Status: **Bloqueado** - Requer configuração no Google Cloud Console pelo usuário).
+- **Resend**: Integrado para enviar e-mails. (Status: **Bloqueado** - Requer verificação de domínio na conta Resend pelo usuário).
+- **Pillow**: Usado no backend para compactação de imagens. (Status: **Funcional**)
+- **pywebpush (NOVO)**: Para notificações push. (Status: **Implementado, requer teste de ponta a ponta**).
 
 **Testing status**
-  - Testing agent used after significant changes: YES (para a correção da API Holdprint).
+  - Testing agent used after significant changes: YES (para validar endpoints de backend das novas funcionalidades).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: Scripts temporários em Python e  foram usados para testes pontuais.
-  - Known regressions: Nenhuma.
+  - Test files created: Scripts  e  para testes pontuais de API.
+  - Known regressions: A página  está quebrada.
 
 **Credentials to test flow:**
 - **Admin:**  / 
 - **Gerente:**  / 
 - **Instalador:**  / 
+- **Andreia Schneider (Admin):**  / 
 
 **What agent forgot to execute**
-O agente iniciou a refatoração da página do Calendário, mas não concluiu a implementação. A tarefa de adicionar a sincronização de e-mails para convites do Google Calendar no backend também não foi iniciada. A página  pode estar em um estado não funcional.</analysis>
+O agente não corrigiu o erro que introduziu na página  ao implementar a última solicitação do usuário. A sessão terminou com a página quebrada, conforme apontado pelo usuário na última mensagem.</analysis>
