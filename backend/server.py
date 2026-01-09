@@ -3711,9 +3711,11 @@ async def export_reports(current_user: User = Depends(get_current_user)):
     
     # Headers
     headers = [
-        "ID do Job",
+        "Código Job",
         "Nome do Job",
         "Cliente",
+        "Item/Produto",
+        "Família",
         "Área Total (m²)",
         "M² Instalado",
         "Instalador",
@@ -3736,6 +3738,25 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         cell.alignment = header_alignment
         cell.border = border
     
+    # Product family classification function
+    def get_product_family(product_name):
+        if not product_name:
+            return 'Outros'
+        name = product_name.lower()
+        if 'adesivo' in name:
+            return 'Adesivos'
+        if 'lona' in name or 'banner' in name:
+            return 'Lonas/Banners'
+        if 'chapa' in name or 'acm' in name or 'fachada' in name:
+            return 'Chapas/Fachadas'
+        if 'serviço' in name or 'serviços' in name or 'instalação' in name or 'entrega' in name:
+            return 'Serviços'
+        if 'placa' in name or 'legenda' in name:
+            return 'Placas/Legendas'
+        if 'display' in name or 'expositor' in name or 'totem' in name:
+            return 'Displays/Totens'
+        return 'Outros'
+    
     # Write data
     row_num = 2
     for checkin in checkins:
@@ -3744,17 +3765,29 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         
         if not job:
             continue
-            
-        ws.cell(row=row_num, column=1, value=job.get('id', '')).border = border
+        
+        # Get product name
+        product_name = checkin.get('product_name') or checkin.get('item_name') or ''
+        if not product_name and job.get('holdprint_data', {}).get('products'):
+            item_index = checkin.get('item_index', 0)
+            products = job['holdprint_data']['products']
+            if item_index < len(products):
+                product_name = products[item_index].get('name', '')
+        
+        job_code = job.get('holdprint_data', {}).get('code') or job.get('code') or job.get('id', '')[:8]
+        
+        ws.cell(row=row_num, column=1, value=f"#{job_code}").border = border
         ws.cell(row=row_num, column=2, value=job.get('title', '')).border = border
-        ws.cell(row=row_num, column=3, value=job.get('client_name', '')).border = border
-        ws.cell(row=row_num, column=4, value=job.get('area_m2', '')).border = border
-        ws.cell(row=row_num, column=5, value=checkin.get('installed_m2', '')).border = border
-        ws.cell(row=row_num, column=6, value=installer.get('full_name', '') if installer else '').border = border
-        ws.cell(row=row_num, column=7, value=checkin.get('gps_lat', '')).border = border
-        ws.cell(row=row_num, column=8, value=checkin.get('gps_long', '')).border = border
-        ws.cell(row=row_num, column=9, value=checkin.get('checkout_gps_lat', '')).border = border
-        ws.cell(row=row_num, column=10, value=checkin.get('checkout_gps_long', '')).border = border
+        ws.cell(row=row_num, column=3, value=job.get('client_name') or job.get('holdprint_data', {}).get('customerName', '')).border = border
+        ws.cell(row=row_num, column=4, value=product_name).border = border
+        ws.cell(row=row_num, column=5, value=get_product_family(product_name)).border = border
+        ws.cell(row=row_num, column=6, value=job.get('area_m2', 0)).border = border
+        ws.cell(row=row_num, column=7, value=checkin.get('installed_m2', 0)).border = border
+        ws.cell(row=row_num, column=8, value=installer.get('full_name', '') if installer else '').border = border
+        ws.cell(row=row_num, column=9, value=checkin.get('gps_lat', '')).border = border
+        ws.cell(row=row_num, column=10, value=checkin.get('gps_long', '')).border = border
+        ws.cell(row=row_num, column=11, value=checkin.get('checkout_gps_lat', '')).border = border
+        ws.cell(row=row_num, column=12, value=checkin.get('checkout_gps_long', '')).border = border
         
         checkin_at = checkin.get('checkin_at')
         if isinstance(checkin_at, str):
