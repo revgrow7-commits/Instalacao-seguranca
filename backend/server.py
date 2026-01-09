@@ -5142,6 +5142,8 @@ async def create_reward(
     reward_dict["created_at"] = reward_dict["created_at"].isoformat()
     await db.rewards.insert_one(reward_dict)
     
+    # Remove _id before returning
+    reward_dict.pop("_id", None)
     return reward_dict
 
 @api_router.put("/gamification/rewards/{reward_id}")
