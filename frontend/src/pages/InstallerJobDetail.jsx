@@ -123,6 +123,12 @@ const InstallerJobDetail = () => {
       setItemCheckins(checkinsMap);
       setPauseLogs(pauseLogsMap);
     } catch (error) {
+      // Check if it's an access denied error
+      if (error.response?.status === 403) {
+        toast.error('Você não tem acesso a este job');
+        navigate('/installer');
+        return;
+      }
       toast.error('Erro ao carregar job');
       console.error(error);
     } finally {
