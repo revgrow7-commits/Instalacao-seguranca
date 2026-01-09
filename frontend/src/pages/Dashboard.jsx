@@ -12,7 +12,8 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
-  const [checkins, setCheckins] = useState([]);
+  const [lateCheckins, setLateCheckins] = useState([]);
+  const [pausedCheckins, setPausedCheckins] = useState([]);
   const [pendingCheckins, setPendingCheckins] = useState([]);
   const [locationAlerts, setLocationAlerts] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
@@ -39,15 +40,24 @@ const Dashboard = () => {
         const metricsRes = await api.getMetrics();
         setMetrics(metricsRes.data);
         
-        // Load recent checkins
+        // Load all checkins and filter for late/paused
         const checkinsRes = await api.getCheckins();
-        // Sort by most recent and take last 6
-        const sortedCheckins = checkinsRes.data.sort((a, b) => 
-          new Date(b.checkin_at) - new Date(a.checkin_at)
-        );
-        setCheckins(sortedCheckins.slice(0, 6));
+        const now = new Date();
         
-        // Load pending check-ins (late alerts)
+        // Filter paused check-ins (status = 'paused')
+        const paused = checkinsRes.data.filter(c => c.status === 'paused');
+        setPausedCheckins(paused);
+        
+        // Filter late check-ins (in_progress for more than 4 hours)
+        const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+        const late = checkinsRes.data.filter(c => {
+          if (c.status !== 'in_progress') return false;
+          const checkinTime = new Date(c.checkin_at);
+          return checkinTime < fourHoursAgo;
+        });
+        setLateCheckins(late);
+        
+        // Load pending check-ins (scheduled but not started)
         try {
           const pendingRes = await api.getPendingCheckins();
           setPendingCheckins(pendingRes.data.pending_checkins || []);
