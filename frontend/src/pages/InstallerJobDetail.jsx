@@ -426,6 +426,13 @@ const InstallerJobDetail = () => {
 
   return (
     <div className="min-h-screen bg-background pb-24">
+      {/* Coin Animation */}
+      <CoinAnimation 
+        show={showCoinAnimation} 
+        coins={earnedCoins} 
+        onComplete={handleCoinAnimationComplete}
+      />
+
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
         <div className="p-4">
