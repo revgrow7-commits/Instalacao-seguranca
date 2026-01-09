@@ -307,14 +307,18 @@ const InstallerCalendar = () => {
                                   key={job.id}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    navigate(`/installer/jobs/${job.id}`);
+                                    if (isMine) {
+                                      navigate(`/installer/jobs/${job.id}`);
+                                    } else {
+                                      toast.info('Este job está atribuído a outro instalador');
+                                    }
                                   }}
                                   className={`text-[9px] px-1 py-0.5 rounded cursor-pointer truncate ${
                                     isMine 
                                       ? 'bg-primary text-white font-bold' 
-                                      : getStatusColor(job.status) + ' text-white opacity-80'
+                                      : getStatusColor(job.status) + ' text-white opacity-60'
                                   }`}
-                                  title={job.title}
+                                  title={isMine ? job.title : `${job.title} (Outro instalador)`}
                                 >
                                   {isMine && '★ '}{job.title?.substring(0, 12)}
                                 </div>
