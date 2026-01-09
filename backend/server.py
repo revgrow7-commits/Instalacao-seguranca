@@ -2594,7 +2594,8 @@ async def get_pause_reasons():
 
 @api_router.get("/installers", response_model=List[Installer])
 async def list_installers(current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    # Allow installers to see basic info about other installers (for team calendar)
+    # Admin/Manager see full data
     
     installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
     
