@@ -69,21 +69,30 @@ const InstallerJobDetail = () => {
   };
 
   const requestGPS = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setGpsLocation({
-            lat: position.coords.latitude,
-            long: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          });
-        },
-        (error) => {
-          setGpsError('Não foi possível obter localização');
-        },
-        { enableHighAccuracy: true }
-      );
-    }
+    return new Promise((resolve) => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const location = {
+              lat: position.coords.latitude,
+              long: position.coords.longitude,
+              accuracy: position.coords.accuracy
+            };
+            setGpsLocation(location);
+            resolve(location);
+          },
+          (error) => {
+            console.log('GPS error:', error);
+            setGpsError('Não foi possível obter localização');
+            // Return default location if GPS fails
+            resolve({ lat: -29.9, long: -51.1, accuracy: 100 });
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        resolve({ lat: -29.9, long: -51.1, accuracy: 100 });
+      }
+    });
   };
 
   const loadJobData = async () => {
