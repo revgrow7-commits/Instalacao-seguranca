@@ -219,13 +219,16 @@ const InstallerJobDetail = () => {
     try {
       setProcessingItem(itemIndex);
       
+      // Request GPS when user initiates check-in (avoids Android overlay error)
+      const location = await requestGPS();
+      
       const formData = new FormData();
       formData.append('job_id', jobId);
       formData.append('item_index', itemIndex);
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', gpsLocation?.lat || -29.9);
-      formData.append('gps_long', gpsLocation?.long || -51.1);
-      formData.append('gps_accuracy', gpsLocation?.accuracy || 10);
+      formData.append('gps_lat', location?.lat || -29.9);
+      formData.append('gps_long', location?.long || -51.1);
+      formData.append('gps_accuracy', location?.accuracy || 10);
 
       await api.createItemCheckin(formData);
       toast.success('Check-in do item realizado!');
