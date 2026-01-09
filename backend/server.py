@@ -2418,6 +2418,37 @@ async def complete_item_checkout(
     if all_assigned_completed and len(assigned_item_indices) > 0:
         await db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
     
+    # ============ GAMIFICATION: Process coins for checkout ============
+    gamification_result = None
+    try:
+        # Get updated checkin with installed_m2
+        updated_checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+        if updated_checkin and updated_checkin.get("installed_m2", 0) > 0:
+            coin_result = await calculate_checkout_coins(updated_checkin, job)
+            
+            if coin_result["total_coins"] > 0:
+                installer_user_id = None
+                # Get installer's user_id
+                installer = await db.installers.find_one({"id": updated_checkin.get("installer_id")}, {"_id": 0})
+                if installer:
+                    installer_user_id = installer.get("user_id")
+                
+                if installer_user_id:
+                    gamification_result = await award_coins(
+                        user_id=installer_user_id,
+                        amount=coin_result["total_coins"],
+                        transaction_type="earn_checkout",
+                        description=f"Checkout: {job.get('title', 'Job')[:30]}",
+                        reference_id=checkin_id,
+                        breakdown=coin_result["breakdown"]
+                    )
+                    if gamification_result:
+                        gamification_result["breakdown"] = coin_result["breakdown"]
+                        gamification_result["installed_m2"] = coin_result["installed_m2"]
+    except Exception as e:
+        logging.warning(f"Gamification processing error (non-blocking): {e}")
+    # ============ END GAMIFICATION ============
+    
     # Return updated checkin with location alert if any
     result = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     
@@ -2425,6 +2456,10 @@ async def complete_item_checkout(
     if location_alert:
         result["location_alert"] = location_alert
         result["checkout_distance_meters"] = round(distance_meters, 2)
+    
+    # Add gamification result to response
+    if gamification_result:
+        result["gamification"] = gamification_result
     
     return result
 
