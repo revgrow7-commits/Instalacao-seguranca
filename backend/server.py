@@ -52,13 +52,13 @@ HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 # Google OAuth Config
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://installer-track.preview.emergentagent.com/api/auth/google/callback')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://prod-control-10.preview.emergentagent.com/api/auth/google/callback')
 GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email']
 
 # Resend Email Config
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://installer-track.preview.emergentagent.com')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://prod-control-10.preview.emergentagent.com')
 resend.api_key = RESEND_API_KEY
 
 # Web Push Notification Config
@@ -4124,7 +4124,7 @@ async def google_callback(code: str, state: str = None):
         if not user:
             # Close window with error
             return RedirectResponse(
-                url=f"https://installer-track.preview.emergentagent.com/calendar?google_error=user_not_found"
+                url=f"https://prod-control-10.preview.emergentagent.com/calendar?google_error=user_not_found"
             )
         
         # Store Google tokens for this user
@@ -4145,13 +4145,13 @@ async def google_callback(code: str, state: str = None):
         
         # Redirect back to calendar page with success
         return RedirectResponse(
-            url=f"https://installer-track.preview.emergentagent.com/calendar?google_connected=true"
+            url=f"https://prod-control-10.preview.emergentagent.com/calendar?google_connected=true"
         )
         
     except Exception as e:
         logging.error(f"Google callback error: {str(e)}")
         return RedirectResponse(
-            url=f"https://installer-track.preview.emergentagent.com/calendar?google_error=auth_failed"
+            url=f"https://prod-control-10.preview.emergentagent.com/calendar?google_error=auth_failed"
         )
 
 @api_router.get("/auth/google/status")

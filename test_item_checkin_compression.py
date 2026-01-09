@@ -13,7 +13,7 @@ from io import BytesIO
 import os
 
 # Test configuration
-BASE_URL = "https://installer-track.preview.emergentagent.com/api"
+BASE_URL = "https://prod-control-10.preview.emergentagent.com/api"
 
 # Test credentials
 INSTALLER_CREDENTIALS = {
