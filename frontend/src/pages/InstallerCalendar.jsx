@@ -26,6 +26,7 @@ const InstallerCalendar = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState('month'); // month, week, list
   const [selectedBranch, setSelectedBranch] = useState('all');
+  const [currentInstallerId, setCurrentInstallerId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -39,12 +40,23 @@ const InstallerCalendar = () => {
       ]);
       setJobs(jobsRes.data);
       setInstallers(installersRes.data);
+      
+      // Find current user's installer ID
+      const currentInstaller = installersRes.data.find(i => i.user_id === user?.id);
+      if (currentInstaller) {
+        setCurrentInstallerId(currentInstaller.id);
+      }
     } catch (error) {
       console.error('Error loading data:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Check if job is assigned to current user
+  const isMyJob = (job) => {
+    return currentInstallerId && job.assigned_installers?.includes(currentInstallerId);
   };
 
   // Get scheduled jobs
