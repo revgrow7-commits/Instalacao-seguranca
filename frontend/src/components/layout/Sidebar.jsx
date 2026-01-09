@@ -10,7 +10,9 @@ import {
   LogOut,
   User,
   CheckCircle,
-  FileText
+  FileText,
+  Trophy,
+  Coins
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -42,6 +44,18 @@ const Sidebar = () => {
       href: '/reports',
       icon: BarChart3,
       roles: ['admin', 'manager']
+    },
+    {
+      name: 'Bonificação',
+      href: '/gamification-report',
+      icon: Trophy,
+      roles: ['admin', 'manager']
+    },
+    {
+      name: 'Loja Faixa Preta',
+      href: '/loja-faixa-preta',
+      icon: Coins,
+      roles: ['installer']
     },
     {
       name: 'Calendário',
