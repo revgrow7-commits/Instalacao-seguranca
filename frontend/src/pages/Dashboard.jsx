@@ -43,8 +43,8 @@ const Dashboard = () => {
         const metricsRes = await api.getMetrics();
         setMetrics(metricsRes.data);
         
-        // Load all checkins and filter for late/paused
-        const checkinsRes = await api.getCheckins();
+        // Load all item checkins and filter for late/paused
+        const checkinsRes = await api.getAllItemCheckins();
         const now = new Date();
         
         // Filter paused check-ins (status = 'paused')
