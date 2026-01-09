@@ -217,6 +217,16 @@ export const api = {
     return axios.get(url, { headers: getAuthHeader() });
   },
   getLeaderboard: (period = 'month', limit = 10) => axios.get(`${API_URL}/gamification/leaderboard?period=${period}&limit=${limit}`, { headers: getAuthHeader() }),
+  
+  // KPIs
+  getFamilyProductivityKpis: (dateFrom = null, dateTo = null) => {
+    let url = `${API_URL}/reports/kpis/family-productivity`;
+    const params = [];
+    if (dateFrom) params.push(`date_from=${dateFrom}`);
+    if (dateTo) params.push(`date_to=${dateTo}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
 };
 
 export default api;
