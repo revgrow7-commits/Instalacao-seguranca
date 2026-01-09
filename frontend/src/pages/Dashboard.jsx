@@ -470,19 +470,43 @@ const Dashboard = () => {
                       <span className="text-sm font-semibold text-yellow-400">Prolongados (+4h)</span>
                     </div>
                     <div className="grid gap-2 pl-10">
-                      {lateCheckins.slice(0, 3).map((checkin) => {
+                      {lateCheckins.slice(0, 5).map((checkin) => {
                         const job = jobs.find(j => j.id === checkin.job_id);
+                        const installer = getInstallerByUserId(checkin.installer_id);
                         const hours = Math.floor((new Date() - new Date(checkin.checkin_at)) / (1000 * 60 * 60));
                         return (
                           <div 
                             key={checkin.id}
-                            className="flex items-center justify-between p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg cursor-pointer hover:bg-yellow-500/10"
-                            onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                            className="flex items-center justify-between p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg"
                           >
-                            <span className="text-sm text-white truncate flex-1">{job?.title || 'Job'}</span>
-                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold ml-2">
-                              {hours}h+
-                            </span>
+                            <div 
+                              className="flex-1 cursor-pointer hover:text-yellow-300"
+                              onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                            >
+                              <span className="text-sm text-white truncate">{job?.title || 'Job'}</span>
+                              {installer && (
+                                <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 ml-2">
+                              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">
+                                {hours}h+
+                              </span>
+                              {installer?.phone && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWhatsApp(installer.phone, 'late', job?.title || 'Job', installer.full_name);
+                                  }}
+                                  title="Enviar WhatsApp"
+                                >
+                                  <MessageCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
