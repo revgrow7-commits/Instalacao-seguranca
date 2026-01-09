@@ -1269,6 +1269,27 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
     
     return jobs
 
+@api_router.get("/jobs/team-calendar")
+async def get_team_calendar_jobs(current_user: User = Depends(get_current_user)):
+    """
+    Get all scheduled jobs for the team calendar view.
+    Installers can see all scheduled jobs (not just their own) to know what the team is doing.
+    """
+    # Get all jobs that have a scheduled date
+    jobs = await db.jobs.find(
+        {"scheduled_date": {"$exists": True, "$ne": None}}, 
+        {"_id": 0}
+    ).to_list(500)
+    
+    # Process dates
+    for job in jobs:
+        if isinstance(job.get('created_at'), str):
+            job['created_at'] = datetime.fromisoformat(job['created_at'])
+        if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
+            job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])
+    
+    return jobs
+
 @api_router.get("/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     job_doc = await db.jobs.find_one({"id": job_id}, {"_id": 0})
