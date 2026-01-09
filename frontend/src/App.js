@@ -203,6 +203,16 @@ const AppRoutes = () => {
         element={<Navigate to="/reports" replace />}
       />
       <Route
+        path="/installer/calendar"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <InstallerCalendar />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/installer/job/:jobId"
         element={
           <ProtectedRoute>
