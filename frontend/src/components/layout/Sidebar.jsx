@@ -12,7 +12,8 @@ import {
   CheckCircle,
   FileText,
   Trophy,
-  Coins
+  Coins,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -43,6 +44,12 @@ const Sidebar = () => {
       name: 'Relatórios',
       href: '/reports',
       icon: BarChart3,
+      roles: ['admin', 'manager']
+    },
+    {
+      name: 'KPIs Família',
+      href: '/reports/kpis',
+      icon: TrendingUp,
       roles: ['admin', 'manager']
     },
     {
