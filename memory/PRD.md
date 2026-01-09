@@ -33,6 +33,8 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ### Calendário
 - [x] Drag-and-drop para agendamento
 - [x] Calendário da equipe para instaladores (read-only)
+- [x] **Nome do job exibido no calendário** (ao invés de apenas código)
+- [x] **Visualização de todos os jobs da equipe** com destaque para "Meus Jobs"
 - [x] Integração Google Calendar (bloqueado - configuração pendente)
 
 ### Relatórios
