@@ -184,6 +184,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - ✅ Adicionado Widget de Gamificação no Dashboard do Instalador
 - ✅ Implementado bônus diário de engajamento
 - ✅ Integração automática de cálculo de moedas no checkout
+- ✅ **Adicionado Ranking Semanal** visível para todos os instaladores
 
 ### 08/01/2026
 - ✅ Corrigido erro de renderização no Dashboard do gerente
