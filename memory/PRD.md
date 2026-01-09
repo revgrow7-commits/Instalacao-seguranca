@@ -191,7 +191,9 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - ✅ Implementada Animação de "Chuva de Moedas" após checkout
 - ✅ Calendário mostra nome do job (não apenas código)
 - ✅ Calendário da Equipe exibe todos os jobs com destaque para "Meus Jobs"
-- ✅ **Dashboard: Central de Alertas Unificada** com 4 tipos de alerta e ícones distintos
+- ✅ Dashboard: Central de Alertas Unificada com 4 tipos de alerta e ícones distintos
+- ✅ Dashboard: Ícones em formato infográfico para alertas
+- ✅ **KPIs por Família de Produtos:** Análise de m²/hora por tipo de material
 
 ### 08/01/2026
 - ✅ Corrigido erro de renderização no Dashboard do gerente
