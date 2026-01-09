@@ -38,6 +38,32 @@ const UnifiedReports = () => {
   const [endDate, setEndDate] = useState('');
   const [selectedInstaller, setSelectedInstaller] = useState('all');
   const [selectedJob, setSelectedJob] = useState('all');
+  const [selectedProductFamily, setSelectedProductFamily] = useState('all');
+  
+  // Product family classification
+  const getProductFamily = (productName) => {
+    if (!productName) return 'outros';
+    const name = productName.toLowerCase();
+    
+    if (name.includes('adesivo')) return 'adesivos';
+    if (name.includes('lona') || name.includes('banner')) return 'lonas';
+    if (name.includes('chapa') || name.includes('acm') || name.includes('fachada')) return 'chapas';
+    if (name.includes('serviço') || name.includes('serviços') || name.includes('instalação') || name.includes('entrega')) return 'servicos';
+    if (name.includes('placa') || name.includes('legenda')) return 'placas';
+    if (name.includes('display') || name.includes('expositor') || name.includes('totem')) return 'displays';
+    return 'outros';
+  };
+  
+  const productFamilies = [
+    { value: 'all', label: 'Todas as Famílias' },
+    { value: 'adesivos', label: 'Adesivos' },
+    { value: 'lonas', label: 'Lonas e Banners' },
+    { value: 'chapas', label: 'Chapas e Fachadas' },
+    { value: 'placas', label: 'Placas e Legendas' },
+    { value: 'displays', label: 'Displays e Totens' },
+    { value: 'servicos', label: 'Serviços' },
+    { value: 'outros', label: 'Outros' }
+  ];
   
   // Pagination
   const [jobsPage, setJobsPage] = useState(1);
