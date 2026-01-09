@@ -45,6 +45,39 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
   const isScheduled = !!job.scheduled_date;
   const isLate = job.scheduled_date && new Date(job.scheduled_date) < new Date() && job.status !== 'completed' && job.status !== 'finalizado';
   
+  // Calculate time since job started (for "instalando" status)
+  const getElapsedTime = () => {
+    // Check if there's a checkin time for this job
+    const checkinTime = job.last_checkin_at || job.started_at;
+    if (!checkinTime) return null;
+    
+    const start = new Date(checkinTime);
+    const now = new Date();
+    const diffMs = now - start;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours > 0) {
+      return `${diffHours}h ${diffMinutes}min`;
+    }
+    return `${diffMinutes}min`;
+  };
+  
+  // Check if job is stalled (more than 3 hours without activity)
+  const isStalled = () => {
+    const checkinTime = job.last_checkin_at || job.started_at;
+    if (!checkinTime) return false;
+    
+    const start = new Date(checkinTime);
+    const now = new Date();
+    const diffHours = (now - start) / (1000 * 60 * 60);
+    return diffHours >= 3;
+  };
+  
+  const isInProgress = job.status === 'instalando' || job.status === 'in_progress';
+  const elapsedTime = isInProgress ? getElapsedTime() : null;
+  const jobIsStalled = isInProgress && isStalled();
+  
   const getStatusStyle = () => {
     switch (job.status) {
       case 'completed':
@@ -80,7 +113,7 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
   };
 
   return (
-    <Card className="bg-card border-white/5 hover:border-primary/30 transition-all duration-200 group">
+    <Card className={`bg-card border-white/5 hover:border-primary/30 transition-all duration-200 group ${isLate ? 'border-l-4 border-l-red-500' : ''} ${jobIsStalled ? 'border-l-4 border-l-orange-500' : ''}`}>
       <CardContent className="p-4">
         {/* Header Row */}
         <div className="flex items-start justify-between gap-2 mb-3">
@@ -92,6 +125,12 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
             <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">
               {job.branch || 'N/A'}
             </span>
+            {/* Late indicator icon */}
+            {isLate && (
+              <span className="flex items-center text-red-400" title="Job atrasado">
+                <AlertTriangle className="h-4 w-4" />
+              </span>
+            )}
           </div>
           <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getStatusStyle()}`}>
             {getStatusLabel()}
@@ -115,18 +154,35 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
         {/* Date Row */}
         <div className="flex items-center gap-3 text-xs mb-3">
           {formattedStartDate && (
-            <div className="flex items-center text-muted-foreground">
+            <div className={`flex items-center ${isLate ? 'text-red-400' : 'text-muted-foreground'}`}>
               <Clock className="h-3 w-3 mr-1" />
               {formattedStartDate}
+              {isLate && <span className="ml-1 text-[10px]">(atrasado)</span>}
             </div>
           )}
-          {isScheduled && (
+          {isScheduled && !isLate && (
             <div className="flex items-center text-green-400">
               <CalendarCheck className="h-3 w-3 mr-1" />
               Agendado
             </div>
           )}
         </div>
+
+        {/* Elapsed time indicator for jobs in progress */}
+        {isInProgress && elapsedTime && (
+          <div className={`flex items-center gap-2 text-xs mb-3 p-2 rounded ${jobIsStalled ? 'bg-orange-500/10 border border-orange-500/30' : 'bg-blue-500/10 border border-blue-500/30'}`}>
+            <Clock className={`h-3 w-3 ${jobIsStalled ? 'text-orange-400' : 'text-blue-400'}`} />
+            <span className={jobIsStalled ? 'text-orange-400' : 'text-blue-400'}>
+              Em execução há <strong>{elapsedTime}</strong>
+            </span>
+            {jobIsStalled && (
+              <span className="text-orange-400 flex items-center gap-1 ml-auto">
+                <AlertTriangle className="h-3 w-3" />
+                Parado
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Action Buttons */}
         {(isAdmin || isManager) && (
