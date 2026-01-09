@@ -182,12 +182,13 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ## Backlog / Próximas Tarefas
 
 ### P1 - Alta Prioridade
+- [ ] Finalizar botão de notificação WhatsApp na página JobDetail
 - [ ] Testar gatilhos de notificação push de ponta a ponta
-- [ ] Implementar animação de "chuva de moedas" após checkout (CoinAnimation pronto)
+- [ ] Gerenciamento de prêmios pelo admin na interface
 
 ### P2 - Média Prioridade
 - [ ] Sistema manual de classificação de produtos por família
-- [ ] Gerenciamento de prêmios pelo admin na interface
+- [ ] Migrar rotas restantes para arquivos separados
 
 ### P3 - Baixa Prioridade
 - [ ] Capacidades Offline (PWA)
@@ -204,7 +205,14 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
-### 09/01/2026
+### 09/01/2026 - Refatoração do Backend
+- ✅ **REFATORAÇÃO:** Dividido `server.py` em módulos menores
+  - `config.py`: Configurações e constantes
+  - `database.py`: Conexão MongoDB
+  - `security.py`: Autenticação JWT
+  - `models/`: Modelos Pydantic (user, job, checkin, product, gamification, notification)
+  - `services/`: Lógica de negócios (product_classifier, holdprint, gamification, image, gps)
+  - `routes/`: Estrutura para migração gradual das rotas
 - ✅ Implementado Módulo de Gamificação e Bonificação completo
 - ✅ Criada Loja Faixa Preta com 7 prêmios padrão
 - ✅ Criado Relatório de Bonificação para gerentes/admins
