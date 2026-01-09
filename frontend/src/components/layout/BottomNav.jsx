@@ -5,7 +5,8 @@ import {
   LayoutDashboard, 
   Briefcase, 
   Calendar,
-  User
+  User,
+  Coins
 } from 'lucide-react';
 
 const BottomNav = () => {
@@ -24,6 +25,12 @@ const BottomNav = () => {
       href: '/jobs',
       icon: Briefcase,
       roles: ['admin', 'manager', 'installer']
+    },
+    {
+      name: 'Loja',
+      href: '/loja-faixa-preta',
+      icon: Coins,
+      roles: ['installer']
     },
     {
       name: 'Calendário',
