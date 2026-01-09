@@ -211,17 +211,25 @@ const UnifiedReports = () => {
     return itemCheckins.filter(c => {
       const matchesInstaller = selectedInstaller === 'all' || c.installer_id === selectedInstaller;
       const matchesJob = selectedJob === 'all' || c.job_id === selectedJob;
-      let matchesDate = true;
       
+      // Filter by product family
+      let matchesFamily = true;
+      if (selectedProductFamily !== 'all') {
+        const productName = c.product_name || c.item_name || '';
+        const family = getProductFamily(productName);
+        matchesFamily = family === selectedProductFamily;
+      }
+      
+      let matchesDate = true;
       if (startDate || endDate) {
         const checkinDate = new Date(c.checkin_at);
         if (startDate && checkinDate < new Date(startDate)) matchesDate = false;
         if (endDate && checkinDate > new Date(endDate + 'T23:59:59')) matchesDate = false;
       }
       
-      return matchesInstaller && matchesJob && matchesDate && (c.checkin_photo || c.checkout_photo);
+      return matchesInstaller && matchesJob && matchesFamily && matchesDate && (c.checkin_photo || c.checkout_photo);
     });
-  }, [itemCheckins, selectedInstaller, selectedJob, startDate, endDate]);
+  }, [itemCheckins, selectedInstaller, selectedJob, selectedProductFamily, startDate, endDate]);
 
   if (loading) {
     return (
