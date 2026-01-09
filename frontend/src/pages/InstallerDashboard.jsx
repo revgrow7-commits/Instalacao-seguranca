@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2 } from 'lucide-react';
+import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, TrendingUp, Gift } from 'lucide-react';
 import { toast } from 'sonner';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
+import GamificationWidget from '../components/GamificationWidget';
 
 const InstallerDashboard = () => {
   const { user } = useAuth();
@@ -15,9 +16,13 @@ const InstallerDashboard = () => {
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [gamificationBalance, setGamificationBalance] = useState(null);
+  const [recentTransactions, setRecentTransactions] = useState([]);
 
   useEffect(() => {
     loadData();
+    loadGamificationData();
+    registerDailyEngagement();
     // Show notification modal after a short delay
     const timer = setTimeout(() => {
       const hasAskedForNotifications = localStorage.getItem('notification_asked');
@@ -47,6 +52,38 @@ const InstallerDashboard = () => {
       setLoading(false);
     }
   };
+
+  const loadGamificationData = async () => {
+    try {
+      const [balanceRes, transactionsRes] = await Promise.all([
+        api.getGamificationBalance(),
+        api.getGamificationTransactions(5)
+      ]);
+      setGamificationBalance(balanceRes.data);
+      setRecentTransactions(transactionsRes.data);
+    } catch (error) {
+      console.log('Gamification data not available yet');
+    }
+  };
+
+  const registerDailyEngagement = async () => {
+    try {
+      const today = new Date().toDateString();
+      const lastEngagement = localStorage.getItem('daily_engagement_date');
+      
+      if (lastEngagement !== today) {
+        const response = await api.registerDailyEngagement();
+        if (response.data.success && !response.data.already_claimed) {
+          toast.success(`🎉 ${response.data.message}`, { duration: 5000 });
+          localStorage.setItem('daily_engagement_date', today);
+          loadGamificationData(); // Refresh balance
+        }
+      }
+    } catch (error) {
+      console.log('Daily engagement already claimed or error');
+    }
+  };
+
 
   const getJobCheckin = (jobId) => {
     return checkins.find(c => c.job_id === jobId && c.status === 'in_progress');
