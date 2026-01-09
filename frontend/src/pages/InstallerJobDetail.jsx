@@ -269,7 +269,14 @@ const InstallerJobDetail = () => {
         );
       }
       
-      toast.success('Check-out do item realizado!');
+      // Check for gamification coins earned
+      if (response.data?.gamification?.coins_awarded > 0) {
+        const coinsAwarded = response.data.gamification.coins_awarded;
+        setEarnedCoins(coinsAwarded);
+        setShowCoinAnimation(true);
+      } else {
+        toast.success('Check-out do item realizado!');
+      }
       
       // Reset form
       setCheckoutForm({ notes: '' });
@@ -281,6 +288,12 @@ const InstallerJobDetail = () => {
     } finally {
       setProcessingItem(null);
     }
+  };
+
+  const handleCoinAnimationComplete = () => {
+    setShowCoinAnimation(false);
+    setEarnedCoins(0);
+    toast.success('Check-out do item realizado! Moedas adicionadas ao seu saldo.');
   };
 
   const getItemByIndex = (index) => {
