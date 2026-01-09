@@ -251,6 +251,9 @@ const InstallerJobDetail = () => {
         return;
       }
 
+      // Request GPS when user initiates checkout (avoids Android overlay error)
+      const location = await requestGPS();
+
       const item = getItemByIndex(itemIndex);
       const assignment = getItemAssignment(itemIndex);
       
@@ -262,9 +265,9 @@ const InstallerJobDetail = () => {
       
       const formData = new FormData();
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', gpsLocation?.lat || -29.9);
-      formData.append('gps_long', gpsLocation?.long || -51.1);
-      formData.append('gps_accuracy', gpsLocation?.accuracy || 10);
+      formData.append('gps_lat', location?.lat || -29.9);
+      formData.append('gps_long', location?.long || -51.1);
+      formData.append('gps_accuracy', location?.accuracy || 10);
       formData.append('installed_m2', installedM2);
       formData.append('complexity_level', complexityLevel);
       formData.append('height_category', heightCategory);
