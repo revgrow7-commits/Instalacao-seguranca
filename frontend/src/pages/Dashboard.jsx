@@ -577,20 +577,39 @@ const Dashboard = () => {
                       <span className="text-sm font-semibold text-purple-400">Localização</span>
                     </div>
                     <div className="grid gap-2 pl-10">
-                      {locationAlerts.slice(0, 3).map((alert) => (
-                        <div 
-                          key={alert.id}
-                          className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg"
-                        >
-                          <div className="truncate flex-1">
-                            <span className="text-sm text-white">{alert.job_title}</span>
-                            <span className="text-xs text-muted-foreground ml-2">{alert.installer_name}</span>
+                      {locationAlerts.slice(0, 5).map((alert) => {
+                        const installer = installers.find(i => i.full_name === alert.installer_name);
+                        return (
+                          <div 
+                            key={alert.id}
+                            className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg"
+                          >
+                            <div className="truncate flex-1">
+                              <span className="text-sm text-white">{alert.job_title}</span>
+                              <span className="text-xs text-muted-foreground ml-2">({alert.installer_name})</span>
+                            </div>
+                            <div className="flex items-center gap-2 ml-2">
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">
+                                {alert.distance_meters?.toFixed(0)}m
+                              </span>
+                              {installer?.phone && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWhatsApp(installer.phone, 'location', alert.job_title, installer.full_name);
+                                  }}
+                                  title="Enviar WhatsApp"
+                                >
+                                  <MessageCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold ml-2">
-                            {alert.distance_meters?.toFixed(0)}m
-                          </span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
