@@ -658,6 +658,19 @@ const UnifiedReports = () => {
                   </Select>
                 </div>
                 <div>
+                  <Label className="text-xs text-muted-foreground">Família de Produto</Label>
+                  <Select value={selectedProductFamily} onValueChange={setSelectedProductFamily}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10">
+                      {productFamilies.map(fam => (
+                        <SelectItem key={fam.value} value={fam.value}>{fam.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
                   <Label className="text-xs text-muted-foreground">Data Início</Label>
                   <Input
                     type="date"
