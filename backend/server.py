@@ -2110,6 +2110,22 @@ async def create_item_checkin(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Check if installer is assigned to this job OR to this specific item
+    job_assigned_installers = job.get("assigned_installers", [])
+    item_assignments = job.get("item_assignments", [])
+    
+    # Check item-level assignment first
+    item_assigned = False
+    for assignment in item_assignments:
+        if item_index in assignment.get("item_indices", []):
+            if installer["id"] in assignment.get("installer_ids", []):
+                item_assigned = True
+                break
+    
+    # If not item-assigned, check job-level assignment
+    if not item_assigned and installer["id"] not in job_assigned_installers:
+        raise HTTPException(status_code=403, detail="Você não está atribuído a este item")
+    
     products = job.get("products_with_area", [])
     if item_index >= len(products):
         raise HTTPException(status_code=400, detail="Invalid item index")
@@ -2147,12 +2163,17 @@ async def create_item_checkin(
         family_name=family_name
     )
     
-    await db.item_checkins.insert_one(item_checkin.model_dump())
+    checkin_dict = item_checkin.model_dump()
+    checkin_dict['checkin_at'] = checkin_dict['checkin_at'].isoformat()
+    await db.item_checkins.insert_one(checkin_dict)
+    
+    # Remove _id before returning
+    checkin_dict.pop('_id', None)
     
     # Update job status
     await db.jobs.update_one({"id": job_id}, {"$set": {"status": "in_progress"}})
     
-    return item_checkin.model_dump()
+    return checkin_dict
 
 @api_router.get("/item-checkins")
 async def get_item_checkins(
