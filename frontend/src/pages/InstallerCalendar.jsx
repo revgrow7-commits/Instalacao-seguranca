@@ -286,14 +286,23 @@ const InstallerCalendar = () => {
                             return installer?.full_name?.split(' ')[0] || 'N/A';
                           }).join(', ') || '';
                           
+                          const isMine = isMyJob(job);
+                          
                           return (
                             <div
                               key={job.id}
                               onClick={() => navigate(`/installer/jobs/${job.id}`)}
-                              className={`${getStatusColor(job.status)} text-white text-[10px] px-1 rounded cursor-pointer hover:opacity-80`}
-                              title={`${job.title} - ${assignedNames}`}
+                              className={`text-white text-[10px] px-1 rounded cursor-pointer hover:opacity-80 ${
+                                isMine 
+                                  ? 'bg-primary ring-1 ring-primary/50' 
+                                  : getStatusColor(job.status) + ' opacity-70'
+                              }`}
+                              title={`${job.title} - ${assignedNames}${isMine ? ' (Seu job)' : ''}`}
                             >
-                              <div className="truncate font-medium">{job.title?.substring(0, 12)}...</div>
+                              <div className="truncate font-medium">
+                                {isMine && <span className="mr-1">★</span>}
+                                {job.title?.substring(0, isMine ? 10 : 12)}...
+                              </div>
                               {assignedNames && (
                                 <div className="truncate opacity-80 text-[8px]">{assignedNames}</div>
                               )}
