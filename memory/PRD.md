@@ -188,7 +188,9 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - ✅ Implementado bônus diário de engajamento
 - ✅ Integração automática de cálculo de moedas no checkout
 - ✅ Adicionado Ranking Semanal visível para todos os instaladores
-- ✅ **Implementada Animação de "Chuva de Moedas"** após checkout
+- ✅ Implementada Animação de "Chuva de Moedas" após checkout
+- ✅ **Calendário mostra nome do job** (não apenas código)
+- ✅ **Calendário da Equipe exibe todos os jobs** com destaque para "Meus Jobs"
 
 ### 08/01/2026
 - ✅ Corrigido erro de renderização no Dashboard do gerente
