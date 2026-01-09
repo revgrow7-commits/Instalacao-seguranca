@@ -3,7 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2, Bell, AlertTriangle } from 'lucide-react';
+import { 
+  Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2, 
+  Bell, AlertTriangle, PauseCircle, PlayCircle, Navigation, Timer, AlertCircle
+} from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 
