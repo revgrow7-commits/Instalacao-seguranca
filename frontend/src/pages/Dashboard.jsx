@@ -478,7 +478,7 @@ const Dashboard = () => {
                     <div className="grid gap-2 pl-10">
                       {lateCheckins.slice(0, 5).map((checkin) => {
                         const job = jobs.find(j => j.id === checkin.job_id);
-                        const installer = getInstallerByUserId(checkin.installer_id);
+                        const installer = getInstallerById(checkin.installer_id);
                         const hours = Math.floor((new Date() - new Date(checkin.checkin_at)) / (1000 * 60 * 60));
                         return (
                           <div 
@@ -532,7 +532,7 @@ const Dashboard = () => {
                     <div className="grid gap-2 pl-10">
                       {pausedCheckins.slice(0, 5).map((checkin) => {
                         const job = jobs.find(j => j.id === checkin.job_id);
-                        const installer = getInstallerByUserId(checkin.installer_id);
+                        const installer = getInstallerById(checkin.installer_id);
                         return (
                           <div 
                             key={checkin.id}
