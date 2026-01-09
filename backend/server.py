@@ -1272,6 +1272,15 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Check if installer is assigned to this job
+    if current_user.role == UserRole.INSTALLER:
+        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        if installer:
+            if installer['id'] not in (job_doc.get('assigned_installers') or []):
+                raise HTTPException(status_code=403, detail="Você não tem acesso a este job")
+        else:
+            raise HTTPException(status_code=403, detail="Instalador não encontrado")
+    
     if isinstance(job_doc['created_at'], str):
         job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
     if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
