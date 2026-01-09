@@ -19,6 +19,7 @@ import Checkins from './pages/Checkins';
 import UnifiedReports from './pages/UnifiedReports';
 import FamilyReport from './pages/FamilyReport';
 import InstallerReport from './pages/InstallerReport';
+import FamilyKPIsReport from './pages/FamilyKPIsReport';
 import Profile from './pages/Profile';
 import LojaFaixaPreta from './pages/LojaFaixaPreta';
 import GamificationReport from './pages/GamificationReport';
