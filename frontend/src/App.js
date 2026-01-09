@@ -20,6 +20,8 @@ import UnifiedReports from './pages/UnifiedReports';
 import FamilyReport from './pages/FamilyReport';
 import InstallerReport from './pages/InstallerReport';
 import Profile from './pages/Profile';
+import LojaFaixaPreta from './pages/LojaFaixaPreta';
+import GamificationReport from './pages/GamificationReport';
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import UpdateNotification from './components/UpdateNotification';
