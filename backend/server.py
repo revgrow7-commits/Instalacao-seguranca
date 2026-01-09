@@ -66,76 +66,7 @@ security = HTTPBearer()
 resend.api_key = RESEND_API_KEY
 
 # ============ CATÁLOGO DE PRODUTOS HOLDPRINT ============
-# Mapeamento de produtos para famílias - usado para associação automática
-
-PRODUCT_FAMILY_MAPPING = {
-    # Adesivos
-    "Adesivos": [
-        "adesivo", "vinil", "fachada adesivada", "fachada com vinil"
-    ],
-    # Lonas e Banners
-    "Lonas e Banners": [
-        "lona", "banner", "faixa", "empena", "faixa de gradil"
-    ],
-    # Chapas e Placas
-    "Chapas e Placas": [
-        "chapa", "placa", "acm", "acrílico", "mdf", "ps", "pvc", "polionda", 
-        "policarbonato", "petg", "compensado", "xps"
-    ],
-    # Estruturas Metálicas
-    "Estruturas Metálicas": [
-        "estrutura metálica", "estrutura metalica", "backdrop", "cavalete"
-    ],
-    # Tecidos
-    "Tecidos": [
-        "tecido", "bandeira", "wind banner"
-    ],
-    # Letras Caixa
-    "Letras Caixa": [
-        "letra caixa", "letra-caixa", "letras caixa"
-    ],
-    # Totens
-    "Totens": [
-        "totem"
-    ],
-    # Envelopamento
-    "Envelopamento": [
-        "envelopamento"
-    ],
-    # Painéis Luminosos
-    "Painéis Luminosos": [
-        "painel backlight", "painel luminoso", "backlight"
-    ],
-    # Serviços
-    "Serviços": [
-        "serviço", "serviços", "instalação", "entrega", "montagem", 
-        "pintura", "serralheria", "solda", "corte", "aplicação"
-    ],
-    # Materiais Promocionais
-    "Materiais Promocionais": [
-        "cartaz", "flyer", "folder", "panfleto", "imã", "marca-página"
-    ],
-    # Produtos Terceirizados
-    "Produtos Terceirizados": [
-        "terceirizado", "produto genérico"
-    ],
-    # Sublimação
-    "Sublimação": [
-        "sublimação", "sublimática", "sublimatico"
-    ],
-    # Impressão
-    "Impressão": [
-        "impressão uv", "impressão latex", "impressão solvente"
-    ],
-    # Display/PS
-    "Display/PS": [
-        "display", "móbile", "mobile", "orelha de monitor"
-    ],
-    # Fundação
-    "Fundação/Estrutura": [
-        "fundação", "sapata", "estrutura em madeira"
-    ]
-}
+# Moved to config.py - PRODUCT_FAMILY_MAPPING is imported from there
 
 def classify_product_to_family(product_name: str) -> tuple:
     """
