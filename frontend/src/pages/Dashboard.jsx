@@ -93,6 +93,14 @@ const Dashboard = () => {
         const metricsRes = await api.getMetrics();
         setMetrics(metricsRes.data);
         
+        // Load installers for WhatsApp contacts
+        try {
+          const installersRes = await api.getInstallers();
+          setInstallers(installersRes.data);
+        } catch (e) {
+          console.log('Could not load installers:', e);
+        }
+        
         // Load all item checkins and filter for late/paused
         const checkinsRes = await api.getAllItemCheckins();
         const now = new Date();
