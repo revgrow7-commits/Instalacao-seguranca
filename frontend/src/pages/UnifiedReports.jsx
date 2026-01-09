@@ -699,7 +699,7 @@ const UnifiedReports = () => {
                 <div className="flex items-end">
                   <Button
                     variant="outline"
-                    onClick={() => { setSelectedInstaller('all'); setSelectedJob('all'); setStartDate(''); setEndDate(''); }}
+                    onClick={() => { setSelectedInstaller('all'); setSelectedJob('all'); setSelectedProductFamily('all'); setStartDate(''); setEndDate(''); }}
                     className="w-full border-white/20 text-white h-9"
                   >
                     Limpar
