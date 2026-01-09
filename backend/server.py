@@ -1281,14 +1281,35 @@ async def get_team_calendar_jobs(current_user: User = Depends(get_current_user))
         {"_id": 0}
     ).to_list(500)
     
-    # Process dates
+    # Process dates and clean data
+    cleaned_jobs = []
     for job in jobs:
+        # Convert dates
         if isinstance(job.get('created_at'), str):
-            job['created_at'] = datetime.fromisoformat(job['created_at'])
-        if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
-            job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])
+            pass  # Keep as string
+        elif job.get('created_at'):
+            job['created_at'] = job['created_at'].isoformat() if hasattr(job['created_at'], 'isoformat') else str(job['created_at'])
+        
+        if isinstance(job.get('scheduled_date'), str):
+            pass  # Keep as string
+        elif job.get('scheduled_date'):
+            job['scheduled_date'] = job['scheduled_date'].isoformat() if hasattr(job['scheduled_date'], 'isoformat') else str(job['scheduled_date'])
+        
+        # Create a clean job dict with only serializable fields
+        clean_job = {
+            "id": job.get("id"),
+            "title": job.get("title"),
+            "status": job.get("status"),
+            "branch": job.get("branch"),
+            "scheduled_date": job.get("scheduled_date"),
+            "created_at": job.get("created_at"),
+            "assigned_installers": job.get("assigned_installers", []),
+            "holdprint_data": job.get("holdprint_data", {}),
+            "client_name": job.get("client_name"),
+        }
+        cleaned_jobs.append(clean_job)
     
-    return jobs
+    return cleaned_jobs
 
 @api_router.get("/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
