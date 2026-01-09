@@ -526,6 +526,8 @@ class ProductivityHistory(BaseModel):
     last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 # ============ UTILITY FUNCTIONS ============
+# Note: These functions are also available in services/ modules
+# Kept here for backward compatibility during migration
 
 import math
 
