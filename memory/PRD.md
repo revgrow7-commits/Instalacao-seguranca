@@ -85,7 +85,31 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ```
 /app/
 ├── backend/
-│   ├── server.py              # API principal (~5500 linhas)
+│   ├── server.py              # API principal (refatorado)
+│   ├── config.py              # Configurações e constantes
+│   ├── database.py            # Conexão MongoDB
+│   ├── security.py            # Autenticação JWT
+│   ├── models/                # Modelos Pydantic
+│   │   ├── __init__.py
+│   │   ├── user.py            # User, UserCreate, Token
+│   │   ├── job.py             # Job, JobCreate, JobSchedule
+│   │   ├── checkin.py         # CheckIn, ItemCheckin
+│   │   ├── product.py         # ProductFamily, ProductInstalled
+│   │   ├── gamification.py    # GamificationBalance, Reward
+│   │   └── notification.py    # PushSubscription
+│   ├── services/              # Lógica de negócios
+│   │   ├── __init__.py
+│   │   ├── product_classifier.py  # Classificação de produtos
+│   │   ├── holdprint.py           # Integração Holdprint
+│   │   ├── gamification.py        # Cálculo de moedas
+│   │   ├── image.py               # Compressão de imagens
+│   │   └── gps.py                 # Cálculo de distâncias
+│   ├── routes/                # Rotas da API (migração em progresso)
+│   │   ├── __init__.py
+│   │   ├── auth.py            # Rotas de autenticação
+│   │   ├── users.py           # Gerenciamento de usuários
+│   │   ├── installers.py      # Rotas de instaladores
+│   │   └── ... (outros em migração)
 │   └── .env                   # Credenciais
 ├── frontend/
 │   ├── src/
