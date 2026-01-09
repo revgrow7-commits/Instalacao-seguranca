@@ -24,7 +24,7 @@ const BottomNav = () => {
       name: 'Jobs',
       href: '/jobs',
       icon: Briefcase,
-      roles: ['admin', 'manager', 'installer']
+      roles: ['admin', 'manager'] // Hidden for installers on mobile
     },
     {
       name: 'Loja',
