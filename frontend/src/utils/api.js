@@ -164,6 +164,58 @@ export const api = {
   
   // Job Justification
   submitJobJustification: (jobId, data) => axios.post(`${API_URL}/jobs/${jobId}/justify`, data, { headers: getAuthHeader() }),
+  
+  // ============ GAMIFICATION ============
+  // Balance & Transactions
+  getGamificationBalance: () => axios.get(`${API_URL}/gamification/balance`, { headers: getAuthHeader() }),
+  getUserGamificationBalance: (userId) => axios.get(`${API_URL}/gamification/balance/${userId}`, { headers: getAuthHeader() }),
+  getGamificationTransactions: (limit = 20) => axios.get(`${API_URL}/gamification/transactions?limit=${limit}`, { headers: getAuthHeader() }),
+  getUserGamificationTransactions: (userId, limit = 20) => axios.get(`${API_URL}/gamification/transactions/${userId}?limit=${limit}`, { headers: getAuthHeader() }),
+  registerDailyEngagement: () => axios.post(`${API_URL}/gamification/daily-engagement`, {}, { headers: getAuthHeader() }),
+  processCheckoutGamification: (checkinId) => axios.post(`${API_URL}/gamification/process-checkout/${checkinId}`, {}, { headers: getAuthHeader() }),
+  
+  // Rewards Store
+  getRewards: () => axios.get(`${API_URL}/gamification/rewards`, { headers: getAuthHeader() }),
+  createReward: (data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (data[key] !== null && data[key] !== undefined) {
+        formData.append(key, data[key]);
+      }
+    });
+    return axios.post(`${API_URL}/gamification/rewards`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  updateReward: (rewardId, data) => {
+    const formData = new FormData();
+    Object.keys(data).forEach(key => {
+      if (data[key] !== null && data[key] !== undefined) {
+        formData.append(key, data[key]);
+      }
+    });
+    return axios.put(`${API_URL}/gamification/rewards/${rewardId}`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  deleteReward: (rewardId) => axios.delete(`${API_URL}/gamification/rewards/${rewardId}`, { headers: getAuthHeader() }),
+  seedRewards: () => axios.post(`${API_URL}/gamification/rewards/seed`, {}, { headers: getAuthHeader() }),
+  redeemReward: (rewardId) => axios.post(`${API_URL}/gamification/redeem/${rewardId}`, {}, { headers: getAuthHeader() }),
+  getMyRedemptions: () => axios.get(`${API_URL}/gamification/redemptions`, { headers: getAuthHeader() }),
+  getAllRedemptions: () => axios.get(`${API_URL}/gamification/redemptions/all`, { headers: getAuthHeader() }),
+  updateRedemptionStatus: (requestId, status, notes = '') => {
+    const formData = new FormData();
+    formData.append('status', status);
+    if (notes) formData.append('notes', notes);
+    return axios.put(`${API_URL}/gamification/redemptions/${requestId}/status`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  
+  // Reports & Leaderboard
+  getGamificationReport: (month = null, year = null) => {
+    let url = `${API_URL}/gamification/report`;
+    const params = [];
+    if (month) params.push(`month=${month}`);
+    if (year) params.push(`year=${year}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
+  getLeaderboard: (period = 'month', limit = 10) => axios.get(`${API_URL}/gamification/leaderboard?period=${period}&limit=${limit}`, { headers: getAuthHeader() }),
 };
 
 export default api;
