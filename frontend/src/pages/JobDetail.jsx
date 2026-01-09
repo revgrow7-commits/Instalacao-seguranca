@@ -865,12 +865,34 @@ const JobDetail = () => {
                     className="flex items-center gap-3 p-3 rounded-lg bg-white/5"
                   >
                     <User className="h-5 w-5 text-primary" />
-                    <div>
+                    <div className="flex-1">
                       <p className="text-white font-medium">{installer.full_name}</p>
                       <p className="text-sm text-muted-foreground">
                         {installer.branch} • {installer.phone || 'Sem telefone'}
                       </p>
                     </div>
+                    {installer.phone && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          const phone = installer.phone.replace(/\D/g, '');
+                          const fullPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const message = encodeURIComponent(
+                            `Olá ${installer.full_name?.split(' ')[0]}! 👋\n\n` +
+                            `Estou entrando em contato sobre o job:\n` +
+                            `📋 *${job?.title || 'Job'}*\n` +
+                            `📍 Cliente: ${job?.holdprint_data?.customerName || job?.client_name || 'N/A'}\n\n` +
+                            `Acesse: https://prod-control-10.preview.emergentagent.com/`
+                          );
+                          window.open(`https://wa.me/${fullPhone}?text=${message}`, '_blank');
+                        }}
+                        className="h-9 w-9 p-0 bg-green-600/20 hover:bg-green-600/40 text-green-400"
+                        title={`Enviar WhatsApp para ${installer.full_name}`}
+                      >
+                        <MessageCircle className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
