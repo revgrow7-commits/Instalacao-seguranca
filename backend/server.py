@@ -2131,7 +2131,12 @@ async def create_item_checkin(
     # Check item-level assignment first
     item_assigned = False
     for assignment in item_assignments:
-        if item_index in assignment.get("item_indices", []):
+        # Check if this assignment is for the requested item_index
+        if assignment.get("item_index") == item_index:
+            # Check if installer matches (can be installer_id or in installer_ids list)
+            if assignment.get("installer_id") == installer["id"]:
+                item_assigned = True
+                break
             if installer["id"] in assignment.get("installer_ids", []):
                 item_assigned = True
                 break
