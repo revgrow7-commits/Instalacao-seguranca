@@ -14,6 +14,7 @@ import {
   Square, ChevronDown, ChevronUp, Upload, Pause, Play
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CoinAnimation from '../components/CoinAnimation';
 
 const PAUSE_REASON_LABELS = {
   "aguardando_cliente": "Aguardando Cliente",
@@ -44,6 +45,10 @@ const InstallerJobDetail = () => {
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseItemIndex, setPauseItemIndex] = useState(null);
   const [pauseReason, setPauseReason] = useState('');
+
+  // Coin animation state
+  const [showCoinAnimation, setShowCoinAnimation] = useState(false);
+  const [earnedCoins, setEarnedCoins] = useState(0);
 
   // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
