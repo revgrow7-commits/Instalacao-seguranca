@@ -416,18 +416,46 @@ const Dashboard = () => {
                       <span className="text-sm font-semibold text-red-400">Não Iniciados</span>
                     </div>
                     <div className="grid gap-2 pl-10">
-                      {pendingCheckins.slice(0, 3).map((job) => (
-                        <div 
-                          key={job.id}
-                          className="flex items-center justify-between p-2 bg-red-500/5 border border-red-500/20 rounded-lg cursor-pointer hover:bg-red-500/10"
-                          onClick={() => navigate(`/jobs/${job.id}`)}
-                        >
-                          <span className="text-sm text-white truncate flex-1">{job.title}</span>
-                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold ml-2">
-                            {job.minutes_late}min
-                          </span>
-                        </div>
-                      ))}
+                      {pendingCheckins.slice(0, 5).map((job) => {
+                        const installer = job.assigned_installers?.length > 0 
+                          ? installers.find(i => i.id === job.assigned_installers[0])
+                          : null;
+                        return (
+                          <div 
+                            key={job.id}
+                            className="flex items-center justify-between p-2 bg-red-500/5 border border-red-500/20 rounded-lg"
+                          >
+                            <div 
+                              className="flex-1 cursor-pointer hover:text-red-300"
+                              onClick={() => navigate(`/jobs/${job.id}`)}
+                            >
+                              <span className="text-sm text-white truncate">{job.title}</span>
+                              {installer && (
+                                <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 ml-2">
+                              <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold">
+                                {job.minutes_late}min
+                              </span>
+                              {installer?.phone && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openWhatsApp(installer.phone, 'pending', job.title, installer.full_name);
+                                  }}
+                                  title="Enviar WhatsApp"
+                                >
+                                  <MessageCircle className="h-4 w-4 text-green-500" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
