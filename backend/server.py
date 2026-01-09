@@ -1193,11 +1193,34 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
     
     jobs = await db.jobs.find(query, {"_id": 0}).to_list(1000)
     
+    # Get active check-ins to add started_at info for jobs in progress
+    active_checkins = await db.item_checkins.find(
+        {"status": "in_progress"},
+        {"_id": 0, "job_id": 1, "checkin_at": 1}
+    ).to_list(1000)
+    
+    # Create a map of job_id to earliest checkin_at
+    job_start_times = {}
+    for checkin in active_checkins:
+        job_id = checkin.get("job_id")
+        checkin_at = checkin.get("checkin_at")
+        if job_id and checkin_at:
+            if isinstance(checkin_at, str):
+                checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+            if job_id not in job_start_times or checkin_at < job_start_times[job_id]:
+                job_start_times[job_id] = checkin_at
+    
     for job in jobs:
         if isinstance(job['created_at'], str):
             job['created_at'] = datetime.fromisoformat(job['created_at'])
         if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
             job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])
+        
+        # Add started_at for jobs that have active checkins
+        job_id = job.get('id')
+        if job_id in job_start_times:
+            job['started_at'] = job_start_times[job_id].isoformat()
+            job['last_checkin_at'] = job_start_times[job_id].isoformat()
     
     return jobs
 
