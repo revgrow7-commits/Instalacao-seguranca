@@ -57,7 +57,8 @@ const InstallerJobDetail = () => {
 
   useEffect(() => {
     loadJobData();
-    requestGPS();
+    // GPS will be requested only when user clicks check-in/checkout button
+    // This prevents the Android overlay permission error
   }, [jobId]);
 
   // Buscar os valores de atribuição definidos pelo gerente para um item
