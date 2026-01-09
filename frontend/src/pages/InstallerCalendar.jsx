@@ -13,7 +13,10 @@ import {
   Clock,
   User,
   Briefcase,
-  Users
+  Users,
+  X,
+  Star,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -24,9 +27,10 @@ const InstallerCalendar = () => {
   const [installers, setInstallers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [viewMode, setViewMode] = useState('month'); // month, week, list
+  const [viewMode, setViewMode] = useState('month'); // month, list
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [currentInstallerId, setCurrentInstallerId] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null); // For mobile day detail
 
   useEffect(() => {
     loadData();
@@ -35,13 +39,12 @@ const InstallerCalendar = () => {
   const loadData = async () => {
     try {
       const [jobsRes, installersRes] = await Promise.all([
-        api.getTeamCalendarJobs(),  // Use the new endpoint that shows all scheduled jobs
+        api.getTeamCalendarJobs(),
         api.getInstallers()
       ]);
       setJobs(jobsRes.data);
       setInstallers(installersRes.data);
       
-      // Find current user's installer ID
       const currentInstaller = installersRes.data.find(i => i.user_id === user?.id);
       if (currentInstaller) {
         setCurrentInstallerId(currentInstaller.id);
@@ -54,12 +57,10 @@ const InstallerCalendar = () => {
     }
   };
 
-  // Check if job is assigned to current user
   const isMyJob = (job) => {
     return currentInstallerId && job.assigned_installers?.includes(currentInstallerId);
   };
 
-  // Get scheduled jobs
   const scheduledJobs = useMemo(() => {
     return jobs.filter(job => {
       const hasSchedule = !!job.scheduled_date;
@@ -68,7 +69,6 @@ const InstallerCalendar = () => {
     });
   }, [jobs, selectedBranch]);
 
-  // Get jobs for a specific date
   const getJobsForDate = (date) => {
     const dateStr = date.toISOString().split('T')[0];
     return scheduledJobs.filter(job => {
@@ -77,7 +77,6 @@ const InstallerCalendar = () => {
     });
   };
 
-  // Generate calendar days
   const generateCalendarDays = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
@@ -88,12 +87,10 @@ const InstallerCalendar = () => {
     
     const days = [];
     
-    // Add empty cells for days before the first day of the month
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
     
-    // Add days of the month
     for (let day = 1; day <= lastDay.getDate(); day++) {
       days.push(new Date(year, month, day));
     }
@@ -101,13 +98,11 @@ const InstallerCalendar = () => {
     return days;
   };
 
-  // Get installer name by ID
   const getInstallerName = (installerId) => {
     const installer = installers.find(i => i.id === installerId);
     return installer?.full_name || 'Não atribuído';
   };
 
-  // Get status color
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
@@ -116,25 +111,33 @@ const InstallerCalendar = () => {
       case 'in_progress':
       case 'instalando':
         return 'bg-blue-500';
-      case 'scheduled':
-      case 'agendado':
-        return 'bg-yellow-500';
       default:
-        return 'bg-gray-500';
+        return 'bg-yellow-500';
     }
   };
 
-  // Navigate months
   const previousMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    setSelectedDay(null);
   };
 
   const nextMonth = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    setSelectedDay(null);
   };
 
   const goToToday = () => {
     setCurrentDate(new Date());
+    setSelectedDay(new Date());
+  };
+
+  const handleDayClick = (date) => {
+    if (date) {
+      const dayJobs = getJobsForDate(date);
+      if (dayJobs.length > 0) {
+        setSelectedDay(date);
+      }
+    }
   };
 
   const monthNames = [
@@ -142,7 +145,8 @@ const InstallerCalendar = () => {
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
 
-  const dayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const dayNames = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+  const dayNamesFull = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   if (loading) {
     return (
@@ -152,34 +156,20 @@ const InstallerCalendar = () => {
     );
   }
 
-  // Get jobs for the week (list view)
-  const getWeekJobs = () => {
-    const today = new Date();
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay());
-    
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    
-    return scheduledJobs
-      .filter(job => {
-        const jobDate = new Date(job.scheduled_date);
-        return jobDate >= weekStart && jobDate <= weekEnd;
-      })
-      .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date));
-  };
+  // Selected day jobs
+  const selectedDayJobs = selectedDay ? getJobsForDate(selectedDay) : [];
 
   return (
     <div className="p-4 pb-24 space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-heading font-bold text-white">Calendário da Equipe</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-xl md:text-2xl font-heading font-bold text-white">Agenda da Equipe</h1>
+          <p className="text-xs md:text-sm text-muted-foreground">
             {scheduledJobs.length} job(s) agendado(s)
           </p>
         </div>
-        <CalendarIcon className="h-8 w-8 text-primary" />
+        <CalendarIcon className="h-6 w-6 md:h-8 md:w-8 text-primary" />
       </div>
 
       {/* Filters */}
@@ -187,7 +177,7 @@ const InstallerCalendar = () => {
         <CardContent className="p-3">
           <div className="flex flex-wrap gap-2 items-center">
             <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-              <SelectTrigger className="w-32 bg-white/5 border-white/10 text-white h-9">
+              <SelectTrigger className="w-24 bg-white/5 border-white/10 text-white h-8 text-xs">
                 <SelectValue placeholder="Filial" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
@@ -197,12 +187,12 @@ const InstallerCalendar = () => {
               </SelectContent>
             </Select>
 
-            <div className="flex gap-1">
+            <div className="flex gap-1 ml-auto">
               <Button
                 variant={viewMode === 'month' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('month')}
-                className="h-9"
+                className="h-8 text-xs px-3"
               >
                 Mês
               </Button>
@@ -210,7 +200,7 @@ const InstallerCalendar = () => {
                 variant={viewMode === 'list' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setViewMode('list')}
-                className="h-9"
+                className="h-8 text-xs px-3"
               >
                 Lista
               </Button>
@@ -223,34 +213,35 @@ const InstallerCalendar = () => {
         <>
           {/* Month Navigation */}
           <Card className="bg-card border-white/5">
-            <CardContent className="p-3">
+            <CardContent className="p-2">
               <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" onClick={previousMonth}>
+                <Button variant="ghost" size="sm" onClick={previousMonth} className="h-8 w-8 p-0">
                   <ChevronLeft className="h-5 w-5" />
                 </Button>
                 <div className="text-center">
-                  <h2 className="text-lg font-semibold text-white">
+                  <h2 className="text-base font-semibold text-white">
                     {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                   </h2>
-                  <Button variant="link" size="sm" onClick={goToToday} className="text-primary p-0 h-auto">
-                    Hoje
+                  <Button variant="link" size="sm" onClick={goToToday} className="text-primary p-0 h-auto text-xs">
+                    Ir para hoje
                   </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={nextMonth}>
+                <Button variant="ghost" size="sm" onClick={nextMonth} className="h-8 w-8 p-0">
                   <ChevronRight className="h-5 w-5" />
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          {/* Calendar Grid */}
+          {/* Calendar Grid - Mobile Optimized */}
           <Card className="bg-card border-white/5">
             <CardContent className="p-2">
               {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {dayNames.map(day => (
-                  <div key={day} className="text-center text-xs font-medium text-muted-foreground py-1">
-                    {day}
+              <div className="grid grid-cols-7 gap-1 mb-1">
+                {dayNames.map((day, i) => (
+                  <div key={i} className="text-center text-[10px] font-medium text-muted-foreground py-1">
+                    <span className="md:hidden">{day}</span>
+                    <span className="hidden md:inline">{dayNamesFull[i]}</span>
                   </div>
                 ))}
               </div>
@@ -259,62 +250,91 @@ const InstallerCalendar = () => {
               <div className="grid grid-cols-7 gap-1">
                 {generateCalendarDays().map((date, index) => {
                   if (!date) {
-                    return <div key={`empty-${index}`} className="h-16 md:h-20" />;
+                    return <div key={`empty-${index}`} className="h-12 md:h-20" />;
                   }
 
                   const dayJobs = getJobsForDate(date);
                   const isToday = date.toDateString() === new Date().toDateString();
+                  const hasJobs = dayJobs.length > 0;
+                  const hasMyJob = dayJobs.some(j => isMyJob(j));
+                  const isSelected = selectedDay && date.toDateString() === selectedDay.toDateString();
 
                   return (
                     <div
                       key={date.toISOString()}
-                      className={`h-16 md:h-20 p-1 rounded-lg border transition-colors ${
-                        isToday
-                          ? 'border-primary bg-primary/10'
-                          : dayJobs.length > 0
-                          ? 'border-white/20 bg-white/5'
-                          : 'border-white/5'
+                      onClick={() => handleDayClick(date)}
+                      className={`h-12 md:h-20 p-1 rounded-lg border transition-all relative ${
+                        isSelected
+                          ? 'border-primary bg-primary/20 ring-2 ring-primary'
+                          : isToday
+                          ? 'border-primary/50 bg-primary/10'
+                          : hasJobs
+                          ? 'border-white/20 bg-white/5 cursor-pointer hover:bg-white/10'
+                          : 'border-transparent'
                       }`}
                     >
-                      <div className={`text-xs font-medium mb-1 ${isToday ? 'text-primary' : 'text-white'}`}>
+                      {/* Day Number */}
+                      <div className={`text-xs font-medium ${
+                        isToday ? 'text-primary' : hasMyJob ? 'text-primary' : 'text-white'
+                      }`}>
                         {date.getDate()}
                       </div>
-                      <div className="space-y-0.5 overflow-hidden">
-                        {dayJobs.slice(0, 2).map(job => {
-                          const assignedNames = job.assigned_installers?.map(id => {
-                            const installer = installers.find(i => i.id === id);
-                            return installer?.full_name?.split(' ')[0] || 'N/A';
-                          }).join(', ') || '';
-                          
-                          const isMine = isMyJob(job);
-                          
-                          return (
-                            <div
-                              key={job.id}
-                              onClick={() => navigate(`/installer/jobs/${job.id}`)}
-                              className={`text-white text-[10px] px-1 rounded cursor-pointer hover:opacity-80 ${
-                                isMine 
-                                  ? 'bg-primary ring-1 ring-primary/50' 
-                                  : getStatusColor(job.status) + ' opacity-70'
-                              }`}
-                              title={`${job.title} - ${assignedNames}${isMine ? ' (Seu job)' : ''}`}
-                            >
-                              <div className="truncate font-medium">
-                                {isMine && <span className="mr-1">★</span>}
-                                {job.title?.substring(0, isMine ? 10 : 12)}...
-                              </div>
-                              {assignedNames && (
-                                <div className="truncate opacity-80 text-[8px]">{assignedNames}</div>
-                              )}
-                            </div>
-                          );
-                        })}
-                        {dayJobs.length > 2 && (
-                          <div className="text-[10px] text-muted-foreground text-center">
-                            +{dayJobs.length - 2} mais
+                      
+                      {/* Job Indicators for Mobile */}
+                      {hasJobs && (
+                        <div className="absolute bottom-1 left-1 right-1">
+                          {/* Dot indicators */}
+                          <div className="flex justify-center gap-0.5 md:hidden">
+                            {dayJobs.slice(0, 3).map((job, i) => (
+                              <div 
+                                key={i}
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  isMyJob(job) ? 'bg-primary' : getStatusColor(job.status)
+                                }`}
+                              />
+                            ))}
+                            {dayJobs.length > 3 && (
+                              <span className="text-[8px] text-muted-foreground">+{dayJobs.length - 3}</span>
+                            )}
                           </div>
-                        )}
-                      </div>
+
+                          {/* Full job names for desktop */}
+                          <div className="hidden md:block space-y-0.5">
+                            {dayJobs.slice(0, 2).map(job => {
+                              const isMine = isMyJob(job);
+                              return (
+                                <div
+                                  key={job.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigate(`/installer/jobs/${job.id}`);
+                                  }}
+                                  className={`text-[9px] px-1 py-0.5 rounded cursor-pointer truncate ${
+                                    isMine 
+                                      ? 'bg-primary text-white font-bold' 
+                                      : getStatusColor(job.status) + ' text-white opacity-80'
+                                  }`}
+                                  title={job.title}
+                                >
+                                  {isMine && '★ '}{job.title?.substring(0, 12)}
+                                </div>
+                              );
+                            })}
+                            {dayJobs.length > 2 && (
+                              <div className="text-[8px] text-center text-muted-foreground">
+                                +{dayJobs.length - 2}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Star indicator for my job on mobile */}
+                      {hasMyJob && (
+                        <div className="absolute top-0.5 right-0.5 md:hidden">
+                          <Star className="h-2.5 w-2.5 text-primary fill-primary" />
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -322,25 +342,134 @@ const InstallerCalendar = () => {
             </CardContent>
           </Card>
 
+          {/* Selected Day Detail Panel - Mobile */}
+          {selectedDay && selectedDayJobs.length > 0 && (
+            <Card className="bg-card border-primary/30 animate-in slide-in-from-bottom-4">
+              <CardHeader className="p-3 pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm text-white flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 text-primary" />
+                    {selectedDay.toLocaleDateString('pt-BR', { 
+                      weekday: 'long', 
+                      day: 'numeric', 
+                      month: 'long' 
+                    })}
+                  </CardTitle>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setSelectedDay(null)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {selectedDayJobs.length} job(s) agendado(s)
+                </p>
+              </CardHeader>
+              <CardContent className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                {selectedDayJobs.map(job => {
+                  const isMine = isMyJob(job);
+                  const scheduledTime = new Date(job.scheduled_date);
+                  
+                  return (
+                    <div
+                      key={job.id}
+                      onClick={() => navigate(`/installer/jobs/${job.id}`)}
+                      className={`p-3 rounded-lg cursor-pointer transition-colors ${
+                        isMine 
+                          ? 'bg-primary/20 border border-primary/30 hover:bg-primary/30' 
+                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1 mb-1">
+                            {isMine && <Star className="h-3 w-3 text-primary fill-primary" />}
+                            <span className={`text-sm font-medium truncate ${isMine ? 'text-primary' : 'text-white'}`}>
+                              {job.title}
+                            </span>
+                          </div>
+                          
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              <span>{scheduledTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            
+                            {job.holdprint_data?.customerName && (
+                              <div className="flex items-center gap-1">
+                                <Briefcase className="h-3 w-3" />
+                                <span className="truncate">{job.holdprint_data.customerName}</span>
+                              </div>
+                            )}
+                            
+                            {job.assigned_installers?.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                <Users className="h-3 w-3" />
+                                <span className={`truncate ${isMine ? 'text-primary' : ''}`}>
+                                  {job.assigned_installers.map(id => {
+                                    const name = getInstallerName(id);
+                                    const firstName = name.split(' ')[0];
+                                    return firstName;
+                                  }).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            job.branch === 'POA' ? 'bg-blue-500/20 text-blue-400' : 'bg-purple-500/20 text-purple-400'
+                          }`}>
+                            {job.branch}
+                          </span>
+                          {isMine && (
+                            <span className="text-[10px] bg-primary/30 text-primary px-1.5 py-0.5 rounded font-bold">
+                              MEU JOB
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-end mt-2 pt-2 border-t border-white/10">
+                        <span className="text-xs text-primary flex items-center gap-1">
+                          Ver detalhes <ExternalLink className="h-3 w-3" />
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Legend */}
-          <div className="flex flex-wrap gap-3 justify-center text-xs">
+          <div className="flex flex-wrap gap-2 justify-center text-[10px] md:text-xs">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-primary ring-1 ring-primary/50"></div>
-              <span className="text-white font-medium">★ Meu Job</span>
+              <Star className="h-3 w-3 text-primary fill-primary" />
+              <span className="text-white font-medium">Meu Job</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-yellow-500 opacity-70"></div>
-              <span className="text-muted-foreground">Equipe - Agendado</span>
+              <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+              <span className="text-muted-foreground">Agendado</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-blue-500 opacity-70"></div>
-              <span className="text-muted-foreground">Equipe - Em Andamento</span>
+              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+              <span className="text-muted-foreground">Em Andamento</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-green-500 opacity-70"></div>
-              <span className="text-muted-foreground">Equipe - Concluído</span>
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="text-muted-foreground">Concluído</span>
             </div>
           </div>
+
+          {/* Tip for mobile */}
+          <p className="text-center text-xs text-muted-foreground md:hidden">
+            💡 Toque em um dia com jobs para ver detalhes
+          </p>
         </>
       ) : (
         /* List View */
@@ -377,14 +506,14 @@ const InstallerCalendar = () => {
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <span className={`w-2 h-2 rounded-full ${isMine ? 'bg-primary' : getStatusColor(job.status)}`}></span>
                             <span className="text-xs text-muted-foreground font-mono">
                               #{job.holdprint_data?.code || job.id?.slice(0, 6)}
                             </span>
                             {isMine && (
-                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
-                                ★ MEU JOB
+                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold flex items-center gap-0.5">
+                                <Star className="h-2.5 w-2.5 fill-primary" /> MEU JOB
                               </span>
                             )}
                             {isToday && (
@@ -419,13 +548,6 @@ const InstallerCalendar = () => {
                                 <span className={isMine ? 'text-primary' : ''}>
                                   {job.assigned_installers.map(id => getInstallerName(id)).join(', ')}
                                 </span>
-                              </div>
-                            )}
-                            
-                            {job.holdprint_data?.city && (
-                              <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                <span>{job.holdprint_data.city}</span>
                               </div>
                             )}
                           </div>
