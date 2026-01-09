@@ -123,6 +123,69 @@ const JobDetail = () => {
     return hoursDiff >= 3;
   };
 
+  // Função para enviar notificação via WhatsApp
+  const sendWhatsAppNotification = (checkin, installer, product) => {
+    if (!installer?.phone) {
+      toast.error('Instalador não possui telefone cadastrado');
+      return;
+    }
+
+    // Limpar telefone (remover caracteres especiais)
+    const phone = installer.phone.replace(/\D/g, '');
+    // Adicionar código do Brasil se não tiver
+    const fullPhone = phone.startsWith('55') ? phone : `55${phone}`;
+
+    const lastActivityTime = checkin.status === 'paused' 
+      ? new Date(checkin.paused_at || checkin.checkin_at)
+      : new Date(checkin.checkin_at);
+    const hoursSince = Math.floor((new Date() - lastActivityTime) / (1000 * 60 * 60));
+
+    const message = encodeURIComponent(
+      `⚠️ *ALERTA DE PRODUÇÃO*\n\n` +
+      `Olá ${installer.full_name?.split(' ')[0] || 'Instalador'},\n\n` +
+      `O item *${product?.name || 'Item'}* está parado há *${hoursSince} hora(s)*.\n\n` +
+      `📋 Job: ${job?.title || 'N/A'}\n` +
+      `📍 Cliente: ${job?.holdprint_data?.customerName || job?.client_name || 'N/A'}\n` +
+      `⏱️ Iniciado: ${lastActivityTime.toLocaleString('pt-BR')}\n\n` +
+      `Por favor, atualize o status ou entre em contato com o supervisor.\n\n` +
+      `_Mensagem automática do Sistema de Instalação_`
+    );
+
+    // Abrir WhatsApp Web ou App
+    window.open(`https://wa.me/${fullPhone}?text=${message}`, '_blank');
+    toast.success('WhatsApp aberto com a mensagem de alerta');
+  };
+
+  // Função para enviar alerta para todos os itens parados
+  const sendAllWhatsAppAlerts = () => {
+    const stalledItems = itemCheckins.filter(c => 
+      c.status !== 'completed' && isItemStalled(c)
+    );
+
+    if (stalledItems.length === 0) {
+      toast.info('Não há itens parados para notificar');
+      return;
+    }
+
+    let sent = 0;
+    stalledItems.forEach((checkin) => {
+      const installer = installers.find(i => i.id === checkin.installer_id);
+      const products = getJobProducts();
+      const product = products[checkin.item_index];
+      
+      if (installer?.phone) {
+        setTimeout(() => {
+          sendWhatsAppNotification(checkin, installer, product);
+        }, sent * 1000); // Delay para não abrir todas as janelas de uma vez
+        sent++;
+      }
+    });
+
+    if (sent === 0) {
+      toast.error('Nenhum instalador possui telefone cadastrado');
+    }
+  };
+
   // Função para obter o checkin de um item específico
   const getItemCheckin = (itemIndex) => {
     return itemCheckins.find(c => c.item_index === itemIndex);
