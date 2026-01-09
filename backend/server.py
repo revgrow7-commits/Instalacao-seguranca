@@ -3149,6 +3149,147 @@ async def get_report_by_family(current_user: User = Depends(get_current_user)):
         "all_products": all_products[:100]  # Primeiros 100 produtos para análise
     }
 
+
+@api_router.get("/reports/kpis/family-productivity")
+async def get_family_productivity_kpis(
+    date_from: Optional[str] = Query(None, description="Start date (YYYY-MM-DD)"),
+    date_to: Optional[str] = Query(None, description="End date (YYYY-MM-DD)"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    KPIs de produtividade por família de produto.
+    
+    Métricas calculadas:
+    - m²/hora por família
+    - Total de m² instalados
+    - Tempo médio de instalação
+    - Número de instalações
+    - Eficiência comparada
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    # Build query with optional date filter
+    query = {"status": "completed"}
+    if date_from or date_to:
+        date_filter = {}
+        if date_from:
+            date_filter["$gte"] = date_from + "T00:00:00"
+        if date_to:
+            date_filter["$lte"] = date_to + "T23:59:59"
+        if date_filter:
+            query["checkin_at"] = date_filter
+    
+    # Get completed item checkins
+    checkins = await db.item_checkins.find(query, {"_id": 0}).to_list(10000)
+    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
+    jobs_map = {j["id"]: j for j in jobs}
+    
+    # Aggregate by family
+    family_data = {}
+    global_totals = {"total_m2": 0, "total_minutes": 0, "count": 0}
+    
+    for checkin in checkins:
+        family = checkin.get("family_name") or "Outros"
+        installed_m2 = checkin.get("installed_m2", 0) or 0
+        duration = checkin.get("net_duration_minutes") or checkin.get("duration_minutes", 0) or 0
+        
+        # Skip if no valid data
+        if installed_m2 <= 0:
+            continue
+            
+        if family not in family_data:
+            family_data[family] = {
+                "family_name": family,
+                "total_m2": 0,
+                "total_minutes": 0,
+                "count": 0,
+                "min_duration": float('inf'),
+                "max_duration": 0,
+                "m2_list": [],
+                "duration_list": [],
+                "installers": set(),
+                "jobs": set()
+            }
+        
+        family_data[family]["total_m2"] += installed_m2
+        family_data[family]["total_minutes"] += duration
+        family_data[family]["count"] += 1
+        family_data[family]["m2_list"].append(installed_m2)
+        family_data[family]["duration_list"].append(duration)
+        
+        if duration > 0:
+            family_data[family]["min_duration"] = min(family_data[family]["min_duration"], duration)
+            family_data[family]["max_duration"] = max(family_data[family]["max_duration"], duration)
+        
+        if checkin.get("installer_id"):
+            family_data[family]["installers"].add(checkin.get("installer_id"))
+        if checkin.get("job_id"):
+            family_data[family]["jobs"].add(checkin.get("job_id"))
+        
+        global_totals["total_m2"] += installed_m2
+        global_totals["total_minutes"] += duration
+        global_totals["count"] += 1
+    
+    # Calculate KPIs for each family
+    result = []
+    global_avg_m2_h = (global_totals["total_m2"] / global_totals["total_minutes"] * 60) if global_totals["total_minutes"] > 0 else 0
+    
+    for family, data in family_data.items():
+        # Calculate metrics
+        avg_m2_per_hour = (data["total_m2"] / data["total_minutes"] * 60) if data["total_minutes"] > 0 else 0
+        avg_m2_per_install = data["total_m2"] / data["count"] if data["count"] > 0 else 0
+        avg_duration = data["total_minutes"] / data["count"] if data["count"] > 0 else 0
+        
+        # Efficiency compared to global average (100% = average)
+        efficiency = (avg_m2_per_hour / global_avg_m2_h * 100) if global_avg_m2_h > 0 else 100
+        
+        # Calculate standard deviation for m²
+        if len(data["m2_list"]) > 1:
+            mean_m2 = sum(data["m2_list"]) / len(data["m2_list"])
+            variance = sum((x - mean_m2) ** 2 for x in data["m2_list"]) / len(data["m2_list"])
+            std_dev_m2 = variance ** 0.5
+        else:
+            std_dev_m2 = 0
+        
+        result.append({
+            "family_name": family,
+            "total_m2": round(data["total_m2"], 2),
+            "total_hours": round(data["total_minutes"] / 60, 2),
+            "installation_count": data["count"],
+            "avg_m2_per_hour": round(avg_m2_per_hour, 2),
+            "avg_m2_per_install": round(avg_m2_per_install, 2),
+            "avg_duration_minutes": round(avg_duration, 1),
+            "min_duration_minutes": data["min_duration"] if data["min_duration"] != float('inf') else 0,
+            "max_duration_minutes": data["max_duration"],
+            "efficiency_percent": round(efficiency, 1),
+            "std_dev_m2": round(std_dev_m2, 2),
+            "unique_installers": len(data["installers"]),
+            "unique_jobs": len(data["jobs"]),
+            "share_of_total_m2": round(data["total_m2"] / global_totals["total_m2"] * 100, 1) if global_totals["total_m2"] > 0 else 0
+        })
+    
+    # Sort by total m²
+    result.sort(key=lambda x: x["total_m2"], reverse=True)
+    
+    # Add ranking
+    for i, item in enumerate(result, 1):
+        item["rank"] = i
+    
+    return {
+        "kpis": result,
+        "summary": {
+            "total_families": len(result),
+            "global_total_m2": round(global_totals["total_m2"], 2),
+            "global_total_hours": round(global_totals["total_minutes"] / 60, 2),
+            "global_installations": global_totals["count"],
+            "global_avg_m2_per_hour": round(global_avg_m2_h, 2),
+            "period": {
+                "from": date_from,
+                "to": date_to
+            }
+        }
+    }
+
 @api_router.post("/jobs/{job_id}/classify-products")
 async def classify_job_products(job_id: str, current_user: User = Depends(get_current_user)):
     """
