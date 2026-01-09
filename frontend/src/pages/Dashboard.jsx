@@ -35,9 +35,15 @@ const Dashboard = () => {
     return digits;
   };
 
-  // Get installer info by user_id
-  const getInstallerByUserId = (userId) => {
-    return installers.find(i => i.user_id === userId);
+  // Get installer info by installer_id (from checkins) or user_id
+  const getInstallerById = (installerId) => {
+    // First try to find by installer id
+    let installer = installers.find(i => i.id === installerId);
+    // If not found, try by user_id
+    if (!installer) {
+      installer = installers.find(i => i.user_id === installerId);
+    }
+    return installer;
   };
 
   // Open WhatsApp with pre-filled message
