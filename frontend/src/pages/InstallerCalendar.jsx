@@ -325,16 +325,20 @@ const InstallerCalendar = () => {
           {/* Legend */}
           <div className="flex flex-wrap gap-3 justify-center text-xs">
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-yellow-500"></div>
-              <span className="text-muted-foreground">Agendado</span>
+              <div className="w-3 h-3 rounded bg-primary ring-1 ring-primary/50"></div>
+              <span className="text-white font-medium">★ Meu Job</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-blue-500"></div>
-              <span className="text-muted-foreground">Em Andamento</span>
+              <div className="w-3 h-3 rounded bg-yellow-500 opacity-70"></div>
+              <span className="text-muted-foreground">Equipe - Agendado</span>
             </div>
             <div className="flex items-center gap-1">
-              <div className="w-3 h-3 rounded bg-green-500"></div>
-              <span className="text-muted-foreground">Concluído</span>
+              <div className="w-3 h-3 rounded bg-blue-500 opacity-70"></div>
+              <span className="text-muted-foreground">Equipe - Em Andamento</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-green-500 opacity-70"></div>
+              <span className="text-muted-foreground">Equipe - Concluído</span>
             </div>
           </div>
         </>
