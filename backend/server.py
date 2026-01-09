@@ -3791,25 +3791,34 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         
         checkin_at = checkin.get('checkin_at')
         if isinstance(checkin_at, str):
-            checkin_at = datetime.fromisoformat(checkin_at)
-        ws.cell(row=row_num, column=11, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
+            try:
+                checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+            except:
+                checkin_at = None
+        ws.cell(row=row_num, column=13, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
         
         checkout_at = checkin.get('checkout_at')
         if isinstance(checkout_at, str):
-            checkout_at = datetime.fromisoformat(checkout_at)
-        ws.cell(row=row_num, column=12, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
+            try:
+                checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
+            except:
+                checkout_at = None
+        ws.cell(row=row_num, column=14, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
         
-        ws.cell(row=row_num, column=13, value=checkin.get('duration_minutes', '')).border = border
-        ws.cell(row=row_num, column=14, value=checkin.get('status', '')).border = border
-        ws.cell(row=row_num, column=15, value=job.get('branch', '')).border = border
+        ws.cell(row=row_num, column=15, value=checkin.get('duration_minutes', 0)).border = border
+        ws.cell(row=row_num, column=16, value=checkin.get('status', '')).border = border
+        ws.cell(row=row_num, column=17, value=job.get('branch', '')).border = border
         
         row_num += 1
     
+    logging.info(f"Excel report generated with {row_num - 2} rows")
+    
     # Adjust column widths
     column_widths = {
-        'A': 35, 'B': 30, 'C': 25, 'D': 15, 'E': 15,
-        'F': 20, 'G': 18, 'H': 18, 'I': 18, 'J': 18,
-        'K': 18, 'L': 18, 'M': 12, 'N': 15, 'O': 12
+        'A': 12, 'B': 35, 'C': 25, 'D': 35, 'E': 18,
+        'F': 15, 'G': 15, 'H': 20, 'I': 15, 'J': 15,
+        'K': 15, 'L': 15, 'M': 18, 'N': 18, 'O': 12,
+        'P': 15, 'Q': 12
     }
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
