@@ -1,9 +1,19 @@
+"""
+INDÚSTRIA VISUAL - Backend Server
+Refactored with modular architecture.
+
+Modules:
+- config.py: Configuration and constants
+- database.py: MongoDB connection
+- security.py: Authentication utilities
+- models/: Pydantic models
+- services/: Business logic services
+- routes/: API route handlers (being migrated)
+"""
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Form, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import FileResponse, StreamingResponse, RedirectResponse
-from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 import asyncio
@@ -29,42 +39,31 @@ import resend
 from pywebpush import webpush, WebPushException
 import json
 
-ROOT_DIR = Path(__file__).parent
-load_dotenv(ROOT_DIR / '.env')
+# Import from modular structure
+from config import (
+    ROOT_DIR, SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS,
+    HOLDPRINT_API_KEY_POA, HOLDPRINT_API_KEY_SP, HOLDPRINT_API_URL,
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, GOOGLE_CALENDAR_SCOPES,
+    RESEND_API_KEY, SENDER_EMAIL, FRONTEND_URL,
+    VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CLAIMS_EMAIL,
+    MAX_CHECKOUT_DISTANCE_METERS, UPLOAD_DIR,
+    PAUSE_REASONS, PAUSE_REASON_LABELS, PRODUCT_FAMILY_MAPPING
+)
+from database import db, client
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# Import services
+from services.product_classifier import classify_product_to_family, extract_product_measures, calculate_job_products_area
+from services.holdprint import extract_product_dimensions
+from services.image import compress_image_to_base64, compress_base64_image
+from services.gps import calculate_gps_distance
+from services.gamification import calculate_checkout_coins, add_coins, calculate_level, COIN_REWARDS
 
-# Security
+# Security setup (kept here for backward compatibility, also in security.py)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
-SECRET_KEY = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
 
-# Holdprint API Keys
-HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
-HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
-
-# Google OAuth Config
-GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
-GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://prod-control-10.preview.emergentagent.com/api/auth/google/callback')
-GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email']
-
-# Resend Email Config
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://prod-control-10.preview.emergentagent.com')
+# Resend setup
 resend.api_key = RESEND_API_KEY
-
-# Web Push Notification Config
-VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
-VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
-VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual.com.br')
 
 # ============ CATÁLOGO DE PRODUTOS HOLDPRINT ============
 # Mapeamento de produtos para famílias - usado para associação automática
