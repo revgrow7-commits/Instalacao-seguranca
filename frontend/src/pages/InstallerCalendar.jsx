@@ -268,16 +268,26 @@ const InstallerCalendar = () => {
                         {date.getDate()}
                       </div>
                       <div className="space-y-0.5 overflow-hidden">
-                        {dayJobs.slice(0, 2).map(job => (
-                          <div
-                            key={job.id}
-                            onClick={() => navigate(`/installer/jobs/${job.id}`)}
-                            className={`${getStatusColor(job.status)} text-white text-[10px] px-1 rounded truncate cursor-pointer hover:opacity-80`}
-                            title={job.title}
-                          >
-                            {job.title?.substring(0, 10)}...
-                          </div>
-                        ))}
+                        {dayJobs.slice(0, 2).map(job => {
+                          const assignedNames = job.assigned_installers?.map(id => {
+                            const installer = installers.find(i => i.id === id);
+                            return installer?.full_name?.split(' ')[0] || 'N/A';
+                          }).join(', ') || '';
+                          
+                          return (
+                            <div
+                              key={job.id}
+                              onClick={() => navigate(`/installer/jobs/${job.id}`)}
+                              className={`${getStatusColor(job.status)} text-white text-[10px] px-1 rounded cursor-pointer hover:opacity-80`}
+                              title={`${job.title} - ${assignedNames}`}
+                            >
+                              <div className="truncate font-medium">{job.title?.substring(0, 12)}...</div>
+                              {assignedNames && (
+                                <div className="truncate opacity-80 text-[8px]">{assignedNames}</div>
+                              )}
+                            </div>
+                          );
+                        })}
                         {dayJobs.length > 2 && (
                           <div className="text-[10px] text-muted-foreground text-center">
                             +{dayJobs.length - 2} mais
