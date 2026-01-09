@@ -8,6 +8,7 @@ import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, T
 import { toast } from 'sonner';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import GamificationWidget from '../components/GamificationWidget';
+import WeeklyLeaderboard from '../components/WeeklyLeaderboard';
 
 const InstallerDashboard = () => {
   const { user } = useAuth();
