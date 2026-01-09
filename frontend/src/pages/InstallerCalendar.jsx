@@ -364,31 +364,37 @@ const InstallerCalendar = () => {
                 const scheduledDate = new Date(job.scheduled_date);
                 const isToday = scheduledDate.toDateString() === new Date().toDateString();
                 const isPast = scheduledDate < new Date() && !isToday;
+                const isMine = isMyJob(job);
 
                 return (
                   <Card 
                     key={job.id} 
-                    className={`bg-card border-white/5 cursor-pointer hover:border-primary/50 transition-colors ${
+                    className={`bg-card cursor-pointer hover:border-primary/50 transition-colors ${
                       isPast ? 'opacity-60' : ''
-                    }`}
+                    } ${isMine ? 'border-primary/50 ring-1 ring-primary/20' : 'border-white/5'}`}
                     onClick={() => navigate(`/installer/jobs/${job.id}`)}
                   >
                     <CardContent className="p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`w-2 h-2 rounded-full ${getStatusColor(job.status)}`}></span>
+                            <span className={`w-2 h-2 rounded-full ${isMine ? 'bg-primary' : getStatusColor(job.status)}`}></span>
                             <span className="text-xs text-muted-foreground font-mono">
                               #{job.holdprint_data?.code || job.id?.slice(0, 6)}
                             </span>
+                            {isMine && (
+                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">
+                                ★ MEU JOB
+                              </span>
+                            )}
                             {isToday && (
-                              <span className="text-[10px] bg-primary/20 text-primary px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">
                                 HOJE
                               </span>
                             )}
                           </div>
                           
-                          <h4 className="text-sm font-medium text-white truncate mb-2">
+                          <h4 className={`text-sm font-medium truncate mb-2 ${isMine ? 'text-primary' : 'text-white'}`}>
                             {job.title}
                           </h4>
                           
@@ -410,7 +416,7 @@ const InstallerCalendar = () => {
                             {job.assigned_installers?.length > 0 && (
                               <div className="flex items-center gap-1">
                                 <Users className="h-3 w-3" />
-                                <span>
+                                <span className={isMine ? 'text-primary' : ''}>
                                   {job.assigned_installers.map(id => getInstallerName(id)).join(', ')}
                                 </span>
                               </div>
