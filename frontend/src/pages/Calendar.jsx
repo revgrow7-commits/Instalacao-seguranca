@@ -580,9 +580,9 @@ const Calendar = () => {
                                     ${getStatusColor(job.status)} text-white
                                     hover:opacity-80 transition-opacity
                                   `}
-                                  title={`${job.title} - ${job.client_name}`}
+                                  title={`#${job.holdprint_data?.code || job.id?.slice(0,4)} - ${job.title} - ${job.client_name || ''}`}
                                 >
-                                  #{job.holdprint_data?.code || job.id?.slice(0,4)}
+                                  {job.title?.substring(0, 12) || `#${job.holdprint_data?.code || job.id?.slice(0,4)}`}
                                 </div>
                               ))}
                               {dayJobs.length > 3 && (
