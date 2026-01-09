@@ -56,6 +56,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - [x] **Relatório de Bonificação:** Apuração mensal para gerentes/admins
 - [x] **Toast de Notificação:** Feedback imediato ao ganhar moedas
 - [x] **Widget no Dashboard:** Saldo, nível, progresso, ganhos recentes
+- [x] **Ranking Semanal:** Leaderboard visível para todos os instaladores
 
 ### Notificações
 - [x] Infraestrutura de Push Notifications (VAPID)
