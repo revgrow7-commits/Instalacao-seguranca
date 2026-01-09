@@ -232,6 +232,9 @@ const InstallerDashboard = () => {
         </Card>
       )}
 
+      {/* Weekly Leaderboard */}
+      <WeeklyLeaderboard />
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 md:gap-6">
         <Card className="bg-card border-white/5">
