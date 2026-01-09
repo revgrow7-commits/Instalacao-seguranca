@@ -34,7 +34,7 @@ const InstallerCalendar = () => {
   const loadData = async () => {
     try {
       const [jobsRes, installersRes] = await Promise.all([
-        api.getJobs(),
+        api.getTeamCalendarJobs(),  // Use the new endpoint that shows all scheduled jobs
         api.getInstallers()
       ]);
       setJobs(jobsRes.data);
