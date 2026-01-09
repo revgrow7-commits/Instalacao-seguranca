@@ -3682,10 +3682,12 @@ async def export_reports(current_user: User = Depends(get_current_user)):
     """Export consolidated report to Excel"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    # Get all checkins with related data
-    checkins = await db.checkins.find({}, {"_id": 0}).to_list(1000)
+    # Get all item_checkins with related data (correct collection)
+    checkins = await db.item_checkins.find({}, {"_id": 0}).to_list(1000)
     jobs = await db.jobs.find({}, {"_id": 0}).to_list(1000)
     installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
+    
+    logging.info(f"Exporting report: {len(checkins)} checkins, {len(jobs)} jobs, {len(installers)} installers")
     
     # Create mapping dicts for faster lookup
     jobs_map = {job['id']: job for job in jobs}
