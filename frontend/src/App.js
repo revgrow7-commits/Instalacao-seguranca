@@ -8,6 +8,7 @@ import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
 import InstallerDashboard from './pages/InstallerDashboard';
 import InstallerJobDetail from './pages/InstallerJobDetail';
+import InstallerCalendar from './pages/InstallerCalendar';
 import Jobs from './pages/Jobs';
 import JobDetail from './pages/JobDetail';
 import Users from './pages/Users';
