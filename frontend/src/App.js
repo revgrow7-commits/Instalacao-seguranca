@@ -196,6 +196,16 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/reports/kpis"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <FamilyKPIsReport />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
       {/* Redirect old productivity route to unified reports */}
       <Route
         path="/reports/productivity"
