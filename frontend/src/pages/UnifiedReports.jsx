@@ -524,10 +524,50 @@ const UnifiedReports = () => {
 
         {/* Jobs Tab */}
         <TabsContent value="jobs" className="mt-6">
+          {/* Filter for Jobs */}
+          <Card className="bg-card border-white/5 mb-4">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                  <Label className="text-sm text-muted-foreground">Filtrar por Família:</Label>
+                </div>
+                <Select value={selectedProductFamily} onValueChange={setSelectedProductFamily}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white w-48 h-9">
+                    <SelectValue placeholder="Todas as Famílias" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    {productFamilies.map(fam => (
+                      <SelectItem key={fam.value} value={fam.value}>{fam.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {selectedProductFamily !== 'all' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setSelectedProductFamily('all')}
+                    className="text-muted-foreground hover:text-white h-9"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Limpar
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
           <Card className="bg-card border-white/5">
             <CardContent className="p-4">
               <div className="space-y-2">
-                {jobs.slice((jobsPage - 1) * ITEMS_PER_PAGE, jobsPage * ITEMS_PER_PAGE).map(job => {
+                {jobs
+                  .filter(job => {
+                    if (selectedProductFamily === 'all') return true;
+                    // Check if any product in the job matches the family
+                    const products = job.products_with_area || job.holdprint_data?.products || [];
+                    return products.some(p => getProductFamily(p.name) === selectedProductFamily);
+                  })
+                  .slice((jobsPage - 1) * ITEMS_PER_PAGE, jobsPage * ITEMS_PER_PAGE).map(job => {
                   const jobCheckins = itemCheckins.filter(c => c.job_id === job.id);
                   const completedItems = jobCheckins.filter(c => c.status === 'completed').length;
                   const totalM2 = jobCheckins.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
