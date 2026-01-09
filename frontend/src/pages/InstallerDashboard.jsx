@@ -154,15 +154,82 @@ const InstallerDashboard = () => {
         onComplete={handleNotificationComplete}
       />
       
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">
-          Olá, {user?.name}
-        </h1>
-        <p className="text-sm md:text-base text-muted-foreground mt-1">
-          Seus Jobs de Instalação
-        </p>
+      {/* Header with Coin Balance */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl md:text-4xl font-heading font-bold text-white tracking-tight">
+            Olá, {user?.name}
+          </h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
+            Seus Jobs de Instalação
+          </p>
+        </div>
+        {gamificationBalance && (
+          <Button
+            onClick={() => navigate('/loja-faixa-preta')}
+            className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-bold"
+          >
+            <Coins className="h-4 w-4 mr-2" />
+            {gamificationBalance.total_coins?.toLocaleString() || 0} moedas
+            <span className="ml-2">{gamificationBalance.level_info?.icon || '🥉'}</span>
+          </Button>
+        )}
       </div>
+
+      {/* Gamification Widget */}
+      {gamificationBalance && (
+        <GamificationWidget 
+          balance={gamificationBalance} 
+          levelInfo={gamificationBalance.level_info} 
+        />
+      )}
+
+      {/* Recent Earnings */}
+      {recentTransactions.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-green-400" />
+              Ganhos Recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {recentTransactions.slice(0, 3).map((transaction) => (
+                <div 
+                  key={transaction.id}
+                  className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                      transaction.amount > 0 ? 'bg-green-500/20' : 'bg-red-500/20'
+                    }`}>
+                      <Coins className={`h-4 w-4 ${transaction.amount > 0 ? 'text-green-400' : 'text-red-400'}`} />
+                    </div>
+                    <div>
+                      <p className="text-sm text-white">{transaction.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(transaction.created_at).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`font-bold ${transaction.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {transaction.amount > 0 ? '+' : ''}{transaction.amount}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <Button
+              onClick={() => navigate('/loja-faixa-preta')}
+              variant="ghost"
+              className="w-full mt-3 text-primary hover:text-primary/80"
+            >
+              <Gift className="h-4 w-4 mr-2" />
+              Ver Loja e Resgatar Prêmios
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 md:gap-6">
