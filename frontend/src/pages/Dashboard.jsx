@@ -198,223 +198,290 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* =============== UNIFIED ALERTS CENTER =============== */}
+      {/* =============== INFOGRAPHIC ALERTS CENTER =============== */}
       {(isAdmin || isManager) && (
-        pendingCheckins.length > 0 || 
-        locationAlerts.length > 0 || 
-        lateCheckins.length > 0 || 
-        pausedCheckins.length > 0
-      ) && (
-        <Card className="bg-card border-white/10">
-          <CardHeader className="border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-500/20">
-                  <AlertCircle className="h-6 w-6 text-red-500" />
+        <div className="space-y-6">
+          {/* Alert Summary Cards - Infographic Style */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {/* Check-ins Não Iniciados */}
+            <div 
+              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                pendingCheckins.length > 0 
+                  ? 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500/50' 
+                  : 'bg-white/5 border border-white/10 opacity-50'
+              }`}
+              onClick={() => pendingCheckins.length > 0 && document.getElementById('pending-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <div className="absolute -right-4 -top-4 opacity-10">
+                <Timer className="h-24 w-24 text-red-500" />
+              </div>
+              <div className="relative z-10">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                  pendingCheckins.length > 0 ? 'bg-red-500/30' : 'bg-white/10'
+                }`}>
+                  <Timer className={`h-7 w-7 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`} />
                 </div>
-                <div>
-                  <CardTitle className="text-xl text-white">Central de Alertas</CardTitle>
-                  <p className="text-sm text-muted-foreground">
-                    {pendingCheckins.length + locationAlerts.length + lateCheckins.length + pausedCheckins.length} alerta(s) ativos
-                  </p>
-                </div>
+                <p className={`text-3xl font-bold mb-1 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`}>
+                  {pendingCheckins.length}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Não Iniciados
+                </p>
               </div>
               {pendingCheckins.length > 0 && (
-                <Button
-                  size="sm"
-                  onClick={handleSendLateAlerts}
-                  disabled={sendingAlerts}
-                  className="bg-red-500 hover:bg-red-600 text-white"
-                >
-                  <Bell className="h-4 w-4 mr-2" />
-                  {sendingAlerts ? 'Enviando...' : 'Notificar Atrasados'}
-                </Button>
+                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-red-500 animate-pulse" />
               )}
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="divide-y divide-white/5">
-              
-              {/* Check-ins Não Iniciados (Scheduled but not started) */}
-              {pendingCheckins.length > 0 && (
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-md bg-red-500/20">
-                      <Timer className="h-4 w-4 text-red-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-red-400 uppercase tracking-wide">
-                      Check-ins Não Iniciados ({pendingCheckins.length})
-                    </h3>
-                  </div>
-                  <div className="space-y-2">
-                    {pendingCheckins.slice(0, 5).map((job) => (
-                      <div 
-                        key={job.id}
-                        className="flex items-center justify-between p-3 bg-red-500/5 border border-red-500/20 rounded-lg cursor-pointer hover:bg-red-500/10 transition-colors"
-                        onClick={() => navigate(`/jobs/${job.id}`)}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Timer className="h-5 w-5 text-red-400" />
-                          <div>
-                            <p className="text-white font-medium">{job.title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {job.installers_info?.map(i => i.full_name).join(', ') || 'Sem instalador'}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="px-2 py-1 bg-red-500/20 text-red-400 rounded text-xs font-bold">
-                          {job.minutes_late} min atrasado
-                        </span>
-                      </div>
-                    ))}
-                    {pendingCheckins.length > 5 && (
-                      <p className="text-xs text-muted-foreground text-center pt-2">
-                        +{pendingCheckins.length - 5} outros alertas
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
 
-              {/* Check-ins em Atraso (Running too long) */}
+            {/* Check-ins Prolongados */}
+            <div 
+              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                lateCheckins.length > 0 
+                  ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-2 border-yellow-500/50' 
+                  : 'bg-white/5 border border-white/10 opacity-50'
+              }`}
+              onClick={() => lateCheckins.length > 0 && document.getElementById('late-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <div className="absolute -right-4 -top-4 opacity-10">
+                <Clock className="h-24 w-24 text-yellow-500" />
+              </div>
+              <div className="relative z-10">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                  lateCheckins.length > 0 ? 'bg-yellow-500/30' : 'bg-white/10'
+                }`}>
+                  <Clock className={`h-7 w-7 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`} />
+                </div>
+                <p className={`text-3xl font-bold mb-1 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                  {lateCheckins.length}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Prolongados
+                </p>
+              </div>
               {lateCheckins.length > 0 && (
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-md bg-yellow-500/20">
-                      <Clock className="h-4 w-4 text-yellow-400" />
-                    </div>
-                    <h3 className="text-sm font-semibold text-yellow-400 uppercase tracking-wide">
-                      Check-ins Prolongados ({lateCheckins.length})
-                    </h3>
-                  </div>
-                  <div className="space-y-2">
-                    {lateCheckins.slice(0, 5).map((checkin) => {
-                      const job = jobs.find(j => j.id === checkin.job_id);
-                      const checkinTime = new Date(checkin.checkin_at);
-                      const hoursElapsed = Math.floor((new Date() - checkinTime) / (1000 * 60 * 60));
-                      return (
-                        <div 
-                          key={checkin.id}
-                          className="flex items-center justify-between p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg cursor-pointer hover:bg-yellow-500/10 transition-colors"
-                          onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <Clock className="h-5 w-5 text-yellow-400" />
-                            <div>
-                              <p className="text-white font-medium">{job?.title || 'Job não encontrado'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Iniciado em {formatDate(checkin.checkin_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">
-                            {hoursElapsed}h+ em andamento
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
               )}
+            </div>
 
-              {/* Check-ins Pausados */}
+            {/* Check-ins Pausados */}
+            <div 
+              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                pausedCheckins.length > 0 
+                  ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-2 border-orange-500/50' 
+                  : 'bg-white/5 border border-white/10 opacity-50'
+              }`}
+              onClick={() => pausedCheckins.length > 0 && document.getElementById('paused-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <div className="absolute -right-4 -top-4 opacity-10">
+                <PauseCircle className="h-24 w-24 text-orange-500" />
+              </div>
+              <div className="relative z-10">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                  pausedCheckins.length > 0 ? 'bg-orange-500/30' : 'bg-white/10'
+                }`}>
+                  <PauseCircle className={`h-7 w-7 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`} />
+                </div>
+                <p className={`text-3xl font-bold mb-1 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`}>
+                  {pausedCheckins.length}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Pausados
+                </p>
+              </div>
               {pausedCheckins.length > 0 && (
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-md bg-orange-500/20">
-                      <PauseCircle className="h-4 w-4 text-orange-400" />
+                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
+              )}
+            </div>
+
+            {/* Alertas de Localização */}
+            <div 
+              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                locationAlerts.length > 0 
+                  ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-2 border-purple-500/50' 
+                  : 'bg-white/5 border border-white/10 opacity-50'
+              }`}
+              onClick={() => locationAlerts.length > 0 && document.getElementById('location-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+            >
+              <div className="absolute -right-4 -top-4 opacity-10">
+                <Navigation className="h-24 w-24 text-purple-500" />
+              </div>
+              <div className="relative z-10">
+                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
+                  locationAlerts.length > 0 ? 'bg-purple-500/30' : 'bg-white/10'
+                }`}>
+                  <Navigation className={`h-7 w-7 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`} />
+                </div>
+                <p className={`text-3xl font-bold mb-1 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`}>
+                  {locationAlerts.length}
+                </p>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                  Localização
+                </p>
+              </div>
+              {locationAlerts.length > 0 && (
+                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-500 animate-pulse" />
+              )}
+            </div>
+          </div>
+
+          {/* Detailed Alerts Section */}
+          {(pendingCheckins.length > 0 || lateCheckins.length > 0 || pausedCheckins.length > 0 || locationAlerts.length > 0) && (
+            <Card className="bg-card/50 backdrop-blur border-white/10">
+              <CardHeader className="pb-2">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg text-white flex items-center gap-2">
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                    Detalhes dos Alertas
+                  </CardTitle>
+                  {pendingCheckins.length > 0 && (
+                    <Button
+                      size="sm"
+                      onClick={handleSendLateAlerts}
+                      disabled={sendingAlerts}
+                      className="bg-red-500 hover:bg-red-600 text-white"
+                    >
+                      <Bell className="h-4 w-4 mr-2" />
+                      {sendingAlerts ? 'Enviando...' : 'Notificar'}
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                
+                {/* Check-ins Não Iniciados */}
+                {pendingCheckins.length > 0 && (
+                  <div id="pending-alerts" className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+                        <Timer className="h-4 w-4 text-red-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-red-400">Não Iniciados</span>
                     </div>
-                    <h3 className="text-sm font-semibold text-orange-400 uppercase tracking-wide">
-                      Check-ins Pausados ({pausedCheckins.length})
-                    </h3>
-                  </div>
-                  <div className="space-y-2">
-                    {pausedCheckins.slice(0, 5).map((checkin) => {
-                      const job = jobs.find(j => j.id === checkin.job_id);
-                      return (
+                    <div className="grid gap-2 pl-10">
+                      {pendingCheckins.slice(0, 3).map((job) => (
                         <div 
-                          key={checkin.id}
-                          className="flex items-center justify-between p-3 bg-orange-500/5 border border-orange-500/20 rounded-lg cursor-pointer hover:bg-orange-500/10 transition-colors"
-                          onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                          key={job.id}
+                          className="flex items-center justify-between p-2 bg-red-500/5 border border-red-500/20 rounded-lg cursor-pointer hover:bg-red-500/10"
+                          onClick={() => navigate(`/jobs/${job.id}`)}
                         >
-                          <div className="flex items-center gap-3">
-                            <PauseCircle className="h-5 w-5 text-orange-400" />
-                            <div>
-                              <p className="text-white font-medium">{job?.title || 'Job não encontrado'}</p>
-                              <p className="text-xs text-muted-foreground">
-                                Pausado desde {formatDate(checkin.updated_at || checkin.checkin_at)}
-                              </p>
-                            </div>
-                          </div>
-                          <span className="px-2 py-1 bg-orange-500/20 text-orange-400 rounded text-xs font-bold uppercase">
-                            Pausado
+                          <span className="text-sm text-white truncate flex-1">{job.title}</span>
+                          <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold ml-2">
+                            {job.minutes_late}min
                           </span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Alertas de Localização */}
-              {locationAlerts.length > 0 && (
-                <div className="p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <div className="p-1.5 rounded-md bg-purple-500/20">
-                      <Navigation className="h-4 w-4 text-purple-400" />
+                      ))}
                     </div>
-                    <h3 className="text-sm font-semibold text-purple-400 uppercase tracking-wide">
-                      Alertas de Localização ({locationAlerts.length})
-                    </h3>
                   </div>
-                  <div className="space-y-2">
-                    {locationAlerts.slice(0, 5).map((alert) => (
-                      <div 
-                        key={alert.id}
-                        className="flex items-center justify-between p-3 bg-purple-500/5 border border-purple-500/20 rounded-lg"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Navigation className="h-5 w-5 text-purple-400" />
-                          <div>
-                            <p className="text-white font-medium">{alert.job_title}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {alert.installer_name} • {new Date(alert.created_at).toLocaleString('pt-BR')}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="px-2 py-1 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">
-                          {alert.distance_meters?.toFixed(0)}m do local
-                        </span>
+                )}
+
+                {/* Check-ins Prolongados */}
+                {lateCheckins.length > 0 && (
+                  <div id="late-alerts" className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                        <Clock className="h-4 w-4 text-yellow-400" />
                       </div>
-                    ))}
+                      <span className="text-sm font-semibold text-yellow-400">Prolongados (+4h)</span>
+                    </div>
+                    <div className="grid gap-2 pl-10">
+                      {lateCheckins.slice(0, 3).map((checkin) => {
+                        const job = jobs.find(j => j.id === checkin.job_id);
+                        const hours = Math.floor((new Date() - new Date(checkin.checkin_at)) / (1000 * 60 * 60));
+                        return (
+                          <div 
+                            key={checkin.id}
+                            className="flex items-center justify-between p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg cursor-pointer hover:bg-yellow-500/10"
+                            onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                          >
+                            <span className="text-sm text-white truncate flex-1">{job?.title || 'Job'}</span>
+                            <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold ml-2">
+                              {hours}h+
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Check-ins Pausados */}
+                {pausedCheckins.length > 0 && (
+                  <div id="paused-alerts" className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+                        <PauseCircle className="h-4 w-4 text-orange-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-orange-400">Pausados</span>
+                    </div>
+                    <div className="grid gap-2 pl-10">
+                      {pausedCheckins.slice(0, 3).map((checkin) => {
+                        const job = jobs.find(j => j.id === checkin.job_id);
+                        return (
+                          <div 
+                            key={checkin.id}
+                            className="flex items-center justify-between p-2 bg-orange-500/5 border border-orange-500/20 rounded-lg cursor-pointer hover:bg-orange-500/10"
+                            onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
+                          >
+                            <span className="text-sm text-white truncate flex-1">{job?.title || 'Job'}</span>
+                            <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs font-bold ml-2">
+                              ⏸ Pausa
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Alertas de Localização */}
+                {locationAlerts.length > 0 && (
+                  <div id="location-alerts" className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                        <Navigation className="h-4 w-4 text-purple-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-purple-400">Localização</span>
+                    </div>
+                    <div className="grid gap-2 pl-10">
+                      {locationAlerts.slice(0, 3).map((alert) => (
+                        <div 
+                          key={alert.id}
+                          className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg"
+                        >
+                          <div className="truncate flex-1">
+                            <span className="text-sm text-white">{alert.job_title}</span>
+                            <span className="text-xs text-muted-foreground ml-2">{alert.installer_name}</span>
+                          </div>
+                          <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold ml-2">
+                            {alert.distance_meters?.toFixed(0)}m
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              </CardContent>
+            </Card>
+          )}
+
+          {/* All Clear Message */}
+          {pendingCheckins.length === 0 && lateCheckins.length === 0 && pausedCheckins.length === 0 && locationAlerts.length === 0 && (
+            <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/30">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-green-500/20 flex items-center justify-center">
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-green-500">Tudo em ordem!</h3>
+                    <p className="text-sm text-muted-foreground">Nenhum alerta ativo no momento.</p>
                   </div>
                 </div>
-              )}
-
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* No Alerts Message */}
-      {(isAdmin || isManager) && 
-        pendingCheckins.length === 0 && 
-        locationAlerts.length === 0 && 
-        lateCheckins.length === 0 && 
-        pausedCheckins.length === 0 && (
-        <Card className="bg-green-500/10 border-green-500/30">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-green-500/20">
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-green-500">Tudo em ordem!</h3>
-                <p className="text-sm text-muted-foreground">Nenhum alerta ativo no momento.</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Recent Jobs */}
