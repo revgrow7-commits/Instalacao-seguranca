@@ -233,6 +233,26 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/loja-faixa-preta"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <LojaFaixaPreta />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/gamification-report"
+        element={
+          <ProtectedRoute>
+            <MainLayout>
+              <GamificationReport />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
