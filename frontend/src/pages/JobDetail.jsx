@@ -892,12 +892,24 @@ const JobDetail = () => {
                 <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 Itens em Execução
               </div>
-              {stalledItemsCount > 0 && (
-                <span className="text-sm font-normal px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse">
-                  <AlertTriangle className="h-4 w-4" />
-                  {stalledItemsCount} alerta(s)
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {stalledItemsCount > 0 && (
+                  <>
+                    <span className="text-sm font-normal px-3 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1 animate-pulse">
+                      <AlertTriangle className="h-4 w-4" />
+                      {stalledItemsCount} alerta(s)
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={sendAllWhatsAppAlerts}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Notificar via WhatsApp
+                    </Button>
+                  </>
+                )}
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 md:p-6 pt-0">
@@ -941,8 +953,13 @@ const JobDetail = () => {
                             <p className="text-white font-medium truncate text-sm">
                               {product?.name || `Item ${checkin.item_index + 1}`}
                             </p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
                               {installer?.full_name || 'Instalador não identificado'}
+                              {installer?.phone && (
+                                <span className="text-green-400 ml-1">
+                                  <Phone className="h-3 w-3 inline" />
+                                </span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -954,6 +971,22 @@ const JobDetail = () => {
                           }`}>
                             {checkin.status === 'in_progress' ? 'Em andamento' : 'Pausado'}
                           </span>
+                          {/* Botão WhatsApp individual para itens parados */}
+                          {isStalled && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                sendWhatsAppNotification(checkin, installer, product);
+                              }}
+                              className="h-8 w-8 p-0 bg-green-600/20 hover:bg-green-600/40 text-green-400"
+                              title={installer?.phone ? `Enviar WhatsApp para ${installer.full_name}` : 'Telefone não cadastrado'}
+                              disabled={!installer?.phone}
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                       
