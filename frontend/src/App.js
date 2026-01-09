@@ -254,6 +254,14 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/coin-demo"
+        element={
+          <ProtectedRoute>
+            <CoinDemo />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/"
         element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
