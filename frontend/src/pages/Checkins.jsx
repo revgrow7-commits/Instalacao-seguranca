@@ -29,28 +29,116 @@ const CheckinSkeleton = () => (
   </Card>
 );
 
+// Cronometer component that updates every second
+const Cronometer = ({ startTime, isPaused }) => {
+  const [elapsed, setElapsed] = useState('');
+  
+  useEffect(() => {
+    if (!startTime) return;
+    
+    const updateTimer = () => {
+      const start = new Date(startTime);
+      const now = new Date();
+      const diffMs = now - start;
+      
+      const hours = Math.floor(diffMs / (1000 * 60 * 60));
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+      
+      if (hours > 0) {
+        setElapsed(`${hours}h ${minutes.toString().padStart(2, '0')}m`);
+      } else {
+        setElapsed(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
+      }
+    };
+    
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    
+    return () => clearInterval(interval);
+  }, [startTime]);
+  
+  if (!startTime) return null;
+  
+  return (
+    <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-bold ${
+      isPaused 
+        ? 'bg-orange-500/20 text-orange-400' 
+        : 'bg-blue-500/20 text-blue-400'
+    }`}>
+      <Timer className="h-3 w-3" />
+      {elapsed}
+    </div>
+  );
+};
+
 // Mini card for check-in/checkout without photo for performance
 const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
   const isCheckout = type === 'checkout';
   const photo = isCheckout ? checkin.checkout_photo : checkin.checkin_photo;
   const date = isCheckout ? checkin.checkout_at : checkin.checkin_at;
   
+  // Calculate if checkin is late (more than 4 hours without checkout)
+  const isLate = useMemo(() => {
+    if (checkin.status === 'completed') return false;
+    const start = new Date(checkin.checkin_at);
+    const now = new Date();
+    const hours = (now - start) / (1000 * 60 * 60);
+    return hours >= 4;
+  }, [checkin]);
+  
+  // Check if paused
+  const isPaused = checkin.status === 'paused';
+  
+  // Check if in progress (not completed, not paused)
+  const isInProgress = checkin.status === 'in_progress';
+  
   return (
-    <Card className="bg-card border-white/5 hover:border-primary/50 transition-all group">
+    <Card className={`bg-card border-white/5 hover:border-primary/50 transition-all group ${
+      isLate ? 'border-l-4 border-l-red-500' : 
+      isPaused ? 'border-l-4 border-l-orange-500' : ''
+    }`}>
       <CardContent className="p-4">
         <div className="flex gap-3">
-          {/* Photo Thumbnail */}
-          <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white/5">
-            {photo ? (
-              <img
-                src={photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`}
-                alt={type}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Image className="h-6 w-6 text-muted-foreground" />
+          {/* Photo Thumbnail with Alert Icons */}
+          <div className="relative w-20 h-20 flex-shrink-0">
+            <div className="w-full h-full rounded-lg overflow-hidden bg-white/5">
+              {photo ? (
+                <img
+                  src={photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`}
+                  alt={type}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className={`w-full h-full flex items-center justify-center ${
+                  checkin.status === 'completed' ? 'bg-green-500/20' : 
+                  isPaused ? 'bg-orange-500/20' : 
+                  isLate ? 'bg-red-500/20' : 'bg-blue-500/20'
+                }`}>
+                  {checkin.status === 'completed' ? (
+                    <CheckCircle className="h-8 w-8 text-green-400" />
+                  ) : isPaused ? (
+                    <Pause className="h-8 w-8 text-orange-400" />
+                  ) : isLate ? (
+                    <Hand className="h-8 w-8 text-red-400" />
+                  ) : (
+                    <Play className="h-8 w-8 text-blue-400" />
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* Alert Icon Overlay */}
+            {(isLate || isPaused) && photo && (
+              <div className={`absolute -top-1 -right-1 p-1 rounded-full ${
+                isLate ? 'bg-red-500' : 'bg-orange-500'
+              }`}>
+                {isLate ? (
+                  <Hand className="h-3 w-3 text-white" />
+                ) : (
+                  <Pause className="h-3 w-3 text-white" />
+                )}
               </div>
             )}
           </div>
@@ -76,30 +164,57 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
                   ? 'bg-green-500/20 text-green-400'
                   : checkin.status === 'paused'
                   ? 'bg-orange-500/20 text-orange-400'
+                  : isLate
+                  ? 'bg-red-500/20 text-red-400'
                   : 'bg-blue-500/20 text-blue-400'
               }`}>
                 {checkin.status === 'completed' ? 'OK' : 
-                 checkin.status === 'paused' ? 'PAUSA' : 'ATIVO'}
+                 checkin.status === 'paused' ? 'PAUSA' : 
+                 isLate ? 'ATRASO' : 'ATIVO'}
               </span>
             </div>
             
-            {/* Product & Duration */}
-            <div className="flex items-center gap-2 mt-2 text-xs">
+            {/* Product & Duration/Cronometer */}
+            <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
               {checkin.product_name && (
-                <span className="text-muted-foreground truncate max-w-[120px]" title={checkin.product_name}>
+                <span className="text-muted-foreground truncate max-w-[100px]" title={checkin.product_name}>
                   <Package className="h-3 w-3 inline mr-1" />
-                  {checkin.product_name.substring(0, 20)}...
+                  {checkin.product_name.substring(0, 15)}...
                 </span>
               )}
-              {checkin.duration_minutes && (
+              
+              {/* Show cronometer for active/paused checkins, duration for completed */}
+              {checkin.status === 'completed' && checkin.duration_minutes ? (
                 <span className="text-green-400 whitespace-nowrap">
                   <Clock className="h-3 w-3 inline mr-1" />
                   {checkin.duration_minutes}min
                 </span>
+              ) : (checkin.status === 'in_progress' || checkin.status === 'paused') && (
+                <Cronometer startTime={checkin.checkin_at} isPaused={isPaused} />
               )}
             </div>
           </div>
         </div>
+        
+        {/* Alert Banner for Late/Paused */}
+        {(isLate || isPaused) && checkin.status !== 'completed' && (
+          <div className={`mt-3 p-2 rounded-lg flex items-center gap-2 text-xs font-medium ${
+            isLate ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+            'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+          }`}>
+            {isLate ? (
+              <>
+                <Hand className="h-4 w-4" />
+                <span>⚠️ Atrasado (+4h sem checkout)</span>
+              </>
+            ) : (
+              <>
+                <Pause className="h-4 w-4" />
+                <span>⏸️ Execução pausada</span>
+              </>
+            )}
+          </div>
+        )}
         
         {/* Actions - Always visible */}
         <div className="flex gap-2 mt-3">
