@@ -1272,11 +1272,25 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Check if installer is assigned to this job
+    # Check if installer is assigned to this job or any item
     if current_user.role == UserRole.INSTALLER:
         installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
         if installer:
-            if installer['id'] not in (job_doc.get('assigned_installers') or []):
+            installer_id = installer['id']
+            job_assigned_installers = job_doc.get('assigned_installers') or []
+            item_assignments = job_doc.get('item_assignments') or []
+            
+            # Check job-level assignment
+            has_access = installer_id in job_assigned_installers
+            
+            # Check item-level assignment
+            if not has_access:
+                for assignment in item_assignments:
+                    if installer_id in assignment.get('installer_ids', []):
+                        has_access = True
+                        break
+            
+            if not has_access:
                 raise HTTPException(status_code=403, detail="Você não tem acesso a este job")
         else:
             raise HTTPException(status_code=403, detail="Instalador não encontrado")
