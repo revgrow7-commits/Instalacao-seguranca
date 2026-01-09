@@ -15,6 +15,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [installers, setInstallers] = useState([]);
   const [lateCheckins, setLateCheckins] = useState([]);
   const [pausedCheckins, setPausedCheckins] = useState([]);
   const [pendingCheckins, setPendingCheckins] = useState([]);
@@ -22,6 +23,55 @@ const Dashboard = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
+
+  // Format phone number for WhatsApp (remove non-digits and add country code)
+  const formatPhoneForWhatsApp = (phone) => {
+    if (!phone) return null;
+    // Remove all non-digits
+    const digits = phone.replace(/\D/g, '');
+    // Add Brazil country code if not present
+    if (digits.startsWith('55')) return digits;
+    if (digits.length === 11 || digits.length === 10) return `55${digits}`;
+    return digits;
+  };
+
+  // Get installer info by user_id
+  const getInstallerByUserId = (userId) => {
+    return installers.find(i => i.user_id === userId);
+  };
+
+  // Open WhatsApp with pre-filled message
+  const openWhatsApp = (phone, messageType, jobTitle, installerName) => {
+    const formattedPhone = formatPhoneForWhatsApp(phone);
+    if (!formattedPhone) {
+      toast.error('Telefone não cadastrado para este instalador');
+      return;
+    }
+
+    let message = '';
+    const appUrl = 'https://prod-control-10.preview.emergentagent.com/';
+    
+    switch (messageType) {
+      case 'paused':
+        message = `Olá ${installerName}! 👋\n\nVerificamos que seu check-in no job "${jobTitle}" está pausado.\n\nPor favor, atualize o status ou retome a instalação.\n\nAcesse: ${appUrl}`;
+        break;
+      case 'late':
+        message = `Olá ${installerName}! 👋\n\nSeu checkout no job "${jobTitle}" está em atraso (mais de 4 horas).\n\nPor favor, finalize o checkout ou entre em contato conosco.\n\nAcesse: ${appUrl}`;
+        break;
+      case 'pending':
+        message = `Olá ${installerName}! 👋\n\nO job "${jobTitle}" está agendado mas ainda não foi iniciado.\n\nPor favor, inicie o check-in assim que possível.\n\nAcesse: ${appUrl}`;
+        break;
+      case 'location':
+        message = `Olá ${installerName}! 👋\n\nVerificamos uma divergência de localização no job "${jobTitle}".\n\nPor favor, verifique se está no local correto da instalação.\n\nAcesse: ${appUrl}`;
+        break;
+      default:
+        message = `Olá ${installerName}! 👋\n\nPrecisamos falar sobre o job "${jobTitle}".\n\nAcesse: ${appUrl}`;
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   useEffect(() => {
     // Redirect installers to their specific dashboard
