@@ -57,6 +57,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - [x] **Toast de Notificação:** Feedback imediato ao ganhar moedas
 - [x] **Widget no Dashboard:** Saldo, nível, progresso, ganhos recentes
 - [x] **Ranking Semanal:** Leaderboard visível para todos os instaladores
+- [x] **Animação de Chuva de Moedas:** Efeito visual após checkout com contador animado
 
 ### Notificações
 - [x] Infraestrutura de Push Notifications (VAPID)
