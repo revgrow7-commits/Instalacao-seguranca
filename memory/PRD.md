@@ -205,6 +205,15 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
+### 12/01/2026 - Correção de Bug e Migração de Rotas
+- ✅ **BUGFIX:** Corrigido `TypeError` no backend que impedia o carregamento do Dashboard do Gerente
+  - Problema: Erro ao ordenar check-ins com tipos mistos (datetime/string) no campo `checkin_at`
+  - Solução: Normalização de `checkin_at` para string antes da ordenação
+- ✅ **REFATORAÇÃO:** Migrada todas as rotas de gamificação de `server.py` para `routes/gamification.py`
+  - Redução de ~530 linhas no `server.py` (5567 → 5040 linhas)
+  - Todas as rotas de balance, transactions, rewards, redemptions, reports e leaderboard migradas
+  - Funções auxiliares (`get_level_from_coins`, `calculate_checkout_coins`, `award_coins`) mantidas no `server.py` para uso em outros endpoints
+
 ### 09/01/2026 - Refatoração do Backend
 - ✅ **REFATORAÇÃO:** Dividido `server.py` em módulos menores
   - `config.py`: Configurações e constantes
