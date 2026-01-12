@@ -5022,6 +5022,12 @@ async def root():
 # Include router
 app.include_router(api_router)
 
+# Health check endpoint for Kubernetes (must be at root, not under /api)
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Kubernetes liveness/readiness probes"""
+    return {"status": "healthy", "service": "industria-visual-api"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
