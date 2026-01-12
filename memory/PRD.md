@@ -85,7 +85,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ```
 /app/
 ├── backend/
-│   ├── server.py              # API principal (refatorado)
+│   ├── server.py              # API principal (~5040 linhas, em refatoração)
 │   ├── config.py              # Configurações e constantes
 │   ├── database.py            # Conexão MongoDB
 │   ├── security.py            # Autenticação JWT
@@ -105,11 +105,13 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 │   │   ├── image.py               # Compressão de imagens
 │   │   └── gps.py                 # Cálculo de distâncias
 │   ├── routes/                # Rotas da API (migração em progresso)
-│   │   ├── __init__.py
-│   │   ├── auth.py            # Rotas de autenticação
-│   │   ├── users.py           # Gerenciamento de usuários
-│   │   ├── installers.py      # Rotas de instaladores
-│   │   └── ... (outros em migração)
+│   │   ├── __init__.py        # Registro de todos os routers
+│   │   ├── auth.py            # ✅ MIGRADO: Autenticação
+│   │   ├── gamification.py    # ✅ MIGRADO: Gamificação completa
+│   │   ├── users.py           # Stub (pendente migração)
+│   │   ├── jobs.py            # Stub (pendente migração)
+│   │   ├── checkins.py        # Stub (pendente migração)
+│   │   └── ...
 │   └── .env                   # Credenciais
 ├── frontend/
 │   ├── src/
