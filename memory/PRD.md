@@ -182,13 +182,13 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ## Backlog / Próximas Tarefas
 
 ### P1 - Alta Prioridade
-- [ ] Finalizar botão de notificação WhatsApp na página JobDetail
-- [ ] Testar gatilhos de notificação push de ponta a ponta
+- [ ] Continuar migração de rotas (jobs, users, checkins) para arquivos separados
 - [ ] Gerenciamento de prêmios pelo admin na interface
+- [ ] Testar gatilhos de notificação push de ponta a ponta
 
 ### P2 - Média Prioridade
 - [ ] Sistema manual de classificação de produtos por família
-- [ ] Migrar rotas restantes para arquivos separados
+- [ ] Remover página de demo `/app/frontend/src/pages/CoinDemo.jsx`
 
 ### P3 - Baixa Prioridade
 - [ ] Capacidades Offline (PWA)
