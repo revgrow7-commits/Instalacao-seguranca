@@ -55,7 +55,7 @@ const Dashboard = () => {
     }
 
     let message = '';
-    const appUrl = 'https://prodtrak.preview.emergentagent.com/';
+    const appUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
     
     switch (messageType) {
       case 'paused':
