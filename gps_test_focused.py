@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://prod-control-10.preview.emergentagent.com/api"
+BASE_URL = "https://prodtrak.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_CREDENTIALS = {

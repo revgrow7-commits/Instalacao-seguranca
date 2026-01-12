@@ -883,7 +883,7 @@ const JobDetail = () => {
                             `Estou entrando em contato sobre o job:\n` +
                             `📋 *${job?.title || 'Job'}*\n` +
                             `📍 Cliente: ${job?.holdprint_data?.customerName || job?.client_name || 'N/A'}\n\n` +
-                            `Acesse: https://prod-control-10.preview.emergentagent.com/`
+                            `Acesse: https://prodtrak.preview.emergentagent.com/`
                           );
                           window.open(`https://wa.me/${fullPhone}?text=${message}`, '_blank');
                         }}
