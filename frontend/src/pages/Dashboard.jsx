@@ -55,7 +55,7 @@ const Dashboard = () => {
     }
 
     let message = '';
-    const appUrl = 'https://prod-control-10.preview.emergentagent.com/';
+    const appUrl = 'https://prodtrak.preview.emergentagent.com/';
     
     switch (messageType) {
       case 'paused':

@@ -21,13 +21,13 @@ HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 # Google OAuth Config
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
-GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://prod-control-10.preview.emergentagent.com/api/auth/google/callback')
+GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI', 'https://prodtrak.preview.emergentagent.com/api/auth/google/callback')
 GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email']
 
 # Resend Email Config
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://prod-control-10.preview.emergentagent.com')
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://prodtrak.preview.emergentagent.com')
 
 # Web Push Notification Config
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
