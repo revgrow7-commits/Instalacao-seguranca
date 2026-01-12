@@ -4134,7 +4134,7 @@ async def google_callback(code: str, state: str = None):
         if not user:
             # Close window with error
             return RedirectResponse(
-                url=f"https://prodtrak.preview.emergentagent.com/calendar?google_error=user_not_found"
+                url=f"{FRONTEND_URL}/calendar?google_error=user_not_found"
             )
         
         # Store Google tokens for this user
@@ -4155,13 +4155,13 @@ async def google_callback(code: str, state: str = None):
         
         # Redirect back to calendar page with success
         return RedirectResponse(
-            url=f"https://prodtrak.preview.emergentagent.com/calendar?google_connected=true"
+            url=f"{FRONTEND_URL}/calendar?google_connected=true"
         )
         
     except Exception as e:
         logging.error(f"Google callback error: {str(e)}")
         return RedirectResponse(
-            url=f"https://prodtrak.preview.emergentagent.com/calendar?google_error=auth_failed"
+            url=f"{FRONTEND_URL}/calendar?google_error=auth_failed"
         )
 
 @api_router.get("/auth/google/status")
