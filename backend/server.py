@@ -5009,24 +5009,10 @@ async def award_coins(user_id: str, amount: int, transaction_type: str, descript
         "level": new_level
     }
 
-@api_router.get("/gamification/balance")
-async def get_gamification_balance(current_user: User = Depends(get_current_user)):
-    """Get current user's gamification balance and level info"""
-    balance = await db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
-    
-    if not balance:
-        # Create default balance
-        balance = GamificationBalance(user_id=current_user.id).model_dump()
-        balance["created_at"] = balance["created_at"].isoformat()
-        balance["updated_at"] = balance["updated_at"].isoformat()
-        await db.gamification_balances.insert_one(balance)
-    
-    level_info = get_level_from_coins(balance.get("lifetime_coins", 0))
-    
-    return {
-        **balance,
-        "level_info": level_info
-    }
+# ============ GAMIFICATION ROUTES (migrated to routes/gamification.py) ============
+# Import and include the gamification router
+from routes.gamification import router as gamification_router
+api_router.include_router(gamification_router, tags=["Gamification"])
 
 @api_router.get("/gamification/balance/{user_id}")
 async def get_user_gamification_balance(user_id: str, current_user: User = Depends(get_current_user)):
