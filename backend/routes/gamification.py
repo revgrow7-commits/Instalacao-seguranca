@@ -229,6 +229,8 @@ async def get_gamification_balance(current_user: User = Depends(get_current_user
         balance["created_at"] = balance["created_at"].isoformat()
         balance["updated_at"] = balance["updated_at"].isoformat()
         await db.gamification_balances.insert_one(balance)
+        # Remove _id after insert
+        balance.pop("_id", None)
     
     level_info = get_level_from_coins(balance.get("lifetime_coins", 0))
     
