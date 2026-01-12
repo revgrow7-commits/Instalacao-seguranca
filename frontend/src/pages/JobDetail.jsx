@@ -878,12 +878,13 @@ const JobDetail = () => {
                         onClick={() => {
                           const phone = installer.phone.replace(/\D/g, '');
                           const fullPhone = phone.startsWith('55') ? phone : `55${phone}`;
+                          const appUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
                           const message = encodeURIComponent(
                             `Olá ${installer.full_name?.split(' ')[0]}! 👋\n\n` +
                             `Estou entrando em contato sobre o job:\n` +
                             `📋 *${job?.title || 'Job'}*\n` +
                             `📍 Cliente: ${job?.holdprint_data?.customerName || job?.client_name || 'N/A'}\n\n` +
-                            `Acesse: https://prodtrak.preview.emergentagent.com/`
+                            `Acesse: ${appUrl}`
                           );
                           window.open(`https://wa.me/${fullPhone}?text=${message}`, '_blank');
                         }}
