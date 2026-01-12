@@ -2248,8 +2248,14 @@ async def get_all_item_checkins(
         job = jobs_map.get(c.get("job_id"), {})
         installer = installers_map.get(c.get("installer_id"), {})
         
+        # Normalize checkin_at to string for consistent sorting
+        checkin_at = c.get("checkin_at", "")
+        if isinstance(checkin_at, datetime):
+            checkin_at = checkin_at.isoformat()
+        
         enriched = {
             **c,
+            "checkin_at": checkin_at,
             "job_title": job.get("title", "N/A"),
             "client_name": job.get("client_name", "N/A"),
             "installer_name": installer.get("full_name", "N/A")
