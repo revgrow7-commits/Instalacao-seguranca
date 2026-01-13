@@ -777,11 +777,11 @@ async def self_register(request: SelfRegisterRequest):
     user = User(
         name=request.name,
         email=request.email,
-        password_hash=get_password_hash(request.password),
         role=UserRole.INSTALLER  # Default role for self-registered users
     )
     
     user_dict = user.model_dump()
+    user_dict['password_hash'] = get_password_hash(request.password)
     user_dict['created_at'] = user_dict['created_at'].isoformat()
     await db.users.insert_one(user_dict)
     
