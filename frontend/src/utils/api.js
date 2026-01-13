@@ -10,6 +10,7 @@ const getAuthHeader = () => {
 export const api = {
   // Auth
   login: (email, password) => axios.post(`${API_URL}/auth/login`, { email, password }),
+  register: (data) => axios.post(`${API_URL}/auth/self-register`, data),
   getMe: () => axios.get(`${API_URL}/auth/me`, { headers: getAuthHeader() }),
   forgotPassword: (email) => axios.post(`${API_URL}/auth/forgot-password`, { email }),
   resetPassword: (token, newPassword) => axios.post(`${API_URL}/auth/reset-password`, { token, new_password: newPassword }),
