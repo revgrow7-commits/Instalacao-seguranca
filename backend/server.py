@@ -870,6 +870,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     frontend_url = _os.environ.get('FRONTEND_URL', 'https://prodtrak.preview.emergentagent.com')
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
     logging.info(f"Password reset link generated with FRONTEND_URL: {frontend_url}")
+    logging.info(f"Full reset link: {reset_link}")
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
