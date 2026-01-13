@@ -74,6 +74,12 @@ const AppRoutes = () => {
         }
       />
       <Route
+        path="/register"
+        element={
+          user ? <Navigate to="/dashboard" replace /> : <Register />
+        }
+      />
+      <Route
         path="/forgot-password"
         element={
           user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
