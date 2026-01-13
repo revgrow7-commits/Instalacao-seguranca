@@ -818,8 +818,11 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Send email
-    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    # Send email - Get FRONTEND_URL directly from environment to ensure fresh value
+    import os as _os
+    frontend_url = _os.environ.get('FRONTEND_URL', 'https://prodtrak.preview.emergentagent.com')
+    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
+    logging.info(f"Password reset link generated with FRONTEND_URL: {frontend_url}")
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
