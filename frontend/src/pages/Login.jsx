@@ -102,7 +102,19 @@ const Login = () => {
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-6 text-center">
+            <p className="text-sm text-muted-foreground">
+              Não tem uma conta?{' '}
+              <Link 
+                to="/register" 
+                className="text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                Criar conta
+              </Link>
+            </p>
+          </div>
+
+          <div className="mt-4 text-center text-sm text-muted-foreground">
             <p>© 2025 INDÚSTRIA VISUAL</p>
           </div>
         </div>
