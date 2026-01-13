@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, UserPlus } from 'lucide-react';
-import api from '../services/api';
+import { api } from '../utils/api';
 
 const Register = () => {
   const [formData, setFormData] = useState({
