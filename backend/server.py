@@ -756,6 +756,53 @@ async def register(user_data: UserCreate, current_user: User = Depends(get_curre
     
     return user
 
+# Self-registration endpoint (public - no auth required)
+class SelfRegisterRequest(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
+@api_router.post("/auth/self-register")
+async def self_register(request: SelfRegisterRequest):
+    """Allow users to create their own account"""
+    # Check if email already exists
+    existing_user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Este email já está cadastrado")
+    
+    if len(request.password) < 6:
+        raise HTTPException(status_code=400, detail="A senha deve ter pelo menos 6 caracteres")
+    
+    # Create user with default 'installer' role
+    user = User(
+        name=request.name,
+        email=request.email,
+        password_hash=hash_password(request.password),
+        role=UserRole.INSTALLER  # Default role for self-registered users
+    )
+    
+    user_dict = user.model_dump()
+    user_dict['created_at'] = user_dict['created_at'].isoformat()
+    await db.users.insert_one(user_dict)
+    
+    # Auto-create installer profile
+    installer = Installer(
+        user_id=user.id,
+        full_name=request.name,
+        branch="POA"  # Default branch
+    )
+    installer_dict = installer.model_dump()
+    installer_dict['created_at'] = installer_dict['created_at'].isoformat()
+    await db.installers.insert_one(installer_dict)
+    
+    logging.info(f"New user self-registered: {request.email}")
+    
+    return {
+        "success": True,
+        "message": "Conta criada com sucesso! Faça login para continuar.",
+        "user_id": user.id
+    }
+
 @api_router.post("/auth/login", response_model=Token)
 async def login(credentials: UserLogin):
     # Find user
