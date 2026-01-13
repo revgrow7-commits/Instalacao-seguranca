@@ -777,7 +777,7 @@ async def self_register(request: SelfRegisterRequest):
     user = User(
         name=request.name,
         email=request.email,
-        password_hash=hash_password(request.password),
+        password_hash=get_password_hash(request.password),
         role=UserRole.INSTALLER  # Default role for self-registered users
     )
     
