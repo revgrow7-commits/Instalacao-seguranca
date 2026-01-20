@@ -1103,12 +1103,17 @@ async def change_password(
 # ============ HOLDPRINT & JOB ROUTES ============
 
 @api_router.get("/holdprint/jobs/{branch}")
-async def get_holdprint_jobs(branch: str, current_user: User = Depends(get_current_user)):
+async def get_holdprint_jobs(
+    branch: str, 
+    month: Optional[int] = Query(None, ge=1, le=12),
+    year: Optional[int] = Query(None, ge=2020, le=2030),
+    current_user: User = Depends(get_current_user)
+):
     """Fetch jobs from Holdprint API"""
     if branch not in ["POA", "SP"]:
         raise HTTPException(status_code=400, detail="Branch must be POA or SP")
     
-    jobs = await fetch_holdprint_jobs(branch)
+    jobs = await fetch_holdprint_jobs(branch, month, year)
     return {"success": True, "jobs": jobs}
 
 @api_router.post("/jobs", response_model=Job)
