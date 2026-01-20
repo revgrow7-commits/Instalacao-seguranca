@@ -76,6 +76,12 @@ const Sidebar = () => {
       icon: Users,
       roles: ['admin']
     },
+    {
+      name: 'Agendamentos',
+      href: '/admin/scheduler',
+      icon: Calendar,
+      roles: ['admin', 'manager']
+    },
   ];
 
   const filteredNav = navigation.filter(item => item.roles.includes(user?.role));
