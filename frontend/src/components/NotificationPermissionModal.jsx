@@ -15,18 +15,12 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
     unsubscribe 
   } = usePushNotifications();
   
-  const [showModal, setShowModal] = useState(false);
-
-  useEffect(() => {
-    // Show modal only if:
-    // 1. Push is supported
-    // 2. User is not already subscribed
-    // 3. Permission is not denied
-    // 4. isOpen is true
-    if (isOpen && isSupported && !isSubscribed && permission !== 'denied') {
-      setShowModal(true);
-    }
-  }, [isOpen, isSupported, isSubscribed, permission]);
+  // Show modal only if:
+  // 1. Push is supported
+  // 2. User is not already subscribed
+  // 3. Permission is not denied
+  // 4. isOpen is true
+  const shouldShowModal = isOpen && isSupported && !isSubscribed && permission !== 'denied';
 
   const handleAllow = async () => {
     try {
