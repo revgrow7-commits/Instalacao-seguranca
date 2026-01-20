@@ -272,10 +272,12 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path="/coin-demo"
+        path="/admin/scheduler"
         element={
           <ProtectedRoute>
-            <CoinDemo />
+            <MainLayout>
+              <SchedulerAdmin />
+            </MainLayout>
           </ProtectedRoute>
         }
       />
