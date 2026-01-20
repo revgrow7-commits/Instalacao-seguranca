@@ -73,7 +73,7 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
   }
 
   return (
-    <Dialog open={showModal} onOpenChange={(open) => !open && handleDeny()}>
+    <Dialog open={shouldShowModal} onOpenChange={(open) => !open && handleDeny()}>
       <DialogContent className="bg-card border-white/10 max-w-md">
         <DialogHeader>
           <div className="flex justify-center mb-4">
