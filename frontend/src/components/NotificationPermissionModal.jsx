@@ -27,7 +27,6 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
       const success = await subscribe();
       if (success) {
         toast.success('Notificações ativadas com sucesso!');
-        setShowModal(false);
         onComplete && onComplete(true);
       } else {
         toast.error('Erro ao ativar notificações');
@@ -39,7 +38,6 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
   };
 
   const handleDeny = () => {
-    setShowModal(false);
     onClose && onClose();
     onComplete && onComplete(false);
   };
