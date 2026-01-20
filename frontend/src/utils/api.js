@@ -155,6 +155,12 @@ export const api = {
   createGoogleCalendarEvent: (data) => axios.post(`${API_URL}/calendar/events`, data, { headers: getAuthHeader() }),
   deleteGoogleCalendarEvent: (eventId) => axios.delete(`${API_URL}/calendar/events/${eventId}`, { headers: getAuthHeader() }),
 
+  // Scheduler (Agendamento Automático)
+  getSchedulerJobs: () => axios.get(`${API_URL}/scheduler/jobs`, { headers: getAuthHeader() }),
+  pauseSchedulerJob: (jobId) => axios.post(`${API_URL}/scheduler/jobs/${jobId}/pause`, {}, { headers: getAuthHeader() }),
+  resumeSchedulerJob: (jobId) => axios.post(`${API_URL}/scheduler/jobs/${jobId}/resume`, {}, { headers: getAuthHeader() }),
+  runSchedulerJobNow: (jobId) => axios.post(`${API_URL}/scheduler/jobs/${jobId}/run-now`, {}, { headers: getAuthHeader() }),
+
   // Push Notifications
   getVapidPublicKey: () => axios.get(`${API_URL}/notifications/vapid-public-key`),
   subscribeToNotifications: (subscription) => axios.post(`${API_URL}/notifications/subscribe`, subscription, { headers: getAuthHeader() }),
