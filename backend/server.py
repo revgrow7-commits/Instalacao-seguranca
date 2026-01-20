@@ -674,8 +674,8 @@ def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimens
         logging.error(f"Error in compress_base64_image: {str(e)}")
         return base64_string
 
-async def fetch_holdprint_jobs(branch: str):
-    """Fetch jobs from Holdprint API - Janeiro 2026 (1 a 7)"""
+async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None):
+    """Fetch jobs from Holdprint API"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
@@ -683,9 +683,16 @@ async def fetch_holdprint_jobs(branch: str):
     
     headers = {"x-api-key": api_key}
     
-    # Período fixo: 1 a 7 de Janeiro de 2026
-    start_date_str = "2026-01-01"
-    end_date_str = "2026-01-07"
+    # Se não especificado, usar mês e ano atual
+    from calendar import monthrange
+    now = datetime.now(timezone.utc)
+    target_month = month if month else now.month
+    target_year = year if year else now.year
+    
+    # Primeiro e último dia do mês
+    last_day = monthrange(target_year, target_month)[1]
+    start_date_str = f"{target_year}-{target_month:02d}-01"
+    end_date_str = f"{target_year}-{target_month:02d}-{last_day:02d}"
     
     # Montar URL com parâmetros de filtro
     params = {
