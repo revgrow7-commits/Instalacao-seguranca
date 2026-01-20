@@ -5261,6 +5261,55 @@ from routes.gamification import router as gamification_router
 api_router.include_router(gamification_router, tags=["Gamification"])
 
 
+# ============ SCHEDULER MANAGEMENT ROUTES ============
+
+@api_router.get("/scheduler/jobs")
+async def get_scheduler_jobs(current_user: User = Depends(get_current_user)):
+    """List all scheduled jobs and their status"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    jobs = get_scheduled_jobs()
+    scheduler_instance = get_scheduler()
+    
+    return {
+        "scheduler_running": scheduler_instance.running,
+        "jobs": jobs
+    }
+
+@api_router.post("/scheduler/jobs/{job_id}/pause")
+async def pause_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Pause a scheduled job"""
+    await require_role(current_user, [UserRole.ADMIN])
+    
+    try:
+        pause_job(job_id)
+        return {"success": True, "message": f"Job {job_id} pausado"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/scheduler/jobs/{job_id}/resume")
+async def resume_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Resume a paused job"""
+    await require_role(current_user, [UserRole.ADMIN])
+    
+    try:
+        resume_job(job_id)
+        return {"success": True, "message": f"Job {job_id} retomado"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/scheduler/jobs/{job_id}/run-now")
+async def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_current_user)):
+    """Trigger a job to run immediately"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    success = run_job_now(job_id)
+    if success:
+        return {"success": True, "message": f"Job {job_id} será executado em instantes"}
+    else:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} não encontrado")
+
+
 @api_router.get("/")
 async def root():
     return {"message": "INDÚSTRIA VISUAL API", "status": "online"}
