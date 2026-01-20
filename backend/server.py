@@ -5337,6 +5337,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize scheduler on application startup"""
+    setup_scheduler(db)
+    start_scheduler()
+    logger.info("✅ Aplicação iniciada com scheduler ativo")
+
 @app.on_event("shutdown")
 async def shutdown_db_client():
+    shutdown_scheduler()
     client.close()
+    logger.info("🛑 Aplicação encerrada")
