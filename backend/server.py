@@ -57,6 +57,10 @@ from services.holdprint import extract_product_dimensions
 from services.image import compress_image_to_base64, compress_base64_image
 from services.gps import calculate_gps_distance
 from services.gamification import calculate_checkout_coins, add_coins, calculate_level, COIN_REWARDS
+from services.scheduler import (
+    get_scheduler, setup_scheduler, start_scheduler, shutdown_scheduler,
+    get_scheduled_jobs, pause_job, resume_job, run_job_now
+)
 
 # Security setup (kept here for backward compatibility, also in security.py)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
