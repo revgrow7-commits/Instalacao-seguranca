@@ -1241,6 +1241,185 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
         "errors": errors[:5] if errors else []  # Return only first 5 errors
     }
 
+# ============ SINCRONIZAÇÃO AUTOMÁTICA HOLDPRINT ============
+
+class SyncResult(BaseModel):
+    branch: str
+    month: int
+    year: int
+    imported: int
+    skipped: int
+    total: int
+    errors: List[str] = []
+
+@api_router.post("/jobs/sync-holdprint")
+async def sync_holdprint_jobs(
+    months_back: int = Query(2, ge=1, le=12, description="Quantos meses para trás buscar"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Sincronização automática de OS da Holdprint.
+    Busca jobs de todas as filiais (POA e SP) dos últimos N meses.
+    Ideal para ser chamado diariamente via cron/scheduler.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    results = []
+    total_imported = 0
+    total_skipped = 0
+    total_errors = []
+    
+    # Calcular meses a buscar
+    now = datetime.now(timezone.utc)
+    months_to_sync = []
+    
+    for i in range(months_back + 1):  # Inclui mês atual
+        target_date = now - timedelta(days=i * 30)
+        month_year = (target_date.month, target_date.year)
+        if month_year not in months_to_sync:
+            months_to_sync.append(month_year)
+    
+    # Buscar de cada filial e cada mês
+    for branch in ["POA", "SP"]:
+        for month, year in months_to_sync:
+            try:
+                # Buscar jobs da Holdprint
+                holdprint_jobs = await fetch_holdprint_jobs(branch, month, year)
+                
+                imported = 0
+                skipped = 0
+                errors = []
+                
+                for holdprint_job in holdprint_jobs:
+                    holdprint_job_id = str(holdprint_job.get('id', ''))
+                    
+                    # Check if already exists
+                    existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                    if existing:
+                        skipped += 1
+                        continue
+                    
+                    try:
+                        # Calculate products and area
+                        products = holdprint_job.get('production', {}).get('products', [])
+                        products_with_area = []
+                        total_area_m2 = 0.0
+                        total_products = len(products)
+                        total_quantity = 0
+                        
+                        for product in products:
+                            product_info = extract_product_dimensions(product)
+                            product_with_area = {
+                                "name": product.get('name', ''),
+                                "quantity": product.get('quantity', 1),
+                                "copies": product_info.get('copies', 1),
+                                "width_m": product_info.get('width_m', 0),
+                                "height_m": product_info.get('height_m', 0),
+                                "unit_area_m2": product_info.get('area_m2', 0),
+                                "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
+                            }
+                            products_with_area.append(product_with_area)
+                            total_area_m2 += product_with_area['total_area_m2']
+                            total_quantity += product.get('quantity', 1)
+                        
+                        # Create job
+                        job = Job(
+                            holdprint_job_id=holdprint_job_id,
+                            title=holdprint_job.get('title', 'Sem título'),
+                            client_name=holdprint_job.get('customerName', 'Cliente não informado'),
+                            client_address='',
+                            branch=branch,
+                            items=holdprint_job.get('production', {}).get('items', []),
+                            holdprint_data=holdprint_job,
+                            area_m2=total_area_m2,
+                            products_with_area=products_with_area,
+                            total_products=total_products,
+                            total_quantity=total_quantity
+                        )
+                        
+                        job_dict = job.model_dump()
+                        job_dict['created_at'] = job_dict['created_at'].isoformat()
+                        if job_dict.get('scheduled_date'):
+                            job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
+                        
+                        await db.jobs.insert_one(job_dict)
+                        imported += 1
+                        
+                    except Exception as e:
+                        errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
+                
+                results.append({
+                    "branch": branch,
+                    "month": month,
+                    "year": year,
+                    "imported": imported,
+                    "skipped": skipped,
+                    "total": len(holdprint_jobs),
+                    "errors": errors[:3]
+                })
+                
+                total_imported += imported
+                total_skipped += skipped
+                total_errors.extend(errors)
+                
+                logger.info(f"Sync {branch} {month}/{year}: {imported} imported, {skipped} skipped")
+                
+            except Exception as e:
+                logger.error(f"Error syncing {branch} {month}/{year}: {str(e)}")
+                results.append({
+                    "branch": branch,
+                    "month": month,
+                    "year": year,
+                    "imported": 0,
+                    "skipped": 0,
+                    "total": 0,
+                    "errors": [str(e)]
+                })
+    
+    # Registrar última sincronização
+    await db.system_config.update_one(
+        {"key": "last_holdprint_sync"},
+        {
+            "$set": {
+                "key": "last_holdprint_sync",
+                "value": datetime.now(timezone.utc).isoformat(),
+                "total_imported": total_imported,
+                "total_skipped": total_skipped
+            }
+        },
+        upsert=True
+    )
+    
+    return {
+        "success": True,
+        "sync_date": datetime.now(timezone.utc).isoformat(),
+        "summary": {
+            "total_imported": total_imported,
+            "total_skipped": total_skipped,
+            "total_errors": len(total_errors)
+        },
+        "details": results
+    }
+
+@api_router.get("/jobs/sync-status")
+async def get_sync_status(current_user: User = Depends(get_current_user)):
+    """Verificar status da última sincronização com Holdprint"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    last_sync = await db.system_config.find_one({"key": "last_holdprint_sync"}, {"_id": 0})
+    
+    if not last_sync:
+        return {
+            "last_sync": None,
+            "message": "Nenhuma sincronização realizada ainda"
+        }
+    
+    return {
+        "last_sync": last_sync.get("value"),
+        "total_imported": last_sync.get("total_imported", 0),
+        "total_skipped": last_sync.get("total_skipped", 0)
+    }
+
 @api_router.get("/jobs", response_model=List[Job])
 async def list_jobs(current_user: User = Depends(get_current_user)):
     """List jobs based on user role"""
