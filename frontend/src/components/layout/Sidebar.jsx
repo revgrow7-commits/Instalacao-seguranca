@@ -13,7 +13,8 @@ import {
   FileText,
   Trophy,
   Coins,
-  TrendingUp
+  TrendingUp,
+  Settings
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
