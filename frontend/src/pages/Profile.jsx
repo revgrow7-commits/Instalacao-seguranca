@@ -31,6 +31,16 @@ const Profile = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
+  // Push notifications
+  const { 
+    isSupported: notifSupported, 
+    isSubscribed: notifSubscribed, 
+    loading: notifLoading,
+    error: notifError,
+    subscribe: subscribeNotif, 
+    unsubscribe: unsubscribeNotif 
+  } = usePushNotifications();
+  
   // Password change state
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
@@ -41,6 +51,24 @@ const Profile = () => {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleToggleNotifications = async () => {
+    try {
+      if (notifSubscribed) {
+        await unsubscribeNotif();
+        toast.success('Notificações desativadas');
+      } else {
+        const success = await subscribeNotif();
+        if (success) {
+          toast.success('Notificações ativadas com sucesso!');
+        } else {
+          toast.error(notifError || 'Erro ao ativar notificações');
+        }
+      }
+    } catch (err) {
+      toast.error('Erro ao alterar configuração de notificações');
+    }
+  };
 
   const handleLogout = () => {
     logout();
