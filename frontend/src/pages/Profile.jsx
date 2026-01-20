@@ -19,9 +19,13 @@ import {
   Eye,
   EyeOff,
   Lock,
-  CheckCircle
+  CheckCircle,
+  Bell,
+  BellOff,
+  Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
+import usePushNotifications from '../hooks/usePushNotifications';
 
 const Profile = () => {
   const { user, logout } = useAuth();
