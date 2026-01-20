@@ -51,7 +51,33 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
   };
 
   if (!isSupported) {
-    return null;
+    return (
+      <Dialog open={isOpen} onOpenChange={(open) => !open && (onClose && onClose())}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-yellow-500/20 rounded-full">
+                <AlertCircle className="h-12 w-12 text-yellow-400" />
+              </div>
+            </div>
+            <DialogTitle className="text-2xl font-heading text-white text-center">
+              Notificações
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-center mt-4">
+              Seu navegador não suporta notificações push. Para receber alertas, use um navegador moderno como Chrome, Firefox ou Edge.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6">
+            <Button 
+              onClick={() => onClose && onClose()} 
+              className="bg-primary hover:bg-primary/90 w-full"
+            >
+              Entendi
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
   }
 
   return (
