@@ -29,13 +29,18 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
   }, [isOpen, isSupported, isSubscribed, permission]);
 
   const handleAllow = async () => {
-    const success = await subscribe();
-    if (success) {
-      toast.success('Notificações ativadas com sucesso!');
-      setShowModal(false);
-      onComplete && onComplete(true);
-    } else {
-      toast.error('Erro ao ativar notificações');
+    try {
+      const success = await subscribe();
+      if (success) {
+        toast.success('Notificações ativadas com sucesso!');
+        setShowModal(false);
+        onComplete && onComplete(true);
+      } else {
+        toast.error('Erro ao ativar notificações');
+      }
+    } catch (err) {
+      console.error('Error enabling notifications:', err);
+      toast.error('Erro ao ativar notificações: ' + (err.message || 'Erro desconhecido'));
     }
   };
 
