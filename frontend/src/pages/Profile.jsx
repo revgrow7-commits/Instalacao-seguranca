@@ -244,6 +244,47 @@ const Profile = () => {
         </button>
       </div>
 
+      {/* Notifications Section */}
+      {notifSupported && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide px-1">
+            Notificações
+          </h3>
+          
+          <button
+            onClick={handleToggleNotifications}
+            disabled={notifLoading}
+            className="w-full flex items-center justify-between p-4 bg-card border border-white/5 rounded-lg hover:bg-card/80 transition-colors group disabled:opacity-50"
+            data-testid="toggle-notifications-btn"
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${notifSubscribed ? 'bg-green-500/20' : 'bg-yellow-500/20'}`}>
+                {notifLoading ? (
+                  <Loader2 className="w-5 h-5 text-white animate-spin" />
+                ) : notifSubscribed ? (
+                  <Bell className="w-5 h-5 text-green-400" />
+                ) : (
+                  <BellOff className="w-5 h-5 text-yellow-400" />
+                )}
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-medium text-white">
+                  {notifSubscribed ? 'Notificações Ativadas' : 'Notificações Desativadas'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {notifSubscribed 
+                    ? 'Você receberá alertas no dispositivo' 
+                    : 'Clique para ativar notificações push'}
+                </p>
+              </div>
+            </div>
+            <div className={`px-3 py-1 rounded-full text-xs font-medium ${notifSubscribed ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
+              {notifSubscribed ? 'ATIVO' : 'INATIVO'}
+            </div>
+          </button>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="space-y-3">
         <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide px-1">
