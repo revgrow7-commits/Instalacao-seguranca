@@ -30,7 +30,16 @@ export const api = {
 
   // Holdprint & Jobs
   importAllJobs: (branch) => axios.post(`${API_URL}/jobs/import-all`, { branch }, { headers: getAuthHeader() }),
-  getHoldprintJobs: (branch) => axios.get(`${API_URL}/holdprint/jobs/${branch}`, { headers: getAuthHeader() }),
+  getHoldprintJobs: (branch, month, year) => {
+    let url = `${API_URL}/holdprint/jobs/${branch}`;
+    const params = [];
+    if (month) params.push(`month=${month}`);
+    if (year) params.push(`year=${year}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
+  syncHoldprintJobs: (monthsBack = 2) => axios.post(`${API_URL}/jobs/sync-holdprint?months_back=${monthsBack}`, {}, { headers: getAuthHeader() }),
+  getSyncStatus: () => axios.get(`${API_URL}/jobs/sync-status`, { headers: getAuthHeader() }),
   createJob: (data) => axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() }),
   getJobs: () => axios.get(`${API_URL}/jobs`, { headers: getAuthHeader() }),
   getJob: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
