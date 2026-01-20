@@ -80,7 +80,7 @@ const Sidebar = () => {
     {
       name: 'Agendamentos',
       href: '/admin/scheduler',
-      icon: Calendar,
+      icon: Settings,
       roles: ['admin', 'manager']
     },
   ];
