@@ -5310,6 +5310,97 @@ async def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_cu
         raise HTTPException(status_code=404, detail=f"Job {job_id} não encontrado")
 
 
+# ============ TRELLO PCP INTEGRATION ============
+from services.trello import (
+    get_board_info, get_board_lists, get_board_cards,
+    get_card_details, get_installation_cards, get_pcp_summary,
+    search_cards, get_cards_by_date_range
+)
+
+@api_router.get("/trello/board")
+async def trello_get_board(current_user: User = Depends(get_current_user)):
+    """Get Trello board information"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        board = await get_board_info()
+        return {"success": True, "board": board}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/lists")
+async def trello_get_lists(current_user: User = Depends(get_current_user)):
+    """Get all lists from the PCP board"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        lists = await get_board_lists()
+        return {"success": True, "lists": lists}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/cards")
+async def trello_get_cards(
+    list_id: Optional[str] = Query(None, description="Filter by list ID"),
+    current_user: User = Depends(get_current_user)
+):
+    """Get cards from the PCP board"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        cards = await get_board_cards(list_id)
+        return {"success": True, "total": len(cards), "cards": cards}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/cards/{card_id}")
+async def trello_get_card_details(card_id: str, current_user: User = Depends(get_current_user)):
+    """Get detailed information about a specific card"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        card = await get_card_details(card_id)
+        return {"success": True, "card": card}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/installation")
+async def trello_get_installation_cards(current_user: User = Depends(get_current_user)):
+    """Get cards from the installation list"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        cards = await get_installation_cards()
+        return {"success": True, "total": len(cards), "cards": cards}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/summary")
+async def trello_get_summary(current_user: User = Depends(get_current_user)):
+    """Get a summary of the PCP board"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        summary = await get_pcp_summary()
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@api_router.get("/trello/search")
+async def trello_search_cards(
+    q: str = Query(..., description="Search query"),
+    current_user: User = Depends(get_current_user)
+):
+    """Search for cards by name or description"""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    try:
+        cards = await search_cards(q)
+        return {"success": True, "total": len(cards), "cards": cards}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @api_router.get("/")
 async def root():
     return {"message": "INDÚSTRIA VISUAL API", "status": "online"}
