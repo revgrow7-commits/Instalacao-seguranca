@@ -12,7 +12,6 @@ import {
   CheckCircle,
   FileText,
   Trophy,
-  Coins,
   TrendingUp,
   Settings
 } from 'lucide-react';
