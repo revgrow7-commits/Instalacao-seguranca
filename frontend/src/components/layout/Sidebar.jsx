@@ -60,12 +60,6 @@ const Sidebar = () => {
       roles: ['admin', 'manager']
     },
     {
-      name: 'Loja Faixa Preta',
-      href: '/loja-faixa-preta',
-      icon: Coins,
-      roles: ['installer']
-    },
-    {
       name: 'Calendário',
       href: '/calendar',
       icon: Calendar,
