@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://prodtrak.preview.emergentagent.com/api"
+BASE_URL = "https://faixapreta-app.preview.emergentagent.com/api"
 
 # Test credentials
 MANAGER_CREDENTIALS = {
