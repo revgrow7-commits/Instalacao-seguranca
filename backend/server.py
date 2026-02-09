@@ -678,12 +678,12 @@ def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimens
         logging.error(f"Error in compress_base64_image: {str(e)}")
         return base64_string
 
-async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None):
+async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = False):
     """Fetch jobs from Holdprint API"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
-        raise HTTPException(status_code=500, detail=f"API key not configured for branch {branch}")
+        raise HTTPException(status_code=500, detail=f"Chave de API não configurada para a filial {branch}")
     
     headers = {"x-api-key": api_key}
     
@@ -701,14 +701,20 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None)
     # Montar URL com parâmetros de filtro
     params = {
         "page": 1,
-        "pageSize": 100,
+        "pageSize": 200,  # Aumentado para pegar mais jobs
         "startDate": start_date_str,
         "endDate": end_date_str,
         "language": "pt-BR"
     }
     
     try:
-        response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=30)
+        response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=60)
+        
+        # Verificar erros específicos
+        if response.status_code == 401:
+            logger.error(f"Holdprint {branch}: Autenticação falhou - chave de API inválida")
+            raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}. Verifique a configuração.")
+        
         response.raise_for_status()
         data = response.json()
         
@@ -719,15 +725,22 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None)
         elif isinstance(data, list):
             jobs = data
         
-        # Filtrar jobs NÃO finalizados (isFinalized = false ou não existe)
-        filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
+        # Filtrar jobs NÃO finalizados (isFinalized = false ou não existe) - se não quiser incluir finalizados
+        if not include_finalized:
+            filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
+        else:
+            filtered_jobs = jobs
         
-        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} não finalizados (período: {start_date_str} a {end_date_str})")
+        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} {'total' if include_finalized else 'não finalizados'} (período: {start_date_str} a {end_date_str})")
         
         return filtered_jobs
     except requests.RequestException as e:
-        logger.error(f"Error fetching from Holdprint: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching from Holdprint: {str(e)}")
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            logger.error(f"Holdprint {branch}: Chave de API inválida")
+            raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}")
+        logger.error(f"Error fetching from Holdprint: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Erro ao conectar com Holdprint: {error_msg}")
 
 # ============ AUTH ROUTES ============
 
