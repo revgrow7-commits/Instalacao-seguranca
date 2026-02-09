@@ -342,9 +342,55 @@ const Jobs = () => {
       setShowImportDialog(false);
     } catch (error) {
       console.error('Error importing jobs:', error);
-      toast.error('Erro ao importar jobs');
+      const errorMsg = error.response?.data?.detail || 'Erro ao importar jobs';
+      toast.error(errorMsg);
     } finally {
       setLoadingHoldprint(false);
+    }
+  };
+
+  const loadCurrentMonthJobs = async () => {
+    setLoadingCurrentMonth(true);
+    try {
+      const response = await api.importCurrentMonthJobs();
+      const { total_imported, total_skipped, branches, month, year, errors } = response.data;
+      
+      const monthNames = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      
+      if (total_imported > 0) {
+        toast.success(`${total_imported} job(s) importado(s) de ${monthNames[month]}/${year}!`);
+        loadJobs();
+      }
+      
+      if (total_skipped > 0 && total_imported === 0) {
+        toast.info(`Todos os ${total_skipped} jobs de ${monthNames[month]} já estavam importados`);
+      }
+      
+      if (total_imported === 0 && total_skipped === 0 && (!errors || errors.length === 0)) {
+        toast.info(`Nenhum job encontrado em ${monthNames[month]}/${year}`);
+      }
+      
+      if (errors && errors.length > 0) {
+        errors.forEach(err => toast.error(err));
+      }
+      
+      // Mostrar detalhes por filial
+      if (branches) {
+        branches.forEach(b => {
+          if (b.error) {
+            toast.error(`${b.branch}: ${b.error}`);
+          }
+        });
+      }
+      
+      setShowImportDialog(false);
+    } catch (error) {
+      console.error('Error importing current month jobs:', error);
+      const errorMsg = error.response?.data?.detail || 'Erro ao importar jobs do mês atual';
+      toast.error(errorMsg);
+    } finally {
+      setLoadingCurrentMonth(false);
     }
   };
 
