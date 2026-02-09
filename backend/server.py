@@ -1258,6 +1258,129 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
         "errors": errors[:5] if errors else []  # Return only first 5 errors
     }
 
+@api_router.post("/jobs/import-current-month")
+async def import_current_month_jobs(current_user: User = Depends(get_current_user)):
+    """
+    Importa automaticamente todos os jobs do mês atual de todas as filiais (SP e POA).
+    Ideal para uso diário ou quando o usuário quer sincronizar rapidamente.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    now = datetime.now(timezone.utc)
+    current_month = now.month
+    current_year = now.year
+    
+    total_imported = 0
+    total_skipped = 0
+    total_errors = []
+    branch_results = []
+    
+    for branch in ["SP", "POA"]:
+        try:
+            # Buscar jobs da Holdprint para o mês atual
+            holdprint_jobs = await fetch_holdprint_jobs(branch, current_month, current_year)
+            
+            imported = 0
+            skipped = 0
+            errors = []
+            
+            for holdprint_job in holdprint_jobs:
+                holdprint_job_id = str(holdprint_job.get('id', ''))
+                
+                # Check if already exists
+                existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                if existing:
+                    skipped += 1
+                    continue
+                
+                try:
+                    # Calculate products and area
+                    products = holdprint_job.get('production', {}).get('products', [])
+                    products_with_area = []
+                    total_area_m2 = 0.0
+                    total_products = len(products)
+                    total_quantity = 0
+                    
+                    for product in products:
+                        product_info = extract_product_dimensions(product)
+                        product_with_area = {
+                            "name": product.get('name', ''),
+                            "quantity": product.get('quantity', 1),
+                            "copies": product_info.get('copies', 1),
+                            "width_m": product_info.get('width_m', 0),
+                            "height_m": product_info.get('height_m', 0),
+                            "unit_area_m2": product_info.get('area_m2', 0),
+                            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
+                        }
+                        products_with_area.append(product_with_area)
+                        total_area_m2 += product_with_area['total_area_m2']
+                        total_quantity += product.get('quantity', 1)
+                    
+                    # Create job
+                    job = Job(
+                        holdprint_job_id=holdprint_job_id,
+                        title=holdprint_job.get('title', 'Sem título'),
+                        client_name=holdprint_job.get('customerName', 'Cliente não informado'),
+                        client_address='',
+                        branch=branch,
+                        items=holdprint_job.get('production', {}).get('items', []),
+                        holdprint_data=holdprint_job,
+                        area_m2=total_area_m2,
+                        products_with_area=products_with_area,
+                        total_products=total_products,
+                        total_quantity=total_quantity
+                    )
+                    
+                    job_dict = job.model_dump()
+                    job_dict['created_at'] = job_dict['created_at'].isoformat()
+                    if job_dict.get('scheduled_date'):
+                        job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
+                    
+                    await db.jobs.insert_one(job_dict)
+                    imported += 1
+                    
+                except Exception as e:
+                    errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
+            
+            branch_results.append({
+                "branch": branch,
+                "imported": imported,
+                "skipped": skipped,
+                "total": len(holdprint_jobs)
+            })
+            total_imported += imported
+            total_skipped += skipped
+            total_errors.extend(errors)
+            
+        except HTTPException as he:
+            branch_results.append({
+                "branch": branch,
+                "imported": 0,
+                "skipped": 0,
+                "total": 0,
+                "error": str(he.detail)
+            })
+            total_errors.append(f"{branch}: {str(he.detail)}")
+        except Exception as e:
+            branch_results.append({
+                "branch": branch,
+                "imported": 0,
+                "skipped": 0,
+                "total": 0,
+                "error": str(e)
+            })
+            total_errors.append(f"{branch}: {str(e)}")
+    
+    return {
+        "success": total_imported > 0 or total_skipped > 0,
+        "month": current_month,
+        "year": current_year,
+        "total_imported": total_imported,
+        "total_skipped": total_skipped,
+        "branches": branch_results,
+        "errors": total_errors[:5] if total_errors else []
+    }
+
 # ============ SINCRONIZAÇÃO AUTOMÁTICA HOLDPRINT ============
 
 class SyncResult(BaseModel):
