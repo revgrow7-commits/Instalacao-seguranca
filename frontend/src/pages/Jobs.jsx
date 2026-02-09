@@ -275,6 +275,7 @@ const Jobs = () => {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
+  const [loadingCurrentMonth, setLoadingCurrentMonth] = useState(false);
   const [processingJobId, setProcessingJobId] = useState(null);
   const [visibleCount, setVisibleCount] = useState(12);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
