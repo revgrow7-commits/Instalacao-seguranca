@@ -830,36 +830,78 @@ const Jobs = () => {
           <DialogHeader>
             <DialogTitle className="text-white">Importar Jobs da Holdprint</DialogTitle>
             <DialogDescription>
-              Selecione a filial para buscar e importar os jobs automaticamente
+              Importe jobs do mês atual ou selecione uma filial específica
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Selecione a filial" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="SP">São Paulo</SelectItem>
-                <SelectItem value="POA">Porto Alegre</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button
-              onClick={loadHoldprintJobs}
-              disabled={loadingHoldprint}
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              {loadingHoldprint ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                  Importando...
-                </>
-              ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Buscar e Importar Jobs
-                </>
-              )}
-            </Button>
+            {/* Importar Mês Atual - Opção Principal */}
+            <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
+              <h4 className="text-white font-medium mb-2 flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                Importação Rápida
+              </h4>
+              <p className="text-sm text-muted-foreground mb-3">
+                Importa automaticamente todos os jobs do mês atual de SP e POA
+              </p>
+              <Button
+                onClick={loadCurrentMonthJobs}
+                disabled={loadingCurrentMonth || loadingHoldprint}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                {loadingCurrentMonth ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Importando mês atual...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Importar Mês Atual (SP + POA)
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {/* Divisor */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-white/10" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">ou importe por filial</span>
+              </div>
+            </div>
+            
+            {/* Importar por Filial */}
+            <div className="space-y-3">
+              <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Selecione a filial" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="SP">São Paulo</SelectItem>
+                  <SelectItem value="POA">Porto Alegre</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={loadHoldprintJobs}
+                disabled={loadingHoldprint || loadingCurrentMonth}
+                variant="outline"
+                className="w-full border-white/20 text-white hover:bg-white/5"
+              >
+                {loadingHoldprint ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                    Importando {selectedBranch}...
+                  </>
+                ) : (
+                  <>
+                    <Download className="h-4 w-4 mr-2" />
+                    Importar só {selectedBranch}
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
