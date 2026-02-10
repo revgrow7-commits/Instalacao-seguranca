@@ -5548,11 +5548,7 @@ app.include_router(api_router)
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Kubernetes liveness/readiness probes"""
-    return {
-        "status": "healthy", 
-        "service": "industria-visual-api",
-        "frontend_url": FRONTEND_URL
-    }
+    return {"status": "healthy", "service": "industria-visual-api"}
 
 app.add_middleware(
     CORSMiddleware,
