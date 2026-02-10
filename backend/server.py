@@ -1020,6 +1020,58 @@ async def admin_reset_password(
     
     return {"message": f"Senha do usuário {user.get('name')} redefinida com sucesso"}
 
+# ============ ADMIN DATA CLEANUP ROUTES ============
+
+@api_router.delete("/admin/cleanup-test-data")
+async def cleanup_test_data(current_user: User = Depends(get_current_user)):
+    """
+    Limpa todos os dados de teste para começar do zero.
+    Remove: jobs, checkins, item_checkins, atribuições.
+    ATENÇÃO: Esta ação é irreversível!
+    """
+    await require_role(current_user, [UserRole.ADMIN])
+    
+    results = {}
+    
+    # 1. Deletar todos os jobs
+    jobs_result = await db.jobs.delete_many({})
+    results["jobs_deleted"] = jobs_result.deleted_count
+    
+    # 2. Deletar todos os checkins
+    checkins_result = await db.checkins.delete_many({})
+    results["checkins_deleted"] = checkins_result.deleted_count
+    
+    # 3. Deletar todos os item_checkins
+    item_checkins_result = await db.item_checkins.delete_many({})
+    results["item_checkins_deleted"] = item_checkins_result.deleted_count
+    
+    # 4. Deletar todas as atribuições de instaladores
+    assignments_result = await db.job_assignments.delete_many({})
+    results["assignments_deleted"] = assignments_result.deleted_count
+    
+    # 5. Deletar status de sincronização
+    sync_result = await db.scheduler_sync_status.delete_many({})
+    results["sync_status_deleted"] = sync_result.deleted_count
+    
+    # 6. Resetar moedas e pontos dos instaladores (opcional - mantém usuários)
+    installers_result = await db.installers.update_many(
+        {},
+        {"$set": {"coins": 0, "total_jobs": 0, "total_area_installed": 0}}
+    )
+    results["installers_reset"] = installers_result.modified_count
+    
+    # 7. Deletar transações de moedas
+    transactions_result = await db.coin_transactions.delete_many({})
+    results["coin_transactions_deleted"] = transactions_result.deleted_count
+    
+    logger.info(f"Admin {current_user.email} limpou dados de teste: {results}")
+    
+    return {
+        "success": True,
+        "message": "Todos os dados de teste foram removidos. Sistema pronto para começar do zero.",
+        "details": results
+    }
+
 # ============ USER MANAGEMENT ROUTES ============
 
 @api_router.get("/users", response_model=List[User])
