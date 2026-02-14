@@ -457,7 +457,8 @@ const Jobs = () => {
       loadJobs();
     } catch (error) {
       console.error('Error submitting justification:', error);
-      toast.error('Erro ao enviar justificativa');
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro ao enviar justificativa';
+      toast.error(errorMsg);
     } finally {
       setSendingJustification(false);
     }
