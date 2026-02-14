@@ -2710,9 +2710,14 @@ async def create_item_checkin(
     if not item_assigned and installer["id"] not in job_assigned_installers:
         raise HTTPException(status_code=403, detail="Você não está atribuído a este item")
     
+    # Get products - try products_with_area first, then items
     products = job.get("products_with_area", [])
-    if item_index >= len(products):
-        raise HTTPException(status_code=400, detail="Invalid item index")
+    if not products:
+        # Fallback to items if products_with_area is empty
+        products = job.get("items", [])
+    
+    if not products or item_index >= len(products):
+        raise HTTPException(status_code=400, detail=f"Item inválido. O job tem {len(products)} itens.")
     
     product = products[item_index]
     
