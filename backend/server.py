@@ -1072,6 +1072,126 @@ async def cleanup_test_data(current_user: User = Depends(get_current_user)):
         "details": results
     }
 
+@api_router.post("/admin/reprocess-job-products")
+async def reprocess_job_products(current_user: User = Depends(get_current_user)):
+    """
+    Reprocessa os produtos de todos os jobs que não têm products_with_area.
+    Útil para jobs importados por versões anteriores do código.
+    """
+    await require_role(current_user, [UserRole.ADMIN])
+    
+    # Buscar jobs sem products_with_area ou com array vazio
+    jobs_to_process = await db.jobs.find({
+        "$or": [
+            {"products_with_area": {"$exists": False}},
+            {"products_with_area": []},
+            {"products_with_area": None}
+        ]
+    }).to_list(1000)
+    
+    processed = 0
+    errors = []
+    
+    for job in jobs_to_process:
+        try:
+            holdprint_data = job.get('holdprint_data', {})
+            products = holdprint_data.get('products', [])
+            
+            if not products:
+                # Tentar pegar de production.products
+                production = holdprint_data.get('production', {})
+                items = job.get('items', [])
+                
+                # Se não tem products mas tem items, usar items como base
+                if items:
+                    products_with_area = []
+                    total_area_m2 = 0.0
+                    
+                    for item in items:
+                        product_info = extract_product_dimensions(item)
+                        quantity = item.get('quantity', 1)
+                        unit_area = product_info.get('area_m2', 0)
+                        total_area = unit_area * quantity
+                        
+                        product_with_area = {
+                            "name": item.get('name', 'Item sem nome'),
+                            "family_name": classify_product_family(item.get('name', '')),
+                            "quantity": quantity,
+                            "width_m": product_info.get('width_m'),
+                            "height_m": product_info.get('height_m'),
+                            "copies": product_info.get('copies', 1),
+                            "unit_area_m2": unit_area,
+                            "total_area_m2": total_area
+                        }
+                        products_with_area.append(product_with_area)
+                        total_area_m2 += total_area
+                    
+                    # Atualizar no banco
+                    await db.jobs.update_one(
+                        {"id": job['id']},
+                        {"$set": {
+                            "products_with_area": products_with_area,
+                            "area_m2": total_area_m2,
+                            "total_products": len(products_with_area),
+                            "total_quantity": sum(p.get('quantity', 1) for p in products_with_area)
+                        }}
+                    )
+                    processed += 1
+                continue
+            
+            # Processar products normalmente
+            products_with_area = []
+            total_area_m2 = 0.0
+            total_quantity = 0
+            
+            for product in products:
+                product_info = extract_product_dimensions(product)
+                quantity = product.get('quantity', 1)
+                unit_area = product_info.get('area_m2', 0)
+                total_area = unit_area * quantity
+                
+                product_with_area = {
+                    "name": product.get('name', 'Produto sem nome'),
+                    "family_name": classify_product_family(product.get('name', '')),
+                    "confidence": product_info.get('confidence', 0),
+                    "quantity": quantity,
+                    "width_m": product_info.get('width_m'),
+                    "height_m": product_info.get('height_m'),
+                    "copies": product_info.get('copies', 1),
+                    "unit_area_m2": unit_area,
+                    "total_area_m2": total_area,
+                    "unit_price": product.get('unitPrice'),
+                    "total_value": product.get('totalPrice')
+                }
+                products_with_area.append(product_with_area)
+                total_area_m2 += total_area
+                total_quantity += quantity
+            
+            # Atualizar no banco
+            await db.jobs.update_one(
+                {"id": job['id']},
+                {"$set": {
+                    "products_with_area": products_with_area,
+                    "area_m2": total_area_m2,
+                    "total_products": len(products_with_area),
+                    "total_quantity": total_quantity
+                }}
+            )
+            processed += 1
+            
+        except Exception as e:
+            errors.append(f"{job.get('title', 'Unknown')}: {str(e)}")
+    
+    logger.info(f"Admin {current_user.email} reprocessou {processed} jobs")
+    
+    return {
+        "success": True,
+        "message": f"{processed} jobs reprocessados com sucesso.",
+        "processed": processed,
+        "total_to_process": len(jobs_to_process),
+        "errors": errors[:10] if errors else []
+    }
+
 # ============ USER MANAGEMENT ROUTES ============
 
 @api_router.get("/users", response_model=List[User])
