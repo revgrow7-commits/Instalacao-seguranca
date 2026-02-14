@@ -211,6 +211,17 @@ def extract_product_measures(description: str) -> dict:
     
     return result
 
+def classify_product_family(product_name: str) -> str:
+    """Classifica um produto em uma família baseado no nome"""
+    name_lower = product_name.lower()
+    
+    for family, keywords in PRODUCT_FAMILY_MAPPING.items():
+        for keyword in keywords:
+            if keyword in name_lower:
+                return family
+    
+    return "Outros"
+
 def calculate_job_products_area(holdprint_data: dict) -> tuple:
     """
     Calcula a área de todos os produtos de um job.
