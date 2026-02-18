@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale/pt-BR';
 
 // Skeleton loader for cards
 const JobCardSkeleton = () => (
