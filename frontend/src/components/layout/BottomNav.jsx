@@ -5,8 +5,7 @@ import {
   LayoutDashboard, 
   Briefcase, 
   Calendar,
-  User,
-  Coins
+  User
 } from 'lucide-react';
 
 const BottomNav = () => {
