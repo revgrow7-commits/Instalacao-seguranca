@@ -102,13 +102,21 @@ const AppRoutes = () => {
       <Route
         path="/forgot-password"
         element={
-          user ? <Navigate to="/dashboard" replace /> : <ForgotPassword />
+          user ? <Navigate to="/dashboard" replace /> : (
+            <Suspense fallback={<PageLoader />}>
+              <ForgotPassword />
+            </Suspense>
+          )
         }
       />
       <Route
         path="/reset-password"
         element={
-          user ? <Navigate to="/dashboard" replace /> : <ResetPassword />
+          user ? <Navigate to="/dashboard" replace /> : (
+            <Suspense fallback={<PageLoader />}>
+              <ResetPassword />
+            </Suspense>
+          )
         }
       />
       <Route
