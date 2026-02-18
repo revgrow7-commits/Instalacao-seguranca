@@ -1965,6 +1965,9 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     if "exclude_from_metrics" in job_update:
         update_data["exclude_from_metrics"] = job_update["exclude_from_metrics"]
     
+    if "item_assignments" in job_update:
+        update_data["item_assignments"] = job_update["item_assignments"]
+    
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
     
