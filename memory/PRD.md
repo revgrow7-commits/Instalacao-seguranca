@@ -185,6 +185,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ## Backlog / Próximas Tarefas
 
 ### P1 - Alta Prioridade
+- [ ] Corrigir os relatórios (Internal Server Error reportado em produção)
 - [ ] Continuar migração de rotas (jobs, users, checkins) para arquivos separados
 - [ ] Gerenciamento de prêmios pelo admin na interface
 - [ ] Testar gatilhos de notificação push de ponta a ponta
