@@ -4226,22 +4226,23 @@ async def get_productivity_report(
         # m² da API (não o reportado manualmente)
         item_m2 = item.get("total_area_m2", 0) or 0
         
+        # Obter checkout_at primeiro (sempre necessário para o record)
+        checkout_at = checkin.get("checkout_at")
+        if isinstance(checkout_at, str):
+            checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
+        
+        # Garantir que ambos têm timezone
+        if checkin_at and checkin_at.tzinfo is None:
+            checkin_at = checkin_at.replace(tzinfo=timezone.utc)
+        if checkout_at and checkout_at.tzinfo is None:
+            checkout_at = checkout_at.replace(tzinfo=timezone.utc)
+        
         # Usar tempo LÍQUIDO se disponível, senão calcular bruto
         net_duration_minutes = checkin.get("net_duration_minutes")
         total_pause_minutes = checkin.get("total_pause_minutes", 0) or 0
         
         if net_duration_minutes is None:
             # Fallback para cálculo bruto se não tiver tempo líquido
-            checkout_at = checkin.get("checkout_at")
-            if isinstance(checkout_at, str):
-                checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
-            
-            # Garantir que ambos têm timezone
-            if checkin_at and checkin_at.tzinfo is None:
-                checkin_at = checkin_at.replace(tzinfo=timezone.utc)
-            if checkout_at and checkout_at.tzinfo is None:
-                checkout_at = checkout_at.replace(tzinfo=timezone.utc)
-            
             if checkin_at and checkout_at:
                 net_duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
             else:
