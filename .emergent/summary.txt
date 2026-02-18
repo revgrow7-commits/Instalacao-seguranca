@@ -12,66 +12,86 @@ O usuário solicitou o desenvolvimento de um sistema PWA para controlar a produt
 **User's preferred language**: Portuguese (Brazil)
 
 **what currently exists?**
-Um PWA full-stack (FastAPI + React) para gerenciamento de produtividade, com autenticação JWT, dashboards, gamificação e relatórios.
+Um PWA full-stack (FastAPI + React) com autenticação JWT, dashboards, gamificação, relatórios e integração com a API da Holdprint. Nesta sessão, o foco foi a estabilização, correção de bugs críticos e otimização de performance.
 
-Nesta sessão, foram realizadas as seguintes implementações:
--   **Correção Crítica:** Um  que quebrava o Dashboard do Gerente foi resolvido.
--   **Correção de Deployment:** Um endpoint  foi adicionado e URLs hardcoded foram removidas para permitir o deploy em produção.
--   **Correção de Bug Recorrente:** O problema do link de redefinição de senha apontando para  foi investigado e corrigido permanentemente, ajustando o arquivo  do backend.
--   **Nova Feature (Auto-Registro):** Usuários agora podem criar suas próprias contas através de uma nova página de registro.
--   **Nova Feature (Sincronização Automática):** Foi implementado um endpoint para sincronizar Ordens de Serviço da API da Holdprint. Um agendador interno () foi configurado para executar essa tarefa diariamente de forma automática, com uma página de administração no frontend para gerenciamento.
--   **Nova Feature (Importação de Usuários):** 14 novos usuários (gerentes e instaladores) foram importados de um arquivo Excel.
--   **Refatoração:** A migração da lógica de  para módulos de rotas foi iniciada, começando pelas rotas de gamificação.
--   **Integração (Trello):** Foi iniciada uma nova integração com a API do Trello. A autenticação foi bem-sucedida, e os endpoints de backend para buscar dados do quadro foram criados.
+Foram realizadas as seguintes tarefas:
+-   **Correções de Bugs Críticos:** Resolvidos múltiplos problemas que impediam os instaladores de verem os itens dos jobs, corrigido o fluxo de redefinição de senha para apontar para o domínio de produção e corrigido o agendamento de jobs.
+-   **Otimização de Performance:** Implementado lazy loading no frontend e limpo o repositório de arquivos desnecessários (, ), reduzindo o tamanho do build de ~9.8MB para ~1.3MB para acelerar o deploy.
+-   **Melhorias de UI/UX:** A página de Jobs agora ordena os trabalhos por data mais recente e utiliza um componente de calendário para filtrar por período. A Loja e a seção de Prêmios foram ocultadas do perfil do instalador.
+-   **Funcionalidades de Admin:** Criados endpoints para limpar dados de teste do banco de dados e para reprocessar jobs antigos que não tinham os dados de produtos corretamente populados.
+-   **Testes:** Realizado um teste de ponta a ponta bem-sucedido do fluxo de vida de um job (criação, agendamento, atribuição, check-in e check-out) no ambiente de desenvolvimento.
 
 **Last working item**:
-    - Last item agent was working: O agente foi solicitado a analisar logs de deployment. A análise revelou que os health checks () estavam retornando , indicando que o backend estava iniciando corretamente no ambiente de deploy. O agente concluiu que os logs não apontavam para um erro de deployment e solicitou ao usuário que especificasse qual funcionalidade estava falhando para poder investigar.
-    - Status: USER VERIFICATION PENDING
-    - Agent Testing Done: N/A
-    - Which testing method agent to use? N/A (Aguardando resposta do usuário para definir os próximos passos de depuração).
+    - Last item agent was working: O agente estava prestes a iniciar a investigação de um erro nos relatórios, conforme solicitado pelo usuário, que forneceu um screenshot da página quebrada.
+    - Status: NOT STARTED
+    - Agent Testing Done: N
+    - Which testing method agent to use? backend testing agent
     - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - Issue 1: (P0) O usuário relatou problemas de deployment, mas os logs parecem saudáveis. É necessário obter mais detalhes sobre qual funcionalidade específica está falhando em produção.
-  - Issue 2: (P1) Erro ao ativar notificações push não foi totalmente diagnosticado. Embora melhorias de UI e tratamento de erro tenham sido adicionadas, o problema original relatado pelo usuário (sem detalhes) pode persistir em um dispositivo real.
-  - Issue 3: (P2) Integração com Google Calendar continua bloqueada.
-  - Issue 4: (P3) Envio de e-mail via Resend provavelmente está em modo de teste.
+  - Issue 1: (P0) Corrigir os relatórios.
+  - Issue 2: (P1) Limpar jobs de teste do instalador Elvis em produção.
+  - Issue 3: (P2) Limpar todos os dados de teste do ambiente de produção.
+  - Issue 4: (P3) Erro ao ativar notificações push não foi diagnosticado.
+  - Issue 5: (P4) Integração com Google Calendar continua bloqueada.
+  - Issue 6: (P5) Envio de e-mail via Resend provavelmente está em modo de teste.
   
   Issues Detail:
   - Issue 1: 
-     - Attempted fixes: O agente analisou os logs de deployment e verificou que o endpoint  está respondendo corretamente.
+     - Attempted fixes: Nenhum. O agente acabou de receber a solicitação.
      - Next debug checklist: 
-        1. Aguardar o usuário descrever o comportamento inesperado ou o erro que está enfrentando no ambiente de produção.
-        2. Se um erro for reportado, solicitar screenshots do console do navegador ou logs relevantes para iniciar a depuração.
-     - Why fix this issue and what will be achieved with the fix? A aplicação precisa ser funcional no ambiente de produção.
-     - Status:  USER VERIFICATION PENDING
+        1.  Verificar os logs do backend em produção para identificar o .
+        2.  Analisar o código do endpoint dos relatórios () em .
+        3.  Analisar o código da página de relatórios no frontend () para entender como os dados são solicitados e renderizados.
+        4.  Reproduzir o erro no ambiente de desenvolvimento, se possível, chamando o endpoint com os mesmos parâmetros.
+     - Why fix this issue and what will be achieved with the fix? Os relatórios são uma funcionalidade essencial para o gerente acompanhar os KPIs e a produtividade.
+     - Status:  NOT STARTED
      - Is recurring issue? N
      - Should Test frontend/backend/both after fix? Both
      - Blocked on other issue: Não.
   - Issue 2: 
-     - Attempted fixes: O agente não conseguiu reproduzir o erro no ambiente de teste (headless). Adicionou uma seção de gerenciamento de notificações na página de Perfil e melhorou as mensagens de erro no modal de permissão.
+     - Attempted fixes: O agente corrigiu o endpoint  para permitir a limpeza de . O código foi testado no ambiente de preview.
      - Next debug checklist: 
-        1. Solicitar ao usuário um screenshot do console do navegador (F12) no momento em que o erro ocorre em um dispositivo real.
-        2. Verificar o fluxo do Service Worker () e a chamada para .
-     - Why fix this issue and what will be achieved with the fix? Permitirá o envio de notificações push, uma funcionalidade chave para alertas.
-     - Status:  IN PROGRESS
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? Frontend
-     - Blocked on other issue: Bloqueado por feedback do usuário.
-  - Issue 3: 
-     - Attempted fixes: Nenhuma nesta sessão.
-     - Next debug checklist: Aguardar o usuário fornecer as novas credenciais OAuth (Client ID e Client Secret) do Google Cloud Console.
-     - Status:  BLOCKED
-     - Is recurring issue? N
-     - Should Test frontend/backend/both after fix? Both
-     - Blocked on other issue: Bloqueado por ação do usuário.
-  - Issue 4: 
-     - Attempted fixes: Nenhuma nesta sessão.
-     - Next debug checklist: Aguardar o usuário confirmar que o domínio foi verificado em sua conta Resend para ativar o modo de produção.
+        1.  Confirmar com o usuário que o **novo deploy foi concluído** em produção.
+        2.  Obter um token de autenticação de administrador para o ambiente de produção.
+        3.  Executar um script  para chamar o endpoint  para cada um dos dois jobs, passando um payload com  e .
+     - Why fix this issue and what will be achieved with the fix? Atenderá à solicitação do usuário de limpar a agenda do instalador Elvis para que ele comece do zero.
      - Status:  BLOCKED
      - Is recurring issue? Y
      - Should Test frontend/backend/both after fix? Backend
-     - Blocked on other issue: Bloqueado por ação do usuário.
+     - Blocked on other issue: Requer que o usuário faça um novo deploy para produção.
+  - Issue 3: 
+     - Attempted fixes: O agente criou o endpoint .
+     - Next debug checklist: 
+        1.  Confirmar com o usuário que o **novo deploy foi concluído** em produção.
+        2.  Obter um token de autenticação de administrador para o ambiente de produção.
+        3.  Chamar o endpoint  via .
+     - Why fix this issue and what will be achieved with the fix? Permitirá que o usuário comece a usar o ambiente de produção com uma base de dados limpa.
+     - Status:  BLOCKED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Backend
+     - Blocked on other issue: Requer que o usuário faça um novo deploy para produção.
+  - Issue 4: 
+     - Attempted fixes: Nenhum nesta sessão.
+     - Next debug checklist: Solicitar ao usuário um screenshot do console do navegador no momento em que o erro ocorre em um dispositivo real.
+     - Status:  IN PROGRESS
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Frontend
+     - Blocked on other issue: Feedback do usuário.
+  - Issue 5: 
+     - Attempted fixes: Nenhuma.
+     - Next debug checklist: Aguardar o usuário fornecer as credenciais OAuth do Google.
+     - Status:  BLOCKED
+     - Is recurring issue? N
+     - Should Test frontend/backend/both after fix? Both
+     - Blocked on other issue: Ação do usuário.
+  - Issue 6: 
+     - Attempted fixes: Nenhuma.
+     - Next debug checklist: Aguardar o usuário confirmar a verificação do domínio no Resend.
+     - Status:  BLOCKED
+     - Is recurring issue? Y
+     - Should Test frontend/backend/both after fix? Backend
+     - Blocked on other issue: Ação do usuário.
 
 **In progress Task List**:
   - Task 1: (P1) Concluir a integração com o Trello.
@@ -79,143 +99,131 @@ Nesta sessão, foram realizadas as seguintes implementações:
  
  Task Detail:
   - Task 1: 
-     - Where to resume: O backend está pronto (serviço e endpoints). O frontend tem uma nova página (), mas ela precisa ser finalizada. É necessário adicionar a rota da nova página no  e um link de navegação na .
-     - What will be achieved with this? Uma visualização em tempo real do quadro PCP do Trello dentro da aplicação.
+     - Where to resume: O backend está pronto. O frontend precisa ter a página  finalizada, adicionada como rota em  e um link de navegação na .
+     - What will be achieved with this? Visualização em tempo real do quadro PCP do Trello dentro da aplicação.
      - Status:  IN PROGRESS
      - Should Test frontend/backend/both after fix? Both
      - Blocked on something: Não.
   - Task 2: 
-     - Where to resume: A lógica das rotas de gamificação foi migrada de  para . O próximo passo é continuar movendo outras rotas (ex: , , ) do monolítico  para seus respectivos arquivos em . A refatoração do  é uma boa prioridade, pois há lógica duplicada de .
-     - What will be achieved with this? Uma base de código de backend mais limpa, organizada e de fácil manutenção.
+     - Where to resume: Continuar migrando grupos de rotas (ex: , , ) do monolítico  para arquivos modulares em .
+     - What will be achieved with this? Código de backend mais limpo, organizado e de fácil manutenção.
      - Status:  IN PROGRESS
      - Should Test frontend/backend/both after fix? Both
      - Blocked on something: Não.
 
 **Upcoming and Future Tasks**
     **Upcoming Tasks:**
-    - **(P1) Gerenciamento de Prêmios:** Criar uma interface de administração para que gerentes possam adicionar/editar/remover prêmios da Loja Faixa Preta.
-    - **(P2) Finalizar Notificações Push:** Implementar os gatilhos de backend para enviar notificações em eventos específicos (ex: novo agendamento, check-in atrasado).
+    - (P1) Gerenciamento de Prêmios: Criar uma interface de administração para que gerentes possam adicionar/editar/remover prêmios da Loja Faixa Preta.
+    - (P2) Finalizar Notificações Push: Implementar os gatilhos de backend para enviar notificações em eventos específicos.
     
     **Future Tasks:**
-    - **(P3) Capacidades Offline (PWA):** Implementar funcionalidade offline robusta.
-    - **(P4) Machine Learning:** Usar dados coletados para calibrar a matriz de tempo de instalação.
-    - **(P5) Melhoria na Classificação de Produtos:** Permitir que o gerente associe manualmente um produto não classificado a uma família de produtos.
+    - (P3) Capacidades Offline (PWA).
+    - (P4) Machine Learning para calibrar a matriz de tempo de instalação.
+    - (P5) Melhoria na Classificação de Produtos: Permitir que o gerente associe manualmente um produto a uma família de produtos.
 
 **Completed work in this session**
-- **BugFix:** Corrigido  no Dashboard do Gerente.
-- **BugFix (Deployment):** Adicionado endpoint  e removido URLs hardcoded.
-- **BugFix (Password Reset):** Resolvido bug recorrente do link de redefinição de senha com .
-- **Feature (User Registration):** Implementada funcionalidade de auto-registro de usuários.
-- **Feature (User Import):** Importados 14 usuários de um arquivo Excel.
-- **Feature (Holdprint Sync):** Criado endpoint e agendador interno () para sincronização diária de OS da Holdprint.
-- **Feature (Scheduler Admin UI):** Criada página no frontend para gerenciar o agendador de tarefas.
-- **Refactoring:** Migradas as rotas de gamificação de  para um módulo dedicado.
-- **Feature (Trello Integration):** Iniciada a integração com Trello (autenticação e endpoints de backend criados).
-- **Improvement:** Adicionada seção de gerenciamento de notificações na página de Perfil.
+- **BugFix:** Corrigido fluxo de check-in que não exibia itens para o instalador.
+- **BugFix:** Corrigido fluxo de redefinição de senha para usar a URL de produção.
+- **BugFix:** Corrigido o componente de calendário que não funcionava devido a conflitos de versão.
+- **BugFix:** Corrigido o fluxo de agendamento de jobs.
+- **Feature:** Criados endpoints administrativos para limpar dados de teste e reprocessar jobs antigos.
+- **Optimization:** Implementado lazy loading (code splitting) no frontend.
+- **Optimization:** Otimizado o  e  para acelerar o tempo de build e deploy.
+- **UI/UX:** Adicionado calendário para seleção de datas na página de Jobs.
+- **UI/UX:** Página de Jobs agora ordena os trabalhos pela data mais recente.
+- **UI/UX:** Removida a visualização da Loja e Prêmios do perfil do instalador.
+- **Testing:** Realizado um teste completo de ponta a ponta do ciclo de vida de um job.
 
 **Earlier issues found/mentioned but not fixed**
-- O agente não removeu a página de demonstração .
+   - A página de demonstração  ainda existe e precisa ser removida.
 
 **Known issue recurrence from previous fork**
-  - O bug do link de redefinição de senha () foi um problema recorrente que foi investigado a fundo e corrigido nesta sessão. A causa raiz era uma combinação de como o  era lido e a necessidade de reiniciar o servidor corretamente. A solução deve ser estável, mas requer atenção caso o problema retorne.
+  - A principal recorrência é o desalinhamento entre o ambiente de desenvolvimento/preview e o de produção. O usuário reporta erros em produção que já foram corrigidos no código-fonte, mas o **novo código ainda não foi implantado (deployed)**. A comunicação sobre a necessidade de fazer o deploy após as correções é crucial.
 
 **Code Architecture**
 
 
 **Key Technical Concepts**
-- **Backend Refactoring**: Migração de endpoints de  para  modulares.
-- **Environment Variables**: Depuração de problemas de carregamento de variáveis do  com .
-- **Internal Cron Jobs**: Uso do  para executar tarefas de fundo recorrentes em uma aplicação FastAPI.
-- **3rd Party API Integration**: Conexão com a API do Trello usando API Key e Token.
-- **Deployment Health Checks**: Implementação de um endpoint  para liveness probes do Kubernetes.
-- **Data Import**: Leitura de dados de um arquivo  com  e criação de registros no MongoDB.
+- **React Lazy Loading & Code Splitting**: Para otimização de performance do frontend.
+- **React.memo**: Para evitar re-renderizações desnecessárias de componentes.
+- **Gerenciamento de Ambiente (Prod vs. Preview)**: A distinção entre os ambientes de produção e preview foi um tema central, exigindo explicações repetidas sobre a necessidade de deploy para que as alterações entrem em vigor.
+- **Data Fallbacks**: Implementação de lógica no frontend e backend para usar fontes de dados alternativas ( ou ) quando a fonte primária () está ausente, tornando a aplicação mais resiliente.
+- **Otimização de Build**: Redução do tamanho do projeto rastreado pelo Git e limpeza de dependências para acelerar o processo de CI/CD (deploy).
 
 **key DB schema**
+  - **jobs**: 
   - **users**: 
-  - **installers**: 
-  - **managers**: 
-  - **jobs**: Sincronizado da Holdprint.
-  - **push_subscriptions**: Armazena dados de inscrição para notificações push.
-  - **scheduler_sync_status**: 
+  - **password_reset_tokens**: 
 
 **changes in tech stack**
-- **apscheduler**: Adicionado ao backend para agendamento de tarefas internas.
-- **httpx**: Adicionado ao backend para requisições HTTP assíncronas no agendador.
+- Nenhuma nova tecnologia foi adicionada.  foi otimizado para produção.
 
 **All files of reference**
-- : Arquivo principal do backend, modificado para adicionar o health check, o scheduler e os endpoints do Trello.
-- : Arquivo de ambiente, atualizado com  e credenciais do Trello.
-- : Lógica do agendador.
-- : Lógica da integração com Trello.
-- : Nova página de registro.
-- : Nova página de administração do agendador.
-- : Modificada para incluir gerenciamento de notificações.
-- : Métodos de API para as novas funcionalidades.
+- : Modificado para corrigir bugs nos endpoints de , , e adicionar os endpoints de admin  e .
+- : Modificado para adicionar calendário, ordenar por data e melhorar o tratamento de erros.
+- : Modificado para adicionar fallbacks de dados e corrigir a exibição de itens.
+- : Refatorado para usar  em todas as rotas de página.
+- : Corrigido e limpo para incluir os arquivos  no deploy e ignorar arquivos de teste e cache.
+- : Otimizado para conter apenas as dependências de produção.
+- : Código atualizado para corrigir um bug de incompatibilidade de versão.
 
 **Areas that need refactoring**:
-- ****: A tarefa de refatoração deve continuar, movendo mais grupos de rotas (como , ) para módulos separados.
-- **Lógica de autenticação duplicada**: Existem duas implementações do endpoint  em  e . Isso deve ser unificado durante a refatoração do módulo de autenticação.
-- A página  ainda precisa ser removida.
+- ****: A tarefa de refatoração para extrair rotas para módulos continua sendo uma prioridade para melhorar a manutenibilidade.
+- A página de demonstração  ainda precisa ser removida.
 
 **key api endpoints**
-- : Endpoint para health checks do Kubernetes.
-- : Endpoint para auto-registro de novos usuários.
-- : Inicia a sincronização de jobs da API da Holdprint.
-- : Retorna o status da última sincronização.
-- : Retorna o status e os jobs do agendador interno.
-- : Retorna um resumo do quadro do Trello.
-- : Retorna os cards de uma lista específica do Trello.
+- : **NOVO**. Limpa todos os dados de teste (jobs, checkins, etc.). Requer role .
+- : **NOVO**. Reprocessa todos os jobs existentes para popular o campo . Requer role .
+- : **CORRIGIDO**. A lógica de acesso para instaladores foi corrigida e agora também popula  dinamicamente se estiver vazio.
+- : **MELHORADO**. Agora permite limpar  para desatribuir completamente um job.
 
 **Critical Info for New Agent**
-- **Prioridade Imediata:** A última interação foi sobre um suposto problema de deployment. Os logs não mostraram erros, então sua primeira ação deve ser pedir ao usuário para descrever o problema específico que está enfrentando no ambiente de produção. Não assuma que há um erro de código.
-- **Bug Recorrente Resolvido:** O bug do link de redefinição de senha foi resolvido. A causa era a variável  ausente/malformada no  do backend. Se o usuário relatar novamente, instrua-o a verificar o email mais recente e confirme se o backend foi reiniciado após qualquer mudança no .
-- **Tarefa em Andamento:** A integração com o Trello está no meio do caminho. O backend está pronto, mas o frontend () precisa ser finalizado e integrado à navegação do app.
-- **Tarefa Contínua:** A refatoração do  é uma tarefa de fundo importante. Continue movendo grupos de rotas para seus próprios módulos para melhorar a manutenibilidade do código.
+- **O DEPLOY É O BLOQUEADOR PRINCIPAL:** Muitas das tarefas solicitadas pelo usuário (limpeza de dados em produção, correção de bugs) já foram implementadas no código, mas não funcionarão no ambiente de produção até que o usuário realize um **novo deploy**. Você deve reforçar isso constantemente. A produção () e o preview () são ambientes isolados com bancos de dados separados.
+- **Fluxo de Correção:** Para problemas em produção, o fluxo deve ser:
+    1. Confirmar que o bug não ocorre no ambiente de preview (que tem o código mais recente).
+    2. Se não ocorrer, instruir o usuário a fazer um **novo deploy**.
+    3. Após o deploy, verificar se o problema foi resolvido em produção.
+- **Tarefas de Limpeza:** As tarefas de limpar os jobs do instalador Elvis e a limpeza geral do banco de dados estão **bloqueadas aguardando o deploy**. Após o deploy, você precisará obter um token de admin do ambiente de produção para chamar os endpoints correspondentes.
 
 **documents and test reports created in this job**
-  - 
+- Nenhum novo documento foi criado. O  foi mencionado mas não atualizado.
 
 **Last 10 User Messages and any pending HUMAN messages** 
-- 
-wtmp begins Mon Jan 12 12:55:56 2026 seria possivel criar esse cron em uma solução interna dentro desta aplicação? - Pedido para criar um agendador interno. (CONCLUÍDO)
--  crie uma chamada API para buscar diariamente todas as OS da holdprint... - Pedido para criar a sincronização com Holdprint. (CONCLUÍDO)
--  confirme as quantidades de jobs da holdprint... - Solicitação de contagem de jobs. (CONCLUÍDO)
--  na api da holdprint busque as OS de dezembro - Pedido para buscar jobs de um mês específico. (CONCLUÍDO)
--  verifique erro ao ativar notificações - Reportou erro ao ativar notificações. (EM ANDAMENTO)
--  qual a senha do instalador? - Pediu a senha de um usuário. (RESPONDIDO)
--  no teste funcionou - Confirmou que o email de teste do reset de senha funcionou. (CONCLUÍDO)
--  para qual caixa de entrada foi enviado? - Perguntou sobre o destinatário do email de teste. (RESPONDIDO)
--  preciso que seja usado o resend para alterar a senha - Insistiu no uso do Resend. (CONCLUÍDO/ESCLARECIDO)
--  o erro ao esquecer a senha continua - Reportou a persistência do erro de reset de senha. (CONCLUÍDO)
+-  
+wtmp begins Wed Jan 28 14:25:13 2026 corrija e teste os relatórios - O usuário reportou que os relatórios estão quebrados e pediu uma correção e teste. (PENDENTE)
+-   corrija o erro, e teste um agendamento de jobs, e nao erre mais - Usuário reportou erro no agendamento. (CONCLUÍDO, funciona no preview)
+-   revise o erro e teste o filtro por agenda de um periodo - Usuário reportou erro no filtro de calendário. (CONCLUÍDO, funciona no preview)
+-   verifique a lentidão no deploy - Usuário reclamou da lentidão. (CONCLUÍDO, otimizações foram feitas)
+-   corrija o erro ao selecionar a data no calendario - Usuário reportou bug no calendário. (CONCLUÍDO)
+-   melhore a velocidade de naveção e refatore se for necessário - Pedido de otimização de performance. (CONCLUÍDO)
+-   ao acessar a tela jobs, garanta que o usuario visualize os jobs mais recentes... - Pedido de melhoria na UI/UX da página de jobs. (CONCLUÍDO)
+-   teste o agendamente o inicie um checkin e e finalize o checkout... - Pedido para testar o fluxo completo. (CONCLUÍDO)
+-   novamente ocorreu erro, o item foi agendado e atribuido porem o usuario acessa vazio... - Reportou o bug recorrente de itens vazios. (CONCLUÍDO, correção definitiva implementada)
+-   remova esses dois jobs que estão alocados para o usuario instalador elvis... - Pedido de limpeza de dados. (EM ANDAMENTO/BLOQUEADO)
 
 **Project Health Check:**
-- **Broken**: Nenhuma funcionalidade principal está quebrada. O Dashboard do Gerente foi corrigido. O deployment parece saudável, mas aguarda confirmação funcional do usuário.
+- **Broken**: A funcionalidade de Relatórios está quebrada em produção.
 - **Mocked**: Nenhuma.
 
 **3rd Party Integrations**
-- **Holdworks API**: Funcional. Agora possui sincronização diária automatizada.
+- **Holdworks API**: Funcional. Chaves corrigidas.
 - **Google Maps**: Funcional.
-- **openpyxl**: Funcional.
-- **Google Calendar API**: Bloqueado (requer ação do usuário).
-- **Resend**: Funcional, mas conta pode estar em modo de teste (requer ação do usuário).
-- **pywebpush**: Implementado, mas o fluxo de ponta a ponta não foi validado em um dispositivo real.
-- **WhatsApp**: Funcional (via URL ).
-- **Trello API**: **NOVA**. Conexão estabelecida, backend criado, frontend em progresso.
-- **APScheduler**: **NOVA**. Integrado e funcionando para tarefas agendadas.
+- **Resend**: Funcional, mas pode estar em modo de teste.
+- **Google Calendar API**: Bloqueado.
+- **Trello API**: Em progresso.
+- **APScheduler**: Funcional.
 
 **Testing status**
   - Testing agent used after significant changes: NO
   - Troubleshoot agent used after agent stuck in loop: NO
   - Test files created: Não.
-  - Known regressions: Nenhuma conhecida.
+  - Known regressions: Nenhuma conhecida, mas a aplicação em produção está rodando uma versão de código antiga e instável.
 
 **Credentials to test flow:**
-- **Admin:**  / 
-- **Gerente:**  / 
-- **Instalador:**  / 
-- **Andreia (Admin):**  / 
-- Além desses, 14 novos usuários foram importados de um arquivo Excel. A senha padrão é o primeiro nome do usuário em minúsculas + 123 (ex: ).
+- **Admin (Preview):**  / 
+- **Instalador (Preview):**  / 
+- **Admin (Produção):**  /  (Confirmado pelo usuário)
 
 **What agent forgot to execute**
-- O agente não adicionou a rota para a nova página  no  nem o link na  antes de ser interrompido.
-- A página de demonstração  ainda não foi removida.</analysis>
+- O agente não removeu a página .
+- O agente não atualizou o arquivo  ao finalizar as tarefas.</analysis>

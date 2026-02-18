@@ -16,7 +16,7 @@ O PWA (Progressive Web App) tem um Service Worker que mantém cache muito agress
 
 3. **Desregistrar Service Worker:**
    - No menu lateral esquerdo, clique em "Service Workers"
-   - Você verá algo como "https://faixapreta-app.preview.emergentagent.com"
+   - Você verá algo como "https://pwa-gamify-prod.preview.emergentagent.com"
    - Clique no botão "Unregister" ao lado
    - Marque a caixa "Update on reload"
 
@@ -47,7 +47,7 @@ O PWA (Progressive Web App) tem um Service Worker que mantém cache muito agress
    - Clique em "Unregister"
 
 4. **Limpar todos os dados:**
-   - Clique com botão direito em "https://faixapreta-app.preview.emergentagent.com"
+   - Clique com botão direito em "https://pwa-gamify-prod.preview.emergentagent.com"
    - Selecione "Delete All"
 
 5. **Hard Reload:**
@@ -70,7 +70,7 @@ O PWA (Progressive Web App) tem um Service Worker que mantém cache muito agress
 
 4. **Feche COMPLETAMENTE o navegador** (não apenas a aba)
 
-5. **Reabra e acesse:** https://faixapreta-app.preview.emergentagent.com
+5. **Reabra e acesse:** https://pwa-gamify-prod.preview.emergentagent.com
 
 ---
 
@@ -81,7 +81,7 @@ O PWA (Progressive Web App) tem um Service Worker que mantém cache muito agress
    - Firefox: `Ctrl + Shift + P`
    - Edge: `Ctrl + Shift + N`
 
-2. **Acesse:** https://faixapreta-app.preview.emergentagent.com
+2. **Acesse:** https://pwa-gamify-prod.preview.emergentagent.com
 
 3. **Faça login e teste**
 
