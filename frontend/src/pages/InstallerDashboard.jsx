@@ -365,44 +365,26 @@ const InstallerDashboard = () => {
         />
       )}
 
-      {/* Recent Earnings */}
-      {recentTransactions.length > 0 && (
-        <Card className="bg-card border-white/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-400" />
-              Ganhos Recentes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {recentTransactions.slice(0, 3).map((transaction) => (
-                <div 
-                  key={transaction.id}
-                  className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      transaction.amount > 0 ? 'bg-green-500/20' : 'bg-red-500/20'
-                    }`}>
-                      <Coins className={`h-4 w-4 ${transaction.amount > 0 ? 'text-green-400' : 'text-red-400'}`} />
-                    </div>
-                    <div>
-                      <p className="text-sm text-white">{transaction.description}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(transaction.created_at).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`font-bold ${transaction.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {transaction.amount > 0 ? '+' : ''}{transaction.amount}
-                  </span>
-                </div>
-              ))}
+      {/* Prêmios - Em Breve */}
+      <Card className="bg-card border-white/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base md:text-lg text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Prêmios
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+              <Coins className="h-8 w-8 text-primary" />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <p className="text-lg font-semibold text-white mb-2">Em breve</p>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Novidades incríveis estão chegando! Aguarde para resgatar prêmios com suas moedas.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Weekly Leaderboard - No final */}
       <WeeklyLeaderboard />
