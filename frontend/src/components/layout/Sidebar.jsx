@@ -13,7 +13,8 @@ import {
   FileText,
   Trophy,
   TrendingUp,
-  Settings
+  Settings,
+  Trello
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
