@@ -1851,6 +1851,10 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
             # Check item-level assignment
             if not has_access:
                 for assignment in item_assignments:
+                    # Check both installer_id (singular) and installer_ids (plural) for compatibility
+                    if assignment.get('installer_id') == installer_id:
+                        has_access = True
+                        break
                     if installer_id in assignment.get('installer_ids', []):
                         has_access = True
                         break
