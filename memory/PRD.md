@@ -218,6 +218,10 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
   - Adicionada rota `/trello-pcp` no `App.js`
   - Adicionado link "Trello PCP" na sidebar para admin/manager
   - Visualização de 2274+ cards do quadro com busca e indicadores de atraso
+- ✅ **REFATORAÇÃO:** Migradas rotas de Check-ins para módulo separado
+  - Criado `/app/backend/routes/checkins.py` com todas as rotas de check-in legado
+  - Reduzido `server.py` de 5832 para 5439 linhas (~393 linhas)
+  - Rotas migradas: POST/GET/PUT/DELETE `/checkins/*`
 
 ### 12/01/2026 - Correção de Bug e Migração de Rotas
 - ✅ **BUGFIX:** Corrigido `TypeError` no backend que impedia o carregamento do Dashboard do Gerente
