@@ -62,6 +62,17 @@ const JobDetail = () => {
     if (job?.products_with_area && job.products_with_area.length > 0) {
       return job.products_with_area;
     }
+    if (job?.items && job.items.length > 0) {
+      // Map items to have consistent structure
+      return job.items.map((item, index) => ({
+        name: item.name || `Item ${index + 1}`,
+        quantity: item.quantity || 1,
+        total_area_m2: item.total_area_m2 || 0,
+        unit_area_m2: item.unit_area_m2 || 0,
+        width_m: item.width_m,
+        height_m: item.height_m
+      }));
+    }
     if (job?.holdprint_data?.products && job.holdprint_data.products.length > 0) {
       return job.holdprint_data.products;
     }
