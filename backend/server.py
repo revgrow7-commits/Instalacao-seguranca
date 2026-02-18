@@ -5651,6 +5651,10 @@ async def award_coins(user_id: str, amount: int, transaction_type: str, descript
 from routes.gamification import router as gamification_router
 api_router.include_router(gamification_router, tags=["Gamification"])
 
+# ============ CHECKINS ROUTES (migrated to routes/checkins.py) ============
+from routes.checkins import router as checkins_router
+api_router.include_router(checkins_router, tags=["Check-ins"])
+
 
 # ============ SCHEDULER MANAGEMENT ROUTES ============
 
