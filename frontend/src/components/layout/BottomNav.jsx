@@ -27,12 +27,6 @@ const BottomNav = () => {
       roles: ['admin', 'manager'] // Hidden for installers on mobile
     },
     {
-      name: 'Loja',
-      href: '/loja-faixa-preta',
-      icon: Coins,
-      roles: ['installer']
-    },
-    {
       name: 'Calendário',
       href: '/installer/calendar',
       icon: Calendar,
