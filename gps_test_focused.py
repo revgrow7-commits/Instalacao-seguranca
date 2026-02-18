@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://faixapreta-app.preview.emergentagent.com/api"
+BASE_URL = "https://pwa-gamify-prod.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_CREDENTIALS = {
