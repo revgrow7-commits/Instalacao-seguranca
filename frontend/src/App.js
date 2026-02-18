@@ -1,34 +1,44 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import InstallerDashboard from './pages/InstallerDashboard';
-import InstallerJobDetail from './pages/InstallerJobDetail';
-import InstallerCalendar from './pages/InstallerCalendar';
-import Jobs from './pages/Jobs';
-import JobDetail from './pages/JobDetail';
-import Users from './pages/Users';
-import Calendar from './pages/Calendar';
-// Removed obsolete imports: CheckIn, CheckOut (replaced by InstallerJobDetail item-based flow)
-import CheckinViewer from './pages/CheckinViewer';
-import Checkins from './pages/Checkins';
-import UnifiedReports from './pages/UnifiedReports';
-import FamilyReport from './pages/FamilyReport';
-import InstallerReport from './pages/InstallerReport';
-import FamilyKPIsReport from './pages/FamilyKPIsReport';
-import Profile from './pages/Profile';
-import LojaFaixaPreta from './pages/LojaFaixaPreta';
-import GamificationReport from './pages/GamificationReport';
-import SchedulerAdmin from './pages/SchedulerAdmin';
+import './App.css';
+
+// Lazy load all pages for better performance
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const InstallerDashboard = lazy(() => import('./pages/InstallerDashboard'));
+const InstallerJobDetail = lazy(() => import('./pages/InstallerJobDetail'));
+const InstallerCalendar = lazy(() => import('./pages/InstallerCalendar'));
+const Jobs = lazy(() => import('./pages/Jobs'));
+const JobDetail = lazy(() => import('./pages/JobDetail'));
+const Users = lazy(() => import('./pages/Users'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const CheckinViewer = lazy(() => import('./pages/CheckinViewer'));
+const Checkins = lazy(() => import('./pages/Checkins'));
+const UnifiedReports = lazy(() => import('./pages/UnifiedReports'));
+const FamilyReport = lazy(() => import('./pages/FamilyReport'));
+const InstallerReport = lazy(() => import('./pages/InstallerReport'));
+const FamilyKPIsReport = lazy(() => import('./pages/FamilyKPIsReport'));
+const Profile = lazy(() => import('./pages/Profile'));
+const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
+const GamificationReport = lazy(() => import('./pages/GamificationReport'));
+const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
+
+// Non-lazy imports for layout components (always needed)
 import Sidebar from './components/layout/Sidebar';
 import BottomNav from './components/layout/BottomNav';
 import UpdateNotification from './components/UpdateNotification';
-import './App.css';
+
+// Loading spinner component
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-[50vh]">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
@@ -54,7 +64,9 @@ const MainLayout = ({ children }) => {
       <Sidebar />
       <div className="md:pl-64 flex flex-col flex-1">
         <main className="flex-1 pb-20 md:pb-0">
-          {children}
+          <Suspense fallback={<PageLoader />}>
+            {children}
+          </Suspense>
         </main>
         <BottomNav />
       </div>
@@ -70,13 +82,21 @@ const AppRoutes = () => {
       <Route
         path="/login"
         element={
-          user ? <Navigate to="/dashboard" replace /> : <Login />
+          user ? <Navigate to="/dashboard" replace /> : (
+            <Suspense fallback={<PageLoader />}>
+              <Login />
+            </Suspense>
+          )
         }
       />
       <Route
         path="/register"
         element={
-          user ? <Navigate to="/dashboard" replace /> : <Register />
+          user ? <Navigate to="/dashboard" replace /> : (
+            <Suspense fallback={<PageLoader />}>
+              <Register />
+            </Suspense>
+          )
         }
       />
       <Route
