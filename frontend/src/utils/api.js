@@ -2,14 +2,44 @@ import axios from 'axios';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
 
+// Simple in-memory cache
+const cache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
 const getAuthHeader = () => {
   const token = localStorage.getItem('token');
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+// Helper to get cached data or fetch
+const getCachedOrFetch = async (key, fetchFn, ttl = CACHE_TTL) => {
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.timestamp < ttl) {
+    return cached.data;
+  }
+  const response = await fetchFn();
+  cache.set(key, { data: response, timestamp: Date.now() });
+  return response;
+};
+
+// Clear cache for a specific key or all
+const clearCache = (key = null) => {
+  if (key) {
+    cache.delete(key);
+  } else {
+    cache.clear();
+  }
+};
+
 export const api = {
+  // Cache control
+  clearCache,
+  
   // Auth
-  login: (email, password) => axios.post(`${API_URL}/auth/login`, { email, password }),
+  login: (email, password) => {
+    clearCache(); // Clear all cache on login
+    return axios.post(`${API_URL}/auth/login`, { email, password });
+  },
   register: (data) => axios.post(`${API_URL}/auth/self-register`, data),
   getMe: () => axios.get(`${API_URL}/auth/me`, { headers: getAuthHeader() }),
   forgotPassword: (email) => axios.post(`${API_URL}/auth/forgot-password`, { email }),
@@ -19,14 +49,28 @@ export const api = {
 
   // Users
   getUsers: () => axios.get(`${API_URL}/users`, { headers: getAuthHeader() }),
-  createUser: (data) => axios.post(`${API_URL}/auth/register`, data, { headers: getAuthHeader() }),
-  updateUser: (userId, data) => axios.put(`${API_URL}/users/${userId}`, data, { headers: getAuthHeader() }),
-  deleteUser: (userId) => axios.delete(`${API_URL}/users/${userId}`, { headers: getAuthHeader() }),
+  createUser: (data) => {
+    clearCache('users');
+    return axios.post(`${API_URL}/auth/register`, data, { headers: getAuthHeader() });
+  },
+  updateUser: (userId, data) => {
+    clearCache('users');
+    return axios.put(`${API_URL}/users/${userId}`, data, { headers: getAuthHeader() });
+  },
+  deleteUser: (userId) => {
+    clearCache('users');
+    return axios.delete(`${API_URL}/users/${userId}`, { headers: getAuthHeader() });
+  },
   changePassword: (currentPassword, newPassword) => axios.post(`${API_URL}/users/change-password`, { current_password: currentPassword, new_password: newPassword }, { headers: getAuthHeader() }),
 
-  // Installers
-  getInstallers: () => axios.get(`${API_URL}/installers`, { headers: getAuthHeader() }),
-  updateInstaller: (installerId, data) => axios.put(`${API_URL}/installers/${installerId}`, data, { headers: getAuthHeader() }),
+  // Installers (cached)
+  getInstallers: () => getCachedOrFetch('installers', () => 
+    axios.get(`${API_URL}/installers`, { headers: getAuthHeader() })
+  ),
+  updateInstaller: (installerId, data) => {
+    clearCache('installers');
+    return axios.put(`${API_URL}/installers/${installerId}`, data, { headers: getAuthHeader() });
+  },
 
   // Holdprint & Jobs
   importAllJobs: (branch) => axios.post(`${API_URL}/jobs/import-all`, { branch }, { headers: getAuthHeader() }),
