@@ -7,6 +7,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import { 
   Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, 
   Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
@@ -15,6 +17,8 @@ import {
 import { toast } from 'sonner';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 // Skeleton loader for cards
 const JobCardSkeleton = () => (
