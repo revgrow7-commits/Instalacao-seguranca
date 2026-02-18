@@ -400,14 +400,6 @@ const InstallerDashboard = () => {
                 </div>
               ))}
             </div>
-            <Button
-              onClick={() => navigate('/loja-faixa-preta')}
-              variant="ghost"
-              className="w-full mt-3 text-primary hover:text-primary/80"
-            >
-              <Gift className="h-4 w-4 mr-2" />
-              Ver Loja e Resgatar Prêmios
-            </Button>
           </CardContent>
         </Card>
       )}
