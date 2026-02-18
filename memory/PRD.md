@@ -190,7 +190,6 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ### P2 - Média Prioridade
 - [ ] Sistema manual de classificação de produtos por família
-- [ ] Remover página de demo `/app/frontend/src/pages/CoinDemo.jsx`
 
 ### P3 - Baixa Prioridade
 - [ ] Capacidades Offline (PWA)
