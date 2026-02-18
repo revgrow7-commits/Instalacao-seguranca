@@ -495,7 +495,8 @@ const Jobs = () => {
       setScheduleDate('');
     } catch (error) {
       console.error('Error scheduling job:', error);
-      toast.error('Erro ao agendar job');
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro ao agendar job';
+      toast.error(errorMsg);
     } finally {
       setProcessingJobId(null);
     }
