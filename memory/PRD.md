@@ -206,6 +206,20 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
+### 18/02/2026 - Refatoração e Integração Trello PCP
+- ✅ **REFATORAÇÃO:** Removidos arquivos obsoletos do frontend
+  - Removido `CoinDemo.jsx` (página de demonstração não utilizada)
+  - Removido `Metrics.jsx` (substituído por UnifiedReports)
+  - Removido `ProductivityReport.jsx` (substituído por UnifiedReports)
+  - Removido `Reports.jsx` (substituído por UnifiedReports)
+- ✅ **FEATURE:** Integração Trello PCP finalizada
+  - Adicionada rota `/trello-pcp` no `App.js`
+  - Adicionado link "Trello PCP" na sidebar para admin/manager
+  - Backend já tinha endpoints funcionais em `/api/trello/*`
+  - Visualização de 2274+ cards do quadro de PCP
+  - Busca por nome/descrição de cards
+  - Indicadores de cards atrasados por lista
+
 ### 12/01/2026 - Correção de Bug e Migração de Rotas
 - ✅ **BUGFIX:** Corrigido `TypeError` no backend que impedia o carregamento do Dashboard do Gerente
   - Problema: Erro ao ordenar check-ins com tipos mistos (datetime/string) no campo `checkin_at`
