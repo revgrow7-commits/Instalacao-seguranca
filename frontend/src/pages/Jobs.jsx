@@ -502,9 +502,9 @@ const Jobs = () => {
     }
   };
 
-  // Memoized filtered jobs
+  // Memoized filtered jobs - sorted by most recent
   const filteredJobs = useMemo(() => {
-    return jobs.filter(job => {
+    const filtered = jobs.filter(job => {
       const matchesSearch = !searchTerm || 
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (job.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
