@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, TrendingUp, Gift } from 'lucide-react';
+import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
 import GamificationWidget from '../components/GamificationWidget';
