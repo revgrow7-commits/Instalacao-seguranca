@@ -566,6 +566,15 @@ const Jobs = () => {
       
       return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
     });
+    
+    // Sort by most recent date (scheduled_date or created_at)
+    return filtered.sort((a, b) => {
+      const getDate = (job) => {
+        const dateStr = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime || job.created_at;
+        return dateStr ? new Date(dateStr) : new Date(0);
+      };
+      return getDate(b) - getDate(a); // Descending (most recent first)
+    });
   }, [jobs, searchTerm, statusFilter, branchFilter, startDateFilter, endDateFilter, monthFilter]);
 
   const loadMore = () => setVisibleCount(prev => prev + 12);
