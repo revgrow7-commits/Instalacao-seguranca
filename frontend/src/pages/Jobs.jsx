@@ -743,7 +743,6 @@ const Jobs = () => {
                         setStartDateFilter('');
                       }
                     }}
-                    locale={ptBR}
                     initialFocus
                   />
                 </PopoverContent>
