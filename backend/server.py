@@ -1837,6 +1837,65 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found")
     
+    # Auto-populate products_with_area if empty
+    if not job_doc.get('products_with_area') or len(job_doc.get('products_with_area', [])) == 0:
+        products_with_area = []
+        total_area_m2 = 0.0
+        
+        # Try items first
+        items = job_doc.get('items', [])
+        if items:
+            for item in items:
+                product_info = extract_product_dimensions(item)
+                quantity = item.get('quantity', 1)
+                unit_area = product_info.get('area_m2', 0)
+                total_area = unit_area * quantity
+                
+                product_with_area = {
+                    "name": item.get('name', 'Item'),
+                    "quantity": quantity,
+                    "width_m": product_info.get('width_m'),
+                    "height_m": product_info.get('height_m'),
+                    "unit_area_m2": unit_area,
+                    "total_area_m2": total_area
+                }
+                products_with_area.append(product_with_area)
+                total_area_m2 += total_area
+        
+        # If no items, try holdprint_data.products
+        if not products_with_area:
+            holdprint_products = job_doc.get('holdprint_data', {}).get('products', [])
+            for product in holdprint_products:
+                product_info = extract_product_dimensions(product)
+                quantity = product.get('quantity', 1)
+                unit_area = product_info.get('area_m2', 0)
+                total_area = unit_area * quantity
+                
+                product_with_area = {
+                    "name": product.get('name', 'Produto'),
+                    "quantity": quantity,
+                    "width_m": product_info.get('width_m'),
+                    "height_m": product_info.get('height_m'),
+                    "unit_area_m2": unit_area,
+                    "total_area_m2": total_area
+                }
+                products_with_area.append(product_with_area)
+                total_area_m2 += total_area
+        
+        # Update job in database
+        if products_with_area:
+            await db.jobs.update_one(
+                {"id": job_id},
+                {"$set": {
+                    "products_with_area": products_with_area,
+                    "area_m2": total_area_m2,
+                    "total_products": len(products_with_area)
+                }}
+            )
+            job_doc['products_with_area'] = products_with_area
+            job_doc['area_m2'] = total_area_m2
+            job_doc['total_products'] = len(products_with_area)
+    
     # Check if installer is assigned to this job or any item
     if current_user.role == UserRole.INSTALLER:
         installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
