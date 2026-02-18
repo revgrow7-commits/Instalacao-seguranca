@@ -28,9 +28,8 @@ next-env.d.ts
 # Production builds
 /build
 dist/
-dist
 
-# Token and credential files (NOT .env files - those are needed for deployment)
+# Token and credential files
 *token.json*
 *credentials.json*
 
@@ -47,7 +46,7 @@ dump.rdb
 
 # Python
 __pycache__/
-*pyc*
+*.pyc
 venv/
 .venv/
 
@@ -55,13 +54,9 @@ venv/
 chainlit.md
 .chainlit
 .ipynb_checkpoints/
-.ac
 
 # Deployment
 .vercel
-
-# Data and databases
-agenthub/agents/youtube/db
 
 # Archive files and large assets
 **/*.zip
@@ -74,16 +69,7 @@ agenthub/agents/youtube/db
 
 # Build caches
 .cache/
+**/node_modules/.cache/
 
 # Mobile development
 android-sdk/
-frontend/node_modules/.cache/default-development/2.pack
-frontend/node_modules/.cache/default-development/4.pack
-frontend/node_modules/.cache/default-development/5.pack
-frontend/node_modules/.cache/default-development/6.pack
--e 
-# Environment files
-*.env
-*.env.*
-frontend/node_modules/.cache/default-development/9.pack
-frontend/node_modules/.cache/default-development/3.pack
