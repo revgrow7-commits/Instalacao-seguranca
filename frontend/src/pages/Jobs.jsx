@@ -722,27 +722,63 @@ const Jobs = () => {
           <div className="flex flex-wrap gap-3 items-end">
             <div>
               <label className="text-[10px] text-muted-foreground mb-1 block">Data Início</label>
-              <Input
-                type="date"
-                value={startDateFilter}
-                onChange={(e) => {
-                  setStartDateFilter(e.target.value);
-                  if (e.target.value) setMonthFilter('all');
-                }}
-                className="w-36 bg-white/5 border-white/10 text-white h-9"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-36 justify-start text-left font-normal bg-white/5 border-white/10 text-white h-9 hover:bg-white/10"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {startDateFilter ? format(new Date(startDateFilter), "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={startDateFilter ? new Date(startDateFilter) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        setStartDateFilter(format(date, "yyyy-MM-dd"));
+                        setMonthFilter('all');
+                      } else {
+                        setStartDateFilter('');
+                      }
+                    }}
+                    locale={ptBR}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="text-[10px] text-muted-foreground mb-1 block">Data Fim</label>
-              <Input
-                type="date"
-                value={endDateFilter}
-                onChange={(e) => {
-                  setEndDateFilter(e.target.value);
-                  if (e.target.value) setMonthFilter('all');
-                }}
-                className="w-36 bg-white/5 border-white/10 text-white h-9"
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-36 justify-start text-left font-normal bg-white/5 border-white/10 text-white h-9 hover:bg-white/10"
+                  >
+                    <Calendar className="mr-2 h-4 w-4" />
+                    {endDateFilter ? format(new Date(endDateFilter), "dd/MM/yyyy") : "Selecionar"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
+                  <CalendarComponent
+                    mode="single"
+                    selected={endDateFilter ? new Date(endDateFilter) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        setEndDateFilter(format(date, "yyyy-MM-dd"));
+                        setMonthFilter('all');
+                      } else {
+                        setEndDateFilter('');
+                      }
+                    }}
+                    locale={ptBR}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <Select value={monthFilter} onValueChange={(value) => {
               setMonthFilter(value);
