@@ -73,3 +73,7 @@ chainlit.md
 
 # Mobile development
 android-sdk/
+
+# Test files (não necessários em produção)
+*_test.py
+test_*.py
