@@ -95,9 +95,12 @@ const Sidebar = () => {
       icon: Settings,
       roles: ['admin', 'manager']
     },
-  ];
+  ], []);
 
-  const filteredNav = navigation.filter(item => item.roles.includes(user?.role));
+  const filteredNav = useMemo(() => 
+    navigation.filter(item => item.roles.includes(user?.role)),
+    [navigation, user?.role]
+  );
 
   return (
     <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0">
