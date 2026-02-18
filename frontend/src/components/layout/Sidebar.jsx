@@ -96,6 +96,12 @@ const Sidebar = () => {
       icon: Settings,
       roles: ['admin', 'manager']
     },
+    {
+      name: 'Trello PCP',
+      href: '/trello-pcp',
+      icon: Trello,
+      roles: ['admin', 'manager']
+    },
   ], []);
 
   const filteredNav = useMemo(() => 
