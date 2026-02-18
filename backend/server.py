@@ -2261,6 +2261,52 @@ async def update_assignment_status(job_id: str, item_index: int, status_update: 
 UPLOAD_DIR = Path("/app/uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
+
+async def detect_product_family(product_names: list) -> tuple:
+    """
+    Detects the product family based on product names.
+    Returns (family_id, family_name) tuple.
+    """
+    # Get all families
+    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    
+    # Keywords for each family type
+    family_keywords = {
+        "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
+        "lonas": ["lona", "banner", "faixa", "frontlight", "backlight"],
+        "acm": ["acm", "alumínio composto", "chapa", "placa"],
+        "painéis": ["painel", "outdoor", "totem", "display"],
+        "outros": []
+    }
+    
+    # Check each product name
+    for name in product_names:
+        name_lower = name.lower() if name else ""
+        
+        for family in families:
+            family_name_lower = family.get("name", "").lower()
+            
+            # Check if family name matches
+            if family_name_lower in name_lower:
+                return family.get("id"), family.get("name")
+            
+            # Check keywords
+            keywords = family_keywords.get(family_name_lower, [])
+            for keyword in keywords:
+                if keyword in name_lower:
+                    return family.get("id"), family.get("name")
+    
+    # Default to first family or None
+    if families:
+        # Try to find "Outros" family
+        outros = next((f for f in families if "outro" in f.get("name", "").lower()), None)
+        if outros:
+            return outros.get("id"), outros.get("name")
+        return families[0].get("id"), families[0].get("name")
+    
+    return None, None
+
+
 # === LEGACY CHECKINS ROUTES REMOVED - NOW IN routes/checkins.py ===
 
 @api_router.delete("/jobs/{job_id}")
