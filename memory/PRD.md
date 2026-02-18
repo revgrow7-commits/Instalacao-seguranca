@@ -208,21 +208,25 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
-### 18/02/2026 - Refatoração e Correção de Relatórios
+### 18/02/2026 - Refatoração, Correções e Testes E2E
 - ✅ **BUGFIX:** Corrigido erro `UnboundLocalError` no endpoint `/api/reports/productivity`
-  - Problema: Variável `checkout_at` não era definida quando `net_duration_minutes` já existia
-  - Solução: Movida a obtenção de `checkout_at` para antes da verificação condicional
+- ✅ **BUGFIX:** Restaurada função `detect_product_family` removida acidentalmente
 - ✅ **REFATORAÇÃO:** Removidos arquivos obsoletos do frontend
-  - Removido `CoinDemo.jsx` (página de demonstração não utilizada)
-  - Removido `Metrics.jsx`, `ProductivityReport.jsx`, `Reports.jsx` (substituídos por UnifiedReports)
+  - Removido `CoinDemo.jsx`, `Metrics.jsx`, `ProductivityReport.jsx`, `Reports.jsx`
 - ✅ **FEATURE:** Integração Trello PCP finalizada
-  - Adicionada rota `/trello-pcp` no `App.js`
-  - Adicionado link "Trello PCP" na sidebar para admin/manager
-  - Visualização de 2274+ cards do quadro com busca e indicadores de atraso
+  - Adicionada rota `/trello-pcp` e link na sidebar
 - ✅ **REFATORAÇÃO:** Migradas rotas de Check-ins para módulo separado
-  - Criado `/app/backend/routes/checkins.py` com todas as rotas de check-in legado
-  - Reduzido `server.py` de 5832 para 5439 linhas (~393 linhas)
-  - Rotas migradas: POST/GET/PUT/DELETE `/checkins/*`
+  - Criado `/app/backend/routes/checkins.py`
+  - Reduzido `server.py` de 5832 para ~5480 linhas
+- ✅ **TESTES E2E:** Revisão completa do sistema
+  - ✅ Dashboard: funcionando
+  - ✅ Jobs: listagem, agendamento, atribuição de itens
+  - ✅ Check-ins: fluxo completo check-in → check-out
+  - ✅ Calendário: mostra jobs agendados corretamente
+  - ✅ Relatórios: produtividade e por família
+  - ✅ KPIs Família: análise por tipo de produto
+  - ✅ Bonificação/Gamification: ranking e moedas
+  - ✅ Trello PCP: integração funcionando
 
 ### 12/01/2026 - Correção de Bug e Migração de Rotas
 - ✅ **BUGFIX:** Corrigido `TypeError` no backend que impedia o carregamento do Dashboard do Gerente
