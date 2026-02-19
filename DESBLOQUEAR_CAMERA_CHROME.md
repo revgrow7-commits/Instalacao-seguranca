@@ -110,7 +110,7 @@ Após desbloquear, o ícone na barra de endereço deve mudar:
 **R:** Pode estar usando HTTP ao invés de HTTPS. Verifique se a URL começa com `https://`
 
 ### P: O ícone diz "Não seguro"
-**R:** Você está usando HTTP. A câmera **só funciona com HTTPS**. Use: `https://pwa-gamify-prod.preview.emergentagent.com`
+**R:** Você está usando HTTP. A câmera **só funciona com HTTPS**. Use: `https://pwa-installer-app.preview.emergentagent.com`
 
 ### P: Removi o bloqueio mas continua bloqueado
 **R:** 
@@ -132,7 +132,7 @@ Se quiser limpar TODAS as permissões do site:
 
 1. Cole na barra de endereço:
    ```
-   chrome://settings/content/siteDetails?site=https://pwa-gamify-prod.preview.emergentagent.com
+   chrome://settings/content/siteDetails?site=https://pwa-installer-app.preview.emergentagent.com
    ```
 2. Role até "Câmera"
 3. Mude para "Permitir"
