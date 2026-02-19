@@ -2667,35 +2667,16 @@ async def get_productivity_metrics(current_user: User = Depends(get_current_user
         "benchmarks": history
     }
 
-
-# === REPORTS ROUTES REMOVED - NOW IN routes/reports.py ===
-# Migrated routes:
-# - GET /reports/by-family
-# - GET /reports/kpis/family-productivity
-# - GET /reports/by-installer
-# - GET /reports/productivity
-# - GET /metrics
-# - GET /reports/export
-
-
-# ============ GOOGLE CALENDAR INTEGRATION ============
-
-@api_router.get("/auth/google/login")
-async def google_login(current_user: User = Depends(get_current_user)):
-    """Initiates Google OAuth flow for calendar access"""
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="Google OAuth não configurado")
+@api_router.get("/reports/by-family")
+async def get_report_by_family(current_user: User = Depends(get_current_user)):
+    """
+    Relatório completo por família de produtos.
+    Analisa todos os jobs importados e classifica seus produtos por família.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    # Store user_id in state to associate tokens later
-    state = f"{current_user.id}"
-    
-    auth_url = (
-        f"https://accounts.google.com/o/oauth2/v2/auth?"
-        f"client_id={GOOGLE_CLIENT_ID}&"
-        f"redirect_uri={GOOGLE_REDIRECT_URI}&"
-        f"response_type=code&"
-        f"scope={'%20'.join(GOOGLE_CALENDAR_SCOPES)}&"
-        f"access_type=offline&"
+    # Buscar todos os jobs
+    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
     
     # Buscar famílias cadastradas
     families = await db.product_families.find({}, {"_id": 0}).to_list(100)
