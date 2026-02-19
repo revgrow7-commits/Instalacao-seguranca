@@ -211,6 +211,8 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ### 18/02/2026 - Refatoração, Correções e Testes E2E
 - ✅ **BUGFIX:** Corrigido erro `UnboundLocalError` no endpoint `/api/reports/productivity`
 - ✅ **BUGFIX:** Restaurada função `detect_product_family` removida acidentalmente
+- ✅ **BUGFIX:** Adicionada opção "Agendado" no filtro de status da página Jobs
+  - O filtro agora considera jobs com `scheduled_date` definido
 - ✅ **REFATORAÇÃO:** Removidos arquivos obsoletos do frontend
   - Removido `CoinDemo.jsx`, `Metrics.jsx`, `ProductivityReport.jsx`, `Reports.jsx`
 - ✅ **FEATURE:** Integração Trello PCP finalizada
