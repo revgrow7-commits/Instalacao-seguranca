@@ -2800,6 +2800,10 @@ api_router.include_router(calendar_router, tags=["Calendar"])
 from routes.notifications import router as notifications_router
 api_router.include_router(notifications_router, tags=["Notifications"])
 
+# ============ JOBS ROUTES (migrated to routes/jobs.py) ============
+from routes.jobs import router as jobs_router
+api_router.include_router(jobs_router, tags=["Jobs"])
+
 
 # ============ SCHEDULER MANAGEMENT ROUTES ============
 
