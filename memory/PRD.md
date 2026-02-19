@@ -105,14 +105,15 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 │   │   ├── gamification.py        # Cálculo de moedas
 │   │   ├── image.py               # Compressão de imagens
 │   │   └── gps.py                 # Cálculo de distâncias
-│   ├── routes/                # Rotas da API (migração em progresso)
+│   ├── routes/                # Rotas da API (migração concluída)
 │   │   ├── __init__.py        # Registro de todos os routers
-│   │   ├── auth.py            # ✅ MIGRADO: Autenticação
-│   │   ├── checkins.py        # ✅ MIGRADO: Check-ins legado
-│   │   ├── item_checkins.py   # ✅ MIGRADO: Item check-ins (fluxo moderno)
-│   │   ├── reports.py         # ✅ MIGRADO: Relatórios de produtividade
-│   │   ├── gamification.py    # ✅ MIGRADO: Gamificação completa
-│   │   ├── users.py           # Stub (pendente migração)
+│   │   ├── auth.py            # ✅ ATIVO: Autenticação (6 rotas)
+│   │   ├── checkins.py        # ✅ ATIVO: Check-ins legado (5 rotas)
+│   │   ├── item_checkins.py   # ✅ ATIVO: Item check-ins (10 rotas)
+│   │   ├── reports.py         # ✅ ATIVO: Relatórios (6 rotas)
+│   │   ├── gamification.py    # ✅ ATIVO: Gamificação (17 rotas)
+│   │   ├── users.py           # ✅ ATIVO: Usuários (5 rotas)
+│   │   ├── installers.py      # ✅ ATIVO: Instaladores (2 rotas)
 │   │   ├── jobs.py            # Stub (pendente migração)
 │   │   └── ...
 │   └── .env                   # Credenciais
