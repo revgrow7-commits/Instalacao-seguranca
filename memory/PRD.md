@@ -208,6 +208,13 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
+### 19/02/2026 - Refatoração Continuada do Backend
+- ✅ **REFATORAÇÃO:** Migradas rotas de Item-Checkins para módulo separado
+  - Criado `/app/backend/routes/item_checkins.py` (~700 linhas)
+  - Rotas migradas: POST/GET/PUT/DELETE `/item-checkins/*`, `/pause-reasons`
+  - `server.py` reduzido de 5485 para 4867 linhas (~11% de redução)
+- ✅ **BUGFIX:** Adicionada opção "Agendado" no filtro de status da página Jobs
+
 ### 18/02/2026 - Refatoração, Correções e Testes E2E
 - ✅ **BUGFIX:** Corrigido erro `UnboundLocalError` no endpoint `/api/reports/productivity`
 - ✅ **BUGFIX:** Restaurada função `detect_product_family` removida acidentalmente
