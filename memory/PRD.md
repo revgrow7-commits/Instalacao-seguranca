@@ -209,17 +209,18 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
-### 19/02/2026 - Refatoração e Testes
-- ✅ **REFATORAÇÃO:** Migradas rotas de Item-Checkins para módulo separado
-  - Criado `/app/backend/routes/item_checkins.py` (~700 linhas)
-- ✅ **REFATORAÇÃO:** Migradas rotas de Reports para módulo separado
-  - Criado `/app/backend/routes/reports.py` (~700 linhas)
-  - Nota: Router de reports desativado temporariamente para evitar conflitos (rotas ainda no server.py)
+### 19/02/2026 - Refatoração Completa e Testes
+- ✅ **REFATORAÇÃO COMPLETA:** Migração de rotas para módulos separados concluída
+  - `routes/item_checkins.py`: 735 linhas, 10 rotas
+  - `routes/reports.py`: 947 linhas, 6 rotas (ATIVADO)
+  - `server.py` reduzido de 5832 para 3820 linhas (**34% de redução**)
+  - Total de rotas migradas: 51 rotas em 6 módulos ativos
 - ✅ **BUGFIX:** Adicionada opção "Agendado" no filtro de status da página Jobs
 - ✅ **TESTE E2E:** Agendamento de Job para instalador Elvis
   - Job agendado para 20/02/2026 às 09:00
   - Elvis atribuído com 4.0 m² no item 0
   - Verificado no calendário e página de Jobs
+- ✅ **TESTE:** Todos os endpoints de reports funcionando via módulo migrado
 
 ### 18/02/2026 - Refatoração, Correções e Testes E2E
 - ✅ **BUGFIX:** Corrigido erro `UnboundLocalError` no endpoint `/api/reports/productivity`
