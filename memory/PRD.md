@@ -86,7 +86,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ```
 /app/
 ├── backend/
-│   ├── server.py              # API principal (~2981 linhas, refatoração em andamento)
+│   ├── server.py              # API principal (~1859 linhas após refatoração completa)
 │   ├── config.py              # Configurações e constantes
 │   ├── database.py            # Conexão MongoDB
 │   ├── security.py            # Autenticação JWT
@@ -114,7 +114,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 │   │   ├── gamification.py    # ✅ ATIVO: Gamificação (17 rotas)
 │   │   ├── users.py           # ✅ ATIVO: Usuários (5 rotas)
 │   │   ├── installers.py      # ✅ ATIVO: Instaladores (2 rotas)
-│   │   ├── jobs.py            # Stub (pendente migração)
+│   │   ├── jobs.py            # ✅ ATIVO: Jobs, Holdprint, importação (21 rotas) - NOVO
 │   │   ├── products.py        # ✅ ATIVO: Famílias e produtos (7 rotas) - NOVO
 │   │   ├── calendar.py        # ✅ ATIVO: Google Calendar (5 rotas) - NOVO
 │   │   ├── notifications.py   # ✅ ATIVO: Push notifications (9 rotas) - NOVO
@@ -191,7 +191,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ## Backlog / Próximas Tarefas
 
 ### P0 - Em Andamento
-- [ ] Migrar rotas de `jobs` do server.py (21 rotas identificadas) - PRÓXIMO PASSO
+- [x] Migrar rotas de `jobs` do server.py (21 rotas) - CONCLUÍDO (19/02/2026)
 - [x] Migrar rotas de `products` para routes/products.py - CONCLUÍDO (19/02/2026)
 - [x] Migrar rotas de `calendar` para routes/calendar.py - CONCLUÍDO (19/02/2026)
 - [x] Migrar rotas de `notifications` para routes/notifications.py - CONCLUÍDO (19/02/2026)
