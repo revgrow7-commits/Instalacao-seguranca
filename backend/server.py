@@ -5304,6 +5304,10 @@ api_router.include_router(gamification_router, tags=["Gamification"])
 from routes.checkins import router as checkins_router
 api_router.include_router(checkins_router, tags=["Check-ins"])
 
+# ============ ITEM CHECKINS ROUTES (migrated to routes/item_checkins.py) ============
+from routes.item_checkins import router as item_checkins_router
+api_router.include_router(item_checkins_router, tags=["Item Check-ins"])
+
 
 # ============ SCHEDULER MANAGEMENT ROUTES ============
 
