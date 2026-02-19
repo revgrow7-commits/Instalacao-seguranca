@@ -701,6 +701,7 @@ const Jobs = () => {
               <SelectContent className="bg-card border-white/10">
                 <SelectItem value="all">Todos os Status</SelectItem>
                 <SelectItem value="aguardando">🟡 Aguardando</SelectItem>
+                <SelectItem value="agendado">🟢 Agendado</SelectItem>
                 <SelectItem value="instalando">🔵 Instalando</SelectItem>
                 <SelectItem value="pausado">🟠 Pausado</SelectItem>
                 <SelectItem value="atrasado">🔴 Atrasado</SelectItem>
