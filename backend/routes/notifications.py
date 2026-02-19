@@ -247,7 +247,7 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
                         job["installers_info"] = installers
                     
                     pending.append(job)
-            except:
+            except (ValueError, TypeError):
                 pass
     
     return {"pending_checkins": pending, "count": len(pending)}
@@ -308,7 +308,7 @@ async def notify_job_scheduled(
         try:
             dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
             date_display = dt.strftime("%d/%m/%Y às %H:%M")
-        except:
+        except (ValueError, TypeError):
             date_display = scheduled_date
     
     sent_count = 0
