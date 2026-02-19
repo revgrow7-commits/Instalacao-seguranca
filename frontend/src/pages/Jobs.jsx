@@ -510,7 +510,18 @@ const Jobs = () => {
         (job.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || job.status === statusFilter;
+      // Status filter logic - "agendado" is a special case
+      let matchesStatus = true;
+      if (statusFilter === 'all') {
+        matchesStatus = true;
+      } else if (statusFilter === 'agendado') {
+        // Filter jobs that have scheduled_date and are not completed/cancelled
+        matchesStatus = !!job.scheduled_date && 
+          !['completed', 'finalizado', 'cancelado'].includes(job.status);
+      } else {
+        matchesStatus = job.status === statusFilter;
+      }
+      
       const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
       
       // Get job date
