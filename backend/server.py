@@ -4687,8 +4687,11 @@ from routes.item_checkins import router as item_checkins_router
 api_router.include_router(item_checkins_router, tags=["Item Check-ins"])
 
 # ============ REPORTS ROUTES (migrated to routes/reports.py) ============
-from routes.reports import router as reports_router
-api_router.include_router(reports_router, tags=["Reports"])
+# ============ REPORTS ROUTES ============
+# Note: Reports routes are still in server.py. 
+# Migration to routes/reports.py is prepared but not active to avoid conflicts.
+# from routes.reports import router as reports_router
+# api_router.include_router(reports_router, tags=["Reports"])
 
 
 # ============ SCHEDULER MANAGEMENT ROUTES ============
