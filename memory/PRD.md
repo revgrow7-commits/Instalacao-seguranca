@@ -109,10 +109,10 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 │   │   ├── __init__.py        # Registro de todos os routers
 │   │   ├── auth.py            # ✅ MIGRADO: Autenticação
 │   │   ├── checkins.py        # ✅ MIGRADO: Check-ins legado
+│   │   ├── item_checkins.py   # ✅ MIGRADO: Item check-ins (fluxo moderno)
 │   │   ├── gamification.py    # ✅ MIGRADO: Gamificação completa
 │   │   ├── users.py           # Stub (pendente migração)
 │   │   ├── jobs.py            # Stub (pendente migração)
-│   │   ├── item_checkins.py   # Stub (pendente migração)
 │   │   └── ...
 │   └── .env                   # Credenciais
 ├── frontend/
