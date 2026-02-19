@@ -2785,9 +2785,20 @@ from routes.item_checkins import router as item_checkins_router
 api_router.include_router(item_checkins_router, tags=["Item Check-ins"])
 
 # ============ REPORTS ROUTES (migrated to routes/reports.py) ============
-# ============ REPORTS ROUTES (migrated to routes/reports.py) ============
 from routes.reports import router as reports_router
 api_router.include_router(reports_router, tags=["Reports"])
+
+# ============ PRODUCTS ROUTES (migrated to routes/products.py) ============
+from routes.products import router as products_router
+api_router.include_router(products_router, tags=["Products"])
+
+# ============ CALENDAR ROUTES (migrated to routes/calendar.py) ============
+from routes.calendar import router as calendar_router
+api_router.include_router(calendar_router, tags=["Calendar"])
+
+# ============ NOTIFICATIONS ROUTES (migrated to routes/notifications.py) ============
+from routes.notifications import router as notifications_router
+api_router.include_router(notifications_router, tags=["Notifications"])
 
 
 # ============ SCHEDULER MANAGEMENT ROUTES ============
