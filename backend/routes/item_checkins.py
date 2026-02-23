@@ -471,12 +471,15 @@ async def complete_item_checkout(
         checkin_at = checkin_at.replace(tzinfo=timezone.utc)
     
     checkout_at = datetime.now(timezone.utc)
-    duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
+    
+    # Calculate duration in minutes with decimal precision
+    duration_seconds = (checkout_at - checkin_at).total_seconds()
+    duration_minutes = round(duration_seconds / 60, 2)  # Keep decimal precision
     
     pause_logs = await db.item_pause_logs.find({"item_checkin_id": checkin_id}, {"_id": 0}).to_list(100)
     total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs)
     
-    net_duration_minutes = max(0, duration_minutes - total_pause_minutes)
+    net_duration_minutes = round(max(0, duration_minutes - total_pause_minutes), 2)
     
     productivity_m2_h = None
     if installed_m2 and installed_m2 > 0 and net_duration_minutes > 0:
