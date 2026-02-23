@@ -542,6 +542,8 @@ const JobDetail = () => {
                     {getJobProducts().map((product, index) => {
                       const itemAssignment = getItemAssignment(index);
                       const isAssigned = !!itemAssignment;
+                      const hasArea = product.total_area_m2 && product.total_area_m2 > 0;
+                      const hasDimensions = product.width_m && product.height_m;
                       
                       return (
                         <div
@@ -560,10 +562,17 @@ const JobDetail = () => {
                           />
                           <div className="flex-1">
                             <p className="text-white font-medium">{product.name}</p>
-                            <div className="flex items-center gap-3 text-sm">
+                            <div className="flex items-center gap-3 text-sm flex-wrap">
                               <span className="text-muted-foreground">Qtd: {product.quantity}</span>
-                              {product.total_area_m2 && (
-                                <span className="text-green-400 font-medium">{product.total_area_m2} m²</span>
+                              {hasDimensions && (
+                                <span className="text-blue-400">
+                                  {product.width_m}m x {product.height_m}m
+                                </span>
+                              )}
+                              {hasArea ? (
+                                <span className="text-green-400 font-medium">{product.total_area_m2.toFixed(2)} m²</span>
+                              ) : (
+                                <span className="text-yellow-400 text-xs">(medidas não calculadas)</span>
                               )}
                               {isAssigned && (
                                 <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-xs">
