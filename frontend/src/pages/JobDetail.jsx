@@ -284,6 +284,74 @@ const JobDetail = () => {
     }
   };
 
+  // Arquivar job inteiro
+  const handleArchiveJob = async () => {
+    try {
+      await api.archiveJob(jobId, archiveExcludeMetrics);
+      toast.success(archiveExcludeMetrics ? 'Job arquivado (não contabilizado)' : 'Job arquivado');
+      setShowArchiveJobDialog(false);
+      setArchiveExcludeMetrics(false);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao arquivar job');
+    }
+  };
+
+  // Desarquivar job
+  const handleUnarchiveJob = async () => {
+    try {
+      await api.unarchiveJob(jobId);
+      toast.success('Job desarquivado');
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao desarquivar job');
+    }
+  };
+
+  // Arquivar itens selecionados
+  const handleArchiveItems = async () => {
+    if (selectedItemsToArchive.length === 0) {
+      toast.error('Selecione pelo menos um item');
+      return;
+    }
+    try {
+      await api.archiveJobItems(jobId, selectedItemsToArchive, archiveExcludeMetrics);
+      toast.success(`${selectedItemsToArchive.length} item(s) arquivado(s)`);
+      setShowArchiveItemsDialog(false);
+      setSelectedItemsToArchive([]);
+      setArchiveExcludeMetrics(false);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao arquivar itens');
+    }
+  };
+
+  // Desarquivar item
+  const handleUnarchiveItem = async (itemIndex) => {
+    try {
+      await api.unarchiveJobItems(jobId, [itemIndex]);
+      toast.success('Item desarquivado');
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao desarquivar item');
+    }
+  };
+
+  // Toggle item para arquivar
+  const toggleItemToArchive = (index) => {
+    setSelectedItemsToArchive(prev =>
+      prev.includes(index)
+        ? prev.filter(i => i !== index)
+        : [...prev, index]
+    );
+  };
+
+  // Verificar se item está arquivado
+  const isItemArchived = (itemIndex) => {
+    const archivedItems = job?.archived_items || [];
+    return archivedItems.some(a => a.item_index === itemIndex);
+  };
+
   // Verificar se um item já está atribuído
   const getItemAssignment = (itemIndex) => {
     if (!assignments?.by_item) return null;
