@@ -145,6 +145,7 @@ export const api = {
   // Job by ID
   getJobById: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
   deleteJob: (jobId) => axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
+  reprocessJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/reprocess-products`, {}, { headers: getAuthHeader() }),
 
   // Metrics
   getMetrics: () => axios.get(`${API_URL}/metrics`, { headers: getAuthHeader() }),
