@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
+import GamificationHighlight from '../components/GamificationHighlight';
 
 const Dashboard = () => {
   const { user, isAdmin, isManager, isInstaller } = useAuth();
