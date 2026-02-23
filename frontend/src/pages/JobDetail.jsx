@@ -39,6 +39,12 @@ const JobDetail = () => {
   const [assignmentScenario, setAssignmentScenario] = useState('');
   const [applyToAllItems, setApplyToAllItems] = useState(true);
 
+  // Estados para arquivamento
+  const [showArchiveJobDialog, setShowArchiveJobDialog] = useState(false);
+  const [showArchiveItemsDialog, setShowArchiveItemsDialog] = useState(false);
+  const [archiveExcludeMetrics, setArchiveExcludeMetrics] = useState(false);
+  const [selectedItemsToArchive, setSelectedItemsToArchive] = useState([]);
+
   // Opções de dificuldade e cenário
   const difficultyOptions = [
     { value: '1', label: 'Nível 1 - Muito Fácil' },
