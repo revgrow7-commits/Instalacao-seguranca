@@ -537,10 +537,14 @@ const Jobs = () => {
   // Memoized filtered jobs - sorted by most recent
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter(job => {
+      // Search filter - includes job code (e.g., #1959 or 1959)
+      const searchLower = searchTerm.toLowerCase().replace('#', '');
+      const jobCode = job.holdprint_data?.code || job.code || '';
       const matchesSearch = !searchTerm || 
         job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (job.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase());
+        (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        jobCode.toString().includes(searchLower);
       
       // Status filter logic - "agendado" and "concluido" are special cases
       let matchesStatus = true;
