@@ -36,17 +36,18 @@ const GamificationHighlight = () => {
     }
   };
 
-  const getLevelStyle = (level) => {
-    switch (level) {
-      case 'faixa_preta':
-        return { bg: 'bg-gradient-to-r from-gray-900 to-black', border: 'border-primary', text: 'text-primary' };
-      case 'ouro':
-        return { bg: 'bg-gradient-to-r from-yellow-500/20 to-yellow-600/20', border: 'border-yellow-500', text: 'text-yellow-400' };
-      case 'prata':
-        return { bg: 'bg-gradient-to-r from-gray-400/20 to-gray-500/20', border: 'border-gray-400', text: 'text-gray-300' };
-      default:
-        return { bg: 'bg-gradient-to-r from-amber-600/20 to-amber-700/20', border: 'border-amber-500', text: 'text-amber-400' };
+  const getLevelStyle = (installer) => {
+    const level = installer.current_level?.toLowerCase() || 'bronze';
+    if (level.includes('faixa') || level.includes('preta')) {
+      return { bg: 'bg-gradient-to-r from-gray-900 to-black', border: 'border-primary', text: 'text-primary' };
     }
+    if (level.includes('ouro')) {
+      return { bg: 'bg-gradient-to-r from-yellow-500/20 to-yellow-600/20', border: 'border-yellow-500', text: 'text-yellow-400' };
+    }
+    if (level.includes('prata')) {
+      return { bg: 'bg-gradient-to-r from-gray-400/20 to-gray-500/20', border: 'border-gray-400', text: 'text-gray-300' };
+    }
+    return { bg: 'bg-gradient-to-r from-amber-600/20 to-amber-700/20', border: 'border-amber-500', text: 'text-amber-400' };
   };
 
   const getRankIcon = (index) => {
