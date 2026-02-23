@@ -267,6 +267,17 @@ const JobDetail = () => {
     }
   };
 
+  // Reprocessar medidas dos produtos
+  const handleReprocessProducts = async () => {
+    try {
+      const response = await api.reprocessJobProducts(jobId);
+      toast.success(`Medidas recalculadas: ${response.data.products_count} produtos, ${response.data.total_area_m2} m²`);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao reprocessar medidas');
+    }
+  };
+
   // Verificar se um item já está atribuído
   const getItemAssignment = (itemIndex) => {
     if (!assignments?.by_item) return null;
