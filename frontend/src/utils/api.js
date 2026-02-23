@@ -104,6 +104,12 @@ export const api = {
   updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
   getTeamCalendarJobs: () => axios.get(`${API_URL}/jobs/team-calendar`, { headers: getAuthHeader() }),
 
+  // Archive Jobs
+  archiveJob: (jobId, excludeFromMetrics) => axios.post(`${API_URL}/jobs/${jobId}/archive`, { exclude_from_metrics: excludeFromMetrics }, { headers: getAuthHeader() }),
+  unarchiveJob: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/unarchive`, {}, { headers: getAuthHeader() }),
+  archiveJobItems: (jobId, itemIndices, excludeFromMetrics) => axios.post(`${API_URL}/jobs/${jobId}/archive-items`, { item_indices: itemIndices, exclude_from_metrics: excludeFromMetrics }, { headers: getAuthHeader() }),
+  unarchiveJobItems: (jobId, itemIndices) => axios.post(`${API_URL}/jobs/${jobId}/unarchive-items`, itemIndices, { headers: getAuthHeader() }),
+
   // Check-ins
   createCheckin: (formData) => axios.post(`${API_URL}/checkins`, formData, { 
     headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
