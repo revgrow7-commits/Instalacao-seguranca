@@ -623,8 +623,8 @@ const Jobs = () => {
         }
       }
       
-      // Hide finalized/cancelled jobs
-      const isHidden = ['completed', 'finalizado', 'cancelado'].includes(job.status);
+      // Hide finalized/cancelled jobs only when statusFilter is 'all' (default view)
+      const isHidden = statusFilter === 'all' && ['completed', 'finalizado', 'cancelado'].includes(job.status);
       
       return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
     });
