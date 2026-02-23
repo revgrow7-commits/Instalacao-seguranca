@@ -328,7 +328,10 @@ async def checkout(
     
     checkout_at = datetime.now(timezone.utc)
     checkin_at = datetime.fromisoformat(checkin_doc['checkin_at']) if isinstance(checkin_doc['checkin_at'], str) else checkin_doc['checkin_at']
-    duration_minutes = int((checkout_at - checkin_at).total_seconds() / 60)
+    
+    # Calculate duration in minutes with decimal precision
+    duration_seconds = (checkout_at - checkin_at).total_seconds()
+    duration_minutes = round(duration_seconds / 60, 2)  # Keep decimal precision
     
     productivity_m2_h = None
     if installed_m2 and installed_m2 > 0 and duration_minutes > 0:
