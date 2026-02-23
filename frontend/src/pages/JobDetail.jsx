@@ -877,6 +877,168 @@ const JobDetail = () => {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Archive Job Dialog */}
+          {job?.archived ? (
+            <Button
+              onClick={handleUnarchiveJob}
+              variant="outline"
+              className="border-green-500/50 text-green-400 hover:bg-green-500/10"
+            >
+              <ArchiveRestore className="h-4 w-4 mr-2" />
+              Desarquivar
+            </Button>
+          ) : (
+            <Dialog open={showArchiveJobDialog} onOpenChange={setShowArchiveJobDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10">
+                  <Archive className="h-4 w-4 mr-2" />
+                  Arquivar Job
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-white/10">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-heading text-white">Arquivar Job</DialogTitle>
+                  <DialogDescription className="text-muted-foreground">
+                    O job será arquivado e não aparecerá mais na lista principal.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                    <Checkbox
+                      id="exclude-metrics"
+                      checked={archiveExcludeMetrics}
+                      onCheckedChange={(checked) => setArchiveExcludeMetrics(checked)}
+                    />
+                    <label htmlFor="exclude-metrics" className="text-sm text-yellow-400 cursor-pointer">
+                      <span className="font-medium">Não contabilizar nos relatórios</span>
+                      <p className="text-xs text-yellow-400/70 mt-1">
+                        Marque esta opção se o job não deve ser incluído nos cálculos de produtividade
+                      </p>
+                    </label>
+                  </div>
+                </div>
+                <DialogFooter className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowArchiveJobDialog(false);
+                      setArchiveExcludeMetrics(false);
+                    }}
+                    className="border-white/20 text-white hover:bg-white/10"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleArchiveJob} className="bg-orange-500 hover:bg-orange-600 text-white">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Arquivar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          {/* Archive Items Dialog */}
+          <Dialog open={showArchiveItemsDialog} onOpenChange={setShowArchiveItemsDialog}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10">
+                <Package className="h-4 w-4 mr-2" />
+                Arquivar Itens
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-card border-white/10 max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-heading text-white">Arquivar Itens do Job</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Selecione os itens que deseja arquivar. Itens arquivados não serão considerados para instalação.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-3 py-4">
+                <Label className="text-white">Selecione os itens:</Label>
+                <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2">
+                  {getJobProducts().map((product, index) => {
+                    const archived = isItemArchived(index);
+                    return (
+                      <div
+                        key={index}
+                        className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
+                          archived
+                            ? 'bg-gray-500/20 border border-gray-500/30'
+                            : selectedItemsToArchive.includes(index)
+                              ? 'bg-orange-500/20 border border-orange-500/50'
+                              : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                        }`}
+                      >
+                        {archived ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleUnarchiveItem(index)}
+                            className="h-6 px-2 text-xs text-green-400 hover:text-green-300"
+                          >
+                            <ArchiveRestore className="h-3 w-3 mr-1" />
+                            Restaurar
+                          </Button>
+                        ) : (
+                          <Checkbox
+                            checked={selectedItemsToArchive.includes(index)}
+                            onCheckedChange={() => toggleItemToArchive(index)}
+                          />
+                        )}
+                        <div className="flex-1">
+                          <p className={`font-medium ${archived ? 'text-gray-400 line-through' : 'text-white'}`}>
+                            {product.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Qtd: {product.quantity} {product.total_area_m2 ? `• ${product.total_area_m2.toFixed(2)} m²` : ''}
+                          </p>
+                        </div>
+                        {archived && (
+                          <span className="text-xs text-gray-400 px-2 py-0.5 bg-gray-500/20 rounded">
+                            Arquivado
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {selectedItemsToArchive.length > 0 && (
+                  <div className="flex items-center space-x-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                    <Checkbox
+                      id="exclude-items-metrics"
+                      checked={archiveExcludeMetrics}
+                      onCheckedChange={(checked) => setArchiveExcludeMetrics(checked)}
+                    />
+                    <label htmlFor="exclude-items-metrics" className="text-sm text-yellow-400 cursor-pointer">
+                      <span className="font-medium">Não contabilizar nos relatórios</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowArchiveItemsDialog(false);
+                    setSelectedItemsToArchive([]);
+                    setArchiveExcludeMetrics(false);
+                  }}
+                  className="border-white/20 text-white hover:bg-white/10"
+                >
+                  Fechar
+                </Button>
+                {selectedItemsToArchive.length > 0 && (
+                  <Button onClick={handleArchiveItems} className="bg-amber-500 hover:bg-amber-600 text-white">
+                    <Archive className="h-4 w-4 mr-2" />
+                    Arquivar {selectedItemsToArchive.length} item(s)
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
