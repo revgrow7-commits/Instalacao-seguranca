@@ -23,7 +23,11 @@ const GamificationHighlight = () => {
           (a, b) => (b.total_coins || 0) - (a.total_coins || 0)
         );
         setTopInstallers(sorted.slice(0, 5));
-        setTotals(response.data.totals);
+        setTotals({
+          total_coins_distributed: response.data.totals?.total_coins_distributed || 0,
+          total_coins_redeemed: response.data.totals?.total_coins_redeemed || 0,
+          total_installers: response.data.totals?.active_installers || 0
+        });
       }
     } catch (error) {
       console.error('Error loading gamification data:', error);
