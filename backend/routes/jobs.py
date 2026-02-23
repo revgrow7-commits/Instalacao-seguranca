@@ -574,6 +574,80 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     return {"message": "Job and all related data deleted successfully"}
 
 
+@router.post("/jobs/{job_id}/reprocess-products")
+async def reprocess_job_products(job_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Reprocessa as medidas dos produtos de um job específico.
+    Útil quando as medidas não foram calculadas corretamente na importação.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get products from holdprint_data or items
+    holdprint_data = job.get('holdprint_data', {})
+    products = holdprint_data.get('products', [])
+    
+    # If no products in holdprint_data, try items
+    if not products:
+        products = job.get('items', [])
+    
+    if not products:
+        return {
+            "message": "Job não possui produtos para reprocessar",
+            "products_count": 0,
+            "total_area_m2": 0
+        }
+    
+    products_with_area = []
+    total_area_m2 = 0.0
+    total_quantity = 0
+    
+    for product in products:
+        product_info = extract_product_dimensions(product)
+        quantity = product.get('quantity', 1)
+        
+        # Calculate areas
+        unit_area = product_info.get('area_m2', 0)
+        total_area = unit_area * quantity
+        
+        product_with_area = {
+            "name": product.get('name', 'Produto sem nome'),
+            "family_name": classify_product_family(product.get('name', '')),
+            "quantity": quantity,
+            "width_m": product_info.get('width_m'),
+            "height_m": product_info.get('height_m'),
+            "copies": product_info.get('copies', 1),
+            "unit_area_m2": unit_area,
+            "total_area_m2": total_area
+        }
+        products_with_area.append(product_with_area)
+        total_area_m2 += total_area
+        total_quantity += quantity
+    
+    # Update job in database
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "products_with_area": products_with_area,
+            "area_m2": round(total_area_m2, 2),
+            "total_products": len(products_with_area),
+            "total_quantity": total_quantity
+        }}
+    )
+    
+    logger.info(f"Job {job_id} reprocessed: {len(products_with_area)} products, {total_area_m2} m²")
+    
+    return {
+        "message": f"Produtos reprocessados com sucesso",
+        "products_count": len(products_with_area),
+        "total_area_m2": round(total_area_m2, 2),
+        "products": products_with_area
+    }
+
+
 # ============ ITEM ASSIGNMENT ROUTES ============
 
 @router.post("/jobs/{job_id}/assign-items")
