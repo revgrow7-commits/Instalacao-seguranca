@@ -43,9 +43,36 @@ const JobCardSkeleton = () => (
 // Mini Job Card Component for better performance
 const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, isAdmin, isManager, isLoading }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
-  const startDate = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime;
-  const formattedStartDate = startDate ? new Date(startDate).toLocaleDateString('pt-BR') : null;
   const isScheduled = !!job.scheduled_date;
+  
+  // Determine which date to show and its label
+  const getDateInfo = () => {
+    if (job.scheduled_date) {
+      return {
+        date: job.scheduled_date,
+        label: null, // No label for scheduled date (already has "Agendado" indicator)
+        isScheduledDate: true
+      };
+    }
+    if (job.holdprint_data?.deliveryNeeded) {
+      return {
+        date: job.holdprint_data.deliveryNeeded,
+        label: 'Previsão de Entrega Hold',
+        isScheduledDate: false
+      };
+    }
+    if (job.holdprint_data?.creationTime) {
+      return {
+        date: job.holdprint_data.creationTime,
+        label: 'Data de Criação',
+        isScheduledDate: false
+      };
+    }
+    return { date: null, label: null, isScheduledDate: false };
+  };
+  
+  const dateInfo = getDateInfo();
+  const formattedStartDate = dateInfo.date ? new Date(dateInfo.date).toLocaleDateString('pt-BR') : null;
   const isLate = job.scheduled_date && new Date(job.scheduled_date) < new Date() && job.status !== 'completed' && job.status !== 'finalizado';
   
   // Calculate time since job started (for "instalando" status)
