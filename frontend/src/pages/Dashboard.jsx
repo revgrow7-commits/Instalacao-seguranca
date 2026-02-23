@@ -724,6 +724,14 @@ const Dashboard = () => {
             ))}
           </div>
         )}
+        </div>
+
+        {/* Gamification Highlight - 1 coluna */}
+        {(isAdmin || isManager) && (
+          <div className="lg:col-span-1">
+            <GamificationHighlight />
+          </div>
+        )}
       </div>
     </div>
   );
