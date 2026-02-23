@@ -182,20 +182,25 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
         </div>
 
         {/* Date Row */}
-        <div className="flex items-center gap-3 text-xs mb-3">
-          {formattedStartDate && (
-            <div className={`flex items-center ${isLate ? 'text-red-400' : 'text-muted-foreground'}`}>
-              <Clock className="h-3 w-3 mr-1" />
-              {formattedStartDate}
-              {isLate && <span className="ml-1 text-[10px]">(atrasado)</span>}
-            </div>
+        <div className="flex flex-col gap-1 text-xs mb-3">
+          {dateInfo.label && (
+            <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">{dateInfo.label}</span>
           )}
-          {isScheduled && !isLate && (
-            <div className="flex items-center text-green-400">
-              <CalendarCheck className="h-3 w-3 mr-1" />
-              Agendado
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {formattedStartDate && (
+              <div className={`flex items-center ${isLate ? 'text-red-400' : dateInfo.label ? 'text-blue-400' : 'text-muted-foreground'}`}>
+                <Clock className="h-3 w-3 mr-1" />
+                {formattedStartDate}
+                {isLate && <span className="ml-1 text-[10px]">(atrasado)</span>}
+              </div>
+            )}
+            {isScheduled && !isLate && (
+              <div className="flex items-center text-green-400">
+                <CalendarCheck className="h-3 w-3 mr-1" />
+                Agendado
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Elapsed time indicator for jobs in progress */}
