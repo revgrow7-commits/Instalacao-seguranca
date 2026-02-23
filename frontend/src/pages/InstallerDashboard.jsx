@@ -105,11 +105,15 @@ const InstallerDashboard = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
+      case 'finalizado':
         return 'bg-green-500/20 text-green-500 border border-green-500/20';
       case 'in_progress':
+      case 'instalando':
         return 'bg-blue-500/20 text-blue-500 border border-blue-500/20';
       case 'pending':
       case 'aguardando':
+      case 'scheduled':
+      case 'agendado':
         return 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/20';
       default:
         return 'bg-gray-500/20 text-gray-500 border border-gray-500/20';
@@ -119,11 +123,15 @@ const InstallerDashboard = () => {
   const getStatusText = (status) => {
     switch (status) {
       case 'completed':
+      case 'finalizado':
         return 'Concluído';
       case 'in_progress':
+      case 'instalando':
         return 'Em Andamento';
       case 'pending':
       case 'aguardando':
+      case 'scheduled':
+      case 'agendado':
         return 'Pendente';
       default:
         return status;
