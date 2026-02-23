@@ -748,6 +748,7 @@ const Jobs = () => {
                 <SelectItem value="instalando">🔵 Instalando</SelectItem>
                 <SelectItem value="pausado">🟠 Pausado</SelectItem>
                 <SelectItem value="atrasado">🔴 Atrasado</SelectItem>
+                <SelectItem value="concluido">✅ Concluído</SelectItem>
               </SelectContent>
             </Select>
             <Select value={branchFilter} onValueChange={setBranchFilter}>
