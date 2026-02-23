@@ -144,10 +144,10 @@ const GamificationHighlight = () => {
                     {getRankIcon(index)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white text-sm truncate">{installer.installer_name}</p>
+                    <p className="font-medium text-white text-sm truncate">{installer.name || 'Instalador'}</p>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs ${levelStyle.text}`}>
-                        {installer.level_info?.icon} {installer.level_info?.name || 'Bronze'}
+                        {installer.level_icon} {installer.current_level || 'Bronze'}
                       </span>
                     </div>
                   </div>
