@@ -352,6 +352,28 @@ const JobDetail = () => {
     return archivedItems.some(a => a.item_index === itemIndex);
   };
 
+  // Arquivar item individual diretamente
+  const handleArchiveSingleItem = async (itemIndex, productName) => {
+    try {
+      await api.archiveJobItems(jobId, [itemIndex], true); // exclude_from_metrics = true por padrão
+      toast.success(`Item "${productName}" arquivado e não será contabilizado`);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao arquivar item');
+    }
+  };
+
+  // Desarquivar item individual
+  const handleUnarchiveSingleItem = async (itemIndex, productName) => {
+    try {
+      await api.unarchiveJobItems(jobId, [itemIndex]);
+      toast.success(`Item "${productName}" restaurado`);
+      loadData();
+    } catch (error) {
+      toast.error('Erro ao desarquivar item');
+    }
+  };
+
   // Verificar se um item já está atribuído
   const getItemAssignment = (itemIndex) => {
     if (!assignments?.by_item) return null;
