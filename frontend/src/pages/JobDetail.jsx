@@ -548,7 +548,18 @@ const JobDetail = () => {
               <div className="space-y-4 mt-4">
                 {/* Selecionar itens */}
                 <div>
-                  <Label className="text-white mb-2 block">1. Selecione os Itens</Label>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-white">1. Selecione os Itens</Label>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleReprocessProducts}
+                      className="text-xs border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10"
+                    >
+                      <Ruler className="h-3 w-3 mr-1" />
+                      Recalcular Medidas
+                    </Button>
+                  </div>
                   <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2">
                     {getJobProducts().map((product, index) => {
                       const itemAssignment = getItemAssignment(index);
