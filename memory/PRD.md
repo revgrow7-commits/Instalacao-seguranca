@@ -22,6 +22,8 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - [x] Integração com API Holdworks para importar jobs
 - [x] Atribuição de itens a instaladores
 - [x] Agendamento com verificação de conflitos
+- [x] **Arquivamento de Jobs** (com opção de excluir das métricas)
+- [x] **Arquivamento de Itens Individual** - Botão ao lado de cada item na modal de atribuição (23/02/2026)
 
 ### Check-in/Check-out
 - [x] Check-in por item com foto e GPS
