@@ -648,6 +648,161 @@ async def reprocess_job_products(job_id: str, current_user: User = Depends(get_c
     }
 
 
+# ============ ARCHIVE ROUTES ============
+
+class ArchiveJobRequest(BaseModel):
+    """Request to archive a job"""
+    exclude_from_metrics: bool = False  # True = não contabilizar
+
+
+class ArchiveItemsRequest(BaseModel):
+    """Request to archive specific items from a job"""
+    item_indices: List[int]
+    exclude_from_metrics: bool = False
+
+
+@router.post("/jobs/{job_id}/archive")
+async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: User = Depends(get_current_user)):
+    """
+    Arquiva um job inteiro.
+    Se exclude_from_metrics=True, o job não será contabilizado nos relatórios.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    update_data = {
+        "status": "arquivado",
+        "archived": True,
+        "archived_at": now,
+        "archived_by": current_user.id,
+        "archived_by_name": current_user.name,
+        "exclude_from_metrics": request.exclude_from_metrics
+    }
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": update_data}
+    )
+    
+    logger.info(f"Job {job_id} archived by {current_user.name}, exclude_from_metrics={request.exclude_from_metrics}")
+    
+    return {
+        "message": "Job arquivado com sucesso",
+        "job_id": job_id,
+        "exclude_from_metrics": request.exclude_from_metrics
+    }
+
+
+@router.post("/jobs/{job_id}/unarchive")
+async def unarchive_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Desarquiva um job."""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {
+            "$set": {
+                "status": "aguardando",
+                "archived": False,
+                "exclude_from_metrics": False
+            },
+            "$unset": {
+                "archived_at": "",
+                "archived_by": "",
+                "archived_by_name": ""
+            }
+        }
+    )
+    
+    return {"message": "Job desarquivado com sucesso"}
+
+
+@router.post("/jobs/{job_id}/archive-items")
+async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_user: User = Depends(get_current_user)):
+    """
+    Arquiva itens específicos de um job.
+    Os itens arquivados não serão considerados para instalação.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    products = job.get("products_with_area", [])
+    if not products:
+        products = job.get("holdprint_data", {}).get("products", [])
+    
+    # Validate indices
+    for idx in request.item_indices:
+        if idx < 0 or idx >= len(products):
+            raise HTTPException(status_code=400, detail=f"Índice de item inválido: {idx}")
+    
+    now = datetime.now(timezone.utc).isoformat()
+    
+    # Get current archived items
+    archived_items = job.get("archived_items", [])
+    
+    # Add new archived items
+    for idx in request.item_indices:
+        if idx not in [a.get("item_index") for a in archived_items]:
+            product = products[idx] if idx < len(products) else {}
+            archived_items.append({
+                "item_index": idx,
+                "item_name": product.get("name", f"Item {idx}"),
+                "archived_at": now,
+                "archived_by": current_user.id,
+                "archived_by_name": current_user.name,
+                "exclude_from_metrics": request.exclude_from_metrics
+            })
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"archived_items": archived_items}}
+    )
+    
+    logger.info(f"Job {job_id}: {len(request.item_indices)} items archived by {current_user.name}")
+    
+    return {
+        "message": f"{len(request.item_indices)} item(s) arquivado(s) com sucesso",
+        "archived_items": archived_items
+    }
+
+
+@router.post("/jobs/{job_id}/unarchive-items")
+async def unarchive_job_items(job_id: str, item_indices: List[int], current_user: User = Depends(get_current_user)):
+    """Desarquiva itens específicos de um job."""
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+    
+    archived_items = job.get("archived_items", [])
+    
+    # Remove items from archived list
+    archived_items = [a for a in archived_items if a.get("item_index") not in item_indices]
+    
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {"archived_items": archived_items}}
+    )
+    
+    return {
+        "message": f"{len(item_indices)} item(s) desarquivado(s) com sucesso",
+        "archived_items": archived_items
+    }
+
+
 # ============ ITEM ASSIGNMENT ROUTES ============
 
 @router.post("/jobs/{job_id}/assign-items")
