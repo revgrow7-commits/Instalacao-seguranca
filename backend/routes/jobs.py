@@ -641,7 +641,7 @@ async def reprocess_job_products(job_id: str, current_user: User = Depends(get_c
     logger.info(f"Job {job_id} reprocessed: {len(products_with_area)} products, {total_area_m2} m²")
     
     return {
-        "message": f"Produtos reprocessados com sucesso",
+        "message": "Produtos reprocessados com sucesso",
         "products_count": len(products_with_area),
         "total_area_m2": round(total_area_m2, 2),
         "products": products_with_area
