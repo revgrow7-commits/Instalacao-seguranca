@@ -546,19 +546,24 @@ const Jobs = () => {
         (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         jobCode.toString().includes(searchLower);
       
-      // Status filter logic - "agendado" and "concluido" are special cases
+      // Status filter logic - "agendado", "concluido" and "arquivado" are special cases
       let matchesStatus = true;
       if (statusFilter === 'all') {
-        matchesStatus = true;
+        // By default, hide archived jobs unless explicitly filtered
+        matchesStatus = !job.archived;
       } else if (statusFilter === 'agendado') {
         // Filter jobs that have scheduled_date and are not completed/cancelled
         matchesStatus = !!job.scheduled_date && 
-          !['completed', 'finalizado', 'cancelado'].includes(job.status);
+          !['completed', 'finalizado', 'cancelado', 'arquivado'].includes(job.status) &&
+          !job.archived;
       } else if (statusFilter === 'concluido') {
         // Filter completed jobs (includes both 'completed' and 'finalizado')
         matchesStatus = ['completed', 'finalizado'].includes(job.status);
+      } else if (statusFilter === 'arquivado') {
+        // Filter archived jobs
+        matchesStatus = job.archived || job.status === 'arquivado';
       } else {
-        matchesStatus = job.status === statusFilter;
+        matchesStatus = job.status === statusFilter && !job.archived;
       }
       
       const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
