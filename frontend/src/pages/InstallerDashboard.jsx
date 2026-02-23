@@ -141,10 +141,11 @@ const InstallerDashboard = () => {
   // Filtrar jobs - incluir 'aguardando' como pendente
   const pendingJobs = jobs.filter(j => {
     const status = getJobStatus(j);
-    return status === 'pending' || status === 'aguardando';
+    return (status === 'pending' || status === 'aguardando' || status === 'scheduled' || status === 'agendado') && 
+           j.status !== 'completed' && j.status !== 'finalizado';
   });
   const activeJobs = jobs.filter(j => getJobStatus(j) === 'in_progress');
-  const completedJobs = jobs.filter(j => j.status === 'completed');
+  const completedJobs = jobs.filter(j => j.status === 'completed' || j.status === 'finalizado');
 
   return (
     <div className="p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8" data-testid="installer-dashboard">
