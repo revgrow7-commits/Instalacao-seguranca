@@ -135,7 +135,7 @@ const GamificationHighlight = () => {
         <div className="space-y-2">
           {topInstallers.length > 0 ? (
             topInstallers.map((installer, index) => {
-              const levelStyle = getLevelStyle(installer.level);
+              const levelStyle = getLevelStyle(installer);
               return (
                 <div
                   key={installer.installer_id}
