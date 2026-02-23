@@ -662,43 +662,78 @@ const JobDetail = () => {
                       const isAssigned = !!itemAssignment;
                       const hasArea = product.total_area_m2 && product.total_area_m2 > 0;
                       const hasDimensions = product.width_m && product.height_m;
+                      const archived = isItemArchived(index);
                       
                       return (
                         <div
                           key={index}
                           className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                            selectedItems.includes(index) 
-                              ? 'bg-green-500/20 border border-green-500/50' 
-                              : isAssigned
-                                ? 'bg-blue-500/10 border border-blue-500/30'
-                                : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                            archived
+                              ? 'bg-gray-500/20 border border-gray-500/30 opacity-60'
+                              : selectedItems.includes(index) 
+                                ? 'bg-green-500/20 border border-green-500/50' 
+                                : isAssigned
+                                  ? 'bg-blue-500/10 border border-blue-500/30'
+                                  : 'bg-white/5 hover:bg-white/10 border border-transparent'
                           }`}
                         >
-                          <Checkbox
-                            checked={selectedItems.includes(index)}
-                            onCheckedChange={() => toggleItemSelection(index)}
-                          />
+                          {!archived && (
+                            <Checkbox
+                              checked={selectedItems.includes(index)}
+                              onCheckedChange={() => toggleItemSelection(index)}
+                            />
+                          )}
                           <div className="flex-1">
-                            <p className="text-white font-medium">{product.name}</p>
+                            <p className={`font-medium ${archived ? 'text-gray-400 line-through' : 'text-white'}`}>
+                              {product.name}
+                            </p>
                             <div className="flex items-center gap-3 text-sm flex-wrap">
                               <span className="text-muted-foreground">Qtd: {product.quantity}</span>
                               {hasDimensions && (
-                                <span className="text-blue-400">
+                                <span className={archived ? 'text-gray-500' : 'text-blue-400'}>
                                   {product.width_m}m x {product.height_m}m
                                 </span>
                               )}
                               {hasArea ? (
-                                <span className="text-green-400 font-medium">{product.total_area_m2.toFixed(2)} m²</span>
+                                <span className={`font-medium ${archived ? 'text-gray-500' : 'text-green-400'}`}>
+                                  {product.total_area_m2.toFixed(2)} m²
+                                </span>
                               ) : (
                                 <span className="text-yellow-400 text-xs">(medidas não calculadas)</span>
                               )}
-                              {isAssigned && (
+                              {archived && (
+                                <span className="px-2 py-0.5 rounded bg-gray-500/20 text-gray-400 text-xs">
+                                  Arquivado
+                                </span>
+                              )}
+                              {isAssigned && !archived && (
                                 <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 text-xs">
                                   Atribuído: {itemAssignment.installers.map(i => i.installer_name).join(', ')}
                                 </span>
                               )}
                             </div>
                           </div>
+                          {/* Botão de arquivar/desarquivar */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (archived) {
+                                handleUnarchiveSingleItem(index, product.name);
+                              } else {
+                                handleArchiveSingleItem(index, product.name);
+                              }
+                            }}
+                            className={`p-2 h-8 w-8 ${
+                              archived 
+                                ? 'text-green-400 hover:text-green-300 hover:bg-green-500/10' 
+                                : 'text-gray-400 hover:text-red-400 hover:bg-red-500/10'
+                            }`}
+                            title={archived ? 'Restaurar item' : 'Arquivar item (não contabilizar)'}
+                          >
+                            {archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
+                          </Button>
                         </div>
                       );
                     })}
