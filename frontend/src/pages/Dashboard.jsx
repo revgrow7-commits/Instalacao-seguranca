@@ -644,18 +644,23 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Recent Jobs */}
-      <div>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-heading font-bold text-white">Jobs Recentes</h2>
-          <button
-            onClick={() => navigate('/jobs')}
-            className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
-            data-testid="view-all-jobs-button"
-          >
-            Ver todos →
-          </button>
-        </div>
+      {/* =============== JOBS RECENTES E GAMIFICAÇÃO =============== */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Jobs Recentes - 2 colunas */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              Jobs Recentes
+            </h2>
+            <button
+              onClick={() => navigate('/jobs')}
+              className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+              data-testid="view-all-jobs-button"
+            >
+              Ver todos →
+            </button>
+          </div>
 
         {jobs.length === 0 ? (
           <Card className="bg-card border-white/5">
