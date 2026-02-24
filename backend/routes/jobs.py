@@ -43,6 +43,7 @@ class Job(BaseModel):
     assigned_installers: List[str] = []
     scheduled_date: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    completed_at: Optional[str] = None
     items: List[dict] = []
     holdprint_data: dict = {}
     products_with_area: List[dict] = []
