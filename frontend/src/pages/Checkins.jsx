@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { 
   CheckCircle, MapPin, Clock, Image, Eye, Search, Filter, 
   Trash2, Archive, RefreshCw, LogIn, LogOut, Play, Pause,
-  ChevronDown, Package, Hand, AlertTriangle, Timer
+  ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 
