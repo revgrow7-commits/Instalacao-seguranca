@@ -305,8 +305,9 @@ const InstallerJobDetail = () => {
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
-      toast.error('Erro ao fazer check-out do item');
-      console.error(error);
+      const errorMessage = error.response?.data?.detail || 'Erro ao fazer check-out do item';
+      toast.error(errorMessage);
+      console.error('Checkout error:', error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
