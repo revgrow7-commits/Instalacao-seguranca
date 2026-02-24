@@ -231,6 +231,20 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
             <Eye className="h-3 w-3 mr-1" />
             Ver
           </Button>
+          
+          {/* WhatsApp Button - Visible when paused or late */}
+          {(isPaused || isLate) && checkin.status !== 'completed' && installerPhone && (
+            <Button
+              onClick={() => onWhatsApp(installerPhone, checkin.installer_name, checkin.job_title, isPaused ? 'paused' : 'late')}
+              variant="outline"
+              size="sm"
+              className="h-7 text-xs border-green-500/50 text-green-400 hover:bg-green-500/10"
+              title="Enviar WhatsApp"
+            >
+              <MessageCircle className="h-3 w-3" />
+            </Button>
+          )}
+          
           <Button
             onClick={() => onArchive(checkin.id)}
             variant="outline"
