@@ -257,51 +257,95 @@ const Dashboard = () => {
       {/* Metrics Cards - Admin & Manager only */}
       {(isAdmin || isManager) && metrics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="bg-card border-white/5 hover:border-primary/50 transition-colors" data-testid="metric-total-jobs">
+          {/* Total de Jobs - Clicável */}
+          <Card 
+            className="bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
+            data-testid="metric-total-jobs"
+            onClick={handleDrillDownJobs}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-300">Total de Jobs</CardTitle>
-              <Briefcase className="h-5 w-5 text-blue-500" />
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-blue-500" />
+                <ChevronRight className="h-4 w-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{metrics.total_jobs}</div>
               <p className="text-xs text-muted-foreground mt-1">
                 {metrics.pending_jobs} pendentes
               </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-white/5 hover:border-primary/50 transition-colors" data-testid="metric-completed-jobs">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Concluídos</CardTitle>
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{metrics.completed_jobs}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {((metrics.completed_jobs / metrics.total_jobs) * 100).toFixed(0)}% do total
+              <p className="text-xs text-blue-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Clique para ver todos →
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-white/5 hover:border-primary/50 transition-colors" data-testid="metric-avg-duration">
+          {/* Concluídos - Clicável */}
+          <Card 
+            className="bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
+            data-testid="metric-completed-jobs"
+            onClick={handleDrillDownCompleted}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-gray-300">Concluídos</CardTitle>
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-500" />
+                <ChevronRight className="h-4 w-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-white">{metrics.completed_jobs}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {metrics.total_jobs > 0 ? ((metrics.completed_jobs / metrics.total_jobs) * 100).toFixed(0) : 0}% do total
+              </p>
+              <p className="text-xs text-green-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Clique para detalhes →
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Tempo Médio - Clicável */}
+          <Card 
+            className="bg-card border-white/5 hover:border-yellow-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
+            data-testid="metric-avg-duration"
+            onClick={handleDrillDownTime}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-300">Tempo Médio</CardTitle>
-              <Clock className="h-5 w-5 text-yellow-500" />
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-yellow-500" />
+                <ChevronRight className="h-4 w-4 text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{metrics.avg_duration_minutes}min</div>
               <p className="text-xs text-muted-foreground mt-1">por job</p>
+              <p className="text-xs text-yellow-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Clique para ranking →
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-card border-white/5 hover:border-primary/50 transition-colors" data-testid="metric-installers">
+          {/* Instaladores - Clicável */}
+          <Card 
+            className="bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02]" 
+            data-testid="metric-installers"
+            onClick={handleDrillDownInstallers}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-300">Instaladores</CardTitle>
-              <Users className="h-5 w-5 text-primary" />
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                <ChevronRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-white">{metrics.total_installers}</div>
               <p className="text-xs text-muted-foreground mt-1">ativos</p>
+              <p className="text-xs text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                Clique para gerenciar →
+              </p>
             </CardContent>
           </Card>
         </div>
