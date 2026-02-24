@@ -662,6 +662,8 @@ const Checkins = () => {
                           onView={handleView}
                           onDelete={handleDelete}
                           onArchive={handleArchive}
+                          onWhatsApp={handleWhatsApp}
+                          installers={installers}
                         />
                       ))}
                     </div>
@@ -682,6 +684,8 @@ const Checkins = () => {
                           onView={handleView}
                           onDelete={handleDelete}
                           onArchive={handleArchive}
+                          onWhatsApp={handleWhatsApp}
+                          installers={installers}
                         />
                       ))}
                     </div>
@@ -698,6 +702,8 @@ const Checkins = () => {
                       onView={handleView}
                       onDelete={handleDelete}
                       onArchive={handleArchive}
+                      onWhatsApp={handleWhatsApp}
+                      installers={installers}
                     />
                   ))}
                 </div>
