@@ -5,9 +5,11 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { 
   Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2, 
-  Bell, AlertTriangle, PauseCircle, PlayCircle, Navigation, Timer, AlertCircle, MessageCircle
+  Bell, AlertTriangle, PauseCircle, PlayCircle, Navigation, Timer, AlertCircle, MessageCircle,
+  ChevronRight, ExternalLink, X
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
 import GamificationHighlight from '../components/GamificationHighlight';
 
