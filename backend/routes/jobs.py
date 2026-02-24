@@ -558,6 +558,56 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     return Job(**result)
 
 
+@router.post("/jobs/{job_id}/finalize")
+async def finalize_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Installer finalizes a job after completing all items.
+    Validates that all assigned items are completed before allowing finalization.
+    """
+    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get all item checkins for this job
+    item_checkins = await db.item_checkins.find({"job_id": job_id}, {"_id": 0}).to_list(1000)
+    
+    # Get assigned item indices
+    item_assignments = job.get("item_assignments", [])
+    assigned_indices = set()
+    for assignment in item_assignments:
+        if "item_index" in assignment:
+            assigned_indices.add(assignment["item_index"])
+        if "item_indices" in assignment:
+            for idx in assignment["item_indices"]:
+                assigned_indices.add(idx)
+    
+    # If no assignments, consider all products as assigned
+    if not assigned_indices:
+        products = job.get("products_with_area", [])
+        assigned_indices = set(range(len(products)))
+    
+    # Check if all assigned items are completed
+    completed_indices = set(c["item_index"] for c in item_checkins if c.get("status") == "completed")
+    
+    if not assigned_indices.issubset(completed_indices):
+        missing = assigned_indices - completed_indices
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Nem todos os itens foram concluídos. Faltam: {list(missing)}"
+        )
+    
+    # Update job status to finalizado
+    await db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "status": "finalizado",
+            "completed_at": datetime.now(timezone.utc).isoformat()
+        }}
+    )
+    
+    return {"message": "Job finalizado com sucesso", "status": "finalizado"}
+
+
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Delete a job and all related data"""
