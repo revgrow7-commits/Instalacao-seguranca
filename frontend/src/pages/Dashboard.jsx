@@ -26,6 +26,13 @@ const Dashboard = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
+  
+  // Drill-down modal states
+  const [showJobsModal, setShowJobsModal] = useState(false);
+  const [showCompletedModal, setShowCompletedModal] = useState(false);
+  const [showTimeModal, setShowTimeModal] = useState(false);
+  const [showInstallersModal, setShowInstallersModal] = useState(false);
+  const [modalData, setModalData] = useState({ title: '', items: [] });
 
   // Format phone number for WhatsApp (remove non-digits and add country code)
   const formatPhoneForWhatsApp = (phone) => {
