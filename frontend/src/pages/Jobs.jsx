@@ -564,6 +564,38 @@ const Jobs = () => {
     }
   };
 
+  // Arquivar/Desarquivar job
+  const handleArchiveJob = async (job, shouldArchive) => {
+    const action = shouldArchive ? 'arquivar' : 'restaurar';
+    if (!window.confirm(`Deseja ${action} o job "${job.title}"?\n\n${shouldArchive ? 'O job será removido da lista principal e não será contabilizado nos relatórios.' : 'O job voltará para a lista principal.'}`)) {
+      return;
+    }
+    
+    try {
+      setProcessingJobId(job.id);
+      if (shouldArchive) {
+        await api.archiveJob(job.id, true); // exclude_from_metrics = true
+      } else {
+        await api.unarchiveJob(job.id);
+      }
+      
+      toast.success(shouldArchive ? 'Job arquivado com sucesso!' : 'Job restaurado com sucesso!');
+      
+      // Update local state
+      setJobs(prev => prev.map(j => 
+        j.id === job.id 
+          ? { ...j, archived: shouldArchive, status: shouldArchive ? 'arquivado' : 'aguardando' }
+          : j
+      ));
+    } catch (error) {
+      console.error('Error archiving job:', error);
+      const errorMsg = error.response?.data?.detail || error.message || `Erro ao ${action} job`;
+      toast.error(errorMsg);
+    } finally {
+      setProcessingJobId(null);
+    }
+  };
+
   // Memoized filtered jobs - sorted by most recent
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter(job => {
