@@ -41,9 +41,10 @@ const JobCardSkeleton = () => (
 );
 
 // Mini Job Card Component for better performance
-const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, isAdmin, isManager, isLoading }) => {
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, isAdmin, isManager, isLoading }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
   const isScheduled = !!job.scheduled_date;
+  const isArchived = job.archived || job.status === 'arquivado';
   
   // Determine which date to show and its label
   const getDateInfo = () => {
