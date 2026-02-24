@@ -660,14 +660,16 @@ const Jobs = () => {
         }
       }
       
-      // Month filter
+      // Month filter - default to last week if 'current'
       let matchesMonth = true;
       if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
         if (jobDate && !isNaN(jobDate.getTime())) {
           if (monthFilter === 'current') {
+            // Show jobs from last 7 days only
             const now = new Date();
-            matchesMonth = jobDate.getMonth() === now.getMonth() && 
-                          jobDate.getFullYear() === now.getFullYear();
+            const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            oneWeekAgo.setHours(0, 0, 0, 0);
+            matchesMonth = jobDate >= oneWeekAgo;
           } else {
             const [year, month] = monthFilter.split('-').map(Number);
             matchesMonth = jobDate.getMonth() === month - 1 && 
@@ -678,19 +680,23 @@ const Jobs = () => {
         }
       }
       
-      // Hide finalized/cancelled jobs only when statusFilter is 'all' (default view)
-      const isHidden = statusFilter === 'all' && ['completed', 'finalizado', 'cancelado'].includes(job.status);
+      // Hide finalized/cancelled/archived jobs by default (unless specifically filtered)
+      const isHidden = statusFilter === 'all' && (
+        ['completed', 'finalizado', 'cancelado'].includes(job.status) || 
+        job.archived || 
+        job.status === 'arquivado'
+      );
       
       return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
     });
     
-    // Sort by oldest date first (scheduled_date or created_at)
+    // Sort by most recent date first (descending order)
     return filtered.sort((a, b) => {
       const getDate = (job) => {
         const dateStr = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime || job.created_at;
         return dateStr ? new Date(dateStr) : new Date(0);
       };
-      return getDate(a) - getDate(b); // Ascending (oldest first)
+      return getDate(b) - getDate(a); // Descending (most recent first)
     });
   }, [jobs, searchTerm, statusFilter, branchFilter, startDateFilter, endDateFilter, monthFilter]);
 
