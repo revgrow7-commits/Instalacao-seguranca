@@ -987,7 +987,7 @@ const Jobs = () => {
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
-                <SelectItem value="current">📅 Mês Atual</SelectItem>
+                <SelectItem value="current">📅 Última Semana</SelectItem>
                 <SelectItem value="all">📋 Todos</SelectItem>
                 {monthOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>
