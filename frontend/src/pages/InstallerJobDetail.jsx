@@ -444,31 +444,40 @@ const InstallerJobDetail = () => {
   }
 
   // Get products - try products_with_area first, then items, then holdprint_data.products
+  // Also filter out archived items
   const getProducts = () => {
+    let products = [];
+    
     if (job.products_with_area && job.products_with_area.length > 0) {
-      return job.products_with_area;
-    }
-    if (job.items && job.items.length > 0) {
+      products = job.products_with_area;
+    } else if (job.items && job.items.length > 0) {
       // Map items to have consistent structure
-      return job.items.map((item, index) => ({
+      products = job.items.map((item, index) => ({
         name: item.name || `Item ${index + 1}`,
         quantity: item.quantity || 1,
         total_area_m2: item.total_area_m2 || 0,
         unit_area_m2: item.unit_area_m2 || 0,
         width_m: item.width_m,
-        height_m: item.height_m
+        height_m: item.height_m,
+        originalIndex: index
       }));
-    }
-    if (job.holdprint_data?.products && job.holdprint_data.products.length > 0) {
+    } else if (job.holdprint_data?.products && job.holdprint_data.products.length > 0) {
       // Map holdprint products to have consistent structure
-      return job.holdprint_data.products.map((product, index) => ({
+      products = job.holdprint_data.products.map((product, index) => ({
         name: product.name || `Produto ${index + 1}`,
         quantity: product.quantity || 1,
         total_area_m2: product.totalValue || 0,
-        unit_area_m2: product.unitPrice || 0
+        unit_area_m2: product.unitPrice || 0,
+        originalIndex: index
       }));
     }
-    return [];
+    
+    // Filter out archived items
+    const archivedItems = job.archived_items || [];
+    const archivedIndices = new Set(archivedItems.map(a => a.item_index));
+    
+    return products.map((p, idx) => ({ ...p, originalIndex: p.originalIndex ?? idx }))
+      .filter((p, idx) => !archivedIndices.has(p.originalIndex ?? idx));
   };
 
   const products = getProducts();
