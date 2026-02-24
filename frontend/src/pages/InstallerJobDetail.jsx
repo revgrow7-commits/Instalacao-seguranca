@@ -845,9 +845,15 @@ const InstallerJobDetail = () => {
       {completedItems === totalItems && totalItems > 0 && (
         <div className="fixed bottom-20 left-4 right-4 md:bottom-4">
           <Button
-            onClick={() => {
-              toast.success('Job concluído com sucesso!');
-              navigate('/');
+            onClick={async () => {
+              try {
+                await api.finalizeJob(jobId);
+                toast.success('Job concluído com sucesso!');
+                navigate('/');
+              } catch (error) {
+                const errorMessage = error.response?.data?.detail || 'Erro ao finalizar job';
+                toast.error(errorMessage);
+              }
             }}
             className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg"
           >
