@@ -73,10 +73,14 @@ const Cronometer = ({ startTime, isPaused }) => {
 };
 
 // Mini card for check-in/checkout without photo for performance
-const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, type }) => {
+const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, type, installers }) => {
   const isCheckout = type === 'checkout';
   const photo = isCheckout ? checkin.checkout_photo : checkin.checkin_photo;
   const date = isCheckout ? checkin.checkout_at : checkin.checkin_at;
+  
+  // Get installer phone
+  const installer = installers?.find(i => i.id === checkin.installer_id || i.user_id === checkin.installer_id);
+  const installerPhone = installer?.phone;
   
   // Calculate if checkin is late (more than 4 hours without checkout)
   const isLate = useMemo(() => {
