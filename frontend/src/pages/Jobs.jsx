@@ -12,7 +12,7 @@ import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import { 
   Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, 
   Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
-  Clock, CheckCircle, MessageSquareWarning, AlertTriangle
+  Clock, CheckCircle, MessageSquareWarning, AlertTriangle, ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '../components/ui/label';
