@@ -688,59 +688,130 @@ const Jobs = () => {
         )}
       </div>
 
-      {/* Stats Row */}
+      {/* Stats Row - Clicáveis com Drill-down */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="bg-card border-white/5">
+        {/* Total */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'all' && !startDateFilter && !endDateFilter ? 'ring-2 ring-primary' : ''
+          }`}
+          onClick={() => {
+            setStatusFilter('all');
+            setStartDateFilter('');
+            setEndDateFilter('');
+          }}
+        >
           <CardContent className="p-3 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/20">
               <Briefcase className="h-4 w-4 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xl font-bold text-white">{filteredJobs.length}</p>
               <p className="text-[10px] text-muted-foreground">Total</p>
             </div>
+            <ChevronRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Aguardando */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-yellow-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'aguardando' ? 'ring-2 ring-yellow-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'aguardando' ? 'all' : 'aguardando')}
+        >
           <CardContent className="p-3 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-yellow-500/20">
               <Clock className="h-4 w-4 text-yellow-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xl font-bold text-white">
                 {filteredJobs.filter(j => j.status === 'aguardando' || j.status === 'pending').length}
               </p>
               <p className="text-[10px] text-muted-foreground">Aguardando</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-yellow-400 transition-opacity ${
+              statusFilter === 'aguardando' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`} />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Instalando */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'instalando' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'instalando' ? 'all' : 'instalando')}
+        >
           <CardContent className="p-3 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/20">
               <Users className="h-4 w-4 text-blue-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xl font-bold text-white">
                 {filteredJobs.filter(j => j.status === 'instalando' || j.status === 'in_progress').length}
               </p>
               <p className="text-[10px] text-muted-foreground">Instalando</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-blue-400 transition-opacity ${
+              statusFilter === 'instalando' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`} />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Agendados */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'agendado' ? 'ring-2 ring-green-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'agendado' ? 'all' : 'agendado')}
+        >
           <CardContent className="p-3 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/20">
               <CalendarCheck className="h-4 w-4 text-green-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-xl font-bold text-white">
                 {filteredJobs.filter(j => j.scheduled_date).length}
               </p>
               <p className="text-[10px] text-muted-foreground">Agendados</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-green-400 transition-opacity ${
+              statusFilter === 'agendado' ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`} />
           </CardContent>
         </Card>
       </div>
+      
+      {/* Active Filter Badge */}
+      {statusFilter !== 'all' && (
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+            statusFilter === 'aguardando' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+            statusFilter === 'instalando' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+            statusFilter === 'agendado' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+            statusFilter === 'concluido' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+            statusFilter === 'arquivado' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30' :
+            'bg-primary/20 text-primary border border-primary/30'
+          }`}>
+            {statusFilter === 'aguardando' && <Clock className="h-4 w-4" />}
+            {statusFilter === 'instalando' && <Users className="h-4 w-4" />}
+            {statusFilter === 'agendado' && <CalendarCheck className="h-4 w-4" />}
+            {statusFilter === 'concluido' && <CheckCircle className="h-4 w-4" />}
+            Filtro: {statusFilter === 'aguardando' ? 'Aguardando' : 
+                    statusFilter === 'instalando' ? 'Instalando' : 
+                    statusFilter === 'agendado' ? 'Agendados' :
+                    statusFilter === 'concluido' ? 'Concluídos' :
+                    statusFilter === 'arquivado' ? 'Arquivados' : statusFilter}
+          </span>
+          <button 
+            onClick={() => setStatusFilter('all')}
+            className="text-xs text-muted-foreground hover:text-white transition-colors"
+          >
+            Limpar ×
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <Card className="bg-card border-white/5">
