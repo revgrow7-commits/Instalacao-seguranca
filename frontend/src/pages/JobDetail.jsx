@@ -98,14 +98,32 @@ const JobDetail = () => {
         api.getItemCheckins(jobId)
       ]);
       
-      setJob(jobRes.data);
+      let jobData = jobRes.data;
+      
+      // Auto-recalcular medidas se algum produto não tem área calculada
+      const products = jobData.products_with_area || [];
+      const needsReprocess = products.length === 0 || products.some(p => !p.total_area_m2 || p.total_area_m2 === 0);
+      
+      if (needsReprocess && (isAdmin || isManager)) {
+        try {
+          const reprocessRes = await api.reprocessJobProducts(jobId);
+          // Recarregar job com medidas atualizadas
+          const updatedJobRes = await api.getJob(jobId);
+          jobData = updatedJobRes.data;
+        } catch (e) {
+          // Se falhar o reprocessamento, continua com os dados originais
+          console.log('Auto-reprocess skipped:', e.message);
+        }
+      }
+      
+      setJob(jobData);
       setInstallers(installersRes.data);
       setCheckins(checkinsRes.data);
       setItemCheckins(itemCheckinsRes.data || []);
-      setSelectedInstallers(jobRes.data.assigned_installers || []);
+      setSelectedInstallers(jobData.assigned_installers || []);
       
-      if (jobRes.data.scheduled_date) {
-        const date = new Date(jobRes.data.scheduled_date);
+      if (jobData.scheduled_date) {
+        const date = new Date(jobData.scheduled_date);
         setScheduledDate(date.toISOString().slice(0, 16));
       }
       
