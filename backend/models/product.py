@@ -40,8 +40,8 @@ class ProductInstalled(BaseModel):
     complexity_level: int = 1
     height_category: str = "terreo"
     scenario_category: str = "loja_rua"
-    estimated_time_min: Optional[int] = None
-    actual_time_min: Optional[int] = None
+    estimated_time_min: Optional[float] = None
+    actual_time_min: Optional[float] = None
     productivity_m2_h: Optional[float] = None
     installers_count: int = 1
     installation_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
