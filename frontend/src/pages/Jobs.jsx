@@ -1040,6 +1040,7 @@ const Jobs = () => {
                 onFinalize={handleFinalizeNoInstallation}
                 onSchedule={handleOpenScheduleDialog}
                 onJustify={handleOpenJustifyDialog}
+                onArchive={handleArchiveJob}
                 isAdmin={isAdmin}
                 isManager={isManager}
                 isLoading={processingJobId}
