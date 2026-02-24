@@ -563,11 +563,15 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
 async def finalize_job(job_id: str, current_user: User = Depends(get_current_user)):
     """
     Installer finalizes a job after completing all items.
-    Validates that all assigned items are completed before allowing finalization.
+    Validates that all assigned items (excluding archived) are completed before allowing finalization.
     """
     job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Get archived item indices - these should be excluded from verification
+    archived_items = job.get("archived_items", [])
+    archived_indices = set(a.get("item_index") for a in archived_items)
     
     # Get all item checkins for this job
     item_checkins = await db.item_checkins.find({"job_id": job_id}, {"_id": 0}).to_list(1000)
@@ -587,11 +591,14 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
         products = job.get("products_with_area", [])
         assigned_indices = set(range(len(products)))
     
-    # Check if all assigned items are completed
+    # Remove archived indices from required items
+    required_indices = assigned_indices - archived_indices
+    
+    # Check if all required items are completed
     completed_indices = set(c["item_index"] for c in item_checkins if c.get("status") == "completed")
     
-    if not assigned_indices.issubset(completed_indices):
-        missing = assigned_indices - completed_indices
+    if not required_indices.issubset(completed_indices):
+        missing = required_indices - completed_indices
         raise HTTPException(
             status_code=400, 
             detail=f"Nem todos os itens foram concluídos. Faltam: {list(missing)}"
