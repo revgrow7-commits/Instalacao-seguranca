@@ -199,6 +199,41 @@ const Dashboard = () => {
     });
   };
 
+  // Drill-down handlers
+  const handleDrillDownJobs = () => {
+    // Navigate to jobs page
+    navigate('/jobs');
+  };
+
+  const handleDrillDownCompleted = () => {
+    // Get completed jobs
+    const completedJobs = jobs.filter(j => j.status === 'completed' || j.status === 'finalizado');
+    setModalData({
+      title: 'Jobs Concluídos',
+      type: 'completed',
+      items: completedJobs.slice(0, 20)
+    });
+    setShowCompletedModal(true);
+  };
+
+  const handleDrillDownTime = () => {
+    // Get jobs with time data sorted by duration
+    const jobsWithTime = jobs
+      .filter(j => j.total_duration_minutes && j.total_duration_minutes > 0)
+      .sort((a, b) => (b.total_duration_minutes || 0) - (a.total_duration_minutes || 0));
+    setModalData({
+      title: 'Tempo por Job',
+      type: 'time',
+      items: jobsWithTime.slice(0, 20)
+    });
+    setShowTimeModal(true);
+  };
+
+  const handleDrillDownInstallers = () => {
+    // Navigate to users page with installer filter
+    navigate('/users');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-screen">
