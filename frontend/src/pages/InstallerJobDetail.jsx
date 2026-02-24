@@ -371,8 +371,9 @@ const InstallerJobDetail = () => {
       setShowPauseModal(false);
       await loadJobData();
     } catch (error) {
-      toast.error('Erro ao pausar item');
-      console.error(error);
+      const errorMessage = error.response?.data?.detail || 'Erro ao pausar item';
+      toast.error(errorMessage);
+      console.error('Pause error:', error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
