@@ -59,8 +59,8 @@ class ProductInstalled(BaseModel):
     scenario_category: str = "loja_rua"
     
     # Times
-    estimated_time_min: Optional[int] = None
-    actual_time_min: Optional[int] = None
+    estimated_time_min: Optional[float] = None
+    actual_time_min: Optional[float] = None
     
     # Calculated productivity
     productivity_m2_h: Optional[float] = None
