@@ -418,53 +418,117 @@ const Checkins = () => {
         </Button>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Clicáveis com Drill-down */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="bg-card border-white/5">
+        {/* Total */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'all' ? 'ring-2 ring-primary' : ''
+          }`}
+          onClick={() => setStatusFilter('all')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-primary/20">
               <CheckCircle className="h-5 w-5 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-2xl font-bold text-white">{stats.total}</p>
               <p className="text-xs text-muted-foreground">Total</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity ${
+              statusFilter === 'all' ? 'opacity-100' : ''
+            }`} />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Em Andamento */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'in_progress' ? 'ring-2 ring-blue-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-blue-500/20">
               <Play className="h-5 w-5 text-blue-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
               <p className="text-xs text-muted-foreground">Em Andamento</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+              statusFilter === 'in_progress' ? 'opacity-100' : ''
+            }`} />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Completos */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-green-500/20">
               <CheckCircle className="h-5 w-5 text-green-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-2xl font-bold text-white">{stats.completed}</p>
               <p className="text-xs text-muted-foreground">Completos</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+              statusFilter === 'completed' ? 'opacity-100' : ''
+            }`} />
           </CardContent>
         </Card>
-        <Card className="bg-card border-white/5">
+        
+        {/* Pausados */}
+        <Card 
+          className={`bg-card border-white/5 hover:border-orange-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+            statusFilter === 'paused' ? 'ring-2 ring-orange-500' : ''
+          }`}
+          onClick={() => setStatusFilter(statusFilter === 'paused' ? 'all' : 'paused')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="p-2 rounded-lg bg-orange-500/20">
               <Pause className="h-5 w-5 text-orange-400" />
             </div>
-            <div>
+            <div className="flex-1">
               <p className="text-2xl font-bold text-white">{stats.paused}</p>
               <p className="text-xs text-muted-foreground">Pausados</p>
             </div>
+            <ChevronRight className={`h-4 w-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+              statusFilter === 'paused' ? 'opacity-100' : ''
+            }`} />
           </CardContent>
         </Card>
       </div>
+      
+      {/* Active Filter Badge */}
+      {statusFilter !== 'all' && (
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+            statusFilter === 'in_progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+            statusFilter === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+            statusFilter === 'paused' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+            'bg-primary/20 text-primary'
+          }`}>
+            {statusFilter === 'in_progress' && <Play className="h-4 w-4" />}
+            {statusFilter === 'completed' && <CheckCircle className="h-4 w-4" />}
+            {statusFilter === 'paused' && <Pause className="h-4 w-4" />}
+            Filtro ativo: {statusFilter === 'in_progress' ? 'Em Andamento' : 
+                          statusFilter === 'completed' ? 'Completos' : 
+                          statusFilter === 'paused' ? 'Pausados' : statusFilter}
+          </span>
+          <button 
+            onClick={() => setStatusFilter('all')}
+            className="text-xs text-muted-foreground hover:text-white transition-colors"
+          >
+            Limpar filtro ×
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <Card className="bg-card border-white/5">
