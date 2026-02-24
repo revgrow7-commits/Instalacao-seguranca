@@ -1030,7 +1030,7 @@ const Jobs = () => {
                 className="mt-2 text-primary"
                 onClick={() => setMonthFilter('all')}
               >
-                Ver todos os meses
+                Ver todos os jobs
               </Button>
             )}
           </CardContent>
