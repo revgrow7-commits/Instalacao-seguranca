@@ -274,7 +274,7 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
             )}
 
             {/* Finalize Without Installation Button */}
-            {!isLate && (
+            {!isLate && !isArchived && (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -295,6 +295,28 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
                 )}
               </Button>
             )}
+
+            {/* Archive/Unarchive Button */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onArchive(job, !isArchived);
+              }}
+              variant="outline"
+              size="sm"
+              className={`h-8 text-xs ${
+                isArchived 
+                  ? 'border-green-500/50 text-green-400 hover:bg-green-500/10' 
+                  : 'border-gray-500/50 text-gray-400 hover:bg-gray-500/10'
+              }`}
+              title={isArchived ? 'Restaurar job' : 'Arquivar job'}
+            >
+              {isArchived ? (
+                <ArchiveRestore className="h-3 w-3" />
+              ) : (
+                <Archive className="h-3 w-3" />
+              )}
+            </Button>
           </div>
         )}
       </CardContent>
