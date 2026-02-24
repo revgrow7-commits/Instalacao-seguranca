@@ -616,17 +616,27 @@ async def pause_item_checkin(
     current_user: User = Depends(get_current_user)
 ):
     """Pause an item checkin and log the reason"""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Pause request for checkin {checkin_id} by user {current_user.email} (role: {current_user.role})")
+    
     if current_user.role != UserRole.INSTALLER:
+        logger.error(f"User {current_user.email} is not an installer (role: {current_user.role})")
         raise HTTPException(status_code=403, detail="Only installers can pause item checkouts")
     
     checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
+        logger.error(f"Checkin {checkin_id} not found")
         raise HTTPException(status_code=404, detail="Item check-in not found")
     
+    logger.info(f"Checkin status: {checkin.get('status')}")
+    
     if checkin["status"] == "completed":
+        logger.error(f"Cannot pause completed checkin {checkin_id}")
         raise HTTPException(status_code=400, detail="Cannot pause a completed item")
     
     if checkin["status"] == "paused":
+        logger.error(f"Checkin {checkin_id} is already paused")
         raise HTTPException(status_code=400, detail="Item is already paused")
     
     pause_log = ItemPauseLog(
