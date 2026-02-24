@@ -399,6 +399,32 @@ const Checkins = () => {
     navigate(`/checkin-viewer/${checkinId}`);
   };
 
+  // Função para enviar WhatsApp manualmente
+  const handleWhatsApp = (phone, installerName, jobTitle, alertType) => {
+    if (!phone) {
+      toast.error('Telefone do instalador não encontrado');
+      return;
+    }
+    
+    // Limpar telefone (remover caracteres especiais)
+    const cleanPhone = phone.replace(/\D/g, '');
+    const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+    
+    // Montar mensagem baseada no tipo de alerta
+    let message = '';
+    if (alertType === 'paused') {
+      message = `⏸️ *Instalação Pausada*\n\nOlá ${installerName}!\n\nNotamos que o item "${jobTitle}" está pausado.\n\nPor favor, retome o trabalho assim que possível ou informe o motivo da pausa prolongada.\n\n_Mensagem enviada pelo sistema Indústria Visual_`;
+    } else if (alertType === 'late') {
+      message = `⚠️ *Alerta de Atraso*\n\nOlá ${installerName}!\n\nO check-in do job "${jobTitle}" está há mais de 4 horas sem checkout.\n\nPor favor, finalize o trabalho ou informe a situação atual.\n\n_Mensagem enviada pelo sistema Indústria Visual_`;
+    }
+    
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodedMessage}`;
+    
+    window.open(whatsappUrl, '_blank');
+    toast.success(`WhatsApp aberto para ${installerName}`);
+  };
+
   const loadMore = () => {
     setVisibleCount(prev => prev + 12);
   };
