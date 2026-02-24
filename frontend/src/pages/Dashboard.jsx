@@ -821,6 +821,134 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      {/* =============== DRILL-DOWN MODALS =============== */}
+      
+      {/* Modal de Jobs Concluídos */}
+      <Dialog open={showCompletedModal} onOpenChange={setShowCompletedModal}>
+        <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-white flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Jobs Concluídos ({modalData.items?.length || 0})
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Lista de jobs finalizados recentemente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 mt-4">
+            {modalData.items?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhum job concluído encontrado</p>
+            ) : (
+              modalData.items?.map((job) => (
+                <div 
+                  key={job.id}
+                  className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg hover:bg-green-500/10 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setShowCompletedModal(false);
+                    navigate(`/jobs/${job.id}`);
+                  }}
+                >
+                  <div className="flex-1">
+                    <p className="text-white font-medium truncate">{job.title}</p>
+                    <p className="text-xs text-muted-foreground">{job.client_name} • {job.branch}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {job.total_duration_minutes > 0 && (
+                      <span className="text-xs text-green-400 bg-green-500/20 px-2 py-1 rounded">
+                        {Math.floor(job.total_duration_minutes / 60)}h {job.total_duration_minutes % 60}min
+                      </span>
+                    )}
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowCompletedModal(false);
+                navigate('/jobs');
+              }}
+            >
+              Ver Todos os Jobs
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Tempo por Job */}
+      <Dialog open={showTimeModal} onOpenChange={setShowTimeModal}>
+        <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl text-white flex items-center gap-2">
+              <Clock className="h-5 w-5 text-yellow-500" />
+              Ranking de Tempo por Job
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Jobs ordenados por duração total de instalação
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 mt-4">
+            {modalData.items?.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">Nenhum job com dados de tempo encontrado</p>
+            ) : (
+              modalData.items?.map((job, index) => {
+                const hours = Math.floor((job.total_duration_minutes || 0) / 60);
+                const minutes = (job.total_duration_minutes || 0) % 60;
+                return (
+                  <div 
+                    key={job.id}
+                    className="flex items-center justify-between p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/10 cursor-pointer transition-colors"
+                    onClick={() => {
+                      setShowTimeModal(false);
+                      navigate(`/jobs/${job.id}`);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        index === 0 ? 'bg-yellow-500/30 text-yellow-400' :
+                        index === 1 ? 'bg-gray-400/30 text-gray-300' :
+                        index === 2 ? 'bg-orange-500/30 text-orange-400' :
+                        'bg-white/10 text-muted-foreground'
+                      }`}>
+                        {index + 1}
+                      </span>
+                      <div className="flex-1">
+                        <p className="text-white font-medium truncate">{job.title}</p>
+                        <p className="text-xs text-muted-foreground">{job.client_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm text-yellow-400 bg-yellow-500/20 px-3 py-1 rounded font-mono">
+                        {hours > 0 ? `${hours}h ` : ''}{minutes}min
+                      </span>
+                      <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowTimeModal(false);
+                navigate('/reports');
+              }}
+            >
+              Ver Relatórios Completos
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
