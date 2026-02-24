@@ -690,13 +690,14 @@ const Jobs = () => {
       return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
     });
     
-    // Sort by most recent date first (descending order)
+    // Sort by oldest delivery date first (deliveryNeeded from Hold is priority)
     return filtered.sort((a, b) => {
       const getDate = (job) => {
-        const dateStr = job.scheduled_date || job.holdprint_data?.deliveryNeeded || job.holdprint_data?.creationTime || job.created_at;
-        return dateStr ? new Date(dateStr) : new Date(0);
+        // Priority: deliveryNeeded (previsão de entrega Hold) > scheduled_date > creationTime
+        const dateStr = job.holdprint_data?.deliveryNeeded || job.scheduled_date || job.holdprint_data?.creationTime || job.created_at;
+        return dateStr ? new Date(dateStr) : new Date('2099-12-31'); // Jobs without date go to the end
       };
-      return getDate(b) - getDate(a); // Descending (most recent first)
+      return getDate(a) - getDate(b); // Ascending (oldest first)
     });
   }, [jobs, searchTerm, statusFilter, branchFilter, startDateFilter, endDateFilter, monthFilter]);
 
