@@ -169,7 +169,13 @@ async def sync_holdprint_job():
                                 total_errors += 1
                                 logger.error(f"Error importing job {holdprint_job_id}: {str(e)}")
                         
-                        logger.info(f"Sync {branch} {month}/{year}: processed {len(filtered_jobs)} jobs")
+                            # Check if we got less than pageSize (last page)
+                            if len(jobs) < 100:
+                                break
+                            
+                            page += 1
+                        
+                        logger.info(f"Sync {branch} {month}/{year}: processed {total_jobs_in_month} jobs")
                         
                     except httpx.HTTPError as e:
                         logger.error(f"Error fetching {branch} {month}/{year}: {str(e)}")
