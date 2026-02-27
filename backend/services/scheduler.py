@@ -110,34 +110,34 @@ async def sync_holdprint_job():
                             
                             # Import ALL jobs (including finalized ones)
                             for holdprint_job in jobs:
-                            holdprint_job_id = str(holdprint_job.get('id', ''))
-                            
-                            # Check if already exists
-                            existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
-                            if existing:
-                                total_skipped += 1
-                                continue
-                            
-                            try:
-                                # Calculate products and area
-                                products = holdprint_job.get('production', {}).get('products', [])
-                                products_with_area = []
-                                total_area_m2 = 0.0
-                                total_products = len(products)
-                                total_quantity = 0
+                                holdprint_job_id = str(holdprint_job.get('id', ''))
                                 
-                                for product in products:
-                                    product_info = extract_product_dimensions(product)
-                                    product_with_area = {
-                                        "name": product.get('name', ''),
-                                        "quantity": product.get('quantity', 1),
-                                        "copies": product_info.get('copies', 1),
-                                        "width_m": product_info.get('width_m', 0),
-                                        "height_m": product_info.get('height_m', 0),
-                                        "unit_area_m2": product_info.get('area_m2', 0),
-                                        "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                                    }
-                                    products_with_area.append(product_with_area)
+                                # Check if already exists
+                                existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                                if existing:
+                                    total_skipped += 1
+                                    continue
+                                
+                                try:
+                                    # Calculate products and area
+                                    products = holdprint_job.get('production', {}).get('products', [])
+                                    products_with_area = []
+                                    total_area_m2 = 0.0
+                                    total_products = len(products)
+                                    total_quantity = 0
+                                    
+                                    for product in products:
+                                        product_info = extract_product_dimensions(product)
+                                        product_with_area = {
+                                            "name": product.get('name', ''),
+                                            "quantity": product.get('quantity', 1),
+                                            "copies": product_info.get('copies', 1),
+                                            "width_m": product_info.get('width_m', 0),
+                                            "height_m": product_info.get('height_m', 0),
+                                            "unit_area_m2": product_info.get('area_m2', 0),
+                                            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
+                                        }
+                                        products_with_area.append(product_with_area)
                                     total_area_m2 += product_with_area['total_area_m2']
                                     total_quantity += product.get('quantity', 1)
                                 
