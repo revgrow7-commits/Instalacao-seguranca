@@ -138,37 +138,37 @@ async def sync_holdprint_job():
                                             "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
                                         }
                                         products_with_area.append(product_with_area)
-                                    total_area_m2 += product_with_area['total_area_m2']
-                                    total_quantity += product.get('quantity', 1)
-                                
-                                # Create job document
-                                job_doc = {
-                                    "id": str(uuid.uuid4()),
-                                    "holdprint_job_id": holdprint_job_id,
-                                    "title": holdprint_job.get('title', 'Sem título'),
-                                    "client_name": holdprint_job.get('customerName', 'Cliente não informado'),
-                                    "client_address": '',
-                                    "branch": branch,
-                                    "status": "aguardando",
-                                    "scheduled_date": None,
-                                    "assigned_installers": [],
-                                    "item_assignments": [],
-                                    "items": holdprint_job.get('production', {}).get('items', []),
-                                    "holdprint_data": holdprint_job,
-                                    "area_m2": total_area_m2,
-                                    "products_with_area": products_with_area,
-                                    "total_products": total_products,
-                                    "total_quantity": total_quantity,
-                                    "created_at": datetime.now(timezone.utc).isoformat()
-                                }
-                                
-                                await db.jobs.insert_one(job_doc)
-                                total_imported += 1
-                                
-                            except Exception as e:
-                                total_errors += 1
-                                logger.error(f"Error importing job {holdprint_job_id}: {str(e)}")
-                        
+                                        total_area_m2 += product_with_area['total_area_m2']
+                                        total_quantity += product.get('quantity', 1)
+                                    
+                                    # Create job document
+                                    job_doc = {
+                                        "id": str(uuid.uuid4()),
+                                        "holdprint_job_id": holdprint_job_id,
+                                        "title": holdprint_job.get('title', 'Sem título'),
+                                        "client_name": holdprint_job.get('customerName', 'Cliente não informado'),
+                                        "client_address": '',
+                                        "branch": branch,
+                                        "status": "aguardando",
+                                        "scheduled_date": None,
+                                        "assigned_installers": [],
+                                        "item_assignments": [],
+                                        "items": holdprint_job.get('production', {}).get('items', []),
+                                        "holdprint_data": holdprint_job,
+                                        "area_m2": total_area_m2,
+                                        "products_with_area": products_with_area,
+                                        "total_products": total_products,
+                                        "total_quantity": total_quantity,
+                                        "created_at": datetime.now(timezone.utc).isoformat()
+                                    }
+                                    
+                                    await db.jobs.insert_one(job_doc)
+                                    total_imported += 1
+                                    
+                                except Exception as e:
+                                    total_errors += 1
+                                    logger.error(f"Error importing job {holdprint_job_id}: {str(e)}")
+                            
                             # Check if we got less than pageSize (last page)
                             if len(jobs) < 100:
                                 break
