@@ -98,10 +98,9 @@ async def sync_holdprint_job():
                         elif isinstance(data, list):
                             jobs = data
                         
-                        # Filter non-finalized jobs
-                        filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
-                        
-                        for holdprint_job in filtered_jobs:
+                        # Import ALL jobs (including finalized ones)
+                        # Previously we filtered out finalized jobs, but this caused missing jobs
+                        for holdprint_job in jobs:
                             holdprint_job_id = str(holdprint_job.get('id', ''))
                             
                             # Check if already exists
