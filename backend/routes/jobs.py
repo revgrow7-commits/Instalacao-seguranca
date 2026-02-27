@@ -159,8 +159,8 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
     return (products_with_area, round(total_area_m2, 2), len(products), total_quantity)
 
 
-async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = False):
-    """Fetch jobs from Holdprint API"""
+async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = True):
+    """Fetch jobs from Holdprint API with pagination"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
@@ -176,36 +176,53 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
     start_date_str = f"{target_year}-{target_month:02d}-01"
     end_date_str = f"{target_year}-{target_month:02d}-{last_day:02d}"
     
-    params = {
-        "page": 1,
-        "pageSize": 200,
-        "startDate": start_date_str,
-        "endDate": end_date_str,
-        "language": "pt-BR"
-    }
+    all_jobs = []
+    page = 1
+    page_size = 200
     
     try:
-        response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=60)
+        while True:
+            params = {
+                "page": page,
+                "pageSize": page_size,
+                "startDate": start_date_str,
+                "endDate": end_date_str,
+                "language": "pt-BR"
+            }
+            
+            response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=60)
+            
+            if response.status_code == 401:
+                logger.error(f"Holdprint {branch}: Autenticação falhou - chave de API inválida")
+                raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}. Verifique a configuração.")
+            
+            response.raise_for_status()
+            data = response.json()
+            
+            jobs = []
+            if isinstance(data, dict) and 'data' in data:
+                jobs = data['data']
+            elif isinstance(data, list):
+                jobs = data
+            
+            if not jobs:
+                break  # No more jobs
+            
+            all_jobs.extend(jobs)
+            
+            # If we got less than page_size, we've reached the last page
+            if len(jobs) < page_size:
+                break
+            
+            page += 1
         
-        if response.status_code == 401:
-            logger.error(f"Holdprint {branch}: Autenticação falhou - chave de API inválida")
-            raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}. Verifique a configuração.")
-        
-        response.raise_for_status()
-        data = response.json()
-        
-        jobs = []
-        if isinstance(data, dict) and 'data' in data:
-            jobs = data['data']
-        elif isinstance(data, list):
-            jobs = data
-        
+        # Filter finalized jobs if requested
         if not include_finalized:
-            filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
+            filtered_jobs = [job for job in all_jobs if not job.get('isFinalized', False)]
         else:
-            filtered_jobs = jobs
+            filtered_jobs = all_jobs
         
-        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} {'total' if include_finalized else 'não finalizados'}")
+        logger.info(f"Holdprint {branch}: {len(all_jobs)} jobs encontrados, {len(filtered_jobs)} {'total' if include_finalized else 'não finalizados'}")
         
         return filtered_jobs
     except requests.RequestException as e:
