@@ -80,27 +80,36 @@ async def sync_holdprint_job():
                         start_date_str = f"{year}-{month:02d}-01"
                         end_date_str = f"{year}-{month:02d}-{last_day:02d}"
                         
-                        params = {
-                            "page": 1,
-                            "pageSize": 100,
-                            "startDate": start_date_str,
-                            "endDate": end_date_str,
-                            "language": "pt-BR"
-                        }
+                        # Paginate through all jobs
+                        page = 1
+                        total_jobs_in_month = 0
                         
-                        response = await client.get(HOLDPRINT_API_URL, headers=headers, params=params)
-                        response.raise_for_status()
-                        data = response.json()
-                        
-                        jobs = []
-                        if isinstance(data, dict) and 'data' in data:
-                            jobs = data['data']
-                        elif isinstance(data, list):
-                            jobs = data
-                        
-                        # Import ALL jobs (including finalized ones)
-                        # Previously we filtered out finalized jobs, but this caused missing jobs
-                        for holdprint_job in jobs:
+                        while True:
+                            params = {
+                                "page": page,
+                                "pageSize": 100,
+                                "startDate": start_date_str,
+                                "endDate": end_date_str,
+                                "language": "pt-BR"
+                            }
+                            
+                            response = await client.get(HOLDPRINT_API_URL, headers=headers, params=params)
+                            response.raise_for_status()
+                            data = response.json()
+                            
+                            jobs = []
+                            if isinstance(data, dict) and 'data' in data:
+                                jobs = data['data']
+                            elif isinstance(data, list):
+                                jobs = data
+                            
+                            if not jobs:
+                                break  # No more jobs
+                            
+                            total_jobs_in_month += len(jobs)
+                            
+                            # Import ALL jobs (including finalized ones)
+                            for holdprint_job in jobs:
                             holdprint_job_id = str(holdprint_job.get('id', ''))
                             
                             # Check if already exists
