@@ -660,16 +660,15 @@ const Jobs = () => {
         }
       }
       
-      // Month filter - default to last week if 'current'
+      // Month filter - default to current month if 'current'
       let matchesMonth = true;
       if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
         if (jobDate && !isNaN(jobDate.getTime())) {
           if (monthFilter === 'current') {
-            // Show jobs from last 7 days only
+            // Show jobs from current month (same month/year as today)
             const now = new Date();
-            const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-            oneWeekAgo.setHours(0, 0, 0, 0);
-            matchesMonth = jobDate >= oneWeekAgo;
+            matchesMonth = jobDate.getMonth() === now.getMonth() && 
+                          jobDate.getFullYear() === now.getFullYear();
           } else {
             const [year, month] = monthFilter.split('-').map(Number);
             matchesMonth = jobDate.getMonth() === month - 1 && 
@@ -988,7 +987,7 @@ const Jobs = () => {
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
-                <SelectItem value="current">📅 Última Semana</SelectItem>
+                <SelectItem value="current">📅 Mês Atual</SelectItem>
                 <SelectItem value="all">📋 Todos</SelectItem>
                 {monthOptions.map(opt => (
                   <SelectItem key={opt.value} value={opt.value}>
@@ -1031,7 +1030,7 @@ const Jobs = () => {
                 className="mt-2 text-primary"
                 onClick={() => setMonthFilter('all')}
               >
-                Ver todos os jobs
+                Ver todos os meses
               </Button>
             )}
           </CardContent>
