@@ -608,11 +608,17 @@ const Jobs = () => {
         (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         jobCode.toString().includes(searchLower);
       
+      // If user is searching by job code, bypass ALL other filters
+      const isCodeSearch = searchTerm && jobCode.toString().includes(searchLower);
+      if (isCodeSearch) {
+        return true; // Return the job regardless of status, date, etc.
+      }
+      
       // Status filter logic - "agendado", "concluido" and "arquivado" are special cases
       let matchesStatus = true;
       if (statusFilter === 'all') {
         // By default, hide archived jobs unless explicitly filtered
-        matchesStatus = !job.archived;
+        matchesStatus = !job.archived && job.status !== 'arquivado';
       } else if (statusFilter === 'agendado') {
         // Filter jobs that have scheduled_date and are not completed/cancelled
         matchesStatus = !!job.scheduled_date && 
