@@ -63,24 +63,34 @@ const JobDetail = () => {
     { value: 'veiculo', label: '06 - Veículo' }
   ];
 
+  // Helper function to check if an item is archived by its index
+  const isItemArchived = (index) => {
+    if (!job?.archived_items || job.archived_items.length === 0) return false;
+    return job.archived_items.some(a => a.item_index === index);
+  };
+
   // Helper function to get products from job (handles empty array vs undefined)
   const getJobProducts = () => {
     if (job?.products_with_area && job.products_with_area.length > 0) {
-      return job.products_with_area;
+      // Filter out archived items using the archived_items array
+      return job.products_with_area.filter((item, index) => !isItemArchived(index) && !item.archived);
     }
     if (job?.items && job.items.length > 0) {
-      // Map items to have consistent structure
-      return job.items.map((item, index) => ({
-        name: item.name || `Item ${index + 1}`,
-        quantity: item.quantity || 1,
-        total_area_m2: item.total_area_m2 || 0,
-        unit_area_m2: item.unit_area_m2 || 0,
-        width_m: item.width_m,
-        height_m: item.height_m
-      }));
+      // Map items to have consistent structure, excluding archived by index
+      return job.items
+        .map((item, index) => ({ ...item, originalIndex: index }))
+        .filter((item, index) => !isItemArchived(item.originalIndex) && !item.archived)
+        .map((item) => ({
+          name: item.name || item.description || `Item ${item.originalIndex + 1}`,
+          quantity: item.quantity || 1,
+          total_area_m2: item.total_area_m2 || 0,
+          unit_area_m2: item.unit_area_m2 || 0,
+          width_m: item.width_m,
+          height_m: item.height_m
+        }));
     }
     if (job?.holdprint_data?.products && job.holdprint_data.products.length > 0) {
-      return job.holdprint_data.products;
+      return job.holdprint_data.products.filter((item, index) => !isItemArchived(index) && !item.archived);
     }
     return [];
   };
@@ -362,12 +372,6 @@ const JobDetail = () => {
         ? prev.filter(i => i !== index)
         : [...prev, index]
     );
-  };
-
-  // Verificar se item está arquivado
-  const isItemArchived = (itemIndex) => {
-    const archivedItems = job?.archived_items || [];
-    return archivedItems.some(a => a.item_index === itemIndex);
   };
 
   // Arquivar item individual diretamente
@@ -1919,19 +1923,23 @@ const JobDetail = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {job.items.map((item, index) => (
-                <div
-                  key={index}
-                  className="p-3 rounded-lg bg-white/5 border border-white/5"
-                >
-                  <p className="text-white font-medium">{item.name || `Item ${index + 1}`}</p>
-                  {item.quantity && (
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Quantidade: {item.quantity}
-                    </p>
-                  )}
-                </div>
-              ))}
+              {job.items.map((item, index) => {
+                // Check if item is archived using archived_items array
+                if (isItemArchived(index) || item.archived) return null;
+                return (
+                  <div
+                    key={index}
+                    className="p-3 rounded-lg bg-white/5 border border-white/5"
+                  >
+                    <p className="text-white font-medium">{item.name || item.description || `Item ${index + 1}`}</p>
+                    {item.quantity && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Quantidade: {item.quantity}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
