@@ -683,8 +683,11 @@ const Jobs = () => {
       }
       
       // Month filter - default to current month if 'current'
+      // IMPORTANT: When a specific status filter is active, bypass month filter
+      // to ensure users can find jobs regardless of their date
       let matchesMonth = true;
-      if (!startDateFilter && !endDateFilter && monthFilter !== 'all') {
+      const hasActiveStatusFilter = statusFilter !== 'all';
+      if (!startDateFilter && !endDateFilter && monthFilter !== 'all' && !hasActiveStatusFilter) {
         if (jobDate && !isNaN(jobDate.getTime())) {
           if (monthFilter === 'current') {
             // Show jobs from current month (same month/year as today)
