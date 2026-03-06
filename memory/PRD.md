@@ -220,6 +220,16 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
+### 06/03/2026 - Correção de Bugs nos Filtros e Arquivamento
+- ✅ **BUGFIX:** Filtros de status (Instalando, Pausado, Agendado) não funcionavam quando combinados com filtro de mês
+  - Causa: O filtro de mês ("Mês Atual") interferia com os filtros de status
+  - Solução: Quando um filtro de status específico está ativo, o filtro de mês é ignorado automaticamente
+- ✅ **BUGFIX:** Itens arquivados ainda apareciam para instaladores na seção "Itens do Job"
+  - Causa: O frontend verificava `item.archived`, mas o backend usava um array separado `archived_items`
+  - Solução: Criada função `isItemArchived(index)` que verifica se o índice do item está no array `archived_items`
+- ✅ **BUGFIX:** Erro de ValidationError no endpoint `/api/jobs` - `total_quantity` era `int` mas recebia `float`
+  - Solução: Alterado tipo de `total_quantity` de `int` para `float` em `server.py` e `routes/jobs.py`
+
 ### 06/03/2026 - Filtro por Instalador na Página de Jobs
 - ✅ **FEATURE:** Implementado filtro por instalador na página de Jobs
   - Dropdown carrega lista de instaladores via API `/api/installers`
