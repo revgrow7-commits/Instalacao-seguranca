@@ -334,6 +334,8 @@ const Jobs = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [branchFilter, setBranchFilter] = useState('all');
+  const [installerFilter, setInstallerFilter] = useState('all');
+  const [installers, setInstallers] = useState([]);
   const [monthFilter, setMonthFilter] = useState('current');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
@@ -369,6 +371,16 @@ const Jobs = () => {
 
   useEffect(() => {
     loadJobs();
+    loadInstallers();
+  }, []);
+
+  const loadInstallers = useCallback(async () => {
+    try {
+      const response = await api.getInstallers();
+      setInstallers(response.data || []);
+    } catch (error) {
+      console.error('Error loading installers:', error);
+    }
   }, []);
 
   const loadJobs = useCallback(async () => {
@@ -636,6 +648,10 @@ const Jobs = () => {
       
       const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
       
+      // Installer filter - checks if the selected installer is assigned to this job
+      const matchesInstaller = installerFilter === 'all' || 
+        (job.assigned_installers && job.assigned_installers.includes(installerFilter));
+      
       // Get job date
       const getJobDate = () => {
         const dateString = job.scheduled_date || 
@@ -692,7 +708,7 @@ const Jobs = () => {
         job.status === 'arquivado'
       );
       
-      return matchesSearch && matchesStatus && matchesBranch && matchesDateRange && matchesMonth && !isHidden;
+      return matchesSearch && matchesStatus && matchesBranch && matchesInstaller && matchesDateRange && matchesMonth && !isHidden;
     });
     
     // Sort by oldest delivery date first (deliveryNeeded from Hold is priority)
@@ -704,7 +720,7 @@ const Jobs = () => {
       };
       return getDate(a) - getDate(b); // Ascending (oldest first)
     });
-  }, [jobs, searchTerm, statusFilter, branchFilter, startDateFilter, endDateFilter, monthFilter]);
+  }, [jobs, searchTerm, statusFilter, branchFilter, installerFilter, startDateFilter, endDateFilter, monthFilter]);
 
   const loadMore = () => setVisibleCount(prev => prev + 12);
 
@@ -851,32 +867,61 @@ const Jobs = () => {
       </div>
       
       {/* Active Filter Badge */}
-      {statusFilter !== 'all' && (
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            statusFilter === 'aguardando' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-            statusFilter === 'instalando' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-            statusFilter === 'agendado' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-            statusFilter === 'concluido' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
-            statusFilter === 'arquivado' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30' :
-            'bg-primary/20 text-primary border border-primary/30'
-          }`}>
-            {statusFilter === 'aguardando' && <Clock className="h-4 w-4" />}
-            {statusFilter === 'instalando' && <Users className="h-4 w-4" />}
-            {statusFilter === 'agendado' && <CalendarCheck className="h-4 w-4" />}
-            {statusFilter === 'concluido' && <CheckCircle className="h-4 w-4" />}
-            Filtro: {statusFilter === 'aguardando' ? 'Aguardando' : 
-                    statusFilter === 'instalando' ? 'Instalando' : 
-                    statusFilter === 'agendado' ? 'Agendados' :
-                    statusFilter === 'concluido' ? 'Concluídos' :
-                    statusFilter === 'arquivado' ? 'Arquivados' : statusFilter}
-          </span>
-          <button 
-            onClick={() => setStatusFilter('all')}
-            className="text-xs text-muted-foreground hover:text-white transition-colors"
-          >
-            Limpar ×
-          </button>
+      {(statusFilter !== 'all' || installerFilter !== 'all') && (
+        <div className="flex flex-wrap items-center gap-2">
+          {statusFilter !== 'all' && (
+            <>
+              <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+                statusFilter === 'aguardando' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                statusFilter === 'instalando' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                statusFilter === 'agendado' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                statusFilter === 'concluido' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                statusFilter === 'arquivado' ? 'bg-gray-500/20 text-gray-400 border border-gray-500/30' :
+                'bg-primary/20 text-primary border border-primary/30'
+              }`}>
+                {statusFilter === 'aguardando' && <Clock className="h-4 w-4" />}
+                {statusFilter === 'instalando' && <Users className="h-4 w-4" />}
+                {statusFilter === 'agendado' && <CalendarCheck className="h-4 w-4" />}
+                {statusFilter === 'concluido' && <CheckCircle className="h-4 w-4" />}
+                Status: {statusFilter === 'aguardando' ? 'Aguardando' : 
+                        statusFilter === 'instalando' ? 'Instalando' : 
+                        statusFilter === 'agendado' ? 'Agendados' :
+                        statusFilter === 'concluido' ? 'Concluídos' :
+                        statusFilter === 'arquivado' ? 'Arquivados' : statusFilter}
+              </span>
+              <button 
+                onClick={() => setStatusFilter('all')}
+                className="text-xs text-muted-foreground hover:text-white transition-colors"
+              >
+                ×
+              </button>
+            </>
+          )}
+          {installerFilter !== 'all' && (
+            <>
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                <Users className="h-4 w-4" />
+                Instalador: {installers.find(i => i.id === installerFilter)?.full_name || installerFilter}
+              </span>
+              <button 
+                onClick={() => setInstallerFilter('all')}
+                className="text-xs text-muted-foreground hover:text-white transition-colors"
+              >
+                ×
+              </button>
+            </>
+          )}
+          {(statusFilter !== 'all' || installerFilter !== 'all') && (
+            <button 
+              onClick={() => {
+                setStatusFilter('all');
+                setInstallerFilter('all');
+              }}
+              className="text-xs text-muted-foreground hover:text-white transition-colors ml-2"
+            >
+              Limpar todos
+            </button>
+          )}
         </div>
       )}
 
@@ -921,8 +966,25 @@ const Jobs = () => {
             </Select>
           </div>
 
-          {/* Second row - Date filters */}
+          {/* Second row - Installer filter and Date filters */}
           <div className="flex flex-wrap gap-3 items-end">
+            <div>
+              <label className="text-[10px] text-muted-foreground mb-1 block">Instalador</label>
+              <Select value={installerFilter} onValueChange={setInstallerFilter}>
+                <SelectTrigger className="w-48 bg-white/5 border-white/10 text-white h-9">
+                  <Users className="h-3 w-3 mr-2" />
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="all">Todos os Instaladores</SelectItem>
+                  {installers.map((installer) => (
+                    <SelectItem key={installer.id} value={installer.id}>
+                      {installer.full_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <label className="text-[10px] text-muted-foreground mb-1 block">Data Início</label>
               <Popover>
@@ -1026,7 +1088,7 @@ const Jobs = () => {
           <CardContent className="py-12 text-center">
             <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">
-              {searchTerm || statusFilter !== 'all' || branchFilter !== 'all' || monthFilter !== 'all'
+              {searchTerm || statusFilter !== 'all' || branchFilter !== 'all' || installerFilter !== 'all' || monthFilter !== 'all'
                 ? 'Nenhum job encontrado com os filtros aplicados'
                 : 'Nenhum job importado ainda. Importe jobs da Holdprint para começar.'}
             </p>
