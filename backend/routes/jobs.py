@@ -48,7 +48,7 @@ class Job(BaseModel):
     holdprint_data: dict = {}
     products_with_area: List[dict] = []
     total_products: int = 0
-    total_quantity: int = 0
+    total_quantity: float = 0
     item_assignments: List[dict] = []
     archived_items: List[dict] = []
 
