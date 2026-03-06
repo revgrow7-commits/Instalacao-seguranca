@@ -220,6 +220,16 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Changelog
 
+### 06/03/2026 - Filtro por Instalador na Página de Jobs
+- ✅ **FEATURE:** Implementado filtro por instalador na página de Jobs
+  - Dropdown carrega lista de instaladores via API `/api/installers`
+  - Filtra jobs pelo campo `assigned_installers` (array de IDs)
+  - Badge de filtro ativo com cor roxa (consistente com UI)
+  - Botões individuais para limpar cada filtro ou "Limpar todos"
+  - Combinação com outros filtros (status, filial, período) funciona corretamente
+  - Busca por código de job continua ignorando filtros (comportamento existente preservado)
+- ✅ **TESTE:** 100% de sucesso no testing_agent_v3_fork (iteration_3.json)
+
 ### 19/02/2026 - Refatoração Completa e Testes
 - ✅ **REFATORAÇÃO COMPLETA:** Migração de rotas para módulos separados concluída
   - `routes/item_checkins.py`: 735 linhas, 10 rotas
