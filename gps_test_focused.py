@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://instalador-pwa.preview.emergentagent.com/api"
+BASE_URL = "https://holdprint-sync-hub.preview.emergentagent.com/api"
 
 # Test credentials
 ADMIN_CREDENTIALS = {

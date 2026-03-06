@@ -902,7 +902,7 @@ async def forgot_password(request: ForgotPasswordRequest):
     
     # Send email - Get FRONTEND_URL directly from environment to ensure fresh value
     import os as _os
-    frontend_url = _os.environ.get('FRONTEND_URL', 'https://instalador-pwa.preview.emergentagent.com')
+    frontend_url = _os.environ.get('FRONTEND_URL', 'https://holdprint-sync-hub.preview.emergentagent.com')
     reset_link = f"{frontend_url}/reset-password?token={reset_token}"
     logging.info(f"Password reset link generated with FRONTEND_URL: {frontend_url}")
     logging.info(f"Full reset link: {reset_link}")
