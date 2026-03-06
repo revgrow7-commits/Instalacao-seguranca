@@ -9,6 +9,11 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - **Banco de Dados:** MongoDB
 - **Integrações:** Holdworks API, Google Calendar, Resend, Web Push Notifications
 
+## Credenciais Importantes (NÃO PERDER)
+### Holdprint API Keys
+- **SP:** `REDACTED_HOLDPRINT_SP`
+- **POA:** `84ae7df8-893c-4b0d-9b6e-516def1367f`
+
 ---
 
 ## Funcionalidades Implementadas
