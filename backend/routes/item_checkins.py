@@ -304,18 +304,25 @@ async def get_item_checkins(
     job_id: str = None,
     current_user: User = Depends(get_current_user)
 ):
-    """Get item check-ins for a job"""
+    """Get item check-ins for a job - optimized"""
     query = {}
     
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["installer_id"] = installer["id"]
     
     if job_id:
         query["job_id"] = job_id
     
-    checkins = await db.item_checkins.find(query, {"_id": 0}).to_list(1000)
+    # Exclui fotos pesadas da listagem
+    projection = {
+        "_id": 0,
+        "checkin_photo": 0,
+        "checkout_photo": 0
+    }
+    
+    checkins = await db.item_checkins.find(query, projection).sort("checkin_at", -1).to_list(500)
     
     for c in checkins:
         if isinstance(c.get('checkin_at'), str):
@@ -330,20 +337,27 @@ async def get_item_checkins(
 async def get_all_item_checkins(
     current_user: User = Depends(get_current_user)
 ):
-    """Get all item check-ins with photos for reports (Admin/Manager only)"""
+    """Get all item check-ins for reports (Admin/Manager only) - optimized"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    checkins = await db.item_checkins.find({}, {"_id": 0}).to_list(5000)
-    jobs_map = {}
-    installers_map = {}
+    # Projeção otimizada - exclui fotos base64 pesadas
+    projection = {
+        "_id": 0,
+        "checkin_photo": 0,
+        "checkout_photo": 0
+    }
     
-    jobs = await db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1}).to_list(1000)
-    installers = await db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1}).to_list(100)
+    checkins = await db.item_checkins.find({}, projection).sort("checkin_at", -1).to_list(1000)
     
-    for job in jobs:
-        jobs_map[job["id"]] = job
-    for installer in installers:
-        installers_map[installer["id"]] = installer
+    # Busca jobs e installers em paralelo com projeção mínima
+    jobs_cursor = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})
+    installers_cursor = db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1})
+    
+    jobs = await jobs_cursor.to_list(500)
+    installers = await installers_cursor.to_list(100)
+    
+    jobs_map = {job["id"]: job for job in jobs}
+    installers_map = {inst["id"]: inst for inst in installers}
     
     enriched_checkins = []
     for c in checkins:

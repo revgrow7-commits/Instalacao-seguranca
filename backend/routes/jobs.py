@@ -295,22 +295,40 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
 
 @router.get("/jobs", response_model=List[Job])
 async def list_jobs(current_user: User = Depends(get_current_user)):
-    """List jobs based on user role"""
+    """List jobs based on user role - optimized"""
     query = {}
     
+    # Projeção otimizada - apenas campos necessários para listagem
+    projection = {
+        "_id": 0,
+        "id": 1, "title": 1, "status": 1, "branch": 1, "client_name": 1,
+        "scheduled_date": 1, "created_at": 1, "assigned_installers": 1,
+        "archived": 1, "holdprint_job_id": 1, "area_m2": 1,
+        "total_products": 1, "total_quantity": 1, "completed_at": 1,
+        "holdprint_data.code": 1, "holdprint_data.customerName": 1,
+        "holdprint_data.deliveryNeeded": 1, "holdprint_data.isFinalized": 1,
+        "products_with_area": 1, "items": 1, "archived_items": 1
+    }
+    
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["assigned_installers"] = installer['id']
         else:
             return []
     
-    jobs = await db.jobs.find(query, {"_id": 0}).to_list(1000)
+    # Busca otimizada com projeção
+    jobs = await db.jobs.find(query, projection).to_list(500)
     
+    if not jobs:
+        return []
+    
+    # Busca checkins apenas para jobs retornados
+    job_ids = [j.get('id') for j in jobs if j.get('id')]
     active_checkins = await db.item_checkins.find(
-        {"status": "in_progress"},
+        {"status": "in_progress", "job_id": {"$in": job_ids}},
         {"_id": 0, "job_id": 1, "checkin_at": 1}
-    ).to_list(1000)
+    ).to_list(500)
     
     job_start_times = {}
     for checkin in active_checkins:
@@ -323,7 +341,7 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
                 job_start_times[job_id] = checkin_at
     
     for job in jobs:
-        if isinstance(job['created_at'], str):
+        if isinstance(job.get('created_at'), str):
             job['created_at'] = datetime.fromisoformat(job['created_at'])
         if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
             job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])

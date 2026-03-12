@@ -395,23 +395,30 @@ async def checkout(
 
 @router.get("/checkins", response_model=List[CheckIn])
 async def list_checkins(job_id: Optional[str] = None, current_user: User = Depends(get_current_user)):
-    """List check-ins"""
+    """List check-ins - optimized"""
     query = {}
     
     if job_id:
         query["job_id"] = job_id
     
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["installer_id"] = installer['id']
         else:
             return []
     
-    checkins = await db.checkins.find(query, {"_id": 0}).to_list(1000)
+    # Projeção - exclui fotos pesadas da listagem
+    projection = {
+        "_id": 0,
+        "checkin_photo": 0,
+        "checkout_photo": 0
+    }
+    
+    checkins = await db.checkins.find(query, projection).sort("checkin_at", -1).to_list(200)
     
     for checkin in checkins:
-        if isinstance(checkin['checkin_at'], str):
+        if isinstance(checkin.get('checkin_at'), str):
             checkin['checkin_at'] = datetime.fromisoformat(checkin['checkin_at'])
         if checkin.get('checkout_at') and isinstance(checkin['checkout_at'], str):
             checkin['checkout_at'] = datetime.fromisoformat(checkin['checkout_at'])
