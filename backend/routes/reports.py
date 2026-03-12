@@ -782,36 +782,52 @@ async def get_productivity_report(
 
 @router.get("/metrics")
 async def get_metrics(current_user: User = Depends(get_current_user)):
-    """Get general metrics for dashboard."""
+    """Get general metrics for dashboard - optimized with aggregation."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    total_jobs = await db.jobs.count_documents({"archived": {"$ne": True}})
-    completed_jobs = await db.jobs.count_documents({"status": {"$in": ["completed", "finalizado"]}, "archived": {"$ne": True}})
-    in_progress_jobs = await db.jobs.count_documents({"status": {"$in": ["in_progress", "instalando"]}, "archived": {"$ne": True}})
-    pending_jobs = await db.jobs.count_documents({"status": {"$in": ["pending", "aguardando", "scheduled", "agendado"]}, "archived": {"$ne": True}})
+    # Agregação única para jobs
+    jobs_pipeline = [
+        {"$match": {"archived": {"$ne": True}}},
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": 1},
+            "completed": {"$sum": {"$cond": [{"$in": ["$status", ["completed", "finalizado"]]}, 1, 0]}},
+            "in_progress": {"$sum": {"$cond": [{"$in": ["$status", ["in_progress", "instalando"]]}, 1, 0]}},
+            "pending": {"$sum": {"$cond": [{"$in": ["$status", ["pending", "aguardando", "scheduled", "agendado"]]}, 1, 0]}}
+        }}
+    ]
+    jobs_stats = await db.jobs.aggregate(jobs_pipeline).to_list(1)
+    jobs_data = jobs_stats[0] if jobs_stats else {"total": 0, "completed": 0, "in_progress": 0, "pending": 0}
     
-    total_checkins = await db.checkins.count_documents({})
-    completed_checkins = await db.checkins.count_documents({"status": "completed"})
+    # Agregação para checkins com avg
+    checkins_pipeline = [
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": 1},
+            "completed": {"$sum": {"$cond": [{"$eq": ["$status", "completed"]}, 1, 0]}},
+            "avg_duration": {"$avg": {"$ifNull": ["$duration_minutes", 0]}}
+        }}
+    ]
     
-    # Include item_checkins as well
-    total_item_checkins = await db.item_checkins.count_documents({})
-    completed_item_checkins = await db.item_checkins.count_documents({"status": "completed"})
+    checkins_stats = await db.checkins.aggregate(checkins_pipeline).to_list(1)
+    item_checkins_stats = await db.item_checkins.aggregate(checkins_pipeline).to_list(1)
     
-    # Combine checkins for duration calculation
-    completed_checkins_docs = await db.checkins.find({"status": "completed"}, {"duration_minutes": 1, "_id": 0}).to_list(1000)
-    completed_item_checkins_docs = await db.item_checkins.find({"status": "completed"}, {"duration_minutes": 1, "_id": 0}).to_list(1000)
-    all_completed = completed_checkins_docs + completed_item_checkins_docs
-    avg_duration = sum(c.get('duration_minutes', 0) or 0 for c in all_completed) / len(all_completed) if all_completed else 0
+    c_data = checkins_stats[0] if checkins_stats else {"total": 0, "completed": 0, "avg_duration": 0}
+    ic_data = item_checkins_stats[0] if item_checkins_stats else {"total": 0, "completed": 0, "avg_duration": 0}
+    
+    total_checkins = c_data["total"] + ic_data["total"]
+    completed_checkins = c_data["completed"] + ic_data["completed"]
+    avg_duration = (c_data["avg_duration"] + ic_data["avg_duration"]) / 2 if total_checkins > 0 else 0
     
     total_installers = await db.installers.count_documents({})
     
     return {
-        "total_jobs": total_jobs,
-        "completed_jobs": completed_jobs,
-        "in_progress_jobs": in_progress_jobs,
-        "pending_jobs": pending_jobs,
-        "total_checkins": total_checkins + total_item_checkins,
-        "completed_checkins": completed_checkins + completed_item_checkins,
+        "total_jobs": jobs_data["total"],
+        "completed_jobs": jobs_data["completed"],
+        "in_progress_jobs": jobs_data["in_progress"],
+        "pending_jobs": jobs_data["pending"],
+        "total_checkins": total_checkins,
+        "completed_checkins": completed_checkins,
         "avg_duration_minutes": round(avg_duration, 2),
         "total_installers": total_installers
     }
