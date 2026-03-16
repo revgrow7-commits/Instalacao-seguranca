@@ -336,7 +336,7 @@ const Jobs = () => {
   const [branchFilter, setBranchFilter] = useState('all');
   const [installerFilter, setInstallerFilter] = useState('all');
   const [installers, setInstallers] = useState([]);
-  const [monthFilter, setMonthFilter] = useState('current');
+  const [monthFilter, setMonthFilter] = useState('week');
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [showImportDialog, setShowImportDialog] = useState(false);
@@ -682,14 +682,19 @@ const Jobs = () => {
         }
       }
       
-      // Month filter - default to current month if 'current'
+      // Month/Week filter - default to last week
       // IMPORTANT: When a specific status filter is active, bypass month filter
       // to ensure users can find jobs regardless of their date
       let matchesMonth = true;
       const hasActiveStatusFilter = statusFilter !== 'all';
       if (!startDateFilter && !endDateFilter && monthFilter !== 'all' && !hasActiveStatusFilter) {
         if (jobDate && !isNaN(jobDate.getTime())) {
-          if (monthFilter === 'current') {
+          if (monthFilter === 'week') {
+            // Show jobs from last 7 days
+            const now = new Date();
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            matchesMonth = jobDate >= weekAgo;
+          } else if (monthFilter === 'current') {
             // Show jobs from current month (same month/year as today)
             const now = new Date();
             matchesMonth = jobDate.getMonth() === now.getMonth() && 
@@ -1058,6 +1063,7 @@ const Jobs = () => {
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
+                <SelectItem value="week">📅 Última Semana</SelectItem>
                 <SelectItem value="current">📅 Mês Atual</SelectItem>
                 <SelectItem value="all">📋 Todos</SelectItem>
                 {monthOptions.map(opt => (
@@ -1074,7 +1080,7 @@ const Jobs = () => {
                 onClick={() => {
                   setStartDateFilter('');
                   setEndDateFilter('');
-                  setMonthFilter('current');
+                  setMonthFilter('week');
                 }}
                 className="text-muted-foreground hover:text-white h-9"
               >
