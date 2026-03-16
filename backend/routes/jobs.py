@@ -407,6 +407,86 @@ async def get_sync_status(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/jobs/check-inconsistent")
+async def check_inconsistent_jobs(current_user: User = Depends(get_current_user)):
+    """
+    Check for jobs with status 'instalando' but no assigned installers.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    inconsistent_jobs = await db.jobs.find({
+        "status": {"$in": ["instalando", "in_progress"]},
+        "$or": [
+            {"assigned_installers": {"$exists": False}},
+            {"assigned_installers": []},
+            {"assigned_installers": None}
+        ]
+    }, {"_id": 0, "id": 1, "title": 1, "status": 1, "holdprint_data.code": 1}).to_list(500)
+    
+    jobs_list = []
+    for job in inconsistent_jobs:
+        code = job.get("holdprint_data", {}).get("code", job.get("id", "")[:8])
+        jobs_list.append({
+            "id": job["id"],
+            "code": code,
+            "title": job.get("title", "N/A"),
+            "status": job.get("status")
+        })
+    
+    return {
+        "inconsistent_count": len(jobs_list),
+        "jobs": jobs_list
+    }
+
+
+@router.post("/jobs/fix-inconsistent")
+async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
+    """
+    Fix jobs with status 'instalando' but no assigned installers.
+    Changes their status back to 'aguardando'.
+    """
+    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    
+    inconsistent_jobs = await db.jobs.find({
+        "status": {"$in": ["instalando", "in_progress"]},
+        "$or": [
+            {"assigned_installers": {"$exists": False}},
+            {"assigned_installers": []},
+            {"assigned_installers": None}
+        ]
+    }, {"_id": 0, "id": 1, "title": 1, "holdprint_data.code": 1}).to_list(500)
+    
+    if not inconsistent_jobs:
+        return {"message": "Nenhum job inconsistente encontrado", "fixed_count": 0, "jobs": []}
+    
+    result = await db.jobs.update_many(
+        {
+            "status": {"$in": ["instalando", "in_progress"]},
+            "$or": [
+                {"assigned_installers": {"$exists": False}},
+                {"assigned_installers": []},
+                {"assigned_installers": None}
+            ]
+        },
+        {"$set": {"status": "aguardando"}}
+    )
+    
+    fixed_jobs = []
+    for job in inconsistent_jobs:
+        code = job.get("holdprint_data", {}).get("code", job.get("id", "")[:8])
+        fixed_jobs.append({
+            "id": job["id"],
+            "code": code,
+            "title": job.get("title", "N/A")
+        })
+    
+    return {
+        "message": f"Corrigidos {result.modified_count} jobs inconsistentes",
+        "fixed_count": result.modified_count,
+        "jobs": fixed_jobs
+    }
+
+
 @router.get("/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Get a specific job by ID"""
@@ -557,6 +637,11 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     """Update job details"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
+    # Get current job data for validation
+    current_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not current_job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
     update_data = {}
     allowed_fields = [
         "status", "scheduled_date", "assigned_installers", "client_name",
@@ -575,6 +660,17 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     
     if not update_data:
         raise HTTPException(status_code=400, detail="No valid fields to update")
+    
+    # VALIDATION: Cannot set status to "instalando" without assigned installers
+    new_status = update_data.get("status")
+    if new_status in ["instalando", "in_progress"]:
+        # Check if we're updating installers in this request or use existing
+        installers = update_data.get("assigned_installers", current_job.get("assigned_installers", []))
+        if not installers or len(installers) == 0:
+            raise HTTPException(
+                status_code=400, 
+                detail="Não é possível definir status 'Instalando' sem instaladores atribuídos. Atribua pelo menos um instalador primeiro."
+            )
     
     result = await db.jobs.find_one_and_update(
         {"id": job_id},
