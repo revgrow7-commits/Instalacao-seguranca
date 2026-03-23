@@ -23,185 +23,119 @@ def get_scheduler():
 
 
 async def sync_holdprint_job():
-    """
-    Job function to sync Holdprint data.
-    This runs as a background task.
-    """
+    """Sync Holdprint data automatically"""
     from database import db
     
     logger.info("🔄 Iniciando sincronização automática com Holdprint...")
     
     try:
-        # Import the fetch function from server
-        import sys
         import os
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        
-        # Use httpx for async requests
         import httpx
-        from calendar import monthrange
-        from services.holdprint import extract_product_dimensions
         import uuid
+        from services.holdprint import extract_product_dimensions
         
-        # Get API keys from environment
         HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
         HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-        HOLDPRINT_API_URL = "https://api.holdprint.com.br/v1/orders"
+        API_URL = "https://api.holdworks.ai/api-key/jobs/data"
         
         total_imported = 0
         total_skipped = 0
         total_errors = 0
         
-        # Sync last 2 months
-        now = datetime.now(timezone.utc)
-        months_to_sync = []
-        
-        for i in range(3):  # Current month + 2 months back
-            target_month = now.month - i
-            target_year = now.year
-            if target_month <= 0:
-                target_month += 12
-                target_year -= 1
-            months_to_sync.append((target_month, target_year))
-        
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:
             for branch in ["POA", "SP"]:
                 api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
                 
                 if not api_key:
-                    logger.warning(f"API key not configured for branch {branch}")
+                    logger.warning(f"API key not configured for {branch}")
                     continue
                 
-                headers = {"x-api-key": api_key}
+                headers = {"x-api-key": api_key, "Accept": "application/json"}
+                page = 1
                 
-                for month, year in months_to_sync:
-                    try:
-                        last_day = monthrange(year, month)[1]
-                        start_date_str = f"{year}-{month:02d}-01"
-                        end_date_str = f"{year}-{month:02d}-{last_day:02d}"
+                try:
+                    while True:
+                        response = await client.get(f"{API_URL}?page={page}", headers=headers)
+                        response.raise_for_status()
+                        data = response.json()
                         
-                        # Paginate through all jobs
-                        page = 1
-                        total_jobs_in_month = 0
+                        jobs = data.get('data', []) if isinstance(data, dict) else data
+                        has_next = data.get('hasNextPage', False) if isinstance(data, dict) else False
                         
-                        while True:
-                            params = {
-                                "page": page,
-                                "pageSize": 100,
-                                "startDate": start_date_str,
-                                "endDate": end_date_str,
-                                "language": "pt-BR"
-                            }
+                        if not jobs:
+                            break
+                        
+                        for holdprint_job in jobs:
+                            holdprint_job_id = str(holdprint_job.get('id', ''))
                             
-                            response = await client.get(HOLDPRINT_API_URL, headers=headers, params=params)
-                            response.raise_for_status()
-                            data = response.json()
+                            existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                            if existing:
+                                total_skipped += 1
+                                continue
                             
-                            jobs = []
-                            if isinstance(data, dict) and 'data' in data:
-                                jobs = data['data']
-                            elif isinstance(data, list):
-                                jobs = data
-                            
-                            if not jobs:
-                                break  # No more jobs
-                            
-                            total_jobs_in_month += len(jobs)
-                            
-                            # Import ALL jobs (including finalized ones)
-                            for holdprint_job in jobs:
-                                holdprint_job_id = str(holdprint_job.get('id', ''))
+                            try:
+                                products = holdprint_job.get('production', {}).get('products', [])
+                                products_with_area = []
+                                total_area_m2 = 0.0
                                 
-                                # Check if already exists
-                                existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
-                                if existing:
-                                    total_skipped += 1
-                                    continue
+                                for product in products:
+                                    product_info = extract_product_dimensions(product)
+                                    products_with_area.append(product_info)
+                                    total_area_m2 += product_info.get('total_area_m2', 0)
                                 
-                                try:
-                                    # Calculate products and area
-                                    products = holdprint_job.get('production', {}).get('products', [])
-                                    products_with_area = []
-                                    total_area_m2 = 0.0
-                                    total_products = len(products)
-                                    total_quantity = 0
-                                    
-                                    for product in products:
-                                        product_info = extract_product_dimensions(product)
-                                        product_with_area = {
-                                            "name": product.get('name', ''),
-                                            "quantity": product.get('quantity', 1),
-                                            "copies": product_info.get('copies', 1),
-                                            "width_m": product_info.get('width_m', 0),
-                                            "height_m": product_info.get('height_m', 0),
-                                            "unit_area_m2": product_info.get('area_m2', 0),
-                                            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                                        }
-                                        products_with_area.append(product_with_area)
-                                        total_area_m2 += product_with_area['total_area_m2']
-                                        total_quantity += product.get('quantity', 1)
-                                    
-                                    # Create job document
-                                    job_doc = {
-                                        "id": str(uuid.uuid4()),
-                                        "holdprint_job_id": holdprint_job_id,
-                                        "title": holdprint_job.get('title', 'Sem título'),
-                                        "client_name": holdprint_job.get('customerName', 'Cliente não informado'),
-                                        "client_address": '',
-                                        "branch": branch,
-                                        "status": "aguardando",
-                                        "scheduled_date": None,
-                                        "assigned_installers": [],
-                                        "item_assignments": [],
-                                        "items": holdprint_job.get('production', {}).get('items', []),
-                                        "holdprint_data": holdprint_job,
-                                        "area_m2": total_area_m2,
-                                        "products_with_area": products_with_area,
-                                        "total_products": total_products,
-                                        "total_quantity": total_quantity,
-                                        "created_at": datetime.now(timezone.utc).isoformat()
-                                    }
-                                    
-                                    await db.jobs.insert_one(job_doc)
-                                    total_imported += 1
-                                    
-                                except Exception as e:
-                                    total_errors += 1
-                                    logger.error(f"Error importing job {holdprint_job_id}: {str(e)}")
-                            
-                            # Check if we got less than pageSize (last page)
-                            if len(jobs) < 100:
-                                break
-                            
-                            page += 1
+                                job_doc = {
+                                    "id": str(uuid.uuid4()),
+                                    "holdprint_job_id": holdprint_job_id,
+                                    "title": holdprint_job.get('title', 'Sem título'),
+                                    "client_name": holdprint_job.get('customerName', 'Cliente não informado'),
+                                    "branch": branch,
+                                    "status": "aguardando",
+                                    "scheduled_date": None,
+                                    "assigned_installers": [],
+                                    "item_assignments": [],
+                                    "items": holdprint_job.get('production', {}).get('items', []),
+                                    "holdprint_data": holdprint_job,
+                                    "area_m2": total_area_m2,
+                                    "products_with_area": products_with_area,
+                                    "total_products": len(products),
+                                    "total_quantity": sum(p.get('quantity', 1) for p in products),
+                                    "created_at": datetime.now(timezone.utc).isoformat()
+                                }
+                                
+                                await db.jobs.insert_one(job_doc)
+                                total_imported += 1
+                                
+                            except Exception as e:
+                                total_errors += 1
+                                logger.error(f"Error importing job {holdprint_job_id}: {e}")
                         
-                        logger.info(f"Sync {branch} {month}/{year}: processed {total_jobs_in_month} jobs")
-                        
-                    except httpx.HTTPError as e:
-                        logger.error(f"Error fetching {branch} {month}/{year}: {str(e)}")
-                    except Exception as e:
-                        logger.error(f"Error processing {branch} {month}/{year}: {str(e)}")
+                        if not has_next:
+                            break
+                        page += 1
+                        if page > 50:
+                            break
+                    
+                    logger.info(f"Sync {branch}: {total_imported} imported")
+                    
+                except Exception as e:
+                    logger.error(f"Error syncing {branch}: {e}")
         
-        # Record sync result
         await db.system_config.update_one(
             {"key": "last_holdprint_sync"},
-            {
-                "$set": {
-                    "key": "last_holdprint_sync",
-                    "value": datetime.now(timezone.utc).isoformat(),
-                    "total_imported": total_imported,
-                    "total_skipped": total_skipped,
-                    "total_errors": total_errors,
-                    "sync_type": "automatic"
-                }
-            },
+            {"$set": {
+                "key": "last_holdprint_sync",
+                "value": datetime.now(timezone.utc).isoformat(),
+                "total_imported": total_imported,
+                "total_skipped": total_skipped,
+                "total_errors": total_errors
+            }},
             upsert=True
         )
         
-        logger.info(f"✅ Sincronização automática concluída: {total_imported} importados, {total_skipped} existentes, {total_errors} erros")
+        logger.info(f"✅ Sync concluída: {total_imported} importados, {total_skipped} existentes")
         
     except Exception as e:
-        logger.error(f"❌ Erro na sincronização automática: {str(e)}")
+        logger.error(f"❌ Erro na sincronização: {e}")
 
 
 def setup_scheduler(db_instance):
