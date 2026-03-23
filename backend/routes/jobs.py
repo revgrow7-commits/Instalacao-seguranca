@@ -160,7 +160,7 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
 
 
 async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = True):
-    """Fetch jobs from Holdprint API with pagination - API uses fixed pageSize=20"""
+    """Fetch ALL jobs from Holdprint API with pagination"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
@@ -171,78 +171,45 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
         "Accept": "application/json"
     }
     
-    # API URL correta conforme documentação
     api_url = "https://api.holdworks.ai/api-key/jobs/data"
-    
-    now = datetime.now(timezone.utc)
-    target_month = month if month else now.month
-    target_year = year if year else now.year
     
     all_jobs = []
     page = 1
     
     try:
         while True:
-            # API usa paginação com pageSize fixo de 20
             response = requests.get(f"{api_url}?page={page}", headers=headers, timeout=60)
             
             if response.status_code == 401:
-                logger.error(f"Holdprint {branch}: Autenticação falhou - chave de API inválida")
-                raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}. Verifique a configuração.")
+                raise HTTPException(status_code=401, detail=f"Chave de API inválida para {branch}")
             
             response.raise_for_status()
             data = response.json()
             
-            jobs = []
-            has_next = False
-            
-            if isinstance(data, dict):
-                jobs = data.get('data', [])
-                has_next = data.get('hasNextPage', False)
-            elif isinstance(data, list):
-                jobs = data
+            jobs = data.get('data', []) if isinstance(data, dict) else data
+            has_next = data.get('hasNextPage', False) if isinstance(data, dict) else False
             
             if not jobs:
                 break
             
-            # Filtrar por mês/ano baseado em creationTime
-            for job in jobs:
-                creation_time = job.get('creationTime', '')
-                if creation_time:
-                    try:
-                        job_date = datetime.fromisoformat(creation_time.replace('Z', '+00:00'))
-                        if job_date.month == target_month and job_date.year == target_year:
-                            all_jobs.append(job)
-                    except:
-                        all_jobs.append(job)  # Include if can't parse date
-                else:
-                    all_jobs.append(job)
+            all_jobs.extend(jobs)
             
             if not has_next:
                 break
             
             page += 1
-            
-            # Safety limit
-            if page > 100:
+            if page > 50:
                 break
         
-        # Filter finalized jobs if requested
         if not include_finalized:
-            filtered_jobs = [job for job in all_jobs if not job.get('isFinalized', False)]
-        else:
-            filtered_jobs = all_jobs
+            all_jobs = [j for j in all_jobs if not j.get('isFinalized', False)]
         
-        logger.info(f"Holdprint {branch}: {len(filtered_jobs)} jobs do mês {target_month}/{target_year}")
+        logger.info(f"Holdprint {branch}: {len(all_jobs)} jobs encontrados")
+        return all_jobs
         
-        return filtered_jobs
     except requests.RequestException as e:
-        error_msg = str(e)
-        if "401" in error_msg or "Unauthorized" in error_msg:
-            logger.error(f"Holdprint {branch}: Chave de API inválida")
-            raise HTTPException(status_code=401, detail=f"Chave de API inválida para a filial {branch}")
-        logger.error(f"Error fetching from Holdprint: {error_msg}")
-        raise HTTPException(status_code=500, detail=f"Erro ao conectar com Holdprint: {error_msg}")
+        logger.error(f"Erro Holdprint {branch}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao conectar com Holdprint: {e}")
 
 
 # ============ HOLDPRINT ROUTES ============
