@@ -9,14 +9,33 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - **Banco de Dados:** MongoDB
 - **Integrações:** Holdworks API, Google Calendar, Resend, Web Push Notifications
 
-## Credenciais Importantes (NÃO PERDER)
-### Holdprint API Keys
+---
+
+## ⚠️ INFORMAÇÕES CRÍTICAS - NÃO ERRAR
+
+### API Holdworks (Holdprint)
+- **URL CORRETA:** `https://api.holdworks.ai/api-key/jobs/data`
+- **Header:** `x-api-key: <chave>`
+- **Paginação:** `?page=N` (pageSize fixo de 20, não aceita parâmetros)
+- **Resposta:** `{ data: [], hasNextPage: true/false, totalCount: N, totalPages: N }`
+
+### Chaves de API Holdprint
 - **SP:** `4e20f4c2-6f84-49e7-9ab9-e27d6930a13a`
 - **POA:** `84ae7df8-893c-4b0d-9b6e-516def1367f0`
 
 ### URLs de Produção
 - **Frontend:** `https://instal-visual.com.br`
-- **FRONTEND_URL (backend .env):** `https://instal-visual.com.br`
+- **FRONTEND_URL (backend .env):** `https://instal-visual.com.br` (HARDCODED no código para evitar erros)
+
+### Reset de Senha
+- Link HARDCODED em `/app/backend/server.py` e `/app/backend/routes/auth.py`
+- URL: `https://instal-visual.com.br/reset-password?token=...`
+
+### Regras de Negócio Importantes
+1. **Status "instalando"** só pode ser definido se houver instaladores atribuídos
+2. **Itens arquivados** NÃO devem aparecer para instaladores - verificar via `archived_items` array
+3. **Filtro de mês** não deve interferir quando filtro de status está ativo
+4. **Jobs novos** devem ser importados automaticamente (sync a cada 30 minutos)
 
 ---
 
