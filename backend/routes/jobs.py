@@ -160,37 +160,31 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
 
 
 async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = True):
-    """Fetch jobs from Holdprint API with pagination"""
+    """Fetch jobs from Holdprint API with pagination - API uses fixed pageSize=20"""
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
     
     if not api_key:
         raise HTTPException(status_code=500, detail=f"Chave de API não configurada para a filial {branch}")
     
-    headers = {"x-api-key": api_key}
+    headers = {
+        "x-api-key": api_key,
+        "Accept": "application/json"
+    }
+    
+    # API URL correta conforme documentação
+    api_url = "https://api.holdworks.ai/api-key/jobs/data"
     
     now = datetime.now(timezone.utc)
     target_month = month if month else now.month
     target_year = year if year else now.year
     
-    last_day = monthrange(target_year, target_month)[1]
-    start_date_str = f"{target_year}-{target_month:02d}-01"
-    end_date_str = f"{target_year}-{target_month:02d}-{last_day:02d}"
-    
     all_jobs = []
     page = 1
-    page_size = 200
     
     try:
         while True:
-            params = {
-                "page": page,
-                "pageSize": page_size,
-                "startDate": start_date_str,
-                "endDate": end_date_str,
-                "language": "pt-BR"
-            }
-            
-            response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=60)
+            # API usa paginação com pageSize fixo de 20
+            response = requests.get(f"{api_url}?page={page}", headers=headers, timeout=60)
             
             if response.status_code == 401:
                 logger.error(f"Holdprint {branch}: Autenticação falhou - chave de API inválida")
@@ -200,21 +194,38 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
             data = response.json()
             
             jobs = []
-            if isinstance(data, dict) and 'data' in data:
-                jobs = data['data']
+            has_next = False
+            
+            if isinstance(data, dict):
+                jobs = data.get('data', [])
+                has_next = data.get('hasNextPage', False)
             elif isinstance(data, list):
                 jobs = data
             
             if not jobs:
-                break  # No more jobs
+                break
             
-            all_jobs.extend(jobs)
+            # Filtrar por mês/ano baseado em creationTime
+            for job in jobs:
+                creation_time = job.get('creationTime', '')
+                if creation_time:
+                    try:
+                        job_date = datetime.fromisoformat(creation_time.replace('Z', '+00:00'))
+                        if job_date.month == target_month and job_date.year == target_year:
+                            all_jobs.append(job)
+                    except:
+                        all_jobs.append(job)  # Include if can't parse date
+                else:
+                    all_jobs.append(job)
             
-            # If we got less than page_size, we've reached the last page
-            if len(jobs) < page_size:
+            if not has_next:
                 break
             
             page += 1
+            
+            # Safety limit
+            if page > 100:
+                break
         
         # Filter finalized jobs if requested
         if not include_finalized:
@@ -222,7 +233,7 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
         else:
             filtered_jobs = all_jobs
         
-        logger.info(f"Holdprint {branch}: {len(all_jobs)} jobs encontrados, {len(filtered_jobs)} {'total' if include_finalized else 'não finalizados'}")
+        logger.info(f"Holdprint {branch}: {len(filtered_jobs)} jobs do mês {target_month}/{target_year}")
         
         return filtered_jobs
     except requests.RequestException as e:
