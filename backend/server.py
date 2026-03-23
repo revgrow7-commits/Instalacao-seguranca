@@ -900,12 +900,8 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Send email - Get FRONTEND_URL directly from environment to ensure fresh value
-    import os as _os
-    frontend_url = _os.environ.get('FRONTEND_URL', 'https://holdprint-sync-hub.preview.emergentagent.com')
-    reset_link = f"{frontend_url}/reset-password?token={reset_token}"
-    logging.info(f"Password reset link generated with FRONTEND_URL: {frontend_url}")
-    logging.info(f"Full reset link: {reset_link}")
+    # Send email - Hardcoded production URL
+    reset_link = f"https://instal-visual.com.br/reset-password?token={reset_token}"
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
