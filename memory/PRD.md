@@ -14,6 +14,10 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - **SP:** `REDACTED_HOLDPRINT_SP`
 - **POA:** `REDACTED_HOLDPRINT_POA`
 
+### URLs de Produção
+- **Frontend:** `https://instal-visual.com.br`
+- **FRONTEND_URL (backend .env):** `https://instal-visual.com.br`
+
 ---
 
 ## Funcionalidades Implementadas
