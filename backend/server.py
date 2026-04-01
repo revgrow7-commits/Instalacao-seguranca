@@ -900,8 +900,8 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Send email - Hardcoded production URL
-    reset_link = f"https://instal-visual.com.br/reset-password?token={reset_token}"
+    # Send email - Use environment variable for frontend URL
+    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">

@@ -97,8 +97,8 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Force production URL - hardcoded to avoid environment variable issues
-    reset_link = f"https://instal-visual.com.br/reset-password?token={reset_token}"
+    # Use environment variable for frontend URL
+    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
     
     logging.info(f"Password reset link generated for {request.email}")
     
