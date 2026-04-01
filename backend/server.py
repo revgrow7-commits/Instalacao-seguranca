@@ -1815,6 +1815,60 @@ async def trello_search_cards(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@api_router.get("/location-alerts")
+async def get_location_alerts(current_user: User = Depends(get_current_user)):
+    """
+    Get recent location alerts for the dashboard.
+    Returns alerts from the last 24 hours where installers checked out
+    far from their check-in location.
+    """
+    try:
+        # Get alerts from last 24 hours
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        
+        alerts_cursor = db.location_alerts.find(
+            {"created_at": {"$gte": cutoff}},
+            {"_id": 0}
+        ).sort("created_at", -1).limit(50)
+        
+        alerts = await alerts_cursor.to_list(length=50)
+        
+        # Enrich with job and installer info
+        enriched_alerts = []
+        for alert in alerts:
+            # Get job info
+            job = await db.jobs.find_one(
+                {"id": alert.get("job_id")},
+                {"_id": 0, "job_number": 1, "client_name": 1}
+            )
+            
+            # Get installer info
+            installer = await db.users.find_one(
+                {"id": alert.get("installer_id")},
+                {"_id": 0, "full_name": 1, "phone": 1}
+            )
+            
+            job_title = f"#{job.get('job_number', 'N/A')} - {job.get('client_name', 'N/A')}" if job else "Job não encontrado"
+            installer_name = installer.get("full_name", "Instalador não encontrado") if installer else "Instalador não encontrado"
+            
+            enriched_alerts.append({
+                "id": alert.get("id"),
+                "job_id": alert.get("job_id"),
+                "job_title": job_title,
+                "installer_id": alert.get("installer_id"),
+                "installer_name": installer_name,
+                "distance_meters": alert.get("distance_meters", 0),
+                "max_allowed_meters": alert.get("max_allowed_meters", MAX_CHECKOUT_DISTANCE_METERS),
+                "created_at": alert.get("created_at"),
+                "action_taken": alert.get("action_taken", "none")
+            })
+        
+        return enriched_alerts
+    except Exception as e:
+        logger.error(f"Error fetching location alerts: {e}")
+        return []
+
+
 @api_router.get("/")
 async def root():
     return {"message": "INDÚSTRIA VISUAL API", "status": "online"}
