@@ -28,8 +28,9 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - **FRONTEND_URL (backend .env):** `https://instal-visual.com.br` (HARDCODED no código para evitar erros)
 
 ### Reset de Senha
-- Link HARDCODED em `/app/backend/server.py` e `/app/backend/routes/auth.py`
-- URL: `https://instal-visual.com.br/reset-password?token=...`
+- Link agora usa variável de ambiente `FRONTEND_URL` em `/app/backend/server.py` e `/app/backend/routes/auth.py`
+- URL: `{FRONTEND_URL}/reset-password?token=...`
+- **CORRIGIDO (01/04/2026):** URLs hardcoded substituídos por variável de ambiente
 
 ### Regras de Negócio Importantes
 1. **Status "instalando"** só pode ser definido se houver instaladores atribuídos
@@ -94,6 +95,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ### Notificações
 - [x] Infraestrutura de Push Notifications (VAPID)
 - [x] Sistema de justificativa para jobs não realizados
+- [x] **Endpoint /api/location-alerts** - Alertas de localização no dashboard (01/04/2026)
 
 ---
 
