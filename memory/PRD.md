@@ -5,13 +5,21 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ## Stack Tecnológico
 - **Frontend:** React + Tailwind CSS + Shadcn UI
-- **Backend:** FastAPI (Python)
+- **Backend:** FastAPI (Python) - **Compatível com Vercel Serverless**
 - **Banco de Dados:** Supabase (PostgreSQL) - **MIGRADO EM 10/04/2026**
 - **Integrações:** Holdworks API, Resend, Web Push Notifications
+- **Deploy Backend:** Vercel Functions (serverless)
+- **Deploy Frontend:** Vercel
 
 ---
 
 ## ⚠️ INFORMAÇÕES CRÍTICAS - NÃO ERRAR
+
+### Deploy Vercel (Backend)
+- **Entry Point:** `/api/index.py`
+- **Cron Job:** `/api/cron/sync-holdprint` (cada 30 min)
+- **Variáveis:** `VERCEL=1`, `SERVERLESS=true` habilitam modo serverless
+- **IMPORTANTE:** APScheduler desabilitado em modo serverless
 
 ### Banco de Dados - SUPABASE
 - **URL:** `https://otyrrvkixegiqsthmaaj.supabase.co`
