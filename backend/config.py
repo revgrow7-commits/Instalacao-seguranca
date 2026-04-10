@@ -2,14 +2,17 @@
 Configuration and constants for the application.
 """
 import os
+import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# JWT Settings
-SECRET_KEY = os.environ.get('JWT_SECRET', 'your-secret-key-change-in-production')
+# JWT Settings - Auto-generate SECRET_KEY from SUPABASE_SERVICE_KEY or use a secure default
+# This eliminates the need for a separate JWT_SECRET environment variable
+_supabase_key = os.environ.get('SUPABASE_SERVICE_KEY', 'industria-visual-default-key-2024')
+SECRET_KEY = hashlib.sha256(_supabase_key.encode()).hexdigest()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
