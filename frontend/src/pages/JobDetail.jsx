@@ -265,7 +265,9 @@ const JobDetail = () => {
     );
   };
 
-  const toggleItemInstaller = (installerId) => {
+  const toggleItemInstaller = (installer) => {
+    // Use user_id for API calls, but track by installer.id for UI
+    const installerId = installer.user_id || installer.id;
     setSelectedItemInstallers(prev => 
       prev.includes(installerId) 
         ? prev.filter(id => id !== installerId)
@@ -285,7 +287,7 @@ const JobDetail = () => {
 
     try {
       await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers, {
-        difficulty_level: assignmentDifficulty && assignmentDifficulty !== 'none' ? parseInt(assignmentDifficulty) : null,
+        difficulty_level: assignmentDifficulty && assignmentDifficulty !== 'none' ? assignmentDifficulty : null,
         scenario_category: assignmentScenario && assignmentScenario !== 'none' ? assignmentScenario : null,
         apply_to_all: applyToAllItems
       });
@@ -297,7 +299,8 @@ const JobDetail = () => {
       setAssignmentScenario('');
       loadData();
     } catch (error) {
-      toast.error('Erro ao atribuir itens');
+      console.error('Erro ao atribuir itens:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao atribuir itens');
     }
   };
 
@@ -777,25 +780,28 @@ const JobDetail = () => {
                 <div>
                   <Label className="text-white mb-2 block">2. Selecione os Instaladores</Label>
                   <div className="space-y-2 max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2">
-                    {installers.map((installer) => (
-                      <div
-                        key={installer.id}
-                        className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
-                          selectedItemInstallers.includes(installer.id) 
-                            ? 'bg-primary/20 border border-primary/50' 
-                            : 'bg-white/5 hover:bg-white/10 border border-transparent'
-                        }`}
-                      >
-                        <Checkbox
-                          checked={selectedItemInstallers.includes(installer.id)}
-                          onCheckedChange={() => toggleItemInstaller(installer.id)}
-                        />
-                        <div className="flex-1">
-                          <p className="text-white font-medium">{installer.full_name}</p>
-                          <p className="text-sm text-muted-foreground">{installer.branch}</p>
+                    {installers.map((installer) => {
+                      const installerId = installer.user_id || installer.id;
+                      return (
+                        <div
+                          key={installer.id}
+                          className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
+                            selectedItemInstallers.includes(installerId) 
+                              ? 'bg-primary/20 border border-primary/50' 
+                              : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={selectedItemInstallers.includes(installerId)}
+                            onCheckedChange={() => toggleItemInstaller(installer)}
+                          />
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{installer.full_name}</p>
+                            <p className="text-sm text-muted-foreground">{installer.branch}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
