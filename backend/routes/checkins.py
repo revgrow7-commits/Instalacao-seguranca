@@ -289,12 +289,7 @@ async def create_checkin(
             gps_accuracy=gps_accuracy
         )
 
-        # Only keep columns that exist in the actual Supabase checkins table
-        _CHECKIN_DB_COLUMNS = {'id', 'job_id', 'installer_id', 'checkin_at', 'checkout_at',
-            'checkin_photo', 'checkout_photo', 'gps_lat', 'gps_long',
-            'checkout_gps_lat', 'checkout_gps_long', 'notes',
-            'duration_minutes', 'status'}
-        checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None and k in _CHECKIN_DB_COLUMNS}
+        checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None}
         checkin_dict['checkin_at'] = checkin.checkin_at.isoformat()
 
         db.checkins.insert_one(checkin_dict)
@@ -378,12 +373,8 @@ async def _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy
         "duration_minutes": duration_minutes,
         "status": "completed"
     }
-    # Only keep columns that exist in the actual Supabase checkins table
-    _CHECKIN_DB_COLUMNS = {'id', 'job_id', 'installer_id', 'checkin_at', 'checkout_at',
-        'checkin_photo', 'checkout_photo', 'gps_lat', 'gps_long',
-        'checkout_gps_lat', 'checkout_gps_long', 'notes',
-        'duration_minutes', 'status'}
-    update_data = {k: v for k, v in update_data.items() if v is not None and k in _CHECKIN_DB_COLUMNS}
+    # Central filter in db_supabase.py handles column filtering automatically
+    update_data = {k: v for k, v in update_data.items() if v is not None}
 
     db.checkins.update_one({"id": checkin_id}, {"$set": update_data})
     result = db.checkins.find_one({"id": checkin_id}, {"_id": 0})

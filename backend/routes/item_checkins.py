@@ -12,7 +12,7 @@ import math
 from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
-from models.product import ProductInstalled
+
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -146,9 +146,10 @@ async def detect_product_family(product_names: list) -> tuple:
     return None, None
 
 
-async def update_productivity_history(installed_product):
-    """Update productivity history aggregates."""
-    pass
+async def update_productivity_history(product_data: dict):
+    """Update productivity history aggregates - delegates to products module."""
+    from routes.products import update_productivity_history as _update
+    await _update(product_data)
 
 
 # Import gamification functions from server (these will be available when router is included)
@@ -538,25 +539,28 @@ async def complete_item_checkout(
         
         family_id, family_name = await detect_product_family([product.get("name", "")])
         
-        installed_product = ProductInstalled(
-            job_id=checkin["job_id"],
-            checkin_id=checkin_id,
-            product_name=product.get("name", f"Item {checkin['item_index']}"),
-            family_id=family_id,
-            family_name=family_name,
-            width_m=product.get("width"),
-            height_m=product.get("height"),
-            area_m2=installed_m2 or product.get("total_area_m2", 0),
-            complexity_level=complexity_level or 1,
-            height_category=height_category or "terreo",
-            scenario_category=scenario_category or "loja_rua",
-            actual_time_min=net_duration_minutes,
-            productivity_m2_h=productivity_m2_h,
-            cause_notes=notes
-        )
-        
-        db.installed_products.insert_one(installed_product.model_dump())
-        await update_productivity_history(installed_product)
+        installed_product_dict = {
+            "id": str(uuid.uuid4()),
+            "job_id": checkin["job_id"],
+            "checkin_id": checkin_id,
+            "installer_id": checkin.get("installer_id"),
+            "product_name": product.get("name", f"Item {checkin['item_index']}"),
+            "family_id": family_id,
+            "family_name": family_name,
+            "width_m": product.get("width"),
+            "height_m": product.get("height"),
+            "quantity": product.get("quantity", 1),
+            "area_m2": installed_m2 or product.get("total_area_m2", 0),
+            "complexity_level": complexity_level or 1,
+            "height_category": height_category or "terreo",
+            "scenario_category": scenario_category or "loja_rua",
+            "duration_minutes": net_duration_minutes,
+            "productivity_m2_h": productivity_m2_h,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        db.installed_products.insert_one(installed_product_dict)
+        await update_productivity_history(installed_product_dict)
     
     # Check job completion
     job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
@@ -623,7 +627,7 @@ async def archive_item_checkin(
     
     db.item_checkins.update_one(
         {"id": checkin_id},
-        {"$set": {"archived": True, "archived_at": datetime.now(timezone.utc).isoformat()}}
+        {"$set": {"is_archived": True}}
     )
     
     return {"message": "Item check-in archived successfully"}
