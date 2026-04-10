@@ -1243,7 +1243,7 @@ const JobDetail = () => {
                         onClick={() => {
                           const phone = installer.phone.replace(/\D/g, '');
                           const fullPhone = phone.startsWith('55') ? phone : `55${phone}`;
-                          const appUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+                          const appUrl = window.location.origin;
                           const message = encodeURIComponent(
                             `Olá ${installer.full_name?.split(' ')[0]}! 👋\n\n` +
                             `Estou entrando em contato sobre o job:\n` +

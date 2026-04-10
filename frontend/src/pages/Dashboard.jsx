@@ -65,7 +65,7 @@ const Dashboard = () => {
     }
 
     let message = '';
-    const appUrl = process.env.REACT_APP_BACKEND_URL || window.location.origin;
+    const appUrl = window.location.origin;
     
     switch (messageType) {
       case 'paused':

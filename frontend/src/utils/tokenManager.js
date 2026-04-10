@@ -1,7 +1,6 @@
 /**
  * Secure Token Manager
- * Uses sessionStorage instead of localStorage for better security against XSS
- * Tokens are cleared when the browser session ends
+ * Uses localStorage with expiry control for persistent sessions
  */
 
 const TOKEN_KEY = 'auth_token';
@@ -16,14 +15,14 @@ const sanitizeToken = (token) => {
 
 // Check if token is expired
 const isTokenExpired = () => {
-  const expiry = sessionStorage.getItem(TOKEN_EXPIRY_KEY);
+  const expiry = localStorage.getItem(TOKEN_EXPIRY_KEY);
   if (!expiry) return true;
   return Date.now() > parseInt(expiry, 10);
 };
 
 export const tokenManager = {
   /**
-   * Store token securely in sessionStorage
+   * Store token securely in localStorage
    * @param {string} token - JWT token
    * @param {number} expiresInDays - Token expiry in days (default 7)
    */
@@ -32,10 +31,10 @@ export const tokenManager = {
     if (!sanitized) return false;
     
     try {
-      sessionStorage.setItem(TOKEN_KEY, sanitized);
+      localStorage.setItem(TOKEN_KEY, sanitized);
       // Store expiry time
       const expiryTime = Date.now() + (expiresInDays * 24 * 60 * 60 * 1000);
-      sessionStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
+      localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
       return true;
     } catch (e) {
       console.error('Failed to store token:', e);
@@ -53,7 +52,7 @@ export const tokenManager = {
         tokenManager.clearToken();
         return null;
       }
-      return sessionStorage.getItem(TOKEN_KEY);
+      return localStorage.getItem(TOKEN_KEY);
     } catch (e) {
       console.error('Failed to get token:', e);
       return null;
@@ -65,8 +64,8 @@ export const tokenManager = {
    */
   clearToken: () => {
     try {
-      sessionStorage.removeItem(TOKEN_KEY);
-      sessionStorage.removeItem(TOKEN_EXPIRY_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(TOKEN_EXPIRY_KEY);
     } catch (e) {
       console.error('Failed to clear token:', e);
     }
@@ -88,11 +87,11 @@ export const tokenManager = {
   },
 
   /**
-   * Migrate from localStorage to sessionStorage (one-time migration)
+   * Migrate from localStorage to localStorage (one-time migration)
    */
   migrateFromLocalStorage: () => {
     const oldToken = localStorage.getItem('token');
-    if (oldToken && !sessionStorage.getItem(TOKEN_KEY)) {
+    if (oldToken && !localStorage.getItem(TOKEN_KEY)) {
       tokenManager.setToken(oldToken);
       localStorage.removeItem('token');
     }

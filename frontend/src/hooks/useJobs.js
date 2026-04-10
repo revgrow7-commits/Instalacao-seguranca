@@ -51,7 +51,7 @@ export function useJobs() {
   const syncHoldprint = useCallback(async () => {
     try {
       setSyncing(true);
-      await api.post('/jobs/import-current-month');
+      await api.importCurrentMonthJobs();
       toast.success('Sincronização iniciada');
       
       // Refresh jobs after sync
@@ -170,11 +170,7 @@ export function useJobs() {
     try {
       setActionLoading(jobId);
       
-      await api.post('/jobs/justify', {
-        job_id: jobId,
-        type,
-        reason
-      });
+      await api.submitJobJustification(jobId, { type, reason });
       
       toast.success('Justificativa enviada');
       return true;

@@ -68,6 +68,23 @@ const webpackConfig = {
         webpackConfig.plugins.push(healthPluginInstance);
       }
 
+      // Remove console.log/warn/error in production builds
+      if (process.env.NODE_ENV === 'production') {
+        const TerserPlugin = require('terser-webpack-plugin');
+        webpackConfig.optimization.minimizer = webpackConfig.optimization.minimizer.map(plugin => {
+          if (plugin instanceof TerserPlugin) {
+            return new TerserPlugin({
+              terserOptions: {
+                compress: {
+                  drop_console: true,
+                },
+              },
+            });
+          }
+          return plugin;
+        });
+      }
+
       return webpackConfig;
     },
   },
