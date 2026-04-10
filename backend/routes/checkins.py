@@ -275,32 +275,37 @@ async def create_checkin(
     if existing:
         raise HTTPException(status_code=400, detail="Already checked in")
     
-    compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
-    
-    checkin_id = str(uuid.uuid4())
-    checkin = CheckIn(
-        id=checkin_id,
-        job_id=job_id,
-        installer_id=installer['id'],
-        checkin_photo=compressed_photo,
-        gps_lat=gps_lat,
-        gps_long=gps_long,
-        gps_accuracy=gps_accuracy
-    )
-    
-    checkin_dict = checkin.model_dump()
-    checkin_dict['checkin_at'] = checkin_dict['checkin_at'].isoformat()
-    if checkin_dict.get('checkout_at'):
-        checkin_dict['checkout_at'] = checkin_dict['checkout_at'].isoformat()
-    
-    db.checkins.insert_one(checkin_dict)
-    
-    db.jobs.update_one(
-        {"id": job_id},
-        {"$set": {"status": "instalando"}}
-    )
-    
-    return checkin
+    try:
+        compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
+
+        checkin_id = str(uuid.uuid4())
+        checkin = CheckIn(
+            id=checkin_id,
+            job_id=job_id,
+            installer_id=installer['id'],
+            checkin_photo=compressed_photo,
+            gps_lat=gps_lat,
+            gps_long=gps_long,
+            gps_accuracy=gps_accuracy
+        )
+
+        # Filter out None values to avoid Supabase column errors
+        checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None}
+        checkin_dict['checkin_at'] = checkin.checkin_at.isoformat()
+
+        db.checkins.insert_one(checkin_dict)
+
+        db.jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "instalando"}}
+        )
+
+        return checkin
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Check-in error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro no check-in: {str(e)}")
 
 
 @router.put("/checkins/{checkin_id}/checkout", response_model=CheckIn)
@@ -356,6 +361,8 @@ async def checkout(
         "duration_minutes": duration_minutes,
         "status": "completed"
     }
+    # Filter out None values to avoid Supabase column errors
+    update_data = {k: v for k, v in update_data.items() if v is not None}
     
     result = db.checkins.find_one_and_update(
         {"id": checkin_id},
