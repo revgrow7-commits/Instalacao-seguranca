@@ -54,31 +54,31 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
     if not balance:
         balance = {
             "user_id": user_id,
-            "coins": 0,
-            "level": 1,
-            "total_earned": 0,
-            "total_redeemed": 0,
+            "total_coins": 0,
+            "lifetime_coins": 0,
+            "current_level": "bronze",
+            "level": "bronze",
             "streak_days": 0,
             "last_activity": None,
-            "created_at": datetime.now(timezone.utc).isoformat()
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }
         db.gamification_balances.insert_one(balance)
     
     # Calculate new balance
-    new_coins = balance.get("coins", 0) + amount
-    new_total_earned = balance.get("total_earned", 0) + (amount if amount > 0 else 0)
-    new_total_redeemed = balance.get("total_redeemed", 0) + (abs(amount) if amount < 0 else 0)
-    new_level = calculate_level(new_total_earned)
-    
+    new_coins = (balance.get("total_coins", 0) or 0) + amount
+    new_lifetime = (balance.get("lifetime_coins", 0) or 0) + (amount if amount > 0 else 0)
+    new_level = calculate_level(new_lifetime)
+
     # Update balance
     db.gamification_balances.update_one(
         {"user_id": user_id},
         {"$set": {
-            "coins": new_coins,
-            "total_earned": new_total_earned,
-            "total_redeemed": new_total_redeemed,
-            "level": new_level,
-            "last_activity": datetime.now(timezone.utc).isoformat()
+            "total_coins": new_coins,
+            "lifetime_coins": new_lifetime,
+            "level": str(new_level),
+            "last_activity": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat()
         }}
     )
     
@@ -93,13 +93,13 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
         "balance_after": new_coins,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    db.gamification_transactions.insert_one(transaction)
+    db.coin_transactions.insert_one(transaction)
     
     return {
-        "coins": new_coins,
+        "total_coins": new_coins,
         "level": new_level,
         "amount_added": amount,
-        "total_earned": new_total_earned
+        "lifetime_coins": new_lifetime
     }
 
 

@@ -94,66 +94,61 @@ class ProductivityHistory(BaseModel):
     """Consolidated productivity history for benchmarks."""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    family_id: str
-    family_name: str
-    complexity_level: int
-    height_category: str
-    scenario_category: str
-    avg_productivity_m2_h: float
-    avg_time_per_m2_min: float
-    sample_count: int
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    family_id: Optional[str] = None
+    family_name: Optional[str] = None
+    installer_id: Optional[str] = None
+    date: Optional[str] = None
+    total_m2: float = 0
+    total_minutes: float = 0
+    items_count: int = 0
+    productivity_m2_h: float = 0
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ============ HELPER FUNCTIONS ============
 
-async def update_productivity_history(product: ProductInstalled):
-    """Update the productivity history based on new data."""
-    if not product.family_id or not product.productivity_m2_h:
+async def update_productivity_history(product_data: dict):
+    """Update the productivity history based on new installed product data."""
+    family_id = product_data.get("family_id")
+    installer_id = product_data.get("installer_id")
+    area_m2 = product_data.get("area_m2", 0) or 0
+    duration_min = product_data.get("duration_minutes", 0) or 0
+
+    if not family_id or area_m2 <= 0:
         return
-    
-    key = {
-        "family_id": product.family_id,
-        "complexity_level": product.complexity_level,
-        "height_category": product.height_category,
-        "scenario_category": product.scenario_category
-    }
-    
+
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    key = {"family_id": family_id, "installer_id": installer_id, "date": today}
+
     existing = db.productivity_history.find_one(key, {"_id": 0})
-    
+
     if existing:
-        # Calculate new average
-        new_count = existing["sample_count"] + 1
-        new_avg_prod = ((existing["avg_productivity_m2_h"] * existing["sample_count"]) + product.productivity_m2_h) / new_count
-        
-        # Calculate avg time per m2
-        new_avg_time = 60 / new_avg_prod if new_avg_prod > 0 else 0
-        
-        db.productivity_history.update_one(
-            key,
-            {
-                "$set": {
-                    "avg_productivity_m2_h": round(new_avg_prod, 2),
-                    "avg_time_per_m2_min": round(new_avg_time, 2),
-                    "sample_count": new_count,
-                    "last_updated": datetime.now(timezone.utc).isoformat()
-                }
-            }
-        )
+        new_m2 = (existing.get("total_m2", 0) or 0) + area_m2
+        new_min = (existing.get("total_minutes", 0) or 0) + duration_min
+        new_count = (existing.get("items_count", 0) or 0) + 1
+        prod = round((new_m2 / (new_min / 60)), 2) if new_min > 0 else 0
+
+        db.productivity_history.update_one(key, {"$set": {
+            "total_m2": round(new_m2, 2),
+            "total_minutes": round(new_min, 2),
+            "items_count": new_count,
+            "productivity_m2_h": prod
+        }})
     else:
-        # Create new record
-        avg_time = 60 / product.productivity_m2_h if product.productivity_m2_h > 0 else 0
+        prod = round((area_m2 / (duration_min / 60)), 2) if duration_min > 0 else 0
         new_history = ProductivityHistory(
-            family_id=product.family_id,
-            family_name=product.family_name or "",
-            complexity_level=product.complexity_level,
-            height_category=product.height_category,
-            scenario_category=product.scenario_category,
-            avg_productivity_m2_h=product.productivity_m2_h,
-            avg_time_per_m2_min=round(avg_time, 2),
-            sample_count=1
+            family_id=family_id,
+            family_name=product_data.get("family_name", ""),
+            installer_id=installer_id,
+            date=today,
+            total_m2=round(area_m2, 2),
+            total_minutes=round(duration_min, 2),
+            items_count=1,
+            productivity_m2_h=prod
         )
-        db.productivity_history.insert_one(new_history.model_dump())
+        history_dict = new_history.model_dump()
+        history_dict["created_at"] = history_dict["created_at"].isoformat()
+        db.productivity_history.insert_one(history_dict)
 
 
 # ============ PRODUCT FAMILIES ROUTES ============
@@ -286,10 +281,18 @@ async def create_product_installed(product: ProductInstalledCreate, current_user
         family_name=family_name
     )
     
-    db.installed_products.insert_one(new_product.model_dump())
-    
+    product_dict = new_product.model_dump()
+    # Map model fields to DB column names
+    product_dict["duration_minutes"] = product_dict.pop("actual_time_min", None)
+    db.installed_products.insert_one(product_dict)
+
     # Update productivity history
-    await update_productivity_history(new_product)
+    await update_productivity_history({
+        "family_id": new_product.family_id,
+        "family_name": family_name,
+        "area_m2": area_m2,
+        "duration_minutes": new_product.actual_time_min
+    })
     
     return new_product.model_dump()
 

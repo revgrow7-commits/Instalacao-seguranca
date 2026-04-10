@@ -45,13 +45,16 @@ class GoogleCalendarEventCreate(BaseModel):
 
 async def get_google_credentials(user_id: str):
     """Get and refresh Google credentials for a user."""
-    user = db.users.find_one({"id": user_id}, {"_id": 0, "google_tokens": 1})
-    
-    if not user or not user.get('google_tokens'):
+    token_doc = db.google_tokens.find_one({"user_id": user_id}, {"_id": 0})
+
+    if not token_doc or not token_doc.get('token'):
         return None
-    
-    tokens = user['google_tokens']
-    
+
+    tokens = token_doc['token']
+    if isinstance(tokens, str):
+        import json
+        tokens = json.loads(tokens)
+
     creds = Credentials(
         token=tokens.get('access_token'),
         refresh_token=tokens.get('refresh_token'),
@@ -60,23 +63,21 @@ async def get_google_credentials(user_id: str):
         client_secret=GOOGLE_CLIENT_SECRET,
         scopes=GOOGLE_CALENDAR_SCOPES
     )
-    
+
     # Refresh if expired
     if creds.expired and creds.refresh_token:
         try:
             creds.refresh(GoogleRequest())
-            # Update stored token
-            db.users.update_one(
-                {"id": user_id},
-                {"$set": {
-                    "google_tokens.access_token": creds.token,
-                    "google_tokens.obtained_at": datetime.now(timezone.utc).isoformat()
-                }}
+            tokens['access_token'] = creds.token
+            tokens['obtained_at'] = datetime.now(timezone.utc).isoformat()
+            db.google_tokens.update_one(
+                {"user_id": user_id},
+                {"$set": {"token": tokens, "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
         except Exception as e:
             logger.error(f"Failed to refresh Google token: {str(e)}")
             return None
-    
+
     return creds
 
 
@@ -152,21 +153,31 @@ async def google_callback(code: str, state: str = None):
                 url=f"{FRONTEND_URL}/calendar?google_error=user_not_found"
             )
         
-        # Store Google tokens for this user
-        db.users.update_one(
-            {"id": user['id']},
-            {"$set": {
-                "google_tokens": {
-                    "access_token": tokens.get('access_token'),
-                    "refresh_token": tokens.get('refresh_token'),
-                    "expires_in": tokens.get('expires_in'),
-                    "token_type": tokens.get('token_type'),
-                    "scope": tokens.get('scope'),
-                    "obtained_at": datetime.now(timezone.utc).isoformat()
-                },
-                "google_email": google_email
-            }}
-        )
+        # Store Google tokens in google_tokens table
+        import uuid as _uuid
+        token_data = {
+            "access_token": tokens.get('access_token'),
+            "refresh_token": tokens.get('refresh_token'),
+            "expires_in": tokens.get('expires_in'),
+            "token_type": tokens.get('token_type'),
+            "scope": tokens.get('scope'),
+            "google_email": google_email,
+            "obtained_at": datetime.now(timezone.utc).isoformat()
+        }
+        existing_token = db.google_tokens.find_one({"user_id": user['id']})
+        if existing_token:
+            db.google_tokens.update_one(
+                {"user_id": user['id']},
+                {"$set": {"token": token_data, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+        else:
+            db.google_tokens.insert_one({
+                "id": str(_uuid.uuid4()),
+                "user_id": user['id'],
+                "token": token_data,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat()
+            })
         
         # Redirect back to calendar page with success
         return RedirectResponse(
@@ -183,27 +194,29 @@ async def google_callback(code: str, state: str = None):
 @router.get("/auth/google/status")
 async def google_auth_status(current_user: User = Depends(get_current_user)):
     """Check if user has connected Google Calendar."""
-    user = db.users.find_one({"id": current_user.id}, {"_id": 0, "google_tokens": 1, "google_email": 1})
-    
+    token_doc = db.google_tokens.find_one({"user_id": current_user.id}, {"_id": 0})
+
     has_google = False
-    if user and user.get('google_tokens'):
-        tokens = user.get('google_tokens')
+    google_email = None
+    if token_doc and token_doc.get('token'):
+        tokens = token_doc['token']
+        if isinstance(tokens, str):
+            import json
+            tokens = json.loads(tokens)
         if isinstance(tokens, dict) and tokens.get('access_token'):
             has_google = True
-    
+            google_email = tokens.get('google_email')
+
     return {
         "connected": has_google,
-        "google_email": user.get('google_email') if has_google else None
+        "google_email": google_email
     }
 
 
 @router.delete("/auth/google/disconnect")
 async def google_disconnect(current_user: User = Depends(get_current_user)):
     """Disconnect Google Calendar from user account."""
-    db.users.update_one(
-        {"id": current_user.id},
-        {"$unset": {"google_tokens": "", "google_email": ""}}
-    )
+    db.google_tokens.delete_one({"user_id": current_user.id})
     
     return {"message": "Google Calendar desconectado com sucesso"}
 

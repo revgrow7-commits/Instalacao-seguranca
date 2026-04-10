@@ -52,24 +52,130 @@ def _serialize(value: Any) -> Any:
     return value
 
 
+"""
+Campos TEXT que armazenam JSON e precisam ser desserializados automaticamente.
+Centralizado aqui para evitar duplicacao. Adicione novos campos JSON nesta lista.
+"""
+JSON_TEXT_FIELDS = frozenset([
+    'items', 'holdprint_data', 'products_with_area', 'item_assignments',
+    'archived_items', 'products_installed', 'breakdown', 'keys',
+    'assigned_installers', 'checklists', 'scopes', 'token',
+    'justification', 'installation_config', 'subscription'
+])
+
+# Registry of actual Supabase table columns (from 001_schema_completo.sql + 002_cleanup_and_fix.sql)
+# Used to auto-filter insert/update payloads and prevent PGRST204 errors
+TABLE_COLUMNS = {
+    "users": frozenset([
+        "id", "email", "name", "full_name", "password_hash", "role", "phone",
+        "branch", "is_active", "created_at"
+    ]),
+    "installers": frozenset([
+        "id", "user_id", "full_name", "phone", "branch", "is_active", "avatar_url",
+        "coins", "level", "total_area_installed", "total_jobs", "created_at"
+    ]),
+    "jobs": frozenset([
+        "id", "holdprint_job_id", "title", "client_name", "client_address", "status",
+        "branch", "area_m2", "assigned_installers", "scheduled_date", "items",
+        "holdprint_data", "products_with_area", "total_products", "total_quantity",
+        "item_assignments", "archived_items", "archived", "archived_at", "archived_by",
+        "archived_by_name", "exclude_from_metrics", "no_installation", "notes",
+        "cancelled_at", "justification", "justified_at", "installation_config",
+        "completed_at", "created_at"
+    ]),
+    "checkins": frozenset([
+        "id", "job_id", "installer_id", "status", "checkin_at", "checkout_at",
+        "duration_minutes", "checkin_photo", "checkout_photo", "gps_lat", "gps_long",
+        "checkout_gps_lat", "checkout_gps_long", "notes", "created_at"
+    ]),
+    "item_checkins": frozenset([
+        "id", "job_id", "installer_id", "item_index", "status", "checkin_at",
+        "checkout_at", "duration_minutes", "net_duration_minutes", "total_pause_minutes",
+        "checkin_photo", "checkout_photo", "gps_lat", "gps_long", "gps_accuracy",
+        "checkout_gps_lat", "checkout_gps_long", "checkout_gps_accuracy", "product_name",
+        "family_name", "installed_m2", "complexity_level", "height_category",
+        "scenario_category", "notes", "productivity_m2_h", "is_archived",
+        "products_installed", "created_at"
+    ]),
+    "item_pause_logs": frozenset([
+        "id", "checkin_id", "reason", "paused_at", "resumed_at", "duration_minutes",
+        "auto_generated", "created_at"
+    ]),
+    "installed_products": frozenset([
+        "id", "checkin_id", "job_id", "installer_id", "family_id", "family_name",
+        "product_name", "quantity", "width_m", "height_m", "area_m2",
+        "complexity_level", "height_category", "scenario_category", "duration_minutes",
+        "productivity_m2_h", "created_at"
+    ]),
+    "product_families": frozenset(["id", "name", "keywords", "created_at"]),
+    "productivity_history": frozenset([
+        "id", "family_id", "family_name", "installer_id", "date", "total_m2",
+        "total_minutes", "items_count", "productivity_m2_h", "created_at"
+    ]),
+    "gamification_balances": frozenset([
+        "id", "user_id", "total_coins", "lifetime_coins", "current_level", "level",
+        "streak_days", "last_activity", "daily_engagement_date", "created_at", "updated_at"
+    ]),
+    "coin_transactions": frozenset([
+        "id", "user_id", "amount", "transaction_type", "description", "reference_type",
+        "reference_id", "breakdown", "balance_after", "created_at"
+    ]),
+    "rewards": frozenset([
+        "id", "name", "description", "cost_coins", "category", "image_url", "stock",
+        "is_active", "created_at"
+    ]),
+    "reward_requests": frozenset([
+        "id", "user_id", "reward_id", "reward_name", "cost_coins", "status", "notes",
+        "processed_at", "created_at"
+    ]),
+    "location_alerts": frozenset([
+        "id", "item_checkin_id", "job_id", "installer_id", "event_type", "checkin_lat",
+        "checkin_long", "checkout_lat", "checkout_long", "distance_meters",
+        "max_allowed_meters", "action_taken", "created_at"
+    ]),
+    "password_resets": frozenset(["id", "user_id", "token", "expires_at", "created_at"]),
+    "google_tokens": frozenset(["id", "user_id", "token", "created_at", "updated_at"]),
+    "job_justifications": frozenset([
+        "id", "job_id", "job_title", "job_code", "type", "type_label", "reason",
+        "submitted_by", "submitted_by_name", "submitted_by_email", "created_at"
+    ]),
+    "push_subscriptions": frozenset([
+        "id", "user_id", "subscription", "is_active", "endpoint", "keys",
+        "subscribed_at", "created_at"
+    ]),
+    "system_config": frozenset([
+        "id", "key", "value", "total_imported", "total_skipped", "updated_at"
+    ]),
+    "scheduler_sync_status": frozenset([
+        "id", "sync_type", "last_sync_at", "total_imported", "total_skipped",
+        "total_errors", "updated_at"
+    ]),
+}
+
+
+def _filter_columns(table_name: str, data: dict) -> dict:
+    """Filter dict to only include columns that exist in the actual Supabase table."""
+    allowed = TABLE_COLUMNS.get(table_name)
+    if not allowed:
+        return data
+    rejected = set(data.keys()) - allowed
+    if rejected:
+        logger.debug(f"Filtered non-DB fields from {table_name}: {rejected}")
+    return {k: v for k, v in data.items() if k in allowed}
+
+
 def _deserialize(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Deserialize JSONB fields from Supabase"""
+    """Deserialize JSON TEXT fields from Supabase"""
     if not doc:
         return doc
-    
-    json_fields = [
-        'items', 'holdprint_data', 'products_with_area', 'item_assignments',
-        'archived_items', 'products_installed', 'breakdown', 'keys',
-        'assigned_installers', 'checklists'
-    ]
-    
-    for field in json_fields:
+
+    for field in JSON_TEXT_FIELDS:
         if field in doc and isinstance(doc[field], str):
             try:
                 doc[field] = json.loads(doc[field])
             except (json.JSONDecodeError, TypeError):
                 pass
-    
+
     return doc
 
 
@@ -264,10 +370,11 @@ class SupabaseTable:
         try:
             # Remove _id if present
             document.pop('_id', None)
-            
-            # Serialize values
+
+            # Serialize values and filter to valid columns
             clean_doc = {k: _serialize(v) for k, v in document.items() if v is not None}
-            
+            clean_doc = _filter_columns(self.table_name, clean_doc)
+
             result = self._table().insert(clean_doc).execute()
             return {'inserted_id': result.data[0]['id'] if result.data else None}
             
@@ -281,7 +388,8 @@ class SupabaseTable:
             clean_docs = []
             for doc in documents:
                 doc.pop('_id', None)
-                clean_docs.append({k: _serialize(v) for k, v in doc.items() if v is not None})
+                clean = {k: _serialize(v) for k, v in doc.items() if v is not None}
+                clean_docs.append(_filter_columns(self.table_name, clean))
             
             result = self._table().insert(clean_docs).execute()
             return {'inserted_count': len(result.data) if result.data else 0}
@@ -319,8 +427,9 @@ class SupabaseTable:
             else:
                 update_data = update
             
-            # Serialize
+            # Serialize and filter to valid columns
             clean_update = {k: _serialize(v) for k, v in update_data.items() if v is not None}
+            clean_update = _filter_columns(self.table_name, clean_update)
             
             if not clean_update:
                 return {'modified_count': 0, 'matched_count': 0}
