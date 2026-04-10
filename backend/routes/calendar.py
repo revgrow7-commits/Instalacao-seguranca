@@ -45,7 +45,7 @@ class GoogleCalendarEventCreate(BaseModel):
 
 async def get_google_credentials(user_id: str):
     """Get and refresh Google credentials for a user."""
-    user = await db.users.find_one({"id": user_id}, {"_id": 0, "google_tokens": 1})
+    user = db.users.find_one({"id": user_id}, {"_id": 0, "google_tokens": 1})
     
     if not user or not user.get('google_tokens'):
         return None
@@ -66,7 +66,7 @@ async def get_google_credentials(user_id: str):
         try:
             creds.refresh(GoogleRequest())
             # Update stored token
-            await db.users.update_one(
+            db.users.update_one(
                 {"id": user_id},
                 {"$set": {
                     "google_tokens.access_token": creds.token,
@@ -141,10 +141,10 @@ async def google_callback(code: str, state: str = None):
         # Find user by state (user_id) or by google email
         user = None
         if state:
-            user = await db.users.find_one({"id": state}, {"_id": 0})
+            user = db.users.find_one({"id": state}, {"_id": 0})
         
         if not user:
-            user = await db.users.find_one({"email": google_email}, {"_id": 0})
+            user = db.users.find_one({"email": google_email}, {"_id": 0})
         
         if not user:
             # Close window with error
@@ -153,7 +153,7 @@ async def google_callback(code: str, state: str = None):
             )
         
         # Store Google tokens for this user
-        await db.users.update_one(
+        db.users.update_one(
             {"id": user['id']},
             {"$set": {
                 "google_tokens": {
@@ -183,7 +183,7 @@ async def google_callback(code: str, state: str = None):
 @router.get("/auth/google/status")
 async def google_auth_status(current_user: User = Depends(get_current_user)):
     """Check if user has connected Google Calendar."""
-    user = await db.users.find_one({"id": current_user.id}, {"_id": 0, "google_tokens": 1, "google_email": 1})
+    user = db.users.find_one({"id": current_user.id}, {"_id": 0, "google_tokens": 1, "google_email": 1})
     
     has_google = False
     if user and user.get('google_tokens'):
@@ -200,7 +200,7 @@ async def google_auth_status(current_user: User = Depends(get_current_user)):
 @router.delete("/auth/google/disconnect")
 async def google_disconnect(current_user: User = Depends(get_current_user)):
     """Disconnect Google Calendar from user account."""
-    await db.users.update_one(
+    db.users.update_one(
         {"id": current_user.id},
         {"$unset": {"google_tokens": "", "google_email": ""}}
     )

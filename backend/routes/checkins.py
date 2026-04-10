@@ -78,7 +78,7 @@ def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimens
 
 async def detect_product_family(product_names: list) -> tuple:
     """Detects the product family based on product names."""
-    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    families = db.product_families.find({}, {"_id": 0})
     
     family_keywords = {
         "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
@@ -132,7 +132,7 @@ async def register_installed_products_from_checkout(
     try:
         from models.product import ProductInstalled
         
-        job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+        job = db.jobs.find_one({"id": job_id}, {"_id": 0})
         if not job:
             return
         
@@ -168,7 +168,7 @@ async def register_installed_products_from_checkout(
                 cause_notes=notes
             )
             
-            await db.installed_products.insert_one(installed_product.model_dump())
+            db.installed_products.insert_one(installed_product.model_dump())
             await update_productivity_history(installed_product)
             
         else:
@@ -209,7 +209,7 @@ async def register_installed_products_from_checkout(
                     cause_notes=notes
                 )
                 
-                await db.installed_products.insert_one(installed_product.model_dump())
+                db.installed_products.insert_one(installed_product.model_dump())
                 await update_productivity_history(installed_product)
                 
     except Exception as e:
@@ -259,15 +259,15 @@ async def create_checkin(
     current_user: User = Depends(get_current_user)
 ):
     """Create check-in for a job with photo in Base64 and GPS coordinates"""
-    installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+    installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
     if not installer:
         raise HTTPException(status_code=400, detail="User is not an installer")
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    existing = await db.checkins.find_one({
+    existing = db.checkins.find_one({
         "job_id": job_id,
         "installer_id": installer['id'],
         "status": "in_progress"
@@ -293,9 +293,9 @@ async def create_checkin(
     if checkin_dict.get('checkout_at'):
         checkin_dict['checkout_at'] = checkin_dict['checkout_at'].isoformat()
     
-    await db.checkins.insert_one(checkin_dict)
+    db.checkins.insert_one(checkin_dict)
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {"status": "in_progress"}}
     )
@@ -319,7 +319,7 @@ async def checkout(
     current_user: User = Depends(get_current_user)
 ):
     """Check out from a job with photo in Base64, GPS coordinates and productivity metrics"""
-    checkin_doc = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin_doc = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin_doc:
         raise HTTPException(status_code=404, detail="Check-in not found")
     
@@ -357,18 +357,18 @@ async def checkout(
         "status": "completed"
     }
     
-    result = await db.checkins.find_one_and_update(
+    result = db.checkins.find_one_and_update(
         {"id": checkin_id},
         {"$set": update_data},
         return_document=True,
         projection={"_id": 0}
     )
     
-    job_checkins = await db.checkins.find({"job_id": checkin_doc['job_id']}, {"_id": 0}).to_list(1000)
+    job_checkins = db.checkins.find({"job_id": checkin_doc['job_id']}, {"_id": 0})
     all_completed = all(c['status'] == "completed" for c in job_checkins)
     
     if all_completed:
-        await db.jobs.update_one(
+        db.jobs.update_one(
             {"id": checkin_doc['job_id']},
             {"$set": {"status": "completed"}}
         )
@@ -402,7 +402,7 @@ async def list_checkins(job_id: Optional[str] = None, current_user: User = Depen
         query["job_id"] = job_id
     
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+        installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["installer_id"] = installer['id']
         else:
@@ -415,7 +415,7 @@ async def list_checkins(job_id: Optional[str] = None, current_user: User = Depen
         "checkout_photo": 0
     }
     
-    checkins = await db.checkins.find(query, projection).sort("checkin_at", -1).to_list(200)
+    checkins = db.checkins.find(query, projection, sort=[("checkin_at", -1)])
     
     for checkin in checkins:
         if isinstance(checkin.get('checkin_at'), str):
@@ -435,19 +435,19 @@ async def get_checkin_details(
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    checkin = await db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     
     if not checkin:
-        checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+        checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
     
-    installer = await db.installers.find_one({"id": checkin.get('installer_id')}, {"_id": 0})
+    installer = db.installers.find_one({"id": checkin.get('installer_id')}, {"_id": 0})
     if not installer:
-        installer = await db.users.find_one({"id": checkin.get('installer_id')}, {"_id": 0, "password_hash": 0})
+        installer = db.users.find_one({"id": checkin.get('installer_id')}, {"_id": 0, "password_hash": 0})
     
-    job = await db.jobs.find_one({"id": checkin.get('job_id')}, {"_id": 0})
+    job = db.jobs.find_one({"id": checkin.get('job_id')}, {"_id": 0})
     
     return {
         "checkin": checkin,
@@ -464,11 +464,11 @@ async def delete_checkin(
     """Delete a check-in - Only admin and managers"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    checkin = await db.checkins.find_one({"id": checkin_id})
+    checkin = db.checkins.find_one({"id": checkin_id})
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
     
-    await db.checkins.delete_one({"id": checkin_id})
-    await db.installed_products.delete_many({"checkin_id": checkin_id})
+    db.checkins.delete_one({"id": checkin_id})
+    db.installed_products.delete_many({"checkin_id": checkin_id})
     
     return {"message": "Check-in deleted successfully"}

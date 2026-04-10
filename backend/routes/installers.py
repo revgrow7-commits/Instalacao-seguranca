@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/installers", response_model=List[Installer])
 async def list_installers(current_user: User = Depends(get_current_user)):
     """List all installers."""
-    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
+    installers = db.installers.find({}, {"_id": 0})
     
     for installer in installers:
         if isinstance(installer['created_at'], str):
@@ -31,7 +31,7 @@ async def update_installer(installer_id: str, installer_data: dict, current_user
     
     update_data = {k: v for k, v in installer_data.items() if k not in ['id', 'user_id', 'created_at']}
     
-    result = await db.installers.find_one_and_update(
+    result = db.installers.find_one_and_update(
         {"id": installer_id},
         {"$set": update_data},
         return_document=True,

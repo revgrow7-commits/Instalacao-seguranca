@@ -41,7 +41,7 @@ class PushNotificationRequest(BaseModel):
 
 async def send_push_notification(user_id: str, title: str, body: str, url: str = "/", data: dict = None):
     """Send push notification to a specific user."""
-    subscription = await db.push_subscriptions.find_one(
+    subscription = db.push_subscriptions.find_one(
         {"user_id": user_id, "is_active": True}
     )
     
@@ -76,7 +76,7 @@ async def send_push_notification(user_id: str, title: str, body: str, url: str =
         logger.error(f"Push notification failed for user {user_id}: {str(e)}")
         # If subscription is invalid, mark it as inactive
         if e.response and e.response.status_code in [404, 410]:
-            await db.push_subscriptions.update_one(
+            db.push_subscriptions.update_one(
                 {"user_id": user_id},
                 {"$set": {"is_active": False}}
             )
@@ -99,7 +99,7 @@ async def subscribe_to_notifications(
     """Subscribe user to push notifications."""
     try:
         # Store subscription in database
-        await db.push_subscriptions.update_one(
+        db.push_subscriptions.update_one(
             {"user_id": current_user.id},
             {
                 "$set": {
@@ -122,7 +122,7 @@ async def subscribe_to_notifications(
 @router.delete("/notifications/unsubscribe")
 async def unsubscribe_from_notifications(current_user: User = Depends(get_current_user)):
     """Unsubscribe user from push notifications."""
-    await db.push_subscriptions.update_one(
+    db.push_subscriptions.update_one(
         {"user_id": current_user.id},
         {"$set": {"is_active": False}}
     )
@@ -132,7 +132,7 @@ async def unsubscribe_from_notifications(current_user: User = Depends(get_curren
 @router.get("/notifications/status")
 async def get_notification_status(current_user: User = Depends(get_current_user)):
     """Check if user is subscribed to notifications."""
-    subscription = await db.push_subscriptions.find_one(
+    subscription = db.push_subscriptions.find_one(
         {"user_id": current_user.id, "is_active": True},
         {"_id": 0}
     )
@@ -154,7 +154,7 @@ async def send_notification_to_users(
         user_ids = notification.user_ids
     else:
         # Send to all installers
-        installers = await db.installers.find({}, {"_id": 0, "user_id": 1}).to_list(1000)
+        installers = db.installers.find({}, {"_id": 0, "user_id": 1})
         user_ids = [i["user_id"] for i in installers if i.get("user_id")]
     
     sent_count = 0
@@ -196,7 +196,7 @@ async def check_schedule_conflicts(
         if exclude_job_id:
             query["id"] = {"$ne": exclude_job_id}
         
-        conflicting_jobs = await db.jobs.find(query, {"_id": 0, "id": 1, "title": 1, "scheduled_date": 1}).to_list(100)
+        conflicting_jobs = db.jobs.find(query, {"_id": 0, "id": 1, "title": 1, "scheduled_date": 1})
         
         has_conflict = len(conflicting_jobs) > 0
         
@@ -221,10 +221,10 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
     today_str = now.strftime('%Y-%m-%d')
     
     # Find jobs scheduled for today that are past their scheduled time
-    jobs = await db.jobs.find({
+    jobs = db.jobs.find({
         "status": "scheduled",
         "scheduled_date": {"$regex": f"^{today_str}"}
-    }, {"_id": 0}).to_list(1000)
+    }, {"_id": 0})
     
     pending = []
     for job in jobs:
@@ -240,10 +240,10 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
                     
                     # Get assigned installers info
                     if job.get("assigned_installers"):
-                        installers = await db.installers.find(
+                        installers = db.installers.find(
                             {"id": {"$in": job["assigned_installers"]}},
                             {"_id": 0, "id": 1, "full_name": 1, "user_id": 1}
-                        ).to_list(100)
+                        )
                         job["installers_info"] = installers
                     
                     pending.append(job)
@@ -288,7 +288,7 @@ async def notify_job_scheduled(
     """Send notification when a job is scheduled."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -297,10 +297,10 @@ async def notify_job_scheduled(
         return {"message": "Job não tem instaladores atribuídos", "sent_count": 0}
     
     # Get installer user IDs
-    installers = await db.installers.find(
+    installers = db.installers.find(
         {"id": {"$in": assigned_installers}},
         {"_id": 0, "user_id": 1, "full_name": 1}
-    ).to_list(100)
+    )
     
     scheduled_date = job.get("scheduled_date", "")
     date_display = ""

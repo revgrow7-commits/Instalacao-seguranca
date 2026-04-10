@@ -113,7 +113,7 @@ def calculate_gps_distance(lat1: float, lon1: float, lat2: float, lon2: float) -
 
 async def detect_product_family(product_names: list) -> tuple:
     """Detects the product family based on product names."""
-    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    families = db.product_families.find({}, {"_id": 0})
     
     family_keywords = {
         "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
@@ -227,11 +227,11 @@ async def create_item_checkin(
     if current_user.role != UserRole.INSTALLER:
         raise HTTPException(status_code=403, detail="Only installers can create item check-ins")
     
-    installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+    installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
     if not installer:
         raise HTTPException(status_code=404, detail="Installer not found")
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -261,7 +261,7 @@ async def create_item_checkin(
     
     product = products[item_index]
     
-    existing = await db.item_checkins.find_one({
+    existing = db.item_checkins.find_one({
         "job_id": job_id,
         "item_index": item_index,
         "installer_id": installer["id"],
@@ -290,11 +290,11 @@ async def create_item_checkin(
     
     checkin_dict = item_checkin.model_dump()
     checkin_dict['checkin_at'] = checkin_dict['checkin_at'].isoformat()
-    await db.item_checkins.insert_one(checkin_dict)
+    db.item_checkins.insert_one(checkin_dict)
     
     checkin_dict.pop('_id', None)
     
-    await db.jobs.update_one({"id": job_id}, {"$set": {"status": "in_progress"}})
+    db.jobs.update_one({"id": job_id}, {"$set": {"status": "in_progress"}})
     
     return checkin_dict
 
@@ -308,7 +308,7 @@ async def get_item_checkins(
     query = {}
     
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+        installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["installer_id"] = installer["id"]
     
@@ -322,7 +322,7 @@ async def get_item_checkins(
         "checkout_photo": 0
     }
     
-    checkins = await db.item_checkins.find(query, projection).sort("checkin_at", -1).to_list(500)
+    checkins = db.item_checkins.find(query, projection, sort=[("checkin_at", -1)])
     
     for c in checkins:
         if isinstance(c.get('checkin_at'), str):
@@ -347,14 +347,14 @@ async def get_all_item_checkins(
         "checkout_photo": 0
     }
     
-    checkins = await db.item_checkins.find({}, projection).sort("checkin_at", -1).to_list(1000)
+    checkins = db.item_checkins.find({}, projection, sort=[("checkin_at", -1)])
     
     # Busca jobs e installers em paralelo com projeção mínima
-    jobs_cursor = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})
-    installers_cursor = db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1})
+    jobs_list = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})
+    installers_list = db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1})
     
-    jobs = await jobs_cursor.to_list(500)
-    installers = await installers_cursor.to_list(100)
+    jobs = jobs_list
+    installers = installers_list
     
     jobs_map = {job["id"]: job for job in jobs}
     installers_map = {inst["id"]: inst for inst in installers}
@@ -405,7 +405,7 @@ async def complete_item_checkout(
         logger.error(f"User {current_user.email} is not an installer (role: {current_user.role})")
         raise HTTPException(status_code=403, detail="Only installers can complete item checkouts")
     
-    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
         logger.error(f"Checkin {checkin_id} not found")
         raise HTTPException(status_code=404, detail="Item check-in not found")
@@ -443,7 +443,7 @@ async def complete_item_checkout(
                 "created_at": datetime.now(timezone.utc).isoformat(),
                 "action_taken": "auto_pause"
             }
-            await db.location_alerts.insert_one(location_log)
+            db.location_alerts.insert_one(location_log)
             
             if checkin["status"] != "paused":
                 pause_reason = f"Saiu do local sem justificar (distância: {round(distance_meters)}m)"
@@ -456,7 +456,7 @@ async def complete_item_checkout(
                     "duration_minutes": 0,
                     "auto_generated": True
                 }
-                await db.item_pause_logs.insert_one(pause_log)
+                db.item_pause_logs.insert_one(pause_log)
                 auto_paused = True
             
             location_alert = {
@@ -469,7 +469,7 @@ async def complete_item_checkout(
     
     # End any active pause
     if checkin["status"] == "paused":
-        active_pause = await db.item_pause_logs.find_one({
+        active_pause = db.item_pause_logs.find_one({
             "item_checkin_id": checkin_id,
             "end_time": None
         }, {"_id": 0})
@@ -481,7 +481,7 @@ async def complete_item_checkout(
             if start_time.tzinfo is None:
                 start_time = start_time.replace(tzinfo=timezone.utc)
             pause_duration = int((end_time - start_time).total_seconds() / 60)
-            await db.item_pause_logs.update_one(
+            db.item_pause_logs.update_one(
                 {"id": active_pause["id"]},
                 {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
             )
@@ -499,7 +499,7 @@ async def complete_item_checkout(
     duration_seconds = (checkout_at - checkin_at).total_seconds()
     duration_minutes = round(duration_seconds / 60, 2)  # Keep decimal precision
     
-    pause_logs = await db.item_pause_logs.find({"item_checkin_id": checkin_id}, {"_id": 0}).to_list(100)
+    pause_logs = db.item_pause_logs.find({"item_checkin_id": checkin_id}, {"_id": 0})
     total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs)
     
     net_duration_minutes = round(max(0, duration_minutes - total_pause_minutes), 2)
@@ -531,10 +531,10 @@ async def complete_item_checkout(
         "status": "completed"
     }
     
-    await db.item_checkins.update_one({"id": checkin_id}, {"$set": update_data})
+    db.item_checkins.update_one({"id": checkin_id}, {"$set": update_data})
     
     # Register installed product
-    job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
+    job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
     if job:
         products = job.get("products_with_area", [])
         product = products[checkin["item_index"]] if checkin["item_index"] < len(products) else {}
@@ -558,12 +558,12 @@ async def complete_item_checkout(
             cause_notes=notes
         )
         
-        await db.installed_products.insert_one(installed_product.model_dump())
+        db.installed_products.insert_one(installed_product.model_dump())
         await update_productivity_history(installed_product)
     
     # Check job completion
-    job = await db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
-    job_checkins = await db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0}).to_list(1000)
+    job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
+    job_checkins = db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0})
     
     item_assignments = job.get("item_assignments", []) if job else []
     assigned_item_indices = set()
@@ -582,10 +582,10 @@ async def complete_item_checkout(
     all_assigned_completed = assigned_item_indices.issubset(completed_item_indices) if assigned_item_indices else False
     
     if all_assigned_completed and len(assigned_item_indices) > 0:
-        await db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
+        db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
     
     # Return result
-    result = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    result = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     
     if location_alert:
         result["location_alert"] = location_alert
@@ -602,12 +602,12 @@ async def delete_item_checkin(
     """Delete an item check-in - Only admin and managers"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    checkin = await db.item_checkins.find_one({"id": checkin_id})
+    checkin = db.item_checkins.find_one({"id": checkin_id})
     if not checkin:
         raise HTTPException(status_code=404, detail="Item check-in not found")
     
-    await db.item_checkins.delete_one({"id": checkin_id})
-    await db.installed_products.delete_many({"checkin_id": checkin_id})
+    db.item_checkins.delete_one({"id": checkin_id})
+    db.installed_products.delete_many({"checkin_id": checkin_id})
     
     return {"message": "Item check-in deleted successfully"}
 
@@ -620,11 +620,11 @@ async def archive_item_checkin(
     """Archive an item check-in - Only admin and managers"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    checkin = await db.item_checkins.find_one({"id": checkin_id})
+    checkin = db.item_checkins.find_one({"id": checkin_id})
     if not checkin:
         raise HTTPException(status_code=404, detail="Item check-in not found")
     
-    await db.item_checkins.update_one(
+    db.item_checkins.update_one(
         {"id": checkin_id},
         {"$set": {"archived": True, "archived_at": datetime.now(timezone.utc).isoformat()}}
     )
@@ -647,7 +647,7 @@ async def pause_item_checkin(
         logger.error(f"User {current_user.email} is not an installer (role: {current_user.role})")
         raise HTTPException(status_code=403, detail="Only installers can pause item checkouts")
     
-    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
         logger.error(f"Checkin {checkin_id} not found")
         raise HTTPException(status_code=404, detail="Item check-in not found")
@@ -672,9 +672,9 @@ async def pause_item_checkin(
     
     pause_dict = pause_log.model_dump()
     pause_dict['start_time'] = pause_dict['start_time'].isoformat()
-    await db.item_pause_logs.insert_one(pause_dict)
+    db.item_pause_logs.insert_one(pause_dict)
     
-    await db.item_checkins.update_one(
+    db.item_checkins.update_one(
         {"id": checkin_id},
         {"$set": {"status": "paused"}}
     )
@@ -696,14 +696,14 @@ async def resume_item_checkin(
     if current_user.role != UserRole.INSTALLER:
         raise HTTPException(status_code=403, detail="Only installers can resume item checkouts")
     
-    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
         raise HTTPException(status_code=404, detail="Item check-in not found")
     
     if checkin["status"] != "paused":
         raise HTTPException(status_code=400, detail="Item is not paused")
     
-    active_pause = await db.item_pause_logs.find_one({
+    active_pause = db.item_pause_logs.find_one({
         "item_checkin_id": checkin_id,
         "end_time": None
     }, {"_id": 0})
@@ -720,12 +720,12 @@ async def resume_item_checkin(
     
     pause_duration = int((end_time - start_time).total_seconds() / 60)
     
-    await db.item_pause_logs.update_one(
+    db.item_pause_logs.update_one(
         {"id": active_pause["id"]},
         {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
     )
     
-    await db.item_checkins.update_one(
+    db.item_checkins.update_one(
         {"id": checkin_id},
         {"$set": {"status": "in_progress"}}
     )
@@ -743,10 +743,10 @@ async def get_item_pause_logs(
     current_user: User = Depends(get_current_user)
 ):
     """Get all pause logs for an item checkin"""
-    pause_logs = await db.item_pause_logs.find(
+    pause_logs = db.item_pause_logs.find(
         {"item_checkin_id": checkin_id},
         {"_id": 0}
-    ).to_list(100)
+    )
     
     for log in pause_logs:
         log["reason_label"] = PAUSE_REASON_LABELS.get(log.get("reason"), log.get("reason"))

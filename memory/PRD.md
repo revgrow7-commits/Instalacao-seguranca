@@ -6,12 +6,19 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 ## Stack Tecnológico
 - **Frontend:** React + Tailwind CSS + Shadcn UI
 - **Backend:** FastAPI (Python)
-- **Banco de Dados:** MongoDB
-- **Integrações:** Holdworks API, Google Calendar, Resend, Web Push Notifications
+- **Banco de Dados:** Supabase (PostgreSQL) - **MIGRADO EM 10/04/2026**
+- **Integrações:** Holdworks API, Resend, Web Push Notifications
 
 ---
 
 ## ⚠️ INFORMAÇÕES CRÍTICAS - NÃO ERRAR
+
+### Banco de Dados - SUPABASE
+- **URL:** `https://otyrrvkixegiqsthmaaj.supabase.co`
+- **Anon Key:** Configurada em `SUPABASE_ANON_KEY`
+- **Service Key:** Configurada em `SUPABASE_SERVICE_KEY`
+- **IMPORTANTE:** Supabase NÃO suporta projeção com `.` (ex: `holdprint_data.code`) - usar campo completo
+- **IMPORTANTE:** Supabase NÃO suporta `$or`, `$exists` nativamente - filtrar no Python
 
 ### API Holdworks (Holdprint)
 - **URL CORRETA:** `https://api.holdworks.ai/api-key/jobs/data`
