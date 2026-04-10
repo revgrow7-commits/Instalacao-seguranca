@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { jwtDecode } from 'jwt-decode';
 import tokenManager from '../utils/tokenManager';
@@ -10,6 +10,7 @@ const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [tokenVersion, setTokenVersion] = useState(0); // Force re-render when token changes
 
   // Migrate from localStorage on first load (one-time)
   useEffect(() => {
@@ -48,6 +49,7 @@ export const AuthProvider = ({ children }) => {
       const { access_token, user: userData } = response.data;
       tokenManager.setToken(access_token);
       setUser(userData);
+      setTokenVersion(v => v + 1); // Trigger re-render
       return { success: true };
     } catch (error) {
       return {
@@ -60,6 +62,7 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     tokenManager.clearToken();
     setUser(null);
+    setTokenVersion(v => v + 1); // Trigger re-render
   };
 
   const isAdmin = user?.role === 'admin';
@@ -67,7 +70,10 @@ export const AuthProvider = ({ children }) => {
   const isInstaller = user?.role === 'installer';
   
   // Get token for consumers who need it
-  const getToken = () => tokenManager.getToken();
+  const getToken = useCallback(() => tokenManager.getToken(), [tokenVersion]);
+  
+  // Memoize the current token value
+  const token = useMemo(() => tokenManager.getToken(), [tokenVersion]);
 
   return (
     <AuthContext.Provider
@@ -79,7 +85,7 @@ export const AuthProvider = ({ children }) => {
         isAdmin,
         isManager,
         isInstaller,
-        token: tokenManager.getToken(),
+        token,
         getToken
       }}
     >

@@ -95,8 +95,11 @@ const Dashboard = () => {
       navigate('/installer/dashboard');
       return;
     }
-    loadDashboardData();
-  }, [isInstaller, navigate]);
+    // Only load data when we have user info
+    if (user) {
+      loadDashboardData();
+    }
+  }, [isInstaller, navigate, user]);
 
   const loadDashboardData = async () => {
     try {
