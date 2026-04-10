@@ -214,17 +214,6 @@ export const api = {
   resumeSchedulerJob: (jobId) => axios.post(`${API_URL}/scheduler/jobs/${jobId}/resume`, {}, { headers: getAuthHeader() }),
   runSchedulerJobNow: (jobId) => axios.post(`${API_URL}/scheduler/jobs/${jobId}/run-now`, {}, { headers: getAuthHeader() }),
 
-  // Trello PCP Integration
-  getTrelloSummary: () => axios.get(`${API_URL}/trello/summary`, { headers: getAuthHeader() }),
-  getTrelloLists: () => axios.get(`${API_URL}/trello/lists`, { headers: getAuthHeader() }),
-  getTrelloCards: (listId) => {
-    const url = listId ? `${API_URL}/trello/cards?list_id=${listId}` : `${API_URL}/trello/cards`;
-    return axios.get(url, { headers: getAuthHeader() });
-  },
-  getTrelloCardDetails: (cardId) => axios.get(`${API_URL}/trello/cards/${cardId}`, { headers: getAuthHeader() }),
-  getTrelloInstallation: () => axios.get(`${API_URL}/trello/installation`, { headers: getAuthHeader() }),
-  searchTrelloCards: (query) => axios.get(`${API_URL}/trello/search?q=${encodeURIComponent(query)}`, { headers: getAuthHeader() }),
-
   // Push Notifications
   getVapidPublicKey: () => axios.get(`${API_URL}/notifications/vapid-public-key`),
   subscribeToNotifications: (subscription) => axios.post(`${API_URL}/notifications/subscribe`, subscription, { headers: getAuthHeader() }),

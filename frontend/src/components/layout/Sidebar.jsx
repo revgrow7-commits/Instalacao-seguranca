@@ -13,8 +13,7 @@ import {
   FileText,
   Trophy,
   TrendingUp,
-  Settings,
-  Trello
+  Settings
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -94,12 +93,6 @@ const Sidebar = () => {
       name: 'Agendamentos',
       href: '/admin/scheduler',
       icon: Settings,
-      roles: ['admin', 'manager']
-    },
-    {
-      name: 'Trello PCP',
-      href: '/trello-pcp',
-      icon: Trello,
       roles: ['admin', 'manager']
     },
   ], []);

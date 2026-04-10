@@ -103,13 +103,14 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 | Integração | Status | Observação |
 |------------|--------|------------|
-| Trello API | ✅ Funcional | Integração PCP finalizada |
-| Holdworks API | ✅ Funcional | Importação de jobs |
+| Holdworks API | ✅ Funcional | Importação de jobs (SP: 41 jobs, POA: 75 jobs) |
 | Google Maps | ✅ Funcional | Links de localização |
 | openpyxl | ✅ Funcional | Exportação Excel |
 | Google Calendar | ⚠️ Bloqueado | Aguarda config no Google Cloud |
 | Resend | ⚠️ Bloqueado | Aguarda verificação de domínio |
 | Web Push | ✅ Implementado | Requer teste e2e |
+
+**Removido (01/04/2026):** Trello API - Integração removida a pedido do usuário.
 
 ---
 
