@@ -133,10 +133,10 @@ class Token(BaseModel):
 class Installer(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    user_id: str
+    user_id: Optional[str] = None  # Made optional for legacy data compatibility
     full_name: str
     phone: Optional[str] = None
-    branch: str  # POA or SP
+    branch: str = "POA"  # POA or SP
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class Job(BaseModel):
