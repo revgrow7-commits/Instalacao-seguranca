@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Indústria Visual - Documentação do Sistema</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css/github-markdown.min.css" />
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Indústria Visual - Documentação do Sistema</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a
+href="#indústria-visual---sistema-de-gestão-de-instalações">INDÚSTRIA
+VISUAL - Sistema de Gestão de Instalações</a>
+<ul>
+<li><a href="#documentação-técnica-e-manual-do-usuário">Documentação
+Técnica e Manual do Usuário</a></li>
+<li><a href="#índice">Índice</a></li>
+<li><a href="#visão-geral">1. Visão Geral</a>
+<ul>
+<li><a href="#descrição-do-sistema">1.1 Descrição do Sistema</a></li>
+<li><a href="#tecnologias-utilizadas">1.2 Tecnologias
+Utilizadas</a></li>
+<li><a href="#perfis-de-usuário">1.3 Perfis de Usuário</a></li>
+</ul></li>
+<li><a href="#arquitetura-do-sistema">2. Arquitetura do Sistema</a>
+<ul>
+<li><a href="#estrutura-de-diretórios">2.1 Estrutura de
+Diretórios</a></li>
+<li><a href="#fluxo-de-dados">2.2 Fluxo de Dados</a></li>
+<li><a href="#modelo-de-dados">2.3 Modelo de Dados</a></li>
+</ul></li>
+<li><a href="#configuração-e-deploy">3. Configuração e Deploy</a>
+<ul>
+<li><a href="#variáveis-de-ambiente---backend">3.1 Variáveis de Ambiente
+- Backend</a></li>
+<li><a href="#variáveis-de-ambiente---frontend">3.2 Variáveis de
+Ambiente - Frontend</a></li>
+<li><a href="#deploy-no-vercel">3.3 Deploy no Vercel</a></li>
+<li><a href="#configuração-dns-registro.br">3.4 Configuração DNS
+(Registro.br)</a></li>
+</ul></li>
+<li><a href="#manual-do-usuário">4. Manual do Usuário</a>
+<ul>
+<li><a href="#login">4.1 Login</a></li>
+<li><a href="#dashboard-admingerente">4.2 Dashboard
+(Admin/Gerente)</a></li>
+<li><a href="#gestão-de-jobs">4.3 Gestão de Jobs</a></li>
+<li><a href="#check-incheck-out-instalador">4.4 Check-in/Check-out
+(Instalador)</a></li>
+<li><a href="#gamificação">4.5 Gamificação</a></li>
+</ul></li>
+<li><a href="#api-reference">5. API Reference</a>
+<ul>
+<li><a href="#autenticação">5.1 Autenticação</a></li>
+<li><a href="#jobs">5.2 Jobs</a></li>
+<li><a href="#check-ins">5.3 Check-ins</a></li>
+</ul></li>
+<li><a href="#segurança">6. Segurança</a>
+<ul>
+<li><a href="#autenticação-1">6.1 Autenticação</a></li>
+<li><a href="#autorização">6.2 Autorização</a></li>
+<li><a href="#boas-práticas">6.3 Boas Práticas</a></li>
+</ul></li>
+<li><a href="#manutenção">7. Manutenção</a>
+<ul>
+<li><a href="#sincronização-holdprint">7.1 Sincronização
+Holdprint</a></li>
+<li><a href="#logs">7.2 Logs</a></li>
+<li><a href="#backup">7.3 Backup</a></li>
+<li><a href="#troubleshooting">7.4 Troubleshooting</a></li>
+</ul></li>
+<li><a href="#contato-e-suporte">Contato e Suporte</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 id="indústria-visual---sistema-de-gestão-de-instalações">INDÚSTRIA
+VISUAL - Sistema de Gestão de Instalações</h1>
+<h2 id="documentação-técnica-e-manual-do-usuário">Documentação Técnica e
+Manual do Usuário</h2>
+<p><strong>Versão:</strong> 2.0<br />
+<strong>Data:</strong> Abril 2026<br />
+<strong>Desenvolvido por:</strong> Emergent Labs</p>
+<hr />
+<h2 id="índice">Índice</h2>
+<ol type="1">
+<li><a href="#visão-geral">Visão Geral</a></li>
+<li><a href="#arquitetura-do-sistema">Arquitetura do Sistema</a></li>
+<li><a href="#configuração-e-deploy">Configuração e Deploy</a></li>
+<li><a href="#manual-do-usuário">Manual do Usuário</a></li>
+<li><a href="#api-reference">API Reference</a></li>
+<li><a href="#segurança">Segurança</a></li>
+<li><a href="#manutenção">Manutenção</a></li>
+</ol>
+<hr />
+<h2 id="visão-geral">1. Visão Geral</h2>
+<h3 id="descrição-do-sistema">1.1 Descrição do Sistema</h3>
+<p>O Sistema de Gestão de Instalações da Indústria Visual é uma
+aplicação PWA (Progressive Web App) desenvolvida para controlar a
+produtividade de instaladores de comunicação visual. O sistema
+oferece:</p>
+<ul>
+<li><strong>Gestão de Jobs/Ordens de Serviço</strong>: Importação
+automática da API Holdprint</li>
+<li><strong>Check-in/Check-out</strong>: Controle de presença com
+geolocalização</li>
+<li><strong>Gamificação</strong>: Sistema de moedas e ranking para
+motivação</li>
+<li><strong>Dashboards</strong>: Visão gerencial de KPIs e
+produtividade</li>
+<li><strong>Relatórios</strong>: Exportação de dados em Excel</li>
+</ul>
+<h3 id="tecnologias-utilizadas">1.2 Tecnologias Utilizadas</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Camada</th>
+<th>Tecnologia</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Frontend</td>
+<td>React 18, Tailwind CSS, Shadcn/UI</td>
+</tr>
+<tr class="even">
+<td>Backend</td>
+<td>FastAPI (Python 3.11)</td>
+</tr>
+<tr class="odd">
+<td>Banco de Dados</td>
+<td>Supabase (PostgreSQL)</td>
+</tr>
+<tr class="even">
+<td>Autenticação</td>
+<td>JWT + Supabase</td>
+</tr>
+<tr class="odd">
+<td>Email</td>
+<td>Resend API</td>
+</tr>
+<tr class="even">
+<td>Hospedagem</td>
+<td>Vercel (Serverless)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="perfis-de-usuário">1.3 Perfis de Usuário</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Perfil</th>
+<th>Permissões</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>Admin</strong></td>
+<td>Acesso total ao sistema</td>
+</tr>
+<tr class="even">
+<td><strong>Gerente</strong></td>
+<td>Gestão de jobs, instaladores e relatórios</td>
+</tr>
+<tr class="odd">
+<td><strong>Instalador</strong></td>
+<td>Visualização de jobs atribuídos, check-in/out</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="arquitetura-do-sistema">2. Arquitetura do Sistema</h2>
+<h3 id="estrutura-de-diretórios">2.1 Estrutura de Diretórios</h3>
+<pre><code>/app/
+├── backend/
+│   ├── api/
+│   │   └── index.py           # Entry point Vercel Serverless
+│   ├── routes/
+│   │   ├── auth_new.py        # Autenticação (Supabase + Resend)
+│   │   ├── jobs.py            # Gestão de Jobs
+│   │   ├── checkins.py        # Check-in/Check-out
+│   │   ├── item_checkins.py   # Check-in por item
+│   │   ├── gamification.py    # Sistema de moedas
+│   │   ├── reports.py         # Relatórios Excel
+│   │   └── ...
+│   ├── services/
+│   │   ├── sync_holdprint.py  # Sincronização Holdprint
+│   │   ├── gamification.py    # Lógica de gamificação
+│   │   └── ...
+│   ├── db_supabase.py         # Wrapper Supabase (Síncrono)
+│   ├── server.py              # Servidor FastAPI principal
+│   └── config.py              # Configurações
+│
+├── frontend/
+│   ├── src/
+│   │   ├── pages/             # Páginas React
+│   │   ├── components/        # Componentes reutilizáveis
+│   │   ├── context/           # Contextos (Auth)
+│   │   ├── hooks/             # Custom hooks
+│   │   └── utils/             # Utilitários (API, tokenManager)
+│   └── public/                # Assets estáticos
+│
+└── memory/
+    └── PRD.md                 # Documento de Requisitos</code></pre>
+<h3 id="fluxo-de-dados">2.2 Fluxo de Dados</h3>
+<pre><code>┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Frontend  │────▶│   Backend   │────▶│  Supabase   │
+│   (React)   │◀────│  (FastAPI)  │◀────│ (PostgreSQL)│
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │  Holdprint  │
+                    │    API      │
+                    └─────────────┘</code></pre>
+<h3 id="modelo-de-dados">2.3 Modelo de Dados</h3>
+<h4 id="tabela-users">Tabela: users</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Tipo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>id</td>
+<td>UUID</td>
+<td>Identificador único</td>
+</tr>
+<tr class="even">
+<td>email</td>
+<td>VARCHAR</td>
+<td>Email do usuário</td>
+</tr>
+<tr class="odd">
+<td>password_hash</td>
+<td>VARCHAR</td>
+<td>Hash bcrypt da senha</td>
+</tr>
+<tr class="even">
+<td>name</td>
+<td>VARCHAR</td>
+<td>Nome do usuário</td>
+</tr>
+<tr class="odd">
+<td>role</td>
+<td>VARCHAR</td>
+<td>admin/manager/installer</td>
+</tr>
+<tr class="even">
+<td>branch</td>
+<td>VARCHAR</td>
+<td>Filial (POA/SP)</td>
+</tr>
+<tr class="odd">
+<td>is_active</td>
+<td>BOOLEAN</td>
+<td>Status ativo</td>
+</tr>
+</tbody>
+</table>
+<h4 id="tabela-jobs">Tabela: jobs</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Tipo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>id</td>
+<td>UUID</td>
+<td>Identificador único</td>
+</tr>
+<tr class="even">
+<td>holdprint_id</td>
+<td>INTEGER</td>
+<td>ID na API Holdprint</td>
+</tr>
+<tr class="odd">
+<td>code</td>
+<td>VARCHAR</td>
+<td>Código do job (ex: #1604)</td>
+</tr>
+<tr class="even">
+<td>client_name</td>
+<td>VARCHAR</td>
+<td>Nome do cliente</td>
+</tr>
+<tr class="odd">
+<td>status</td>
+<td>VARCHAR</td>
+<td>Status atual</td>
+</tr>
+<tr class="even">
+<td>scheduled_date</td>
+<td>TIMESTAMP</td>
+<td>Data agendada</td>
+</tr>
+<tr class="odd">
+<td>branch</td>
+<td>VARCHAR</td>
+<td>Filial</td>
+</tr>
+</tbody>
+</table>
+<h4 id="tabela-installers">Tabela: installers</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Campo</th>
+<th>Tipo</th>
+<th>Descrição</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>id</td>
+<td>UUID</td>
+<td>Identificador único</td>
+</tr>
+<tr class="even">
+<td>user_id</td>
+<td>UUID</td>
+<td>FK para users</td>
+</tr>
+<tr class="odd">
+<td>full_name</td>
+<td>VARCHAR</td>
+<td>Nome completo</td>
+</tr>
+<tr class="even">
+<td>coins</td>
+<td>INTEGER</td>
+<td>Moedas acumuladas</td>
+</tr>
+<tr class="odd">
+<td>total_area_installed</td>
+<td>FLOAT</td>
+<td>Área total instalada (m²)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="configuração-e-deploy">3. Configuração e Deploy</h2>
+<h3 id="variáveis-de-ambiente---backend">3.1 Variáveis de Ambiente -
+Backend</h3>
+<pre class="env"><code># Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_KEY=your-service-key
+USE_SUPABASE=true
+
+# Frontend URL (para emails de reset)
+FRONTEND_URL=https://instal-visual.com.br
+
+# API Holdprint
+HOLDPRINT_API_KEY_POA=your-poa-key
+HOLDPRINT_API_KEY_SP=your-sp-key
+
+# Email (Resend)
+RESEND_API_KEY=your-resend-key
+SENDER_EMAIL=bruno@industriavisual.com.br
+
+# Vercel
+VERCEL=1
+SERVERLESS=true
+CORS_ORIGINS=https://instal-visual.com.br</code></pre>
+<h3 id="variáveis-de-ambiente---frontend">3.2 Variáveis de Ambiente -
+Frontend</h3>
+<pre class="env"><code>REACT_APP_BACKEND_URL=https://api.instal-visual.com.br</code></pre>
+<h3 id="deploy-no-vercel">3.3 Deploy no Vercel</h3>
+<ol type="1">
+<li><strong>Salvar no GitHub</strong>: Use “Save to GitHub” no
+Emergent</li>
+<li><strong>Conectar ao Vercel</strong>: Importe o repositório</li>
+<li><strong>Configurar variáveis</strong>: Settings → Environment
+Variables</li>
+<li><strong>Deploy</strong>: Automático após push</li>
+</ol>
+<h3 id="configuração-dns-registro.br">3.4 Configuração DNS
+(Registro.br)</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Tipo</th>
+<th>Nome</th>
+<th>Valor</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>A</td>
+<td>@</td>
+<td>76.76.21.21</td>
+</tr>
+<tr class="even">
+<td>CNAME</td>
+<td>www</td>
+<td>cname.vercel-dns.com</td>
+</tr>
+<tr class="odd">
+<td>CNAME</td>
+<td>api</td>
+<td>cname.vercel-dns.com</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="manual-do-usuário">4. Manual do Usuário</h2>
+<h3 id="login">4.1 Login</h3>
+<ol type="1">
+<li>Acesse <code>https://instal-visual.com.br</code></li>
+<li>Digite seu email e senha</li>
+<li>Clique em “Entrar”</li>
+</ol>
+<p><strong>Credenciais de Admin:</strong> - Email:
+<code>mktindustriavisual@gmail.com</code> - Senha:
+<code>@Industria123456</code></p>
+<h3 id="dashboard-admingerente">4.2 Dashboard (Admin/Gerente)</h3>
+<p>O dashboard exibe: - <strong>Jobs em andamento</strong>: Quantidade e
+status - <strong>Check-ins ativos</strong>: Instaladores trabalhando -
+<strong>Produtividade</strong>: Área instalada no mês -
+<strong>Ranking</strong>: Top instaladores</p>
+<h3 id="gestão-de-jobs">4.3 Gestão de Jobs</h3>
+<h4 id="listar-jobs">Listar Jobs</h4>
+<ul>
+<li>Menu lateral → “Jobs”</li>
+<li>Use filtros: Status, Data, Filial, Instalador</li>
+<li>Busque por código: Digite “#1604” para encontrar job específico</li>
+</ul>
+<h4 id="atribuir-itens">Atribuir Itens</h4>
+<ol type="1">
+<li>Clique no job desejado</li>
+<li>Clique em “Atribuir Itens”</li>
+<li>Selecione os itens</li>
+<li>Escolha o instalador</li>
+<li>Defina nível de dificuldade e cenário</li>
+<li>Clique em “Atribuir”</li>
+</ol>
+<h4 id="arquivar-job">Arquivar Job</h4>
+<ul>
+<li>Na lista de jobs, clique no ícone de arquivo</li>
+<li>Jobs arquivados não aparecem para instaladores</li>
+</ul>
+<h3 id="check-incheck-out-instalador">4.4 Check-in/Check-out
+(Instalador)</h3>
+<h4 id="fazer-check-in">Fazer Check-in</h4>
+<ol type="1">
+<li>Acesse o job atribuído</li>
+<li>Clique em “Iniciar Check-in”</li>
+<li>Permita acesso à localização</li>
+<li>Tire foto do local (opcional)</li>
+<li>Confirme o check-in</li>
+</ol>
+<h4 id="fazer-check-out">Fazer Check-out</h4>
+<ol type="1">
+<li>No job em andamento, clique em “Finalizar”</li>
+<li>Tire foto da instalação concluída</li>
+<li>Informe a área instalada</li>
+<li>Confirme o check-out</li>
+</ol>
+<h3 id="gamificação">4.5 Gamificação</h3>
+<h4 id="sistema-de-moedas">Sistema de Moedas</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Ação</th>
+<th>Moedas</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Check-in no prazo</td>
+<td>50% do total</td>
+</tr>
+<tr class="even">
+<td>Foto no check-out</td>
+<td>20% do total</td>
+</tr>
+<tr class="odd">
+<td>Primeiro acesso do dia</td>
+<td>10% do total</td>
+</tr>
+<tr class="even">
+<td>Produtividade base</td>
+<td>20% do total</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Conversão:</strong> 1 m² instalado = 10 moedas base</p>
+<h4 id="níveis">Níveis</h4>
+<table>
+<thead>
+<tr class="header">
+<th>Nível</th>
+<th>Moedas Necessárias</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Bronze</td>
+<td>0 - 499</td>
+</tr>
+<tr class="even">
+<td>Prata</td>
+<td>500 - 1.999</td>
+</tr>
+<tr class="odd">
+<td>Ouro</td>
+<td>2.000 - 4.999</td>
+</tr>
+<tr class="even">
+<td>Faixa Preta</td>
+<td>5.000+</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="api-reference">5. API Reference</h2>
+<h3 id="autenticação">5.1 Autenticação</h3>
+<h4 id="post-apiauthlogin">POST /api/auth/login</h4>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;email&quot;</span><span class="fu">:</span> <span class="st">&quot;user@example.com&quot;</span><span class="fu">,</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;password&quot;</span><span class="fu">:</span> <span class="st">&quot;senha123&quot;</span></span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a><span class="er">Response:</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;access_token&quot;</span><span class="fu">:</span> <span class="st">&quot;eyJ...&quot;</span><span class="fu">,</span></span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;user&quot;</span><span class="fu">:</span> <span class="fu">{</span></span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;id&quot;</span><span class="fu">:</span> <span class="st">&quot;uuid&quot;</span><span class="fu">,</span></span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;email&quot;</span><span class="fu">:</span> <span class="st">&quot;user@example.com&quot;</span><span class="fu">,</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;name&quot;</span><span class="fu">:</span> <span class="st">&quot;Nome&quot;</span><span class="fu">,</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">&quot;role&quot;</span><span class="fu">:</span> <span class="st">&quot;admin&quot;</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">}</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h4 id="post-apiauthforgot-password">POST /api/auth/forgot-password</h4>
+<div class="sourceCode" id="cb6"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;email&quot;</span><span class="fu">:</span> <span class="st">&quot;user@example.com&quot;</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="er">Response:</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;Se o email existir, você receberá um link...&quot;</span><span class="fu">,</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;email_sent&quot;</span><span class="fu">:</span> <span class="kw">true</span></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h4 id="post-apiauthreset-password">POST /api/auth/reset-password</h4>
+<div class="sourceCode" id="cb7"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;token&quot;</span><span class="fu">:</span> <span class="st">&quot;reset-token&quot;</span><span class="fu">,</span></span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;new_password&quot;</span><span class="fu">:</span> <span class="st">&quot;novaSenha123&quot;</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a><span class="er">Response:</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;Senha alterada com sucesso!&quot;</span></span>
+<span id="cb7-10"><a href="#cb7-10" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h3 id="jobs">5.2 Jobs</h3>
+<h4 id="get-apijobs">GET /api/jobs</h4>
+<p>Lista todos os jobs com filtros opcionais.</p>
+<p><strong>Query Parameters:</strong> - <code>status</code>: Filtrar por
+status - <code>branch</code>: Filtrar por filial - <code>month</code>:
+Filtrar por mês (1-12) - <code>year</code>: Filtrar por ano -
+<code>search</code>: Buscar por código ou cliente</p>
+<h4 id="post-apijobsjob_idassign-items">POST
+/api/jobs/{job_id}/assign-items</h4>
+<div class="sourceCode" id="cb8"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;item_indices&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="dv">0</span><span class="ot">,</span> <span class="dv">1</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;installer_ids&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="st">&quot;uuid-installer&quot;</span><span class="ot">]</span><span class="fu">,</span></span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;difficulty_level&quot;</span><span class="fu">:</span> <span class="st">&quot;Nível 2 - Fácil&quot;</span><span class="fu">,</span></span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;scenario_category&quot;</span><span class="fu">:</span> <span class="st">&quot;02 - Shopping&quot;</span><span class="fu">,</span></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;apply_to_all&quot;</span><span class="fu">:</span> <span class="kw">true</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a><span class="er">Response:</span></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;message&quot;</span><span class="fu">:</span> <span class="st">&quot;2 atribuições criadas com sucesso&quot;</span><span class="fu">,</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;assignments&quot;</span><span class="fu">:</span> <span class="ot">[</span><span class="er">...</span><span class="ot">]</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h3 id="check-ins">5.3 Check-ins</h3>
+<h4 id="post-apiitem-checkins">POST /api/item-checkins</h4>
+<div class="sourceCode" id="cb9"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;job_id&quot;</span><span class="fu">:</span> <span class="st">&quot;uuid&quot;</span><span class="fu">,</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;item_index&quot;</span><span class="fu">:</span> <span class="dv">0</span><span class="fu">,</span></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;installer_id&quot;</span><span class="fu">:</span> <span class="st">&quot;uuid&quot;</span><span class="fu">,</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;latitude&quot;</span><span class="fu">:</span> <span class="fl">-30.0277</span><span class="fu">,</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;longitude&quot;</span><span class="fu">:</span> <span class="fl">-51.2287</span><span class="fu">,</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;checkin_photo&quot;</span><span class="fu">:</span> <span class="st">&quot;base64...&quot;</span></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<h4 id="post-apiitem-checkinscheckin_idcheckout">POST
+/api/item-checkins/{checkin_id}/checkout</h4>
+<div class="sourceCode" id="cb10"><pre
+class="sourceCode json"><code class="sourceCode json"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="er">Request:</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="fu">{</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;latitude&quot;</span><span class="fu">:</span> <span class="fl">-30.0277</span><span class="fu">,</span></span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;longitude&quot;</span><span class="fu">:</span> <span class="fl">-51.2287</span><span class="fu">,</span></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;checkout_photo&quot;</span><span class="fu">:</span> <span class="st">&quot;base64...&quot;</span><span class="fu">,</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;installed_m2&quot;</span><span class="fu">:</span> <span class="fl">15.5</span><span class="fu">,</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">&quot;notes&quot;</span><span class="fu">:</span> <span class="st">&quot;Instalação concluída&quot;</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a><span class="fu">}</span></span></code></pre></div>
+<hr />
+<h2 id="segurança">6. Segurança</h2>
+<h3 id="autenticação-1">6.1 Autenticação</h3>
+<ul>
+<li><strong>JWT Tokens</strong>: Expiram em 7 dias</li>
+<li><strong>Armazenamento</strong>: sessionStorage (não
+localStorage)</li>
+<li><strong>Proteção XSS</strong>: Sanitização de tokens</li>
+<li><strong>Senhas</strong>: Hash bcrypt com salt</li>
+</ul>
+<h3 id="autorização">6.2 Autorização</h3>
+<ul>
+<li>Rotas protegidas por middleware <code>require_role</code></li>
+<li>Verificação de permissões por endpoint</li>
+<li>Instaladores só veem jobs atribuídos</li>
+</ul>
+<h3 id="boas-práticas">6.3 Boas Práticas</h3>
+<ul>
+<li>Variáveis de ambiente para credenciais</li>
+<li>CORS configurado para domínios específicos</li>
+<li>HTTPS obrigatório em produção</li>
+<li>Logs de ações sensíveis</li>
+</ul>
+<hr />
+<h2 id="manutenção">7. Manutenção</h2>
+<h3 id="sincronização-holdprint">7.1 Sincronização Holdprint</h3>
+<p>A sincronização automática ocorre às 06:00 (BRT) diariamente.</p>
+<p><strong>Sincronização Manual:</strong></p>
+<div class="sourceCode" id="cb11"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="ex">curl</span> <span class="at">-X</span> POST https://api.instal-visual.com.br/api/cron/sync <span class="dt">\</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">-H</span> <span class="st">&quot;Authorization: Bearer CRON_SECRET&quot;</span></span></code></pre></div>
+<h3 id="logs">7.2 Logs</h3>
+<p><strong>Vercel:</strong> - Dashboard → Functions → Logs</p>
+<p><strong>Local:</strong></p>
+<div class="sourceCode" id="cb12"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tail</span> <span class="at">-f</span> /var/log/supervisor/backend.err.log</span></code></pre></div>
+<h3 id="backup">7.3 Backup</h3>
+<p>O Supabase realiza backups automáticos. Para backup manual: 1. Acesse
+o Supabase Dashboard 2. Settings → Database → Backups 3. Clique em
+“Create backup”</p>
+<h3 id="troubleshooting">7.4 Troubleshooting</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Problema</th>
+<th>Solução</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Login não funciona</td>
+<td>Verificar FRONTEND_URL no backend</td>
+</tr>
+<tr class="even">
+<td>Jobs não aparecem</td>
+<td>Verificar chaves da API Holdprint</td>
+</tr>
+<tr class="odd">
+<td>Email não envia</td>
+<td>Verificar domínio no Resend</td>
+</tr>
+<tr class="even">
+<td>Erro 500</td>
+<td>Verificar logs do Vercel</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="contato-e-suporte">Contato e Suporte</h2>
+<p><strong>Desenvolvido por:</strong> Emergent Labs<br />
+<strong>Email:</strong> suporte@emergentagent.com<br />
+<strong>Documentação:</strong> https://docs.emergentagent.com</p>
+<hr />
+<p><em>Este documento foi gerado automaticamente em Abril de
+2026.</em></p>
+</body>
+</html>
