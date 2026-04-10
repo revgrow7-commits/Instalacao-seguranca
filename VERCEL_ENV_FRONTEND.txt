@@ -1,0 +1,9 @@
+# ============================================================
+# VARIÁVEIS DE AMBIENTE - FRONTEND VERCEL
+# ============================================================
+# Copie no painel do Vercel do projeto FRONTEND:
+# Settings → Environment Variables → Add New
+# ============================================================
+
+# URL do Backend (API)
+REACT_APP_BACKEND_URL=https://api.instal-visual.com.br
