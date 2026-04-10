@@ -550,10 +550,11 @@ const Calendar = () => {
                   {days.map((date, index) => {
                     const dayJobs = date ? getJobsForDate(date) : [];
                     const isDragOver = dragOverDate === date?.toISOString();
+                    const dateKey = date ? `day-${date.toISOString()}` : `empty-${index}`;
                     
                     return (
                       <div
-                        key={index}
+                        key={dateKey}
                         onDragOver={(e) => handleDragOver(e, date)}
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, date)}

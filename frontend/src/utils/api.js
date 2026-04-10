@@ -1,4 +1,5 @@
 import axios from 'axios';
+import tokenManager from './tokenManager';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
 
@@ -7,8 +8,7 @@ const cache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
 const getAuthHeader = () => {
-  const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  return tokenManager.getAuthHeader();
 };
 
 // Helper to get cached data or fetch

@@ -67,6 +67,7 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - [x] Alteração de senha pelo usuário autenticado
 - [x] Reset de senha por admin
 - [x] Gerenciamento de usuários (busca, filtros, edição, ativação/desativação)
+- [x] **Token seguro (10/04/2026)** - Migrado de localStorage para sessionStorage com proteção XSS
 
 ### Jobs e Importação
 - [x] Integração com API Holdworks para importar jobs
