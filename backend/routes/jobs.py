@@ -1050,7 +1050,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
             try:
                 import json
                 job_config = json.loads(job_config)
-            except:
+            except (json.JSONDecodeError, ValueError):
                 job_config = {}
         if not isinstance(job_config, dict):
             job_config = {}
