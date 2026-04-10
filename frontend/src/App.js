@@ -27,7 +27,6 @@ const Profile = lazy(() => import('./pages/Profile'));
 const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
 const GamificationReport = lazy(() => import('./pages/GamificationReport'));
 const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
-const TrelloPCP = lazy(() => import('./pages/TrelloPCP'));
 
 // Non-lazy imports for layout components (always needed)
 import Sidebar from './components/layout/Sidebar';
@@ -306,16 +305,6 @@ const AppRoutes = () => {
           <ProtectedRoute>
             <MainLayout>
               <SchedulerAdmin />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/trello-pcp"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <TrelloPCP />
             </MainLayout>
           </ProtectedRoute>
         }
