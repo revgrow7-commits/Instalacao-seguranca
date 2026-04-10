@@ -685,10 +685,11 @@ const JobDetail = () => {
                       const hasArea = product.total_area_m2 && product.total_area_m2 > 0;
                       const hasDimensions = product.width_m && product.height_m;
                       const archived = isItemArchived(index);
+                      const productKey = `product-${product.name?.replace(/\s+/g, '-') || 'item'}-${index}`;
                       
                       return (
                         <div
-                          key={index}
+                          key={productKey}
                           className={`flex items-center space-x-3 p-3 rounded-lg transition-colors ${
                             archived
                               ? 'bg-gray-500/20 border border-gray-500/30 opacity-60'
@@ -1038,9 +1039,10 @@ const JobDetail = () => {
                 <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-2">
                   {getJobProducts().map((product, index) => {
                     const archived = isItemArchived(index);
+                    const archiveItemKey = `archive-item-${product.name?.replace(/\s+/g, '-') || 'item'}-${index}`;
                     return (
                       <div
-                        key={index}
+                        key={archiveItemKey}
                         className={`flex items-center space-x-3 p-2 rounded-lg transition-colors ${
                           archived
                             ? 'bg-gray-500/20 border border-gray-500/30'
@@ -1462,10 +1464,11 @@ const JobDetail = () => {
                 const unitArea = width && height ? (width * height) : null;
                 const totalArea = isCalculated ? product.total_area_m2 : (unitArea ? unitArea * quantity * copies : null);
                 const familyName = product.family_name;
+                const productDetailKey = `detail-${product.name?.replace(/\s+/g, '-') || 'product'}-${index}`;
                 
                 return (
                   <div
-                    key={index}
+                    key={productDetailKey}
                     className="p-4 rounded-lg bg-white/5 border border-white/10"
                   >
                     <div className="flex items-start justify-between gap-4">
@@ -1877,7 +1880,7 @@ const JobDetail = () => {
             <div className="space-y-3">
               {job.holdprint_data.production.items.map((item, index) => (
                 <div
-                  key={index}
+                  key={`production-item-${item.name?.replace(/\s+/g, '-') || 'item'}-${index}`}
                   className="p-3 rounded-lg bg-white/5 border border-white/5"
                 >
                   <div className="flex items-center justify-between">
@@ -1926,9 +1929,10 @@ const JobDetail = () => {
               {job.items.map((item, index) => {
                 // Check if item is archived using archived_items array
                 if (isItemArchived(index) || item.archived) return null;
+                const legacyItemKey = `legacy-item-${item.name?.replace(/\s+/g, '-') || item.description?.replace(/\s+/g, '-') || 'item'}-${index}`;
                 return (
                   <div
-                    key={index}
+                    key={legacyItemKey}
                     className="p-3 rounded-lg bg-white/5 border border-white/5"
                   >
                     <p className="text-white font-medium">{item.name || item.description || `Item ${index + 1}`}</p>
