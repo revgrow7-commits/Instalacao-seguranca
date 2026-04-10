@@ -70,7 +70,7 @@ class JobSchedule(BaseModel):
 class ItemAssignment(BaseModel):
     item_indices: List[int]
     installer_ids: List[str]
-    difficulty_level: Optional[int] = None
+    difficulty_level: Optional[str] = None
     scenario_category: Optional[str] = None
     apply_to_all: bool = True
 
@@ -984,11 +984,21 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    installers = db.installers.find({"id": {"$in": assignment.installer_ids}}, {"_id": 0})
-    installer_map = {i["id"]: i for i in installers}
+    # Search installers by both id and user_id for compatibility
+    installers_by_id = db.installers.find({"id": {"$in": assignment.installer_ids}})
+    installers_by_user_id = db.installers.find({"user_id": {"$in": assignment.installer_ids}})
     
-    if len(installers) != len(assignment.installer_ids):
-        raise HTTPException(status_code=400, detail="One or more installers not found")
+    # Combine results
+    installer_map = {}
+    for i in installers_by_id:
+        installer_map[i["id"]] = i
+    for i in installers_by_user_id:
+        installer_map[i["user_id"]] = i
+    
+    # Verify all requested installers were found
+    missing = [iid for iid in assignment.installer_ids if iid not in installer_map]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Installers not found: {missing}")
     
     products = job.get("products_with_area", [])
     if not products:
@@ -1035,6 +1045,16 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     
     if assignment.apply_to_all and (assignment.difficulty_level or assignment.scenario_category):
         job_config = job.get("installation_config", {})
+        # Ensure job_config is a dict (could be string from DB)
+        if isinstance(job_config, str):
+            try:
+                import json
+                job_config = json.loads(job_config)
+            except:
+                job_config = {}
+        if not isinstance(job_config, dict):
+            job_config = {}
+        
         if assignment.difficulty_level:
             job_config["default_difficulty_level"] = assignment.difficulty_level
         if assignment.scenario_category:
