@@ -25,6 +25,13 @@ python-dotenv==1.2.1
 requests==2.32.5
 httpx
 
+# Image processing
+Pillow>=10.0.0
+
+# Google APIs (Calendar integration)
+google-auth>=2.0.0
+google-api-python-client>=2.0.0
+
 # Email
 resend==2.19.0
 
