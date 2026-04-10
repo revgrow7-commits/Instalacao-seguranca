@@ -918,7 +918,7 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         if isinstance(checkin_at, str):
             try:
                 checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
-            except:
+            except (ValueError, TypeError):
                 checkin_at = None
         ws.cell(row=row_num, column=13, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
         
@@ -926,7 +926,7 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         if isinstance(checkout_at, str):
             try:
                 checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
-            except:
+            except (ValueError, TypeError):
                 checkout_at = None
         ws.cell(row=row_num, column=14, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
         

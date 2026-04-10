@@ -83,205 +83,18 @@ security = HTTPBearer()
 resend.api_key = RESEND_API_KEY
 
 # ============ CATÁLOGO DE PRODUTOS HOLDPRINT ============
-# Moved to config.py - PRODUCT_FAMILY_MAPPING is imported from there
-
-def classify_product_to_family(product_name: str) -> tuple:
-    """
-    Classifica um produto em uma família baseado no nome.
-    Retorna (family_name, confidence_score)
-    """
-    if not product_name:
-        return (None, 0)
-    
-    product_lower = product_name.lower()
-    
-    # Mapeamento com prioridade (mais específico primeiro)
-    priority_mapping = [
-        # Letras Caixa - verificar antes de outros
-        ("Letras Caixa", ["letra caixa", "letra-caixa", "letras caixa"]),
-        # Totens
-        ("Totens", ["totem"]),
-        # Envelopamento
-        ("Envelopamento", ["envelopamento", "envelopar"]),
-        # Painéis Luminosos
-        ("Painéis Luminosos", ["painel backlight", "painel luminoso", "backlight", "lightbox"]),
-        # Tecidos
-        ("Tecidos", ["tecido", "bandeira", "wind banner"]),
-        # Estruturas Metálicas
-        ("Estruturas Metálicas", ["estrutura metálica", "estrutura metalica", "backdrop", "cavalete"]),
-        # Lonas e Banners
-        ("Lonas e Banners", ["lona", "banner", "faixa", "empena"]),
-        # Adesivos - depois de lonas para não pegar "lona com adesivo"
-        ("Adesivos", ["adesivo", "vinil", "fachada adesivada", "fachada com vinil"]),
-        # Chapas e Placas
-        ("Chapas e Placas", ["chapa", "placa", "acm", "acrílico", "acrilico", "mdf", " ps ", "pvc", "polionda", 
-                           "policarbonato", "petg", "compensado", "xps"]),
-        # Serviços
-        ("Serviços", ["serviço", "serviços", "instalação", "instalacao", "entrega", "montagem", 
-                     "pintura", "serralheria", "solda", "corte", "aplicação", "aplicacao"]),
-        # Materiais Promocionais
-        ("Materiais Promocionais", ["cartaz", "flyer", "folder", "panfleto", "imã", "marca-página"]),
-        # Sublimação
-        ("Sublimação", ["sublimação", "sublimática", "sublimatico", "sublimacao"]),
-        # Impressão
-        ("Impressão", ["impressão uv", "impressão latex", "impressão solvente", "impresso"]),
-        # Display/PS
-        ("Display/PS", ["display", "móbile", "mobile", "orelha de monitor"]),
-        # Produtos Terceirizados
-        ("Produtos Terceirizados", ["terceirizado", "produto genérico"]),
-        # Fundação
-        ("Fundação/Estrutura", ["fundação", "sapata", "estrutura em madeira"]),
-    ]
-    
-    best_match = None
-    best_score = 0
-    
-    for family_name, keywords in priority_mapping:
-        for keyword in keywords:
-            if keyword.lower() in product_lower:
-                # Score baseado no tamanho do match e posição
-                keyword_len = len(keyword)
-                product_len = len(product_name)
-                
-                # Score base: proporção do keyword no nome
-                base_score = (keyword_len / product_len) * 100
-                
-                # Bonus se keyword está no início
-                if product_lower.startswith(keyword.lower()):
-                    base_score += 30
-                
-                # Bonus por match exato de palavra
-                if keyword.lower() == product_lower:
-                    base_score = 100
-                
-                score = min(base_score, 100)
-                
-                if score > best_score:
-                    best_score = score
-                    best_match = family_name
-    
-    if best_match:
-        return (best_match, round(best_score, 1))
-    
-    return ("Outros", 10)  # Família genérica com baixa confiança
-
-def extract_product_measures(description: str) -> dict:
-    """
-    Extrai medidas (largura, altura, cópias) da descrição HTML do produto.
-    Retorna dict com width_m, height_m, copies e area_m2
-    """
-    import re
-    
-    result = {
-        "width_m": None,
-        "height_m": None,
-        "copies": 1,
-        "area_m2": None
-    }
-    
-    if not description:
-        return result
-    
-    # Extrair Largura - vários formatos possíveis
-    width_patterns = [
-        r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m',
-        r'Largura:\s*([0-9.,]+)\s*m',
-        r'largura[:\s]+([0-9.,]+)\s*m',
-    ]
-    for pattern in width_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["width_m"] = float(match.group(1).replace(',', '.'))
-            break
-    
-    # Extrair Altura
-    height_patterns = [
-        r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m',
-        r'Altura:\s*([0-9.,]+)\s*m',
-        r'altura[:\s]+([0-9.,]+)\s*m',
-    ]
-    for pattern in height_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["height_m"] = float(match.group(1).replace(',', '.'))
-            break
-    
-    # Extrair Cópias
-    copies_patterns = [
-        r'Cópias:\s*<span[^>]*>([0-9]+)',
-        r'Cópias:\s*([0-9]+)',
-        r'copias[:\s]+([0-9]+)',
-    ]
-    for pattern in copies_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["copies"] = int(match.group(1))
-            break
-    
-    # Calcular área se tiver largura e altura
-    if result["width_m"] and result["height_m"]:
-        result["area_m2"] = round(result["width_m"] * result["height_m"] * result["copies"], 2)
-    
-    return result
+# All product classification and area calculation functions are now in services/product_classifier.py
+# The following functions are imported from there:
+# - classify_product_to_family
+# - extract_product_measures  
+# - calculate_job_products_area
 
 def classify_product_family(product_name: str) -> str:
-    """Classifica um produto em uma família baseado no nome"""
-    name_lower = product_name.lower()
-    
-    for family, keywords in PRODUCT_FAMILY_MAPPING.items():
-        for keyword in keywords:
-            if keyword in name_lower:
-                return family
-    
-    return "Outros"
+    """Classifica um produto em uma família baseado no nome (legacy wrapper)"""
+    family, _ = classify_product_to_family(product_name)
+    return family if family else "Outros"
 
-def calculate_job_products_area(holdprint_data: dict) -> tuple:
-    """
-    Calcula a área de todos os produtos de um job.
-    Retorna (products_with_area, total_area_m2, total_products, total_quantity)
-    """
-    products = holdprint_data.get("products", [])
-    products_with_area = []
-    total_area_m2 = 0
-    total_quantity = 0
-    
-    for product in products:
-        product_name = product.get("name", "")
-        quantity = product.get("quantity", 1)
-        description = product.get("description", "")
-        
-        # Extrair medidas
-        measures = extract_product_measures(description)
-        
-        # Classificar família
-        family_name, confidence = classify_product_to_family(product_name)
-        
-        # Calcular área do item (considerando quantidade)
-        item_area = None
-        if measures["width_m"] and measures["height_m"]:
-            # Área unitária × quantidade
-            unit_area = measures["width_m"] * measures["height_m"]
-            item_area = round(unit_area * quantity * measures["copies"], 2)
-            total_area_m2 += item_area
-        
-        total_quantity += quantity
-        
-        product_data = {
-            "name": product_name,
-            "family_name": family_name,
-            "confidence": confidence,
-            "quantity": quantity,
-            "width_m": measures["width_m"],
-            "height_m": measures["height_m"],
-            "copies": measures["copies"],
-            "unit_area_m2": round(measures["width_m"] * measures["height_m"], 2) if measures["width_m"] and measures["height_m"] else None,
-            "total_area_m2": item_area,
-            "unit_price": product.get("unitPrice", 0),
-            "total_value": product.get("totalValue", 0)
-        }
-        products_with_area.append(product_data)
-    
-    return (products_with_area, round(total_area_m2, 2), len(products), total_quantity)
+# Note: calculate_job_products_area is imported from services/product_classifier.py
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -438,28 +251,7 @@ class ItemPauseLog(BaseModel):
     duration_minutes: Optional[int] = None  # Calculado ao encerrar a pausa
 
 
-# Enum de motivos de pausa
-PAUSE_REASONS = [
-    "aguardando_cliente",
-    "chuva",
-    "falta_material", 
-    "almoco_intervalo",
-    "problema_acesso",
-    "problema_equipamento",
-    "aguardando_aprovacao",
-    "outro"
-]
-
-PAUSE_REASON_LABELS = {
-    "aguardando_cliente": "Aguardando Cliente",
-    "chuva": "Chuva/Intempérie",
-    "falta_material": "Falta de Material",
-    "almoco_intervalo": "Almoço/Intervalo",
-    "problema_acesso": "Problema de Acesso",
-    "problema_equipamento": "Problema com Equipamento",
-    "aguardando_aprovacao": "Aguardando Aprovação",
-    "outro": "Outro Motivo"
-}
+# PAUSE_REASONS and PAUSE_REASON_LABELS are imported from config.py
 
 class CheckInCreate(BaseModel):
     job_id: str
@@ -556,32 +348,8 @@ class ProductivityHistory(BaseModel):
 # ============ UTILITY FUNCTIONS ============
 # Note: These functions are also available in services/ modules
 # Kept here for backward compatibility during migration
-
-import math
-
-def calculate_gps_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """
-    Calculate the distance between two GPS coordinates using Haversine formula.
-    Returns distance in meters.
-    """
-    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
-        return 0
-    
-    R = 6371000  # Earth's radius in meters
-    
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    
-    a = math.sin(delta_phi / 2) ** 2 + \
-        math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return R * c
-
-# Maximum distance in meters before triggering location alert
-MAX_CHECKOUT_DISTANCE_METERS = 500
+# Note: calculate_gps_distance is imported from services/gps.py
+# Note: MAX_CHECKOUT_DISTANCE_METERS is imported from config.py
 
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -621,86 +389,7 @@ async def require_role(user: User, allowed_roles: List[str]):
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return user
 
-def compress_image_to_base64(image_data: bytes, max_size_kb: int = 300, max_dimension: int = 1200) -> str:
-    """
-    Compress image and return base64 string.
-    - Resizes image if larger than max_dimension
-    - Compresses to target size (default 300KB)
-    - Converts to JPEG format
-    """
-    try:
-        img = Image.open(BytesIO(image_data))
-        
-        # Convert to RGB if necessary (handles PNG with transparency, etc.)
-        if img.mode in ('RGBA', 'P', 'LA'):
-            # Create white background for transparent images
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        # Resize if image is too large
-        original_size = img.size
-        if img.width > max_dimension or img.height > max_dimension:
-            ratio = min(max_dimension / img.width, max_dimension / img.height)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-            logging.info(f"Image resized from {original_size} to {img.size}")
-        
-        # Progressive compression to meet target size
-        quality = 85
-        output = BytesIO()
-        
-        while quality >= 20:
-            output = BytesIO()
-            img.save(output, format='JPEG', quality=quality, optimize=True)
-            size_kb = len(output.getvalue()) / 1024
-            
-            if size_kb <= max_size_kb:
-                break
-            quality -= 5
-        
-        final_size_kb = len(output.getvalue()) / 1024
-        logging.info(f"Image compressed: {len(image_data)/1024:.1f}KB -> {final_size_kb:.1f}KB (quality={quality})")
-        
-        return base64.b64encode(output.getvalue()).decode('utf-8')
-        
-    except Exception as e:
-        logging.error(f"Error compressing image: {str(e)}")
-        # Return original as base64 if compression fails
-        return base64.b64encode(image_data).decode('utf-8')
-
-def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimension: int = 1200) -> str:
-    """
-    Compress a base64-encoded image string.
-    Returns compressed base64 string.
-    """
-    if not base64_string:
-        return base64_string
-    
-    try:
-        # Remove data URL prefix if present
-        if ',' in base64_string:
-            base64_string = base64_string.split(',')[1]
-        
-        # Decode base64 to bytes
-        image_data = base64.b64decode(base64_string)
-        original_size_kb = len(image_data) / 1024
-        
-        # Skip compression for small images
-        if original_size_kb <= max_size_kb:
-            logging.info(f"Image already small ({original_size_kb:.1f}KB), skipping compression")
-            return base64_string
-        
-        # Compress the image
-        return compress_image_to_base64(image_data, max_size_kb, max_dimension)
-        
-    except Exception as e:
-        logging.error(f"Error in compress_base64_image: {str(e)}")
-        return base64_string
+# Note: compress_image_to_base64 and compress_base64_image are imported from services/image.py
 
 async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = False):
     """Fetch jobs from Holdprint API"""
@@ -1015,8 +704,7 @@ async def delete_user(user_id: str, current_user: User = Depends(get_current_use
 # NOTE: Legacy check-in routes have been migrated to routes/checkins.py
 # The router is included via: api_router.include_router(checkins_router, tags=["Check-ins"])
 
-# Create uploads directory if it doesn't exist
-UPLOAD_DIR = Path("/app/uploads")
+# Note: UPLOAD_DIR is imported from config.py - ensure directory exists
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 
@@ -1232,80 +920,7 @@ def get_level_from_coins(lifetime_coins: int) -> dict:
             }
     return {"level": "bronze", "name": "Bronze", "icon": "🥉", "progress": 0, "next_level": "prata", "coins_to_next": 500}
 
-async def calculate_checkout_coins(checkin_data: dict, job_data: dict) -> dict:
-    """
-    Calculate coins earned from a checkout based on triggers:
-    - Check-in no Prazo (50%): If check-in time <= scheduled time
-    - Check-out com Evidências (20%): If checkout photo exists
-    - Engajamento na Agenda (10%): Daily bonus for first access
-    - Produtividade Base (20%): Awarded by m² completed
-    
-    Conversion: 1 m² with 100% approval = 10 coins
-    """
-    installed_m2 = checkin_data.get("installed_m2", 0) or 0
-    if installed_m2 <= 0:
-        return {"total_coins": 0, "breakdown": {}, "base_coins": 0}
-    
-    # Base coins from m² (this is 100% if all triggers are met)
-    base_coins = int(installed_m2 * BASE_COINS_PER_M2)
-    
-    breakdown = {
-        "checkin_on_time": {"earned": 0, "max": 0, "percentage": 50, "approved": False},
-        "checkout_evidence": {"earned": 0, "max": 0, "percentage": 20, "approved": False},
-        "daily_engagement": {"earned": 0, "max": 0, "percentage": 10, "approved": False},
-        "base_productivity": {"earned": 0, "max": 0, "percentage": 20, "approved": False}
-    }
-    
-    # Calculate max possible for each trigger
-    breakdown["checkin_on_time"]["max"] = int(base_coins * 0.50)
-    breakdown["checkout_evidence"]["max"] = int(base_coins * 0.20)
-    breakdown["daily_engagement"]["max"] = int(base_coins * 0.10)
-    breakdown["base_productivity"]["max"] = int(base_coins * 0.20)
-    
-    # 1. Check-in on Time (50%) - Compare checkin_at with scheduled_date
-    scheduled_date = job_data.get("scheduled_date")
-    checkin_at = checkin_data.get("checkin_at")
-    
-    if scheduled_date and checkin_at:
-        try:
-            if isinstance(scheduled_date, str):
-                scheduled_dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
-            else:
-                scheduled_dt = scheduled_date
-            
-            if isinstance(checkin_at, str):
-                checkin_dt = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
-            else:
-                checkin_dt = checkin_at
-            
-            # Allow 15 minutes tolerance
-            tolerance = timedelta(minutes=15)
-            if checkin_dt <= scheduled_dt + tolerance:
-                breakdown["checkin_on_time"]["earned"] = breakdown["checkin_on_time"]["max"]
-                breakdown["checkin_on_time"]["approved"] = True
-        except Exception as e:
-            logging.warning(f"Error comparing dates for gamification: {e}")
-    
-    # 2. Check-out with Evidence (20%) - Has checkout photo
-    if checkin_data.get("checkout_photo"):
-        breakdown["checkout_evidence"]["earned"] = breakdown["checkout_evidence"]["max"]
-        breakdown["checkout_evidence"]["approved"] = True
-    
-    # 3. Daily Engagement (10%) - First access today (handled separately)
-    # This will be checked in the endpoint
-    
-    # 4. Base Productivity (20%) - Always awarded for completion
-    breakdown["base_productivity"]["earned"] = breakdown["base_productivity"]["max"]
-    breakdown["base_productivity"]["approved"] = True
-    
-    total_coins = sum(trigger["earned"] for trigger in breakdown.values())
-    
-    return {
-        "total_coins": total_coins,
-        "breakdown": breakdown,
-        "base_coins": base_coins,
-        "installed_m2": installed_m2
-    }
+# Note: calculate_checkout_coins is imported from services/gamification.py
 
 async def award_coins(user_id: str, amount: int, transaction_type: str, description: str, reference_id: str = None, breakdown: dict = None):
     """Award coins to a user and update their balance"""
