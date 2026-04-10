@@ -3,10 +3,17 @@
   "builds": [
     {
       "src": "api/index.py",
-      "use": "@vercel/python"
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
     }
   ],
   "routes": [
+    {
+      "src": "/health",
+      "dest": "api/index.py"
+    },
     {
       "src": "/api/(.*)",
       "dest": "api/index.py"
@@ -17,19 +24,5 @@
       "path": "/api/cron/sync-holdprint",
       "schedule": "*/30 * * * *"
     }
-  ],
-  "env": {
-    "SUPABASE_URL": "@supabase_url",
-    "SUPABASE_SERVICE_KEY": "@supabase_service_key",
-    "SUPABASE_ANON_KEY": "@supabase_anon_key",
-    "JWT_SECRET": "@jwt_secret",
-    "HOLDPRINT_API_KEY_POA": "@holdprint_api_key_poa",
-    "HOLDPRINT_API_KEY_SP": "@holdprint_api_key_sp",
-    "RESEND_API_KEY": "@resend_api_key",
-    "SENDER_EMAIL": "@sender_email",
-    "FRONTEND_URL": "https://instal-visual.com.br",
-    "VAPID_PUBLIC_KEY": "@vapid_public_key",
-    "VAPID_PRIVATE_KEY": "@vapid_private_key",
-    "VAPID_CLAIMS_EMAIL": "@vapid_claims_email"
-  }
+  ]
 }
