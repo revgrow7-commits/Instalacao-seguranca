@@ -2,7 +2,7 @@
 Gamification service - coin calculations and rewards.
 """
 from datetime import datetime, timezone
-from database import db
+from db_supabase import db
 
 # Coin reward values
 COIN_REWARDS = {

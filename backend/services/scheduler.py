@@ -24,7 +24,7 @@ def get_scheduler():
 
 async def sync_holdprint_job():
     """Sync Holdprint data automatically"""
-    from database import db
+    from db_supabase import db
     
     logger.info("🔄 Iniciando sincronização automática com Holdprint...")
     

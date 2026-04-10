@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole, Installer
 
@@ -27,7 +27,7 @@ async def list_installers(current_user: User = Depends(get_current_user)):
 @router.put("/installers/{installer_id}", response_model=Installer)
 async def update_installer(installer_id: str, installer_data: dict, current_user: User = Depends(get_current_user)):
     """Update installer data."""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     update_data = {k: v for k, v in installer_data.items() if k not in ['id', 'user_id', 'created_at']}
     

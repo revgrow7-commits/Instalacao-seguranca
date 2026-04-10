@@ -43,9 +43,11 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 - **FRONTEND_URL (backend .env):** `https://instal-visual.com.br` (HARDCODED no código para evitar erros)
 
 ### Reset de Senha
-- Link agora usa variável de ambiente `FRONTEND_URL` em `/app/backend/server.py` e `/app/backend/routes/auth.py`
+- Link usa variável de ambiente `FRONTEND_URL` em `/app/backend/routes/auth_new.py`
 - URL: `{FRONTEND_URL}/reset-password?token=...`
-- **CORRIGIDO (01/04/2026):** URLs hardcoded substituídos por variável de ambiente
+- **CORRIGIDO (10/04/2026):** Sistema de autenticação completamente recriado para Supabase
+- **Email de envio:** `bruno@industriavisual.com.br` (domínio verificado no Resend)
+- **IMPORTANTE:** Toda a lógica de auth está centralizada em `/app/backend/routes/auth_new.py`
 
 ### Regras de Negócio Importantes
 1. **Status "instalando"** só pode ser definido se houver instaladores atribuídos
@@ -59,7 +61,11 @@ Sistema PWA para controlar a produtividade de instaladores da Indústria Visual.
 
 ### Autenticação e Usuários
 - [x] Login JWT com diferentes perfis (Admin, Gerente, Instalador)
-- [x] Recuperação de senha (com Resend - bloqueado aguardando verificação de domínio)
+- [x] Recuperação de senha via Resend (email `bruno@industriavisual.com.br`)
+- [x] **Sistema de auth recriado (10/04/2026)** - Agora usa Supabase diretamente
+- [x] Auto-registro de instaladores (`/auth/register` ou `/auth/self-register`)
+- [x] Alteração de senha pelo usuário autenticado
+- [x] Reset de senha por admin
 - [x] Gerenciamento de usuários (busca, filtros, edição, ativação/desativação)
 
 ### Jobs e Importação

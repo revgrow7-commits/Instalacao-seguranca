@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import logging
 import json
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CLAIMS_EMAIL
@@ -147,7 +147,7 @@ async def send_notification_to_users(
     current_user: User = Depends(get_current_user)
 ):
     """Send push notification to specific users or all installers (admin/manager only)."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     if notification.user_ids:
         # Send to specific users
@@ -215,7 +215,7 @@ async def check_schedule_conflicts(
 @router.get("/notifications/pending-checkins")
 async def get_pending_checkins(current_user: User = Depends(get_current_user)):
     """Get scheduled jobs that haven't been started (for late check-in alerts)."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     now = datetime.now(timezone.utc)
     today_str = now.strftime('%Y-%m-%d')
@@ -256,7 +256,7 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
 @router.post("/notifications/send-late-alerts")
 async def send_late_checkin_alerts(current_user: User = Depends(get_current_user)):
     """Send notifications for late check-ins."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     result = await get_pending_checkins(current_user)
     pending = result["pending_checkins"]
@@ -286,7 +286,7 @@ async def notify_job_scheduled(
     current_user: User = Depends(get_current_user)
 ):
     """Send notification when a job is scheduled."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:

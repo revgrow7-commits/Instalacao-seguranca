@@ -10,7 +10,7 @@ from io import BytesIO
 import logging
 import re
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
@@ -113,7 +113,7 @@ async def get_report_by_family(current_user: User = Depends(get_current_user)):
     Relatório completo por família de produtos.
     Analisa todos os jobs importados e classifica seus produtos por família.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
     families = db.product_families.find({}, {"_id": 0})
@@ -251,7 +251,7 @@ async def get_family_productivity_kpis(
     """
     KPIs de produtividade por família de produto.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     query = {"status": "completed"}
     if date_from or date_to:
@@ -367,7 +367,7 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     """
     Relatório de produtividade por instalador.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     installers = db.installers.find({}, {"_id": 0})
     item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
@@ -475,7 +475,7 @@ async def get_productivity_report(
     """
     Relatório de produtividade completo.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
     item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
@@ -783,7 +783,7 @@ async def get_productivity_report(
 @router.get("/metrics")
 async def get_metrics(current_user: User = Depends(get_current_user)):
     """Get general metrics for dashboard - optimized for Supabase."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Queries simples para jobs (Supabase não suporta aggregation pipelines)
     all_jobs = db.jobs.find({"archived": {"$ne": True}}, {"_id": 0, "status": 1})
@@ -826,7 +826,7 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
 @router.get("/reports/export")
 async def export_reports(current_user: User = Depends(get_current_user)):
     """Export consolidated report to Excel"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     checkins = db.item_checkins.find({}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})

@@ -9,7 +9,7 @@ import uuid
 import logging
 import math
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from models.product import ProductInstalled
@@ -338,7 +338,7 @@ async def get_all_item_checkins(
     current_user: User = Depends(get_current_user)
 ):
     """Get all item check-ins for reports (Admin/Manager only) - optimized"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Projeção otimizada - exclui fotos base64 pesadas
     projection = {
@@ -600,7 +600,7 @@ async def delete_item_checkin(
     current_user: User = Depends(get_current_user)
 ):
     """Delete an item check-in - Only admin and managers"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     checkin = db.item_checkins.find_one({"id": checkin_id})
     if not checkin:
@@ -618,7 +618,7 @@ async def archive_item_checkin(
     current_user: User = Depends(get_current_user)
 ):
     """Archive an item check-in - Only admin and managers"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     checkin = db.item_checkins.find_one({"id": checkin_id})
     if not checkin:

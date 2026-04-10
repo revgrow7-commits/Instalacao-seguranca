@@ -4,7 +4,7 @@ Routes package initialization.
 from fastapi import APIRouter
 
 # Import all routers
-from routes.auth import router as auth_router
+from routes.auth_new import router as auth_router  # Updated to use new auth system
 from routes.users import router as users_router
 from routes.jobs import router as jobs_router
 from routes.checkins import router as checkins_router

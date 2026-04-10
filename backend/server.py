@@ -49,7 +49,7 @@ from config import (
     MAX_CHECKOUT_DISTANCE_METERS, UPLOAD_DIR,
     PAUSE_REASONS, PAUSE_REASON_LABELS, PRODUCT_FAMILY_MAPPING
 )
-from database import db, client
+from db_supabase import db
 
 # Import services
 from services.product_classifier import classify_product_to_family, extract_product_measures, calculate_job_products_area
@@ -768,288 +768,10 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
 
 # ============ AUTH ROUTES ============
 
-@api_router.post("/auth/register", response_model=User)
-async def register(user_data: UserCreate, current_user: User = Depends(get_current_user)):
-    """Admin creates new user"""
-    await require_role(current_user, [UserRole.ADMIN])
-    
-    # Check if user exists
-    existing = db.users.find_one({"email": user_data.email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Create user
-    user = User(
-        email=user_data.email,
-        name=user_data.name,
-        role=user_data.role
-    )
-    
-    user_dict = user.model_dump()
-    user_dict['password_hash'] = get_password_hash(user_data.password)
-    user_dict['created_at'] = user_dict['created_at'].isoformat()
-    
-    db.users.insert_one(user_dict)
-    
-    # If installer, create installer record
-    if user_data.role == UserRole.INSTALLER:
-        installer = Installer(
-            user_id=user.id,
-            full_name=user_data.name,
-            branch="POA"  # Default, can be updated later
-        )
-        installer_dict = installer.model_dump()
-        installer_dict['created_at'] = installer_dict['created_at'].isoformat()
-        db.installers.insert_one(installer_dict)
-    
-    return user
+# ============ AUTH ROUTES MOVED TO routes/auth_new.py ============
+# All authentication routes have been moved to a dedicated module.
+# The router is included at the bottom of this file.
 
-# Self-registration endpoint (public - no auth required)
-class SelfRegisterRequest(BaseModel):
-    name: str
-    email: EmailStr
-    password: str
-
-@api_router.post("/auth/self-register")
-async def self_register(request: SelfRegisterRequest):
-    """Allow users to create their own account"""
-    # Check if email already exists
-    existing_user = db.users.find_one({"email": request.email}, {"_id": 0})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Este email já está cadastrado")
-    
-    if len(request.password) < 6:
-        raise HTTPException(status_code=400, detail="A senha deve ter pelo menos 6 caracteres")
-    
-    # Create user with default 'installer' role
-    user = User(
-        name=request.name,
-        email=request.email,
-        role=UserRole.INSTALLER  # Default role for self-registered users
-    )
-    
-    user_dict = user.model_dump()
-    user_dict['password_hash'] = get_password_hash(request.password)
-    user_dict['created_at'] = user_dict['created_at'].isoformat()
-    db.users.insert_one(user_dict)
-    
-    # Auto-create installer profile
-    installer = Installer(
-        user_id=user.id,
-        full_name=request.name,
-        branch="POA"  # Default branch
-    )
-    installer_dict = installer.model_dump()
-    installer_dict['created_at'] = installer_dict['created_at'].isoformat()
-    db.installers.insert_one(installer_dict)
-    
-    logging.info(f"New user self-registered: {request.email}")
-    
-    return {
-        "success": True,
-        "message": "Conta criada com sucesso! Faça login para continuar.",
-        "user_id": user.id
-    }
-
-@api_router.post("/auth/login", response_model=Token)
-async def login(credentials: UserLogin):
-    # Find user
-    user_doc = db.users.find_one({"email": credentials.email}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Verify password
-    if not verify_password(credentials.password, user_doc['password_hash']):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    
-    # Convert datetime
-    if isinstance(user_doc['created_at'], str):
-        user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
-    
-    user = User(**user_doc)
-    
-    # Create token
-    access_token = create_access_token(data={"sub": user.id, "email": user.email, "role": user.role})
-    
-    return Token(access_token=access_token, token_type="bearer", user=user)
-
-@api_router.get("/auth/me", response_model=User)
-async def get_me(current_user: User = Depends(get_current_user)):
-    return current_user
-
-# ============ PASSWORD RECOVERY ============
-
-class ForgotPasswordRequest(BaseModel):
-    email: EmailStr
-
-class ResetPasswordRequest(BaseModel):
-    token: str
-    new_password: str
-
-class AdminResetPasswordRequest(BaseModel):
-    new_password: str
-
-@api_router.post("/auth/forgot-password")
-async def forgot_password(request: ForgotPasswordRequest):
-    """Send password reset email"""
-    # Find user by email
-    user = db.users.find_one({"email": request.email}, {"_id": 0})
-    
-    if not user:
-        # Don't reveal if email exists or not for security
-        return {"message": "Se o email existir, você receberá um link para redefinir sua senha."}
-    
-    # Generate reset token
-    reset_token = secrets.token_urlsafe(32)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-    
-    # Store reset token in database
-    db.password_resets.delete_many({"user_id": user['id']})  # Remove old tokens
-    db.password_resets.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user['id'],
-        "token": reset_token,
-        "expires_at": expires_at.isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    # IMPORTANTE: Sempre usar URL de produção para reset de senha
-    # Fallback hardcoded para garantir que nunca use localhost
-    production_url = FRONTEND_URL
-    if not production_url or 'localhost' in str(production_url) or '127.0.0.1' in str(production_url):
-        production_url = "https://instal-visual.com.br"
-    
-    reset_link = f"{production_url}/reset-password?token={reset_token}"
-    logger.info(f"Password reset link generated: {reset_link}")
-    
-    html_content = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <div style="text-align: center; margin-bottom: 30px;">
-            <h1 style="color: #FF1F5A; margin: 0;">INDÚSTRIA VISUAL</h1>
-            <p style="color: #666; margin-top: 5px;">Transformamos ideias em realidade</p>
-        </div>
-        
-        <div style="background-color: #1a1a2e; color: white; padding: 30px; border-radius: 10px;">
-            <h2 style="margin-top: 0;">Redefinir Senha</h2>
-            <p>Olá {user.get('name', 'Usuário')},</p>
-            <p>Recebemos uma solicitação para redefinir a senha da sua conta.</p>
-            <p>Clique no botão abaixo para criar uma nova senha:</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-                <a href="{reset_link}" 
-                   style="background-color: #FF1F5A; color: white; padding: 15px 30px; 
-                          text-decoration: none; border-radius: 5px; font-weight: bold;">
-                    Redefinir Senha
-                </a>
-            </div>
-            
-            <p style="color: #999; font-size: 12px;">
-                Este link expira em 1 hora.<br>
-                Se você não solicitou esta redefinição, ignore este email.
-            </p>
-        </div>
-        
-        <p style="color: #666; font-size: 12px; text-align: center; margin-top: 20px;">
-            © 2025 Indústria Visual. Todos os direitos reservados.
-        </p>
-    </div>
-    """
-    
-    try:
-        params = {
-            "from": SENDER_EMAIL,
-            "to": [request.email],
-            "subject": "Redefinir Senha - Indústria Visual",
-            "html": html_content
-        }
-        await asyncio.to_thread(resend.Emails.send, params)
-        logging.info(f"Password reset email sent to {request.email}")
-        return {"message": "Se o email existir, você receberá um link para redefinir sua senha.", "email_sent": True}
-    except Exception as e:
-        error_message = str(e)
-        logging.error(f"Failed to send password reset email: {error_message}")
-        # Check if it's a Resend test account limitation
-        if "testing emails" in error_message.lower() or "verify a domain" in error_message.lower():
-            return {
-                "message": "O serviço de email está em modo de teste. Entre em contato com o administrador para redefinir sua senha.",
-                "email_sent": False,
-                "error_type": "test_mode"
-            }
-        # Still return success message to not reveal if email exists
-        return {"message": "Se o email existir, você receberá um link para redefinir sua senha.", "email_sent": False}
-
-@api_router.post("/auth/reset-password")
-async def reset_password(request: ResetPasswordRequest):
-    """Reset password using token from email"""
-    # Find reset token
-    reset_record = db.password_resets.find_one({"token": request.token}, {"_id": 0})
-    
-    if not reset_record:
-        raise HTTPException(status_code=400, detail="Token inválido ou expirado")
-    
-    # Check if token expired
-    expires_at = datetime.fromisoformat(reset_record['expires_at'])
-    if datetime.now(timezone.utc) > expires_at:
-        db.password_resets.delete_one({"token": request.token})
-        raise HTTPException(status_code=400, detail="Token expirado. Solicite um novo link.")
-    
-    # Update user password
-    new_hash = get_password_hash(request.new_password)
-    result = db.users.update_one(
-        {"id": reset_record['user_id']},
-        {"$set": {"password_hash": new_hash}}
-    )
-    
-    # Supabase returns dict with 'modified_count' or 'matched_count'
-    modified = result.get('modified_count', 0) if isinstance(result, dict) else getattr(result, 'modified_count', 0)
-    if modified == 0:
-        # Try to check if user exists
-        user = db.users.find_one({"id": reset_record['user_id']})
-        if not user:
-            raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    # Delete used token
-    db.password_resets.delete_one({"token": request.token})
-    
-    return {"message": "Senha alterada com sucesso!"}
-
-@api_router.get("/auth/verify-reset-token")
-async def verify_reset_token(token: str):
-    """Verify if a reset token is valid"""
-    reset_record = db.password_resets.find_one({"token": token}, {"_id": 0})
-    
-    if not reset_record:
-        return {"valid": False, "message": "Token inválido"}
-    
-    expires_at = datetime.fromisoformat(reset_record['expires_at'])
-    if datetime.now(timezone.utc) > expires_at:
-        db.password_resets.delete_one({"token": token})
-        return {"valid": False, "message": "Token expirado"}
-    
-    return {"valid": True}
-
-@api_router.put("/users/{user_id}/reset-password")
-async def admin_reset_password(
-    user_id: str,
-    request: AdminResetPasswordRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Admin can reset any user's password"""
-    await require_role(current_user, [UserRole.ADMIN])
-    
-    # Find user
-    user = db.users.find_one({"id": user_id}, {"_id": 0})
-    if not user:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    # Update password
-    new_hash = get_password_hash(request.new_password)
-    db.users.update_one(
-        {"id": user_id},
-        {"$set": {"password_hash": new_hash}}
-    )
-    
-    return {"message": f"Senha do usuário {user.get('name')} redefinida com sucesso"}
 
 # ============ ADMIN DATA CLEANUP ROUTES ============
 
@@ -1060,7 +782,7 @@ async def cleanup_test_data(current_user: User = Depends(get_current_user)):
     Remove: jobs, checkins, item_checkins, atribuições.
     ATENÇÃO: Esta ação é irreversível!
     """
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     results = {}
     
@@ -1109,7 +831,7 @@ async def reprocess_job_products(current_user: User = Depends(get_current_user))
     Reprocessa os produtos de todos os jobs que não têm products_with_area.
     Útil para jobs importados por versões anteriores do código.
     """
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     # Buscar jobs sem products_with_area ou com array vazio
     jobs_to_process = db.jobs.find({
@@ -1227,7 +949,7 @@ async def reprocess_job_products(current_user: User = Depends(get_current_user))
 
 @api_router.get("/users", response_model=List[User])
 async def list_users(current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     users = db.users.find({}, {"_id": 0, "password_hash": 0})
     
     for user in users:
@@ -1238,7 +960,7 @@ async def list_users(current_user: User = Depends(get_current_user)):
 
 @api_router.put("/users/{user_id}", response_model=User)
 async def update_user(user_id: str, user_data: dict, current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     # Update user
     update_data = {k: v for k, v in user_data.items() if k not in ['id', 'created_at', 'password', 'phone', 'branch']}
@@ -1279,45 +1001,14 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
 
 @api_router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     result = db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User deleted"}
 
 
-class PasswordChangeRequest(BaseModel):
-    current_password: str
-    new_password: str
-
-
-@api_router.post("/users/change-password")
-async def change_password(
-    password_data: PasswordChangeRequest,
-    current_user: User = Depends(get_current_user)
-):
-    """Change the current user's password"""
-    # Get user with password hash
-    user_doc = db.users.find_one({"id": current_user.id})
-    if not user_doc:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    # Verify current password
-    if not verify_password(password_data.current_password, user_doc['password_hash']):
-        raise HTTPException(status_code=400, detail="Senha atual incorreta")
-    
-    # Validate new password
-    if len(password_data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres")
-    
-    # Hash and save new password
-    new_password_hash = get_password_hash(password_data.new_password)
-    db.users.update_one(
-        {"id": current_user.id},
-        {"$set": {"password_hash": new_password_hash}}
-    )
-    
-    return {"message": "Senha alterada com sucesso"}
+# NOTE: /users/change-password has been moved to routes/auth_new.py as /auth/change-password
 
 
 # ============ CHECK-IN/OUT ROUTES ============
@@ -1382,7 +1073,7 @@ async def delete_job(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a job and all related data - Only admin and managers"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Check if job exists
     job = db.jobs.find_one({"id": job_id})
@@ -1424,7 +1115,7 @@ async def list_installers(current_user: User = Depends(get_current_user)):
 
 @api_router.put("/installers/{installer_id}", response_model=Installer)
 async def update_installer(installer_id: str, installer_data: dict, current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     update_data = {k: v for k, v in installer_data.items() if k not in ['id', 'user_id', 'created_at']}
     
@@ -1698,13 +1389,17 @@ api_router.include_router(notifications_router, tags=["Notifications"])
 from routes.jobs import router as jobs_router
 api_router.include_router(jobs_router, tags=["Jobs"])
 
+# ============ AUTH ROUTES (migrated to routes/auth_new.py) ============
+from routes.auth_new import router as auth_router
+api_router.include_router(auth_router, tags=["Authentication"])
+
 
 # ============ SCHEDULER / CRON MANAGEMENT ROUTES ============
 
 @api_router.get("/scheduler/jobs")
 async def get_scheduler_jobs(current_user: User = Depends(get_current_user)):
     """List scheduled jobs status - works in both traditional and serverless mode"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Get last sync status from database
     last_sync = db.system_config.find_one({"key": "last_holdprint_sync"})
@@ -1729,7 +1424,7 @@ async def get_scheduler_jobs(current_user: User = Depends(get_current_user)):
 @api_router.post("/scheduler/jobs/{job_id}/pause")
 async def pause_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Pause a scheduled job - not available in serverless mode"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     if IS_SERVERLESS:
         raise HTTPException(
@@ -1749,7 +1444,7 @@ async def pause_scheduler_job(job_id: str, current_user: User = Depends(get_curr
 @api_router.post("/scheduler/jobs/{job_id}/resume")
 async def resume_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Resume a paused job - not available in serverless mode"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     if IS_SERVERLESS:
         raise HTTPException(
@@ -1769,7 +1464,7 @@ async def resume_scheduler_job(job_id: str, current_user: User = Depends(get_cur
 @api_router.post("/scheduler/jobs/{job_id}/run-now")
 async def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_current_user)):
     """Trigger a job to run immediately"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     if job_id == "holdprint_sync":
         # Run sync directly

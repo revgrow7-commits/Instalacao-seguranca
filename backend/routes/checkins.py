@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import uuid
 import logging
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
@@ -462,7 +462,7 @@ async def delete_checkin(
     current_user: User = Depends(get_current_user)
 ):
     """Delete a check-in - Only admin and managers"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     checkin = db.checkins.find_one({"id": checkin_id})
     if not checkin:

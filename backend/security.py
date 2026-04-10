@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
-from database import db
+from db_supabase import db
 from models.user import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -34,7 +34,7 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> User:
     """Get current authenticated user from JWT token."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -50,7 +50,10 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise credentials_exception
     
-    user_doc = db.users.find_one({"id": user_id}, {"_id": 0})
+    # Use synchronous Supabase wrapper
+    users = db.users.find({"id": user_id})
+    user_doc = users[0] if users else None
+    
     if user_doc is None:
         raise credentials_exception
     
@@ -61,7 +64,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return User(**user_doc)
 
 
-async def require_role(user: User, allowed_roles: list) -> User:
+def require_role(user: User, allowed_roles: list) -> User:
     """Check if user has required role."""
     if user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
