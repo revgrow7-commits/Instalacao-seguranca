@@ -188,31 +188,52 @@ class SupabaseTable:
                         elif value is not None:
                             or_builder = or_builder.eq(key, value)
                     
-                    # Apply the OR condition
+                    # Apply the OR condition - handle array contains for JSONB/TEXT fields
                     for cond_key, cond_val in condition.items():
-                        if isinstance(cond_val, list):
-                            # For array contains
-                            or_builder = or_builder.contains(cond_key, cond_val)
+                        if isinstance(cond_val, dict):
+                            # Handle operators like $in
+                            for op, op_val in cond_val.items():
+                                if op == '$in':
+                                    or_builder = or_builder.in_(cond_key, op_val)
+                                elif op == '$contains':
+                                    # Use ilike for TEXT columns storing JSON arrays
+                                    or_builder = or_builder.ilike(cond_key, f'%{op_val}%')
+                        elif isinstance(cond_val, list):
+                            # For array contains - use ilike since column may be TEXT
+                            for val in cond_val:
+                                or_builder = or_builder.ilike(cond_key, f'%{val}%')
                         else:
-                            or_builder = or_builder.contains(cond_key, [cond_val])
+                            # For checking if a value is contained in a JSON array stored as TEXT
+                            # Use ilike to search for the value as substring
+                            or_builder = or_builder.ilike(cond_key, f'%{cond_val}%')
                     
                     # Apply sorting
                     if sort:
                         for field, direction in sort:
                             or_builder = or_builder.order(field, desc=(direction == -1))
                     
-                    result = or_builder.execute()
-                    for doc in (result.data or []):
-                        doc_id = doc.get('id')
-                        if doc_id and doc_id not in seen_ids:
-                            seen_ids.add(doc_id)
-                            all_results.append(_deserialize(doc))
+                    try:
+                        result = or_builder.execute()
+                        for doc in (result.data or []):
+                            doc_id = doc.get('id')
+                            if doc_id and doc_id not in seen_ids:
+                                seen_ids.add(doc_id)
+                                all_results.append(_deserialize(doc))
+                    except Exception as or_err:
+                        logger.warning(f"$or condition query failed: {or_err}")
+                        continue
                 
-                # Apply limit after combining
-                if limit:
-                    all_results = all_results[:limit]
+                # Sort combined results if needed
+                if sort and all_results:
+                    for field, direction in reversed(sort):
+                        reverse = (direction == -1)
+                        all_results.sort(key=lambda x: x.get(field) or '', reverse=reverse)
+                
+                # Apply skip first, then limit
                 if skip:
                     all_results = all_results[skip:]
+                if limit:
+                    all_results = all_results[:limit]
                     
                 return all_results
             
