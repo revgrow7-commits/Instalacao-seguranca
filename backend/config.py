@@ -43,8 +43,13 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual
 MAX_CHECKOUT_DISTANCE_METERS = 500
 
 # Upload directory
-UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', ROOT_DIR / 'uploads'))
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+_is_serverless = os.environ.get('VERCEL') == '1' or os.environ.get('SERVERLESS') == 'true'
+UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', '/tmp/uploads' if _is_serverless else str(ROOT_DIR / 'uploads')))
+try:
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except OSError:
+    UPLOAD_DIR = Path('/tmp/uploads')
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Pause reasons
 PAUSE_REASONS = [
