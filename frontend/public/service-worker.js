@@ -128,6 +128,73 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// Handle push notifications
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'Indústria Visual',
+    body: 'Você tem uma nova notificação',
+    icon: '/logo192.png',
+    badge: '/logo192.png',
+    url: '/'
+  };
+
+  if (event.data) {
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch (e) {
+      // ignore parse errors
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/logo192.png',
+    badge: data.badge || '/logo192.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'notification',
+    renotify: true,
+    requireInteraction: true,
+    data: {
+      url: data.url || '/',
+      ...data.data
+    },
+    actions: [
+      { action: 'open', title: 'Abrir' },
+      { action: 'close', title: 'Fechar' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Handle notification click
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'close') {
+    return;
+  }
+
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.navigate(url);
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(url);
+        }
+      })
+  );
+});
+
 // Background sync for offline check-ins
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-checkins') {

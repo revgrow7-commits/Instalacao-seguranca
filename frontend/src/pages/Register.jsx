@@ -64,7 +64,7 @@ const Register = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div 
         className="absolute inset-0 bg-cover bg-center opacity-10" 
-        style={{ backgroundImage: 'url(https://images.unsplash.com/photo-1729944950511-e9c71556cfd4?crop=entropy&cs=srgb&fm=jpg&q=85)' }}
+        style={{ backgroundImage: 'url(/bg-auth.jpg)' }}
       />
       
       <div className="relative z-10 w-full max-w-md">

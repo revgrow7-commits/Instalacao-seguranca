@@ -40,7 +40,7 @@ const usePushNotifications = () => {
       throw new Error('Service Worker não suportado');
     }
 
-    const registration = await navigator.serviceWorker.register('/sw.js');
+    const registration = await navigator.serviceWorker.register('/service-worker.js');
     await navigator.serviceWorker.ready;
     return registration;
   };

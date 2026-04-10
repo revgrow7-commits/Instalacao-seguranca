@@ -1,7 +1,7 @@
 import axios from 'axios';
 import tokenManager from './tokenManager';
 
-const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
+const API_URL = (process.env.REACT_APP_BACKEND_URL || window.location.origin) + '/api';
 
 // Simple in-memory cache
 const cache = new Map();

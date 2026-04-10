@@ -384,7 +384,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         raise credentials_exception
     return User(**user_doc)
 
-async def require_role(user: User, allowed_roles: List[str]):
+def require_role(user: User, allowed_roles: List[str]):
     if user.role not in allowed_roles:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     return user
@@ -469,9 +469,13 @@ async def cleanup_test_data(current_user: User = Depends(get_current_user)):
     """
     Limpa todos os dados de teste para começar do zero.
     Remove: jobs, checkins, item_checkins, atribuições.
-    ATENÇÃO: Esta ação é irreversível!
+    ATENÇÃO: Esta ação é irreversível! Disponível apenas em ambiente de desenvolvimento/staging.
     """
     require_role(current_user, [UserRole.ADMIN])
+
+    env = os.environ.get('ENV', 'production').lower()
+    if env == 'production':
+        raise HTTPException(status_code=403, detail="Endpoint desabilitado em produção")
     
     results = {}
     

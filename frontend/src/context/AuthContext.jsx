@@ -1,11 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
-import { jwtDecode } from 'jwt-decode';
 import tokenManager from '../utils/tokenManager';
+import { api } from '../utils/api';
 
 const AuthContext = createContext();
 
-const API_URL = process.env.REACT_APP_BACKEND_URL + '/api';
+const API_URL = (process.env.REACT_APP_BACKEND_URL || window.location.origin) + '/api';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -61,6 +61,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     tokenManager.clearToken();
+    api.clearCache();
     setUser(null);
     setTokenVersion(v => v + 1); // Trigger re-render
   };

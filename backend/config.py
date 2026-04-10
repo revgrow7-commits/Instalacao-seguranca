@@ -9,9 +9,10 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# JWT Settings - Auto-generate SECRET_KEY from SUPABASE_SERVICE_KEY or use a secure default
-# This eliminates the need for a separate JWT_SECRET environment variable
-_supabase_key = os.environ.get('SUPABASE_SERVICE_KEY', 'industria-visual-default-key-2024')
+# JWT Settings - derived from SUPABASE_SERVICE_KEY (required)
+_supabase_key = os.environ.get('SUPABASE_SERVICE_KEY')
+if not _supabase_key:
+    raise RuntimeError("SUPABASE_SERVICE_KEY environment variable is required. Cannot start without a secure JWT secret.")
 SECRET_KEY = hashlib.sha256(_supabase_key.encode()).hexdigest()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 7
@@ -42,8 +43,8 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual
 MAX_CHECKOUT_DISTANCE_METERS = 500
 
 # Upload directory
-UPLOAD_DIR = Path("/app/uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', ROOT_DIR / 'uploads'))
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Pause reasons
 PAUSE_REASONS = [
