@@ -270,7 +270,8 @@ class SupabaseTable:
         self, 
         query: Dict[str, Any], 
         update: Dict[str, Any],
-        return_document: str = 'after'
+        return_document: str = 'after',
+        projection: Dict[str, Any] = None  # Ignored for Supabase compatibility
     ) -> Optional[Dict]:
         """Find and update, returning the document"""
         try:
