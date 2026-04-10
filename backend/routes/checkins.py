@@ -237,7 +237,7 @@ class CheckIn(BaseModel):
     checkout_gps_long: Optional[float] = None
     checkout_gps_accuracy: Optional[float] = None
     notes: Optional[str] = None
-    duration_minutes: Optional[int] = None
+    duration_minutes: Optional[float] = None
     installed_m2: Optional[float] = None
     complexity_level: Optional[int] = None
     height_category: Optional[str] = None
@@ -289,8 +289,12 @@ async def create_checkin(
             gps_accuracy=gps_accuracy
         )
 
-        # Filter out None values to avoid Supabase column errors
-        checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None}
+        # Only keep columns that exist in the actual Supabase checkins table
+        _CHECKIN_DB_COLUMNS = {'id', 'job_id', 'installer_id', 'checkin_at', 'checkout_at',
+            'checkin_photo', 'checkout_photo', 'gps_lat', 'gps_long',
+            'checkout_gps_lat', 'checkout_gps_long', 'notes',
+            'duration_minutes', 'status'}
+        checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None and k in _CHECKIN_DB_COLUMNS}
         checkin_dict['checkin_at'] = checkin.checkin_at.isoformat()
 
         db.checkins.insert_one(checkin_dict)
@@ -324,6 +328,19 @@ async def checkout(
     current_user: User = Depends(get_current_user)
 ):
     """Check out from a job with photo in Base64, GPS coordinates and productivity metrics"""
+    try:
+        return await _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy,
+            installed_m2, complexity_level, height_category, scenario_category,
+            difficulty_description, notes, current_user)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Checkout error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro no checkout: {str(e)}")
+
+async def _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy,
+    installed_m2, complexity_level, height_category, scenario_category,
+    difficulty_description, notes, current_user):
     checkin_doc = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin_doc:
         raise HTTPException(status_code=404, detail="Check-in not found")
@@ -336,7 +353,7 @@ async def checkout(
     
     # Calculate duration in minutes with decimal precision
     duration_seconds = (checkout_at - checkin_at).total_seconds()
-    duration_minutes = round(duration_seconds / 60, 2)  # Keep decimal precision
+    duration_minutes = round(duration_seconds / 60, 2)
     
     productivity_m2_h = None
     if installed_m2 and installed_m2 > 0 and duration_minutes > 0:
@@ -361,15 +378,17 @@ async def checkout(
         "duration_minutes": duration_minutes,
         "status": "completed"
     }
-    # Filter out None values to avoid Supabase column errors
-    update_data = {k: v for k, v in update_data.items() if v is not None}
-    
-    result = db.checkins.find_one_and_update(
-        {"id": checkin_id},
-        {"$set": update_data},
-        return_document=True,
-        projection={"_id": 0}
-    )
+    # Only keep columns that exist in the actual Supabase checkins table
+    _CHECKIN_DB_COLUMNS = {'id', 'job_id', 'installer_id', 'checkin_at', 'checkout_at',
+        'checkin_photo', 'checkout_photo', 'gps_lat', 'gps_long',
+        'checkout_gps_lat', 'checkout_gps_long', 'notes',
+        'duration_minutes', 'status'}
+    update_data = {k: v for k, v in update_data.items() if v is not None and k in _CHECKIN_DB_COLUMNS}
+
+    db.checkins.update_one({"id": checkin_id}, {"$set": update_data})
+    result = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    if not result:
+        raise HTTPException(status_code=404, detail="Check-in not found after update")
     
     job_checkins = db.checkins.find({"job_id": checkin_doc['job_id']}, {"_id": 0})
     all_completed = all(c['status'] == "completed" for c in job_checkins)

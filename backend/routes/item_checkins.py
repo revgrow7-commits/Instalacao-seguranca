@@ -190,9 +190,9 @@ class ItemCheckin(BaseModel):
     height_category: Optional[str] = None
     scenario_category: Optional[str] = None
     notes: Optional[str] = None
-    duration_minutes: Optional[int] = None
-    net_duration_minutes: Optional[int] = None
-    total_pause_minutes: Optional[int] = None
+    duration_minutes: Optional[float] = None
+    net_duration_minutes: Optional[float] = None
+    total_pause_minutes: Optional[float] = None
     productivity_m2_h: Optional[float] = None
     status: str = "in_progress"
 
@@ -204,7 +204,7 @@ class ItemPauseLog(BaseModel):
     reason: str
     paused_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     resumed_at: Optional[datetime] = None
-    duration_minutes: Optional[int] = None
+    duration_minutes: Optional[float] = None
     auto_generated: bool = False
 
 
