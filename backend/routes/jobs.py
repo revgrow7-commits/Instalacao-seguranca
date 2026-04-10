@@ -236,7 +236,7 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
     """Import job from Holdprint to local database"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    existing = await db.jobs.find_one({"holdprint_job_id": job_data.holdprint_job_id})
+    existing = db.jobs.find_one({"holdprint_job_id": job_data.holdprint_job_id})
     if existing:
         raise HTTPException(status_code=400, detail="Job already imported")
     
@@ -267,7 +267,7 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
     if job_dict.get('scheduled_date'):
         job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
     
-    await db.jobs.insert_one(job_dict)
+    db.jobs.insert_one(job_dict)
     return job
 
 
@@ -277,36 +277,37 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
     query = {}
     
     # Projeção otimizada - apenas campos necessários para listagem
+    # Nota: Supabase não suporta projeção com "." - retornar campo completo
     projection = {
         "_id": 0,
         "id": 1, "title": 1, "status": 1, "branch": 1, "client_name": 1,
         "scheduled_date": 1, "created_at": 1, "assigned_installers": 1,
         "archived": 1, "holdprint_job_id": 1, "area_m2": 1,
         "total_products": 1, "total_quantity": 1, "completed_at": 1,
-        "holdprint_data.code": 1, "holdprint_data.customerName": 1,
-        "holdprint_data.deliveryNeeded": 1, "holdprint_data.isFinalized": 1,
-        "products_with_area": 1, "items": 1, "archived_items": 1
+        "holdprint_data": 1,
+        "products_with_area": 1, "items": 1, "archived_items": 1,
+        "item_assignments": 1
     }
     
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+        installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
             query["assigned_installers"] = installer['id']
         else:
             return []
     
     # Busca otimizada com projeção
-    jobs = await db.jobs.find(query, projection).to_list(500)
+    jobs = db.jobs.find(query, projection)
     
     if not jobs:
         return []
     
     # Busca checkins apenas para jobs retornados
     job_ids = [j.get('id') for j in jobs if j.get('id')]
-    active_checkins = await db.item_checkins.find(
+    active_checkins = db.item_checkins.find(
         {"status": "in_progress", "job_id": {"$in": job_ids}},
         {"_id": 0, "job_id": 1, "checkin_at": 1}
-    ).to_list(500)
+    )
     
     job_start_times = {}
     for checkin in active_checkins:
@@ -335,10 +336,10 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
 @router.get("/jobs/team-calendar")
 async def get_team_calendar_jobs(current_user: User = Depends(get_current_user)):
     """Get all scheduled jobs for the team calendar view."""
-    jobs = await db.jobs.find(
+    jobs = db.jobs.find(
         {"scheduled_date": {"$exists": True, "$ne": None}}, 
         {"_id": 0}
-    ).to_list(500)
+    )
     
     cleaned_jobs = []
     for job in jobs:
@@ -373,7 +374,7 @@ async def get_sync_status(current_user: User = Depends(get_current_user)):
     """Check last Holdprint sync status"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    last_sync = await db.system_config.find_one({"key": "last_holdprint_sync"}, {"_id": 0})
+    last_sync = db.system_config.find_one({"key": "last_holdprint_sync"}, {"_id": 0})
     
     if not last_sync:
         return {"last_sync": None, "message": "Nenhuma sincronização realizada ainda"}
@@ -392,14 +393,16 @@ async def check_inconsistent_jobs(current_user: User = Depends(get_current_user)
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    inconsistent_jobs = await db.jobs.find({
-        "status": {"$in": ["instalando", "in_progress"]},
-        "$or": [
-            {"assigned_installers": {"$exists": False}},
-            {"assigned_installers": []},
-            {"assigned_installers": None}
-        ]
-    }, {"_id": 0, "id": 1, "title": 1, "status": 1, "holdprint_data.code": 1}).to_list(500)
+    # Busca jobs com status "instalando" e filtra no Python
+    all_installing_jobs = db.jobs.find({
+        "status": {"$in": ["instalando", "in_progress"]}
+    }, {"_id": 0, "id": 1, "title": 1, "status": 1, "holdprint_data": 1, "assigned_installers": 1})
+    
+    # Filtra jobs inconsistentes (sem instaladores)
+    inconsistent_jobs = [
+        job for job in all_installing_jobs 
+        if not job.get("assigned_installers") or len(job.get("assigned_installers", [])) == 0
+    ]
     
     jobs_list = []
     for job in inconsistent_jobs:
@@ -425,29 +428,28 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    inconsistent_jobs = await db.jobs.find({
-        "status": {"$in": ["instalando", "in_progress"]},
-        "$or": [
-            {"assigned_installers": {"$exists": False}},
-            {"assigned_installers": []},
-            {"assigned_installers": None}
-        ]
-    }, {"_id": 0, "id": 1, "title": 1, "holdprint_data.code": 1}).to_list(500)
+    # Busca jobs com status "instalando" e filtra no Python
+    all_installing_jobs = db.jobs.find({
+        "status": {"$in": ["instalando", "in_progress"]}
+    }, {"_id": 0, "id": 1, "title": 1, "holdprint_data": 1, "assigned_installers": 1})
+    
+    # Filtra jobs inconsistentes (sem instaladores)
+    inconsistent_jobs = [
+        job for job in all_installing_jobs 
+        if not job.get("assigned_installers") or len(job.get("assigned_installers", [])) == 0
+    ]
     
     if not inconsistent_jobs:
         return {"message": "Nenhum job inconsistente encontrado", "fixed_count": 0, "jobs": []}
     
-    result = await db.jobs.update_many(
-        {
-            "status": {"$in": ["instalando", "in_progress"]},
-            "$or": [
-                {"assigned_installers": {"$exists": False}},
-                {"assigned_installers": []},
-                {"assigned_installers": None}
-            ]
-        },
-        {"$set": {"status": "aguardando"}}
-    )
+    # Atualiza cada job individualmente
+    fixed_count = 0
+    for job in inconsistent_jobs:
+        db.jobs.update_one(
+            {"id": job["id"]},
+            {"$set": {"status": "aguardando"}}
+        )
+        fixed_count += 1
     
     fixed_jobs = []
     for job in inconsistent_jobs:
@@ -459,8 +461,8 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
         })
     
     return {
-        "message": f"Corrigidos {result.modified_count} jobs inconsistentes",
-        "fixed_count": result.modified_count,
+        "message": f"Corrigidos {fixed_count} jobs inconsistentes",
+        "fixed_count": fixed_count,
         "jobs": fixed_jobs
     }
 
@@ -468,7 +470,7 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
 @router.get("/jobs/{job_id}", response_model=Job)
 async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Get a specific job by ID"""
-    job_doc = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job_doc = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -516,7 +518,7 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
                 total_area_m2 += total_area
         
         if products_with_area:
-            await db.jobs.update_one(
+            db.jobs.update_one(
                 {"id": job_id},
                 {"$set": {
                     "products_with_area": products_with_area,
@@ -530,7 +532,7 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
     
     # Check installer access
     if current_user.role == UserRole.INSTALLER:
-        installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+        installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
         if installer:
             installer_id = installer['id']
             job_assigned_installers = job_doc.get('assigned_installers') or []
@@ -565,7 +567,7 @@ async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = D
     """Assign installers to a job"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    result = await db.jobs.find_one_and_update(
+    result = db.jobs.find_one_and_update(
         {"id": job_id},
         {"$set": {"assigned_installers": assign_data.installer_ids}},
         return_document=True,
@@ -592,7 +594,7 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
     if schedule_data.installer_ids:
         update_data["assigned_installers"] = schedule_data.installer_ids
     
-    result = await db.jobs.find_one_and_update(
+    result = db.jobs.find_one_and_update(
         {"id": job_id},
         {"$set": update_data},
         return_document=True,
@@ -616,7 +618,7 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Get current job data for validation
-    current_job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    current_job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not current_job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -650,7 +652,7 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
                 detail="Não é possível definir status 'Instalando' sem instaladores atribuídos. Atribua pelo menos um instalador primeiro."
             )
     
-    result = await db.jobs.find_one_and_update(
+    result = db.jobs.find_one_and_update(
         {"id": job_id},
         {"$set": update_data},
         return_document=True,
@@ -674,7 +676,7 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
     Installer finalizes a job after completing all items.
     Validates that all assigned items (excluding archived) are completed before allowing finalization.
     """
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -683,7 +685,7 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
     archived_indices = set(a.get("item_index") for a in archived_items)
     
     # Get all item checkins for this job
-    item_checkins = await db.item_checkins.find({"job_id": job_id}, {"_id": 0}).to_list(1000)
+    item_checkins = db.item_checkins.find({"job_id": job_id}, {"_id": 0})
     
     # Get assigned item indices
     item_assignments = job.get("item_assignments", [])
@@ -714,7 +716,7 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
         )
     
     # Update job status to finalizado
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {
             "status": "finalizado",
@@ -730,14 +732,14 @@ async def delete_job(job_id: str, current_user: User = Depends(get_current_user)
     """Delete a job and all related data"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id})
+    job = db.jobs.find_one({"id": job_id})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    await db.checkins.delete_many({"job_id": job_id})
-    await db.item_checkins.delete_many({"job_id": job_id})
-    await db.installed_products.delete_many({"job_id": job_id})
-    await db.jobs.delete_one({"id": job_id})
+    db.checkins.delete_many({"job_id": job_id})
+    db.item_checkins.delete_many({"job_id": job_id})
+    db.installed_products.delete_many({"job_id": job_id})
+    db.jobs.delete_one({"id": job_id})
     
     return {"message": "Job and all related data deleted successfully"}
 
@@ -750,7 +752,7 @@ async def reprocess_job_products(job_id: str, current_user: User = Depends(get_c
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -796,7 +798,7 @@ async def reprocess_job_products(job_id: str, current_user: User = Depends(get_c
         total_quantity += quantity
     
     # Update job in database
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {
             "products_with_area": products_with_area,
@@ -837,7 +839,7 @@ async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: Use
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -852,7 +854,7 @@ async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: Use
         "exclude_from_metrics": request.exclude_from_metrics
     }
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": update_data}
     )
@@ -871,11 +873,11 @@ async def unarchive_job(job_id: str, current_user: User = Depends(get_current_us
     """Desarquiva um job."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {
             "$set": {
@@ -902,7 +904,7 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -933,7 +935,7 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
                 "exclude_from_metrics": request.exclude_from_metrics
             })
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {"archived_items": archived_items}}
     )
@@ -951,7 +953,7 @@ async def unarchive_job_items(job_id: str, item_indices: List[int], current_user
     """Desarquiva itens específicos de um job."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -960,7 +962,7 @@ async def unarchive_job_items(job_id: str, item_indices: List[int], current_user
     # Remove items from archived list
     archived_items = [a for a in archived_items if a.get("item_index") not in item_indices]
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {"archived_items": archived_items}}
     )
@@ -978,11 +980,11 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     """Assign specific items to installers"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    installers = await db.installers.find({"id": {"$in": assignment.installer_ids}}, {"_id": 0}).to_list(100)
+    installers = db.installers.find({"id": {"$in": assignment.installer_ids}}, {"_id": 0})
     installer_map = {i["id"]: i for i in installers}
     
     if len(installers) != len(assignment.installer_ids):
@@ -1038,7 +1040,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
         if assignment.scenario_category:
             job_config["default_scenario_category"] = assignment.scenario_category
         
-        await db.jobs.update_one(
+        db.jobs.update_one(
             {"id": job_id},
             {"$set": {"installation_config": job_config}}
         )
@@ -1046,7 +1048,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
     all_assignments = current_assignments + new_assignments
     all_installer_ids = list(set([a["installer_id"] for a in all_assignments]))
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {
             "item_assignments": all_assignments,
@@ -1066,7 +1068,7 @@ async def get_job_assignments(job_id: str, current_user: User = Depends(get_curr
     """Get job assignments grouped by installer and item"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -1120,7 +1122,7 @@ async def get_job_assignments(job_id: str, current_user: User = Depends(get_curr
 @router.put("/jobs/{job_id}/assignments/{item_index}/status")
 async def update_assignment_status(job_id: str, item_index: int, status_update: dict, current_user: User = Depends(get_current_user)):
     """Update assignment status"""
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
@@ -1136,7 +1138,7 @@ async def update_assignment_status(job_id: str, item_index: int, status_update: 
     for assignment in assignments:
         if assignment.get("item_index") == item_index:
             if current_user.role == UserRole.INSTALLER:
-                installer = await db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+                installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
                 if not installer or installer.get("id") != assignment.get("installer_id"):
                     continue
             
@@ -1150,7 +1152,7 @@ async def update_assignment_status(job_id: str, item_index: int, status_update: 
     if not updated:
         raise HTTPException(status_code=404, detail="Assignment not found or unauthorized")
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {"item_assignments": assignments}}
     )
@@ -1174,7 +1176,7 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
     for holdprint_job in holdprint_jobs:
         holdprint_job_id = str(holdprint_job.get('id', ''))
         
-        existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+        existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
         if existing:
             skipped += 1
             continue
@@ -1219,7 +1221,7 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
             if job_dict.get('scheduled_date'):
                 job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
             
-            await db.jobs.insert_one(job_dict)
+            db.jobs.insert_one(job_dict)
             imported += 1
             
         except Exception as e:
@@ -1259,7 +1261,7 @@ async def import_current_month_jobs(current_user: User = Depends(get_current_use
             for holdprint_job in holdprint_jobs:
                 holdprint_job_id = str(holdprint_job.get('id', ''))
                 
-                existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                 if existing:
                     skipped += 1
                     continue
@@ -1304,7 +1306,7 @@ async def import_current_month_jobs(current_user: User = Depends(get_current_use
                     if job_dict.get('scheduled_date'):
                         job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
                     
-                    await db.jobs.insert_one(job_dict)
+                    db.jobs.insert_one(job_dict)
                     imported += 1
                     
                 except Exception as e:
@@ -1379,7 +1381,7 @@ async def import_month_jobs(request: ImportMonthRequest, current_user: User = De
             for holdprint_job in holdprint_jobs:
                 holdprint_job_id = str(holdprint_job.get('id', ''))
                 
-                existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                 if existing:
                     skipped += 1
                     continue
@@ -1424,7 +1426,7 @@ async def import_month_jobs(request: ImportMonthRequest, current_user: User = De
                     if job_dict.get('scheduled_date'):
                         job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
                     
-                    await db.jobs.insert_one(job_dict)
+                    db.jobs.insert_one(job_dict)
                     imported += 1
                     
                 except Exception as e:
@@ -1504,7 +1506,7 @@ async def sync_holdprint_jobs(
                 for holdprint_job in holdprint_jobs:
                     holdprint_job_id = str(holdprint_job.get('id', ''))
                     
-                    existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                    existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                     if existing:
                         skipped += 1
                         continue
@@ -1549,7 +1551,7 @@ async def sync_holdprint_jobs(
                         if job_dict.get('scheduled_date'):
                             job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
                         
-                        await db.jobs.insert_one(job_dict)
+                        db.jobs.insert_one(job_dict)
                         imported += 1
                         
                     except Exception as e:
@@ -1583,7 +1585,7 @@ async def sync_holdprint_jobs(
                     "errors": [str(e)]
                 })
     
-    await db.system_config.update_one(
+    db.system_config.update_one(
         {"key": "last_holdprint_sync"},
         {
             "$set": {
@@ -1619,7 +1621,7 @@ async def submit_job_justification(
     """Submit justification for a job that wasn't completed"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    job = await db.jobs.find_one({"id": job_id}, {"_id": 0})
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -1646,9 +1648,9 @@ async def submit_job_justification(
         "created_at": datetime.now(timezone.utc).isoformat()
     }
     
-    await db.job_justifications.insert_one(justification_record)
+    db.job_justifications.insert_one(justification_record)
     
-    await db.jobs.update_one(
+    db.jobs.update_one(
         {"id": job_id},
         {"$set": {
             "status": "justificado",
@@ -1729,5 +1731,5 @@ async def get_job_justifications(current_user: User = Depends(get_current_user))
     """Get all job justifications"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    justifications = await db.job_justifications.find({}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    justifications = db.job_justifications.find({}, {"_id": 0}, sort=[("created_at", -1)])
     return justifications

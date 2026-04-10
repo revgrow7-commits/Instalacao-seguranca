@@ -115,8 +115,8 @@ async def get_report_by_family(current_user: User = Depends(get_current_user)):
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
-    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    jobs = db.jobs.find({}, {"_id": 0})
+    families = db.product_families.find({}, {"_id": 0})
     family_map = {f["name"]: f for f in families}
     
     family_report = {}
@@ -263,8 +263,8 @@ async def get_family_productivity_kpis(
         if date_filter:
             query["checkin_at"] = date_filter
     
-    checkins = await db.item_checkins.find(query, {"_id": 0}).to_list(10000)
-    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
+    checkins = db.item_checkins.find(query, {"_id": 0})
+    jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {j["id"]: j for j in jobs}
     
     family_data = {}
@@ -369,9 +369,9 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
-    item_checkins = await db.item_checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
-    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
+    installers = db.installers.find({}, {"_id": 0})
+    item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
+    jobs = db.jobs.find({}, {"_id": 0})
     
     jobs_map = {job["id"]: job for job in jobs}
     installer_report = []
@@ -477,10 +477,10 @@ async def get_productivity_report(
     """
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    jobs = await db.jobs.find({}, {"_id": 0}).to_list(10000)
-    item_checkins = await db.item_checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
-    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
-    legacy_checkins = await db.checkins.find({"status": "completed"}, {"_id": 0}).to_list(10000)
+    jobs = db.jobs.find({}, {"_id": 0})
+    item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
+    installers = db.installers.find({}, {"_id": 0})
+    legacy_checkins = db.checkins.find({"status": "completed"}, {"_id": 0})
     
     jobs_map = {job["id"]: job for job in jobs}
     installers_map = {inst["id"]: inst for inst in installers}
@@ -782,50 +782,40 @@ async def get_productivity_report(
 
 @router.get("/metrics")
 async def get_metrics(current_user: User = Depends(get_current_user)):
-    """Get general metrics for dashboard - optimized with aggregation."""
+    """Get general metrics for dashboard - optimized for Supabase."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    # Agregação única para jobs
-    jobs_pipeline = [
-        {"$match": {"archived": {"$ne": True}}},
-        {"$group": {
-            "_id": None,
-            "total": {"$sum": 1},
-            "completed": {"$sum": {"$cond": [{"$in": ["$status", ["completed", "finalizado"]]}, 1, 0]}},
-            "in_progress": {"$sum": {"$cond": [{"$in": ["$status", ["in_progress", "instalando"]]}, 1, 0]}},
-            "pending": {"$sum": {"$cond": [{"$in": ["$status", ["pending", "aguardando", "scheduled", "agendado"]]}, 1, 0]}}
-        }}
-    ]
-    jobs_stats = await db.jobs.aggregate(jobs_pipeline).to_list(1)
-    jobs_data = jobs_stats[0] if jobs_stats else {"total": 0, "completed": 0, "in_progress": 0, "pending": 0}
+    # Queries simples para jobs (Supabase não suporta aggregation pipelines)
+    all_jobs = db.jobs.find({"archived": {"$ne": True}}, {"_id": 0, "status": 1})
     
-    # Agregação para checkins com avg
-    checkins_pipeline = [
-        {"$group": {
-            "_id": None,
-            "total": {"$sum": 1},
-            "completed": {"$sum": {"$cond": [{"$eq": ["$status", "completed"]}, 1, 0]}},
-            "avg_duration": {"$avg": {"$ifNull": ["$duration_minutes", 0]}}
-        }}
-    ]
+    total_jobs = len(all_jobs)
+    completed_jobs = len([j for j in all_jobs if j.get("status") in ["completed", "finalizado"]])
+    in_progress_jobs = len([j for j in all_jobs if j.get("status") in ["in_progress", "instalando"]])
+    pending_jobs = len([j for j in all_jobs if j.get("status") in ["pending", "aguardando", "scheduled", "agendado"]])
     
-    checkins_stats = await db.checkins.aggregate(checkins_pipeline).to_list(1)
-    item_checkins_stats = await db.item_checkins.aggregate(checkins_pipeline).to_list(1)
+    # Queries simples para checkins
+    checkins = db.checkins.find({}, {"_id": 0, "status": 1})
+    item_checkins = db.item_checkins.find({}, {"_id": 0, "status": 1, "time_worked_minutes": 1})
     
-    c_data = checkins_stats[0] if checkins_stats else {"total": 0, "completed": 0, "avg_duration": 0}
-    ic_data = item_checkins_stats[0] if item_checkins_stats else {"total": 0, "completed": 0, "avg_duration": 0}
+    total_checkins = len(checkins) + len(item_checkins)
+    completed_checkins = (
+        len([c for c in checkins if c.get("status") == "completed"]) +
+        len([c for c in item_checkins if c.get("status") == "completed"])
+    )
     
-    total_checkins = c_data["total"] + ic_data["total"]
-    completed_checkins = c_data["completed"] + ic_data["completed"]
-    avg_duration = (c_data["avg_duration"] + ic_data["avg_duration"]) / 2 if total_checkins > 0 else 0
+    # Calcular duração média dos item_checkins completados
+    completed_with_time = [c for c in item_checkins if c.get("status") == "completed" and c.get("time_worked_minutes")]
+    avg_duration = 0
+    if completed_with_time:
+        avg_duration = sum(c.get("time_worked_minutes", 0) for c in completed_with_time) / len(completed_with_time)
     
-    total_installers = await db.installers.count_documents({})
+    total_installers = db.installers.count_documents({})
     
     return {
-        "total_jobs": jobs_data["total"],
-        "completed_jobs": jobs_data["completed"],
-        "in_progress_jobs": jobs_data["in_progress"],
-        "pending_jobs": jobs_data["pending"],
+        "total_jobs": total_jobs,
+        "completed_jobs": completed_jobs,
+        "in_progress_jobs": in_progress_jobs,
+        "pending_jobs": pending_jobs,
         "total_checkins": total_checkins,
         "completed_checkins": completed_checkins,
         "avg_duration_minutes": round(avg_duration, 2),
@@ -838,9 +828,9 @@ async def export_reports(current_user: User = Depends(get_current_user)):
     """Export consolidated report to Excel"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    checkins = await db.item_checkins.find({}, {"_id": 0}).to_list(1000)
-    jobs = await db.jobs.find({}, {"_id": 0}).to_list(1000)
-    installers = await db.installers.find({}, {"_id": 0}).to_list(1000)
+    checkins = db.item_checkins.find({}, {"_id": 0})
+    jobs = db.jobs.find({}, {"_id": 0})
+    installers = db.installers.find({}, {"_id": 0})
     
     logger.info(f"Exporting report: {len(checkins)} checkins, {len(jobs)} jobs, {len(installers)} installers")
     

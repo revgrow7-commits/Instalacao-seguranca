@@ -68,7 +68,7 @@ async def sync_holdprint_job():
                         for holdprint_job in jobs:
                             holdprint_job_id = str(holdprint_job.get('id', ''))
                             
-                            existing = await db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+                            existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                             if existing:
                                 total_skipped += 1
                                 continue
@@ -102,7 +102,7 @@ async def sync_holdprint_job():
                                     "created_at": datetime.now(timezone.utc).isoformat()
                                 }
                                 
-                                await db.jobs.insert_one(job_doc)
+                                db.jobs.insert_one(job_doc)
                                 total_imported += 1
                                 
                             except Exception as e:
@@ -120,7 +120,7 @@ async def sync_holdprint_job():
                 except Exception as e:
                     logger.error(f"Error syncing {branch}: {e}")
         
-        await db.system_config.update_one(
+        db.system_config.update_one(
             {"key": "last_holdprint_sync"},
             {"$set": {
                 "key": "last_holdprint_sync",

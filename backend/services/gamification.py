@@ -49,7 +49,7 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
     Returns updated balance info.
     """
     # Get or create balance
-    balance = await db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
     
     if not balance:
         balance = {
@@ -62,7 +62,7 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
             "last_activity": None,
             "created_at": datetime.now(timezone.utc).isoformat()
         }
-        await db.gamification_balances.insert_one(balance)
+        db.gamification_balances.insert_one(balance)
     
     # Calculate new balance
     new_coins = balance.get("coins", 0) + amount
@@ -71,7 +71,7 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
     new_level = calculate_level(new_total_earned)
     
     # Update balance
-    await db.gamification_balances.update_one(
+    db.gamification_balances.update_one(
         {"user_id": user_id},
         {"$set": {
             "coins": new_coins,
@@ -93,7 +93,7 @@ async def add_coins(user_id: str, amount: int, transaction_type: str, descriptio
         "balance_after": new_coins,
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.gamification_transactions.insert_one(transaction)
+    db.gamification_transactions.insert_one(transaction)
     
     return {
         "coins": new_coins,

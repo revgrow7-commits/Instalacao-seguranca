@@ -15,7 +15,7 @@ router = APIRouter()
 @router.get("/users", response_model=List[User])
 async def list_users(current_user: User = Depends(get_current_user)):
     await require_role(current_user, [UserRole.ADMIN])
-    users = await db.users.find({}, {"_id": 0, "password_hash": 0}).to_list(1000)
+    users = db.users.find({}, {"_id": 0, "password_hash": 0})
     
     for user in users:
         if isinstance(user['created_at'], str):
@@ -33,7 +33,7 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
     if user_data.get('password'):
         update_data['password_hash'] = get_password_hash(user_data['password'])
     
-    result = await db.users.find_one_and_update(
+    result = db.users.find_one_and_update(
         {"id": user_id},
         {"$set": update_data},
         return_document=True,
@@ -53,7 +53,7 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
             installer_update['full_name'] = user_data['name']
         
         if installer_update:
-            await db.installers.update_one(
+            db.installers.update_one(
                 {"user_id": user_id},
                 {"$set": installer_update}
             )
@@ -67,7 +67,7 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: User = Depends(get_current_user)):
     await require_role(current_user, [UserRole.ADMIN])
-    result = await db.users.delete_one({"id": user_id})
+    result = db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
     return {"message": "User deleted"}
@@ -79,7 +79,7 @@ async def change_password(
     current_user: User = Depends(get_current_user)
 ):
     """Change the current user's password"""
-    user_doc = await db.users.find_one({"id": current_user.id})
+    user_doc = db.users.find_one({"id": current_user.id})
     if not user_doc:
         raise HTTPException(status_code=404, detail="User not found")
     
@@ -90,7 +90,7 @@ async def change_password(
         raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres")
     
     new_password_hash = get_password_hash(password_data.new_password)
-    await db.users.update_one(
+    db.users.update_one(
         {"id": current_user.id},
         {"$set": {"password_hash": new_password_hash}}
     )
@@ -107,12 +107,12 @@ async def admin_reset_password(
     """Admin can reset any user's password"""
     await require_role(current_user, [UserRole.ADMIN])
     
-    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    user = db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
     new_hash = get_password_hash(request.new_password)
-    await db.users.update_one(
+    db.users.update_one(
         {"id": user_id},
         {"$set": {"password_hash": new_hash}}
     )

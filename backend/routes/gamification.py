@@ -173,21 +173,21 @@ async def calculate_checkout_coins(checkin_data: dict, job_data: dict) -> dict:
 async def award_coins(user_id: str, amount: int, transaction_type: str, description: str, reference_id: str = None, breakdown: dict = None):
     """Award coins to a user and update their balance"""
     # Get or create balance
-    balance = await db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
     
     if not balance:
         new_balance = GamificationBalance(user_id=user_id)
         balance = new_balance.model_dump()
         balance["created_at"] = balance["created_at"].isoformat()
         balance["updated_at"] = balance["updated_at"].isoformat()
-        await db.gamification_balances.insert_one(balance)
+        db.gamification_balances.insert_one(balance)
     
     # Update balance
     new_total = (balance.get("total_coins", 0) or 0) + amount
     new_lifetime = (balance.get("lifetime_coins", 0) or 0) + amount
     new_level = get_level_from_coins(new_lifetime)["level"]
     
-    await db.gamification_balances.update_one(
+    db.gamification_balances.update_one(
         {"user_id": user_id},
         {"$set": {
             "total_coins": new_total,
@@ -208,7 +208,7 @@ async def award_coins(user_id: str, amount: int, transaction_type: str, descript
     )
     trans_dict = transaction.model_dump()
     trans_dict["created_at"] = trans_dict["created_at"].isoformat()
-    await db.coin_transactions.insert_one(trans_dict)
+    db.coin_transactions.insert_one(trans_dict)
     
     return {
         "coins_awarded": amount,
@@ -221,14 +221,14 @@ async def award_coins(user_id: str, amount: int, transaction_type: str, descript
 @router.get("/gamification/balance")
 async def get_gamification_balance(current_user: User = Depends(get_current_user)):
     """Get current user's gamification balance and level info"""
-    balance = await db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
     
     if not balance:
         # Create default balance
         balance = GamificationBalance(user_id=current_user.id).model_dump()
         balance["created_at"] = balance["created_at"].isoformat()
         balance["updated_at"] = balance["updated_at"].isoformat()
-        await db.gamification_balances.insert_one(balance)
+        db.gamification_balances.insert_one(balance)
         # Remove _id after insert
         balance.pop("_id", None)
     
@@ -246,13 +246,13 @@ async def get_user_gamification_balance(user_id: str, current_user: User = Depen
     if user_id != current_user.id:
         await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    balance = await db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
     
     if not balance:
         balance = GamificationBalance(user_id=user_id).model_dump()
         balance["created_at"] = balance["created_at"].isoformat()
         balance["updated_at"] = balance["updated_at"].isoformat()
-        await db.gamification_balances.insert_one(balance)
+        db.gamification_balances.insert_one(balance)
         # Remove _id after insert
         balance.pop("_id", None)
     
@@ -271,10 +271,12 @@ async def get_gamification_transactions(
     current_user: User = Depends(get_current_user)
 ):
     """Get current user's coin transaction history"""
-    transactions = await db.coin_transactions.find(
+    transactions = db.coin_transactions.find(
         {"user_id": current_user.id}, 
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(limit)
+        {"_id": 0},
+        sort=[("created_at", -1)],
+        limit=limit
+    )
     
     return transactions
 
@@ -289,10 +291,12 @@ async def get_user_transactions(
     if user_id != current_user.id:
         await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    transactions = await db.coin_transactions.find(
+    transactions = db.coin_transactions.find(
         {"user_id": user_id}, 
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(limit)
+        {"_id": 0},
+        sort=[("created_at", -1)],
+        limit=limit
+    )
     
     return transactions
 
@@ -304,7 +308,7 @@ async def register_daily_engagement(current_user: User = Depends(get_current_use
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     
     # Check if already claimed today
-    balance = await db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
     
     if balance and balance.get("daily_engagement_date") == today:
         return {"already_claimed": True, "message": "Bônus diário já foi coletado hoje"}
@@ -319,7 +323,7 @@ async def register_daily_engagement(current_user: User = Depends(get_current_use
     )
     
     # Update engagement date
-    await db.gamification_balances.update_one(
+    db.gamification_balances.update_one(
         {"user_id": current_user.id},
         {"$set": {"daily_engagement_date": today}}
     )
@@ -339,7 +343,7 @@ async def process_checkout_gamification(
 ):
     """Process gamification rewards for a completed checkout"""
     # Get checkin data
-    checkin = await db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in não encontrado")
     
@@ -347,7 +351,7 @@ async def process_checkout_gamification(
         raise HTTPException(status_code=400, detail="Check-in ainda não foi finalizado")
     
     # Check if already processed
-    existing = await db.coin_transactions.find_one({
+    existing = db.coin_transactions.find_one({
         "reference_id": checkin_id,
         "transaction_type": "earn_checkout"
     }, {"_id": 0})
@@ -356,7 +360,7 @@ async def process_checkout_gamification(
         return {"already_processed": True, "transaction": existing}
     
     # Get job data for scheduled date comparison
-    job = await db.jobs.find_one({"id": checkin.get("job_id")}, {"_id": 0})
+    job = db.jobs.find_one({"id": checkin.get("job_id")}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job não encontrado")
     
@@ -388,7 +392,7 @@ async def process_checkout_gamification(
 @router.get("/gamification/rewards")
 async def get_rewards(current_user: User = Depends(get_current_user)):
     """Get all available rewards"""
-    rewards = await db.rewards.find({"is_active": True}, {"_id": 0}).to_list(100)
+    rewards = db.rewards.find({"is_active": True}, {"_id": 0})
     return rewards
 
 
@@ -416,7 +420,7 @@ async def create_reward(
     
     reward_dict = reward.model_dump()
     reward_dict["created_at"] = reward_dict["created_at"].isoformat()
-    await db.rewards.insert_one(reward_dict)
+    db.rewards.insert_one(reward_dict)
     
     # Remove _id before returning
     reward_dict.pop("_id", None)
@@ -448,16 +452,16 @@ async def update_reward(
     if is_active is not None: update_data["is_active"] = is_active
     
     if update_data:
-        await db.rewards.update_one({"id": reward_id}, {"$set": update_data})
+        db.rewards.update_one({"id": reward_id}, {"$set": update_data})
     
-    return await db.rewards.find_one({"id": reward_id}, {"_id": 0})
+    return db.rewards.find_one({"id": reward_id}, {"_id": 0})
 
 
 @router.delete("/gamification/rewards/{reward_id}")
 async def delete_reward(reward_id: str, current_user: User = Depends(get_current_user)):
     """Delete a reward (admin only)"""
     await require_role(current_user, [UserRole.ADMIN])
-    await db.rewards.delete_one({"id": reward_id})
+    db.rewards.delete_one({"id": reward_id})
     return {"message": "Prêmio excluído com sucesso"}
 
 
@@ -478,12 +482,12 @@ async def seed_default_rewards(current_user: User = Depends(get_current_user)):
     
     created = 0
     for reward_data in default_rewards:
-        existing = await db.rewards.find_one({"name": reward_data["name"]}, {"_id": 0})
+        existing = db.rewards.find_one({"name": reward_data["name"]}, {"_id": 0})
         if not existing:
             reward = Reward(**reward_data)
             reward_dict = reward.model_dump()
             reward_dict["created_at"] = reward_dict["created_at"].isoformat()
-            await db.rewards.insert_one(reward_dict)
+            db.rewards.insert_one(reward_dict)
             created += 1
     
     return {"message": f"{created} prêmios criados com sucesso"}
@@ -493,7 +497,7 @@ async def seed_default_rewards(current_user: User = Depends(get_current_user)):
 async def redeem_reward(reward_id: str, current_user: User = Depends(get_current_user)):
     """Redeem a reward with coins"""
     # Get reward
-    reward = await db.rewards.find_one({"id": reward_id, "is_active": True}, {"_id": 0})
+    reward = db.rewards.find_one({"id": reward_id, "is_active": True}, {"_id": 0})
     if not reward:
         raise HTTPException(status_code=404, detail="Prêmio não encontrado ou indisponível")
     
@@ -502,13 +506,13 @@ async def redeem_reward(reward_id: str, current_user: User = Depends(get_current
         raise HTTPException(status_code=400, detail="Prêmio esgotado")
     
     # Get user balance
-    balance = await db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
+    balance = db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
     if not balance or balance.get("total_coins", 0) < reward["cost_coins"]:
         raise HTTPException(status_code=400, detail="Saldo de moedas insuficiente")
     
     # Deduct coins
     new_total = balance["total_coins"] - reward["cost_coins"]
-    await db.gamification_balances.update_one(
+    db.gamification_balances.update_one(
         {"user_id": current_user.id},
         {"$set": {
             "total_coins": new_total,
@@ -526,11 +530,11 @@ async def redeem_reward(reward_id: str, current_user: User = Depends(get_current
     )
     trans_dict = transaction.model_dump()
     trans_dict["created_at"] = trans_dict["created_at"].isoformat()
-    await db.coin_transactions.insert_one(trans_dict)
+    db.coin_transactions.insert_one(trans_dict)
     
     # Update stock if applicable
     if reward.get("stock") is not None:
-        await db.rewards.update_one({"id": reward_id}, {"$inc": {"stock": -1}})
+        db.rewards.update_one({"id": reward_id}, {"$inc": {"stock": -1}})
     
     # Create redemption request
     request = RewardRequest(
@@ -541,7 +545,7 @@ async def redeem_reward(reward_id: str, current_user: User = Depends(get_current
     )
     request_dict = request.model_dump()
     request_dict["created_at"] = request_dict["created_at"].isoformat()
-    await db.reward_requests.insert_one(request_dict)
+    db.reward_requests.insert_one(request_dict)
     
     return {
         "success": True,
@@ -555,10 +559,11 @@ async def redeem_reward(reward_id: str, current_user: User = Depends(get_current
 @router.get("/gamification/redemptions")
 async def get_my_redemptions(current_user: User = Depends(get_current_user)):
     """Get current user's reward redemptions"""
-    redemptions = await db.reward_requests.find(
+    redemptions = db.reward_requests.find(
         {"user_id": current_user.id}, 
-        {"_id": 0}
-    ).sort("created_at", -1).to_list(50)
+        {"_id": 0},
+        sort=[("created_at", -1)]
+    )
     return redemptions
 
 
@@ -567,12 +572,12 @@ async def get_all_redemptions(current_user: User = Depends(get_current_user)):
     """Get all redemption requests (admin/manager only)"""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    redemptions = await db.reward_requests.find({}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    redemptions = db.reward_requests.find({}, {"_id": 0}, sort=[("created_at", -1)])
     
     # Enrich with user info
     enriched = []
     for redemption in redemptions:
-        user = await db.users.find_one({"id": redemption["user_id"]}, {"_id": 0, "name": 1, "email": 1})
+        user = db.users.find_one({"id": redemption["user_id"]}, {"_id": 0, "name": 1, "email": 1})
         enriched.append({
             **redemption,
             "user_name": user.get("name") if user else "N/A",
@@ -604,9 +609,9 @@ async def update_redemption_status(
     
     # If rejected, refund the coins
     if status == "rejected":
-        request = await db.reward_requests.find_one({"id": request_id}, {"_id": 0})
+        request = db.reward_requests.find_one({"id": request_id}, {"_id": 0})
         if request and request.get("status") != "rejected":
-            await db.gamification_balances.update_one(
+            db.gamification_balances.update_one(
                 {"user_id": request["user_id"]},
                 {"$inc": {"total_coins": request["cost_coins"]}}
             )
@@ -620,11 +625,11 @@ async def update_redemption_status(
             )
             refund_dict = refund_trans.model_dump()
             refund_dict["created_at"] = refund_dict["created_at"].isoformat()
-            await db.coin_transactions.insert_one(refund_dict)
+            db.coin_transactions.insert_one(refund_dict)
     
-    await db.reward_requests.update_one({"id": request_id}, {"$set": update_data})
+    db.reward_requests.update_one({"id": request_id}, {"$set": update_data})
     
-    return await db.reward_requests.find_one({"id": request_id}, {"_id": 0})
+    return db.reward_requests.find_one({"id": request_id}, {"_id": 0})
 
 
 # ============ GAMIFICATION REPORTS ============
@@ -650,7 +655,7 @@ async def get_gamification_report(
         end_date = datetime(report_year, report_month + 1, 1, tzinfo=timezone.utc)
     
     # Get all installers
-    installers = await db.installers.find({}, {"_id": 0}).to_list(100)
+    installers = db.installers.find({}, {"_id": 0})
     
     report_data = []
     for installer in installers:
@@ -659,16 +664,16 @@ async def get_gamification_report(
             continue
         
         # Get balance
-        balance = await db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+        balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
         
         # Get transactions for the month
-        transactions = await db.coin_transactions.find({
+        transactions = db.coin_transactions.find({
             "user_id": user_id,
             "created_at": {
                 "$gte": start_date.isoformat(),
                 "$lt": end_date.isoformat()
             }
-        }, {"_id": 0}).to_list(500)
+        }, {"_id": 0})
         
         # Calculate monthly stats
         month_earned = sum(t["amount"] for t in transactions if t["amount"] > 0)
@@ -676,7 +681,7 @@ async def get_gamification_report(
         checkouts_count = len([t for t in transactions if t["transaction_type"] == "earn_checkout"])
         
         # Get user info
-        user = await db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "email": 1})
+        user = db.users.find_one({"id": user_id}, {"_id": 0, "name": 1, "email": 1})
         
         level_info = get_level_from_coins(balance.get("lifetime_coins", 0) if balance else 0)
         
@@ -738,7 +743,7 @@ async def get_leaderboard(
         query["created_at"] = {"$gte": start_date.isoformat()}
     
     # Aggregate coins by user
-    transactions = await db.coin_transactions.find(query, {"_id": 0}).to_list(10000)
+    transactions = db.coin_transactions.find(query, {"_id": 0})
     
     user_coins = {}
     for t in transactions:
@@ -753,8 +758,8 @@ async def get_leaderboard(
     # Enrich with user info
     leaderboard = []
     for rank, (user_id, coins) in enumerate(sorted_users, 1):
-        installer = await db.installers.find_one({"user_id": user_id}, {"_id": 0})
-        balance = await db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+        installer = db.installers.find_one({"user_id": user_id}, {"_id": 0})
+        balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
         level_info = get_level_from_coins(balance.get("lifetime_coins", 0) if balance else 0)
         
         leaderboard.append({

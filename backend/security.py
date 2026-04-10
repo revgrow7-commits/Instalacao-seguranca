@@ -50,7 +50,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     except JWTError:
         raise credentials_exception
     
-    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
+    user_doc = db.users.find_one({"id": user_id}, {"_id": 0})
     if user_doc is None:
         raise credentials_exception
     

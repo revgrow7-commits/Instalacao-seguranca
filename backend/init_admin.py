@@ -22,7 +22,7 @@ async def create_admin():
     db = client[os.environ['DB_NAME']]
     
     # Check if admin exists
-    existing = await db.users.find_one({"email": "admin@industriavisual.com"})
+    existing = db.users.find_one({"email": "admin@industriavisual.com"})
     if existing:
         print("❌ Admin já existe!")
         return
@@ -39,7 +39,7 @@ async def create_admin():
         "is_active": True
     }
     
-    await db.users.insert_one(admin)
+    db.users.insert_one(admin)
     print("✅ Admin criado com sucesso!")
     print(f"   Email: admin@industriavisual.com")
     print(f"   Senha: admin123")
@@ -56,7 +56,7 @@ async def create_admin():
         "created_at": datetime.now(timezone.utc).isoformat(),
         "is_active": True
     }
-    await db.users.insert_one(manager)
+    db.users.insert_one(manager)
     print("✅ Gerente de teste criado!")
     print(f"   Email: gerente@industriavisual.com")
     print(f"   Senha: gerente123")
@@ -74,7 +74,7 @@ async def create_admin():
         "created_at": datetime.now(timezone.utc).isoformat(),
         "is_active": True
     }
-    await db.users.insert_one(installer_user)
+    db.users.insert_one(installer_user)
     
     installer = {
         "id": installer_id,
@@ -84,7 +84,7 @@ async def create_admin():
         "branch": "POA",
         "created_at": datetime.now(timezone.utc).isoformat()
     }
-    await db.installers.insert_one(installer)
+    db.installers.insert_one(installer)
     print("✅ Instalador de teste criado!")
     print(f"   Email: instalador@industriavisual.com")
     print(f"   Senha: instalador123")

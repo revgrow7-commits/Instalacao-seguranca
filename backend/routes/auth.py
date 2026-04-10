@@ -25,7 +25,7 @@ async def register(user_data: UserCreate, current_user: User = Depends(get_curre
     """Admin creates new user"""
     await require_role(current_user, [UserRole.ADMIN])
     
-    existing = await db.users.find_one({"email": user_data.email})
+    existing = db.users.find_one({"email": user_data.email})
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
     
@@ -39,7 +39,7 @@ async def register(user_data: UserCreate, current_user: User = Depends(get_curre
     user_dict['password_hash'] = get_password_hash(user_data.password)
     user_dict['created_at'] = user_dict['created_at'].isoformat()
     
-    await db.users.insert_one(user_dict)
+    db.users.insert_one(user_dict)
     
     if user_data.role == UserRole.INSTALLER:
         installer = Installer(
@@ -49,14 +49,14 @@ async def register(user_data: UserCreate, current_user: User = Depends(get_curre
         )
         installer_dict = installer.model_dump()
         installer_dict['created_at'] = installer_dict['created_at'].isoformat()
-        await db.installers.insert_one(installer_dict)
+        db.installers.insert_one(installer_dict)
     
     return user
 
 
 @router.post("/auth/login", response_model=Token)
 async def login(credentials: UserLogin):
-    user_doc = await db.users.find_one({"email": credentials.email}, {"_id": 0})
+    user_doc = db.users.find_one({"email": credentials.email}, {"_id": 0})
     if not user_doc:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
@@ -80,7 +80,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 @router.post("/auth/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
     """Send password reset email"""
-    user = await db.users.find_one({"email": request.email}, {"_id": 0})
+    user = db.users.find_one({"email": request.email}, {"_id": 0})
     
     if not user:
         return {"message": "Se o email existir, você receberá um link para redefinir sua senha."}
@@ -88,8 +88,8 @@ async def forgot_password(request: ForgotPasswordRequest):
     reset_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
     
-    await db.password_resets.delete_many({"user_id": user['id']})
-    await db.password_resets.insert_one({
+    db.password_resets.delete_many({"user_id": user['id']})
+    db.password_resets.insert_one({
         "id": str(uuid.uuid4()),
         "user_id": user['id'],
         "token": reset_token,
@@ -160,18 +160,18 @@ async def forgot_password(request: ForgotPasswordRequest):
 @router.post("/auth/reset-password")
 async def reset_password(request: ResetPasswordRequest):
     """Reset password using token from email"""
-    reset_record = await db.password_resets.find_one({"token": request.token}, {"_id": 0})
+    reset_record = db.password_resets.find_one({"token": request.token}, {"_id": 0})
     
     if not reset_record:
         raise HTTPException(status_code=400, detail="Token inválido ou expirado")
     
     expires_at = datetime.fromisoformat(reset_record['expires_at'])
     if datetime.now(timezone.utc) > expires_at:
-        await db.password_resets.delete_one({"token": request.token})
+        db.password_resets.delete_one({"token": request.token})
         raise HTTPException(status_code=400, detail="Token expirado. Solicite um novo link.")
     
     new_hash = get_password_hash(request.new_password)
-    result = await db.users.update_one(
+    result = db.users.update_one(
         {"id": reset_record['user_id']},
         {"$set": {"password_hash": new_hash}}
     )
@@ -179,7 +179,7 @@ async def reset_password(request: ResetPasswordRequest):
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
-    await db.password_resets.delete_one({"token": request.token})
+    db.password_resets.delete_one({"token": request.token})
     
     return {"message": "Senha alterada com sucesso!"}
 
@@ -187,14 +187,14 @@ async def reset_password(request: ResetPasswordRequest):
 @router.get("/auth/verify-reset-token")
 async def verify_reset_token(token: str):
     """Verify if a reset token is valid"""
-    reset_record = await db.password_resets.find_one({"token": token}, {"_id": 0})
+    reset_record = db.password_resets.find_one({"token": token}, {"_id": 0})
     
     if not reset_record:
         return {"valid": False, "message": "Token inválido"}
     
     expires_at = datetime.fromisoformat(reset_record['expires_at'])
     if datetime.now(timezone.utc) > expires_at:
-        await db.password_resets.delete_one({"token": token})
+        db.password_resets.delete_one({"token": token})
         return {"valid": False, "message": "Token expirado"}
     
     return {"valid": True}

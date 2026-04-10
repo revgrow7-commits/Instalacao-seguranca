@@ -119,7 +119,7 @@ async def update_productivity_history(product: ProductInstalled):
         "scenario_category": product.scenario_category
     }
     
-    existing = await db.productivity_history.find_one(key, {"_id": 0})
+    existing = db.productivity_history.find_one(key, {"_id": 0})
     
     if existing:
         # Calculate new average
@@ -129,7 +129,7 @@ async def update_productivity_history(product: ProductInstalled):
         # Calculate avg time per m2
         new_avg_time = 60 / new_avg_prod if new_avg_prod > 0 else 0
         
-        await db.productivity_history.update_one(
+        db.productivity_history.update_one(
             key,
             {
                 "$set": {
@@ -153,7 +153,7 @@ async def update_productivity_history(product: ProductInstalled):
             avg_time_per_m2_min=round(avg_time, 2),
             sample_count=1
         )
-        await db.productivity_history.insert_one(new_history.model_dump())
+        db.productivity_history.insert_one(new_history.model_dump())
 
 
 # ============ PRODUCT FAMILIES ROUTES ============
@@ -162,7 +162,7 @@ async def update_productivity_history(product: ProductInstalled):
 async def get_product_families(current_user: User = Depends(get_current_user)):
     """List all product families."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    families = await db.product_families.find({}, {"_id": 0}).to_list(1000)
+    families = db.product_families.find({}, {"_id": 0})
     return families
 
 
@@ -172,7 +172,7 @@ async def create_product_family(family: ProductFamilyCreate, current_user: User 
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     new_family = ProductFamily(**family.model_dump())
-    await db.product_families.insert_one(new_family.model_dump())
+    db.product_families.insert_one(new_family.model_dump())
     return new_family.model_dump()
 
 
@@ -181,14 +181,14 @@ async def update_product_family(family_id: str, family: ProductFamilyCreate, cur
     """Update a product family."""
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    result = await db.product_families.update_one(
+    result = db.product_families.update_one(
         {"id": family_id},
         {"$set": family.model_dump()}
     )
     if result.modified_count == 0:
         raise HTTPException(status_code=404, detail="Family not found")
     
-    updated = await db.product_families.find_one({"id": family_id}, {"_id": 0})
+    updated = db.product_families.find_one({"id": family_id}, {"_id": 0})
     return updated
 
 
@@ -197,7 +197,7 @@ async def delete_product_family(family_id: str, current_user: User = Depends(get
     """Delete a product family."""
     await require_role(current_user, [UserRole.ADMIN])
     
-    result = await db.product_families.delete_one({"id": family_id})
+    result = db.product_families.delete_one({"id": family_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Family not found")
     return {"message": "Family deleted"}
@@ -226,10 +226,10 @@ async def seed_product_families(current_user: User = Depends(get_current_user)):
     
     inserted = 0
     for family_data in default_families:
-        existing = await db.product_families.find_one({"name": family_data["name"]})
+        existing = db.product_families.find_one({"name": family_data["name"]})
         if not existing:
             new_family = ProductFamily(**family_data)
-            await db.product_families.insert_one(new_family.model_dump())
+            db.product_families.insert_one(new_family.model_dump())
             inserted += 1
     
     return {"message": f"{inserted} families created", "total": len(default_families)}
@@ -252,7 +252,7 @@ async def get_products_installed(
     if family_id:
         query["family_id"] = family_id
     
-    products = await db.installed_products.find(query, {"_id": 0}).to_list(1000)
+    products = db.installed_products.find(query, {"_id": 0})
     return products
 
 
@@ -275,7 +275,7 @@ async def create_product_installed(product: ProductInstalledCreate, current_user
     # Get family name if family_id provided
     family_name = None
     if product.family_id:
-        family = await db.product_families.find_one({"id": product.family_id}, {"_id": 0})
+        family = db.product_families.find_one({"id": product.family_id}, {"_id": 0})
         if family:
             family_name = family.get("name")
     
@@ -286,7 +286,7 @@ async def create_product_installed(product: ProductInstalledCreate, current_user
         family_name=family_name
     )
     
-    await db.installed_products.insert_one(new_product.model_dump())
+    db.installed_products.insert_one(new_product.model_dump())
     
     # Update productivity history
     await update_productivity_history(new_product)
@@ -308,7 +308,7 @@ async def get_productivity_history(
     if family_id:
         query["family_id"] = family_id
     
-    history = await db.productivity_history.find(query, {"_id": 0}).to_list(1000)
+    history = db.productivity_history.find(query, {"_id": 0})
     return history
 
 
@@ -318,13 +318,13 @@ async def get_productivity_metrics(current_user: User = Depends(get_current_user
     await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Get all product families
-    families = await db.product_families.find({}, {"_id": 0}).to_list(100)
+    families = db.product_families.find({}, {"_id": 0})
     
     # Get all products installed
-    products = await db.installed_products.find({}, {"_id": 0}).to_list(10000)
+    products = db.installed_products.find({}, {"_id": 0})
     
     # Get productivity history
-    history = await db.productivity_history.find({}, {"_id": 0}).to_list(1000)
+    history = db.productivity_history.find({}, {"_id": 0})
     
     # Calculate metrics by family
     family_metrics = {}
