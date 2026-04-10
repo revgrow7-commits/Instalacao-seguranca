@@ -24,19 +24,11 @@ import resend
 from db_supabase import db
 from security import get_password_hash, verify_password, create_access_token, get_current_user, require_role
 from models.user import User, UserRole
+from config import FRONTEND_URL, RESEND_API_KEY, SENDER_EMAIL
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-
-# Configuration - ALWAYS use production URL for password reset
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://instal-visual.com.br')
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
-SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'bruno@industriavisual.com.br')
-
-# Ensure production URL - NEVER use localhost
-if not FRONTEND_URL or 'localhost' in str(FRONTEND_URL) or '127.0.0.1' in str(FRONTEND_URL):
-    FRONTEND_URL = 'https://instal-visual.com.br'
 
 # Initialize Resend
 if RESEND_API_KEY:
