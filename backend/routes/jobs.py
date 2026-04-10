@@ -290,11 +290,18 @@ async def list_jobs(current_user: User = Depends(get_current_user)):
     }
     
     if current_user.role == UserRole.INSTALLER:
+        # Installer can only see jobs where they are assigned
+        # Check both installer.id and user_id for compatibility
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
         if installer:
-            query["assigned_installers"] = installer['id']
+            # Filter by user_id OR installer.id in assigned_installers
+            query["$or"] = [
+                {"assigned_installers": current_user.id},  # user_id
+                {"assigned_installers": installer['id']}   # installer.id
+            ]
         else:
-            return []
+            # Fallback to just user_id if no installer record
+            query["assigned_installers"] = current_user.id
     
     # Busca otimizada com projeção
     jobs = db.jobs.find(query, projection)
@@ -535,17 +542,19 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
         if installer:
             installer_id = installer['id']
+            user_id = current_user.id
             job_assigned_installers = job_doc.get('assigned_installers') or []
             item_assignments = job_doc.get('item_assignments') or []
             
-            has_access = installer_id in job_assigned_installers
+            # Check access by both installer.id and user_id
+            has_access = installer_id in job_assigned_installers or user_id in job_assigned_installers
             
             if not has_access:
                 for assignment in item_assignments:
-                    if assignment.get('installer_id') == installer_id:
+                    if assignment.get('installer_id') in [installer_id, user_id]:
                         has_access = True
                         break
-                    if installer_id in assignment.get('installer_ids', []):
+                    if installer_id in assignment.get('installer_ids', []) or user_id in assignment.get('installer_ids', []):
                         has_access = True
                         break
             
