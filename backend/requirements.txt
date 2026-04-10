@@ -4,9 +4,8 @@ uvicorn==0.25.0
 starlette==0.37.2
 python-multipart==0.0.20
 
-# Database
-motor==3.3.1
-pymongo==4.5.0
+# Database - Supabase
+supabase>=2.0.0
 
 # Authentication
 passlib==1.7.4
@@ -25,13 +24,6 @@ python-dotenv==1.2.1
 # HTTP clients
 requests==2.32.5
 httpx
-aiohttp==3.13.3
-
-# Google APIs
-google-api-python-client==2.187.0
-google-auth==2.41.1
-google-auth-oauthlib==1.2.3
-google-auth-httplib2==0.3.0
 
 # Email
 resend==2.19.0
@@ -43,7 +35,7 @@ py-vapid==1.9.4
 # Excel handling
 openpyxl==3.1.5
 
-# Scheduling
+# Scheduling (optional - not used in serverless)
 apscheduler==3.11.2
 tzlocal==5.3.1
 
