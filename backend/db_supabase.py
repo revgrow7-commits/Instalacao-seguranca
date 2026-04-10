@@ -140,7 +140,10 @@ class SupabaseTable:
             
             builder = self._table().select(columns)
             
-            # Apply filters
+            # Handle $or operator specially
+            or_conditions = query.pop('$or', None)
+            
+            # Apply standard filters
             for key, value in query.items():
                 if isinstance(value, dict):
                     for op, op_val in value.items():
@@ -154,8 +157,64 @@ class SupabaseTable:
                             builder = builder.neq(key, op_val)
                         elif op == '$regex':
                             builder = builder.ilike(key, f'%{op_val}%')
+                        elif op == '$contains':
+                            builder = builder.contains(key, op_val)
                 elif value is not None:
                     builder = builder.eq(key, value)
+            
+            # Handle $or by making separate queries and combining results
+            if or_conditions:
+                all_results = []
+                seen_ids = set()
+                
+                for condition in or_conditions:
+                    # Create a new builder for each OR condition
+                    or_builder = self._table().select(columns)
+                    
+                    # Apply the same base filters (excluding $or)
+                    for key, value in query.items():
+                        if isinstance(value, dict):
+                            for op, op_val in value.items():
+                                if op == '$in':
+                                    or_builder = or_builder.in_(key, op_val)
+                                elif op == '$gte':
+                                    or_builder = or_builder.gte(key, op_val)
+                                elif op == '$lte':
+                                    or_builder = or_builder.lte(key, op_val)
+                                elif op == '$ne':
+                                    or_builder = or_builder.neq(key, op_val)
+                                elif op == '$regex':
+                                    or_builder = or_builder.ilike(key, f'%{op_val}%')
+                        elif value is not None:
+                            or_builder = or_builder.eq(key, value)
+                    
+                    # Apply the OR condition
+                    for cond_key, cond_val in condition.items():
+                        if isinstance(cond_val, list):
+                            # For array contains
+                            or_builder = or_builder.contains(cond_key, cond_val)
+                        else:
+                            or_builder = or_builder.contains(cond_key, [cond_val])
+                    
+                    # Apply sorting
+                    if sort:
+                        for field, direction in sort:
+                            or_builder = or_builder.order(field, desc=(direction == -1))
+                    
+                    result = or_builder.execute()
+                    for doc in (result.data or []):
+                        doc_id = doc.get('id')
+                        if doc_id and doc_id not in seen_ids:
+                            seen_ids.add(doc_id)
+                            all_results.append(_deserialize(doc))
+                
+                # Apply limit after combining
+                if limit:
+                    all_results = all_results[:limit]
+                if skip:
+                    all_results = all_results[skip:]
+                    
+                return all_results
             
             # Apply sorting
             if sort:
