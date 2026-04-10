@@ -913,8 +913,14 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Send email - Use environment variable for frontend URL
-    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    # IMPORTANTE: Sempre usar URL de produção para reset de senha
+    # Fallback hardcoded para garantir que nunca use localhost
+    production_url = FRONTEND_URL
+    if not production_url or 'localhost' in str(production_url) or '127.0.0.1' in str(production_url):
+        production_url = "https://instal-visual.com.br"
+    
+    reset_link = f"{production_url}/reset-password?token={reset_token}"
+    logger.info(f"Password reset link generated: {reset_link}")
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
@@ -994,8 +1000,13 @@ async def reset_password(request: ResetPasswordRequest):
         {"$set": {"password_hash": new_hash}}
     )
     
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    # Supabase returns dict with 'modified_count' or 'matched_count'
+    modified = result.get('modified_count', 0) if isinstance(result, dict) else getattr(result, 'modified_count', 0)
+    if modified == 0:
+        # Try to check if user exists
+        user = db.users.find_one({"id": reset_record['user_id']})
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
     # Delete used token
     db.password_resets.delete_one({"token": request.token})

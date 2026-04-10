@@ -97,10 +97,15 @@ async def forgot_password(request: ForgotPasswordRequest):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Use environment variable for frontend URL
-    reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
+    # IMPORTANTE: Sempre usar URL de produção para reset de senha
+    # Fallback hardcoded para garantir que nunca use localhost
+    production_url = FRONTEND_URL
+    if not production_url or 'localhost' in production_url or '127.0.0.1' in production_url:
+        production_url = "https://instal-visual.com.br"
     
-    logging.info(f"Password reset link generated for {request.email}")
+    reset_link = f"{production_url}/reset-password?token={reset_token}"
+    
+    logging.info(f"Password reset link generated for {request.email}: {reset_link}")
     
     html_content = f"""
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
