@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import logging
 import requests
 
-from database import db
+from db_supabase import db
 from security import get_current_user
 from models.user import User
 from config import (

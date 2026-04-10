@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 
-from database import db
+from db_supabase import db
 from security import get_current_user, get_password_hash, verify_password, require_role
 from models.user import User, UserRole, AdminResetPasswordRequest, PasswordChangeRequest
 
@@ -14,7 +14,7 @@ router = APIRouter()
 
 @router.get("/users", response_model=List[User])
 async def list_users(current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     users = db.users.find({}, {"_id": 0, "password_hash": 0})
     
     for user in users:
@@ -26,7 +26,7 @@ async def list_users(current_user: User = Depends(get_current_user)):
 
 @router.put("/users/{user_id}", response_model=User)
 async def update_user(user_id: str, user_data: dict, current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     update_data = {k: v for k, v in user_data.items() if k not in ['id', 'created_at', 'password', 'phone', 'branch']}
     
@@ -66,7 +66,7 @@ async def update_user(user_id: str, user_data: dict, current_user: User = Depend
 
 @router.delete("/users/{user_id}")
 async def delete_user(user_id: str, current_user: User = Depends(get_current_user)):
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     result = db.users.delete_one({"id": user_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
@@ -105,7 +105,7 @@ async def admin_reset_password(
     current_user: User = Depends(get_current_user)
 ):
     """Admin can reset any user's password"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     user = db.users.find_one({"id": user_id}, {"_id": 0})
     if not user:

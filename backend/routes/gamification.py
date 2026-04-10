@@ -6,7 +6,7 @@ from typing import Optional
 from datetime import datetime, timezone, timedelta
 import uuid
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
@@ -244,7 +244,7 @@ async def get_gamification_balance(current_user: User = Depends(get_current_user
 async def get_user_gamification_balance(user_id: str, current_user: User = Depends(get_current_user)):
     """Get a specific user's gamification balance (admin/manager only for other users)"""
     if user_id != current_user.id:
-        await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+        require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
     
@@ -289,7 +289,7 @@ async def get_user_transactions(
 ):
     """Get a specific user's transactions (admin/manager only for other users)"""
     if user_id != current_user.id:
-        await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+        require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     transactions = db.coin_transactions.find(
         {"user_id": user_id}, 
@@ -407,7 +407,7 @@ async def create_reward(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new reward (admin only)"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     reward = Reward(
         name=name,
@@ -440,7 +440,7 @@ async def update_reward(
     current_user: User = Depends(get_current_user)
 ):
     """Update a reward (admin only)"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     update_data = {}
     if name is not None: update_data["name"] = name
@@ -460,7 +460,7 @@ async def update_reward(
 @router.delete("/gamification/rewards/{reward_id}")
 async def delete_reward(reward_id: str, current_user: User = Depends(get_current_user)):
     """Delete a reward (admin only)"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     db.rewards.delete_one({"id": reward_id})
     return {"message": "Prêmio excluído com sucesso"}
 
@@ -468,7 +468,7 @@ async def delete_reward(reward_id: str, current_user: User = Depends(get_current
 @router.post("/gamification/rewards/seed")
 async def seed_default_rewards(current_user: User = Depends(get_current_user)):
     """Seed default rewards (admin only)"""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     default_rewards = [
         {"name": "Voucher R$50", "description": "Vale-compras de R$50 para usar em lojas parceiras", "cost_coins": 500, "category": "voucher"},
@@ -570,7 +570,7 @@ async def get_my_redemptions(current_user: User = Depends(get_current_user)):
 @router.get("/gamification/redemptions/all")
 async def get_all_redemptions(current_user: User = Depends(get_current_user)):
     """Get all redemption requests (admin/manager only)"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     redemptions = db.reward_requests.find({}, {"_id": 0}, sort=[("created_at", -1)])
     
@@ -595,7 +595,7 @@ async def update_redemption_status(
     current_user: User = Depends(get_current_user)
 ):
     """Update redemption request status (admin/manager only)"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     if status not in ["pending", "approved", "delivered", "rejected"]:
         raise HTTPException(status_code=400, detail="Status inválido")
@@ -640,7 +640,7 @@ async def get_gamification_report(
     current_user: User = Depends(get_current_user)
 ):
     """Get gamification report for admin/manager"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Default to current month
     now = datetime.now(timezone.utc)

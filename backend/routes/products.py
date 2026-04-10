@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ConfigDict
 import logging
 import uuid
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import PRODUCT_FAMILY_MAPPING
@@ -161,7 +161,7 @@ async def update_productivity_history(product: ProductInstalled):
 @router.get("/product-families")
 async def get_product_families(current_user: User = Depends(get_current_user)):
     """List all product families."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     families = db.product_families.find({}, {"_id": 0})
     return families
 
@@ -169,7 +169,7 @@ async def get_product_families(current_user: User = Depends(get_current_user)):
 @router.post("/product-families")
 async def create_product_family(family: ProductFamilyCreate, current_user: User = Depends(get_current_user)):
     """Create a new product family."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     new_family = ProductFamily(**family.model_dump())
     db.product_families.insert_one(new_family.model_dump())
@@ -179,7 +179,7 @@ async def create_product_family(family: ProductFamilyCreate, current_user: User 
 @router.put("/product-families/{family_id}")
 async def update_product_family(family_id: str, family: ProductFamilyCreate, current_user: User = Depends(get_current_user)):
     """Update a product family."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     result = db.product_families.update_one(
         {"id": family_id},
@@ -195,7 +195,7 @@ async def update_product_family(family_id: str, family: ProductFamilyCreate, cur
 @router.delete("/product-families/{family_id}")
 async def delete_product_family(family_id: str, current_user: User = Depends(get_current_user)):
     """Delete a product family."""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     result = db.product_families.delete_one({"id": family_id})
     if result.deleted_count == 0:
@@ -206,7 +206,7 @@ async def delete_product_family(family_id: str, current_user: User = Depends(get
 @router.post("/product-families/seed")
 async def seed_product_families(current_user: User = Depends(get_current_user)):
     """Seed initial product families from Holdprint catalog."""
-    await require_role(current_user, [UserRole.ADMIN])
+    require_role(current_user, [UserRole.ADMIN])
     
     # Default families based on Holdprint catalog
     default_families = [
@@ -244,7 +244,7 @@ async def get_products_installed(
     current_user: User = Depends(get_current_user)
 ):
     """List installed products with optional filters."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     query = {}
     if job_id:
@@ -259,7 +259,7 @@ async def get_products_installed(
 @router.post("/products-installed")
 async def create_product_installed(product: ProductInstalledCreate, current_user: User = Depends(get_current_user)):
     """Register a new installed product with productivity metrics."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
     
     # Calculate area
     area_m2 = None
@@ -302,7 +302,7 @@ async def get_productivity_history(
     current_user: User = Depends(get_current_user)
 ):
     """Get productivity benchmarks."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     query = {}
     if family_id:
@@ -315,7 +315,7 @@ async def get_productivity_history(
 @router.get("/productivity-metrics")
 async def get_productivity_metrics(current_user: User = Depends(get_current_user)):
     """Get comprehensive productivity metrics."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Get all product families
     families = db.product_families.find({}, {"_id": 0})

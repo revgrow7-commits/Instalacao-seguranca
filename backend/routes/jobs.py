@@ -15,7 +15,7 @@ from calendar import monthrange
 
 import resend
 
-from database import db
+from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import (
@@ -234,7 +234,7 @@ async def get_holdprint_jobs(
 @router.post("/jobs", response_model=Job)
 async def create_job(job_data: JobCreate, current_user: User = Depends(get_current_user)):
     """Import job from Holdprint to local database"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     existing = db.jobs.find_one({"holdprint_job_id": job_data.holdprint_job_id})
     if existing:
@@ -372,7 +372,7 @@ async def get_team_calendar_jobs(current_user: User = Depends(get_current_user))
 @router.get("/jobs/sync-status")
 async def get_sync_status(current_user: User = Depends(get_current_user)):
     """Check last Holdprint sync status"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     last_sync = db.system_config.find_one({"key": "last_holdprint_sync"}, {"_id": 0})
     
@@ -391,7 +391,7 @@ async def check_inconsistent_jobs(current_user: User = Depends(get_current_user)
     """
     Check for jobs with status 'instalando' but no assigned installers.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Busca jobs com status "instalando" e filtra no Python
     all_installing_jobs = db.jobs.find({
@@ -426,7 +426,7 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
     Fix jobs with status 'instalando' but no assigned installers.
     Changes their status back to 'aguardando'.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Busca jobs com status "instalando" e filtra no Python
     all_installing_jobs = db.jobs.find({
@@ -565,7 +565,7 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
 @router.put("/jobs/{job_id}/assign", response_model=Job)
 async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = Depends(get_current_user)):
     """Assign installers to a job"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     result = db.jobs.find_one_and_update(
         {"id": job_id},
@@ -588,7 +588,7 @@ async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = D
 @router.put("/jobs/{job_id}/schedule", response_model=Job)
 async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: User = Depends(get_current_user)):
     """Schedule a job"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     update_data = {"scheduled_date": schedule_data.scheduled_date.isoformat()}
     if schedule_data.installer_ids:
@@ -615,7 +615,7 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
 @router.put("/jobs/{job_id}", response_model=Job)
 async def update_job(job_id: str, job_update: dict, current_user: User = Depends(get_current_user)):
     """Update job details"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Get current job data for validation
     current_job = db.jobs.find_one({"id": job_id}, {"_id": 0})
@@ -730,7 +730,7 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Delete a job and all related data"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id})
     if not job:
@@ -750,7 +750,7 @@ async def reprocess_job_products(job_id: str, current_user: User = Depends(get_c
     Reprocessa as medidas dos produtos de um job específico.
     Útil quando as medidas não foram calculadas corretamente na importação.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -837,7 +837,7 @@ async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: Use
     Arquiva um job inteiro.
     Se exclude_from_metrics=True, o job não será contabilizado nos relatórios.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -871,7 +871,7 @@ async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: Use
 @router.post("/jobs/{job_id}/unarchive")
 async def unarchive_job(job_id: str, current_user: User = Depends(get_current_user)):
     """Desarquiva um job."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -902,7 +902,7 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
     Arquiva itens específicos de um job.
     Os itens arquivados não serão considerados para instalação.
     """
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -951,7 +951,7 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
 @router.post("/jobs/{job_id}/unarchive-items")
 async def unarchive_job_items(job_id: str, item_indices: List[int], current_user: User = Depends(get_current_user)):
     """Desarquiva itens específicos de um job."""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -978,7 +978,7 @@ async def unarchive_job_items(job_id: str, item_indices: List[int], current_user
 @router.post("/jobs/{job_id}/assign-items")
 async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, current_user: User = Depends(get_current_user)):
     """Assign specific items to installers"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -1066,7 +1066,7 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
 @router.get("/jobs/{job_id}/assignments")
 async def get_job_assignments(job_id: str, current_user: User = Depends(get_current_user)):
     """Get job assignments grouped by installer and item"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER, UserRole.INSTALLER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -1165,7 +1165,7 @@ async def update_assignment_status(job_id: str, item_index: int, status_update: 
 @router.post("/jobs/import-all")
 async def import_all_jobs(request: BatchImportRequest, current_user: User = Depends(get_current_user)):
     """Import all jobs from Holdprint in batch"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     holdprint_jobs = await fetch_holdprint_jobs(request.branch)
     
@@ -1239,7 +1239,7 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
 @router.post("/jobs/import-current-month")
 async def import_current_month_jobs(current_user: User = Depends(get_current_user)):
     """Import all jobs from current month for both branches"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     now = datetime.now(timezone.utc)
     current_month = now.month
@@ -1360,7 +1360,7 @@ class ImportMonthRequest(BaseModel):
 @router.post("/jobs/import-month")
 async def import_month_jobs(request: ImportMonthRequest, current_user: User = Depends(get_current_user)):
     """Import all jobs from a specific month for both branches"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     target_month = request.month
     target_year = request.year
@@ -1478,7 +1478,7 @@ async def sync_holdprint_jobs(
     current_user: User = Depends(get_current_user)
 ):
     """Sync jobs from Holdprint for multiple months"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     results = []
     total_imported = 0
@@ -1619,7 +1619,7 @@ async def submit_job_justification(
     current_user: User = Depends(get_current_user)
 ):
     """Submit justification for a job that wasn't completed"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
@@ -1729,7 +1729,7 @@ async def submit_job_justification(
 @router.get("/job-justifications")
 async def get_job_justifications(current_user: User = Depends(get_current_user)):
     """Get all job justifications"""
-    await require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     justifications = db.job_justifications.find({}, {"_id": 0}, sort=[("created_at", -1)])
     return justifications
