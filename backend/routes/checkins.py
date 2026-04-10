@@ -297,7 +297,7 @@ async def create_checkin(
     
     db.jobs.update_one(
         {"id": job_id},
-        {"$set": {"status": "in_progress"}}
+        {"$set": {"status": "instalando"}}
     )
     
     return checkin
@@ -370,7 +370,7 @@ async def checkout(
     if all_completed:
         db.jobs.update_one(
             {"id": checkin_doc['job_id']},
-            {"$set": {"status": "completed"}}
+            {"$set": {"status": "finalizado"}}
         )
     
     await register_installed_products_from_checkout(

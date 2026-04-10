@@ -200,13 +200,10 @@ class ItemCheckin(BaseModel):
 class ItemPauseLog(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    item_checkin_id: str
-    job_id: str
-    item_index: int
-    installer_id: str
+    checkin_id: str
     reason: str
-    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    end_time: Optional[datetime] = None
+    paused_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    resumed_at: Optional[datetime] = None
     duration_minutes: Optional[int] = None
     auto_generated: bool = False
 
@@ -294,7 +291,7 @@ async def create_item_checkin(
     
     checkin_dict.pop('_id', None)
     
-    db.jobs.update_one({"id": job_id}, {"$set": {"status": "in_progress"}})
+    db.jobs.update_one({"id": job_id}, {"$set": {"status": "instalando"}})
     
     return checkin_dict
 
@@ -449,10 +446,10 @@ async def complete_item_checkout(
                 pause_reason = f"Saiu do local sem justificar (distância: {round(distance_meters)}m)"
                 pause_log = {
                     "id": str(uuid.uuid4()),
-                    "item_checkin_id": checkin_id,
+                    "checkin_id": checkin_id,
                     "reason": pause_reason,
-                    "start_time": datetime.now(timezone.utc).isoformat(),
-                    "end_time": datetime.now(timezone.utc).isoformat(),
+                    "paused_at": datetime.now(timezone.utc).isoformat(),
+                    "resumed_at": datetime.now(timezone.utc).isoformat(),
                     "duration_minutes": 0,
                     "auto_generated": True
                 }
@@ -470,36 +467,36 @@ async def complete_item_checkout(
     # End any active pause
     if checkin["status"] == "paused":
         active_pause = db.item_pause_logs.find_one({
-            "item_checkin_id": checkin_id,
-            "end_time": None
+            "checkin_id": checkin_id,
+            "resumed_at": None
         }, {"_id": 0})
         if active_pause:
             end_time = datetime.now(timezone.utc)
-            start_time = active_pause['start_time']
-            if isinstance(start_time, str):
-                start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-            if start_time.tzinfo is None:
-                start_time = start_time.replace(tzinfo=timezone.utc)
-            pause_duration = int((end_time - start_time).total_seconds() / 60)
+            paused_at = active_pause['paused_at']
+            if isinstance(paused_at, str):
+                paused_at = datetime.fromisoformat(paused_at.replace('Z', '+00:00'))
+            if paused_at.tzinfo is None:
+                paused_at = paused_at.replace(tzinfo=timezone.utc)
+            pause_duration = int((end_time - paused_at).total_seconds() / 60)
             db.item_pause_logs.update_one(
                 {"id": active_pause["id"]},
-                {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
+                {"$set": {"resumed_at": end_time.isoformat(), "duration_minutes": pause_duration}}
             )
-    
+
     # Calculate durations
     checkin_at = checkin['checkin_at']
     if isinstance(checkin_at, str):
         checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
     if checkin_at.tzinfo is None:
         checkin_at = checkin_at.replace(tzinfo=timezone.utc)
-    
+
     checkout_at = datetime.now(timezone.utc)
-    
+
     # Calculate duration in minutes with decimal precision
     duration_seconds = (checkout_at - checkin_at).total_seconds()
     duration_minutes = round(duration_seconds / 60, 2)  # Keep decimal precision
-    
-    pause_logs = db.item_pause_logs.find({"item_checkin_id": checkin_id}, {"_id": 0})
+
+    pause_logs = db.item_pause_logs.find({"checkin_id": checkin_id}, {"_id": 0})
     total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs)
     
     net_duration_minutes = round(max(0, duration_minutes - total_pause_minutes), 2)
@@ -582,7 +579,7 @@ async def complete_item_checkout(
     all_assigned_completed = assigned_item_indices.issubset(completed_item_indices) if assigned_item_indices else False
     
     if all_assigned_completed and len(assigned_item_indices) > 0:
-        db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "completed"}})
+        db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "finalizado"}})
     
     # Return result
     result = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
@@ -663,27 +660,24 @@ async def pause_item_checkin(
         raise HTTPException(status_code=400, detail="Item is already paused")
     
     pause_log = ItemPauseLog(
-        item_checkin_id=checkin_id,
-        job_id=checkin["job_id"],
-        item_index=checkin["item_index"],
-        installer_id=checkin["installer_id"],
+        checkin_id=checkin_id,
         reason=reason
     )
-    
+
     pause_dict = pause_log.model_dump()
-    pause_dict['start_time'] = pause_dict['start_time'].isoformat()
+    pause_dict['paused_at'] = pause_dict['paused_at'].isoformat()
     db.item_pause_logs.insert_one(pause_dict)
-    
+
     db.item_checkins.update_one(
         {"id": checkin_id},
         {"$set": {"status": "paused"}}
     )
-    
+
     return {
         "message": "Item paused successfully",
         "pause_id": pause_log.id,
         "reason": reason,
-        "start_time": pause_dict['start_time']
+        "paused_at": pause_dict['paused_at']
     }
 
 
@@ -704,25 +698,25 @@ async def resume_item_checkin(
         raise HTTPException(status_code=400, detail="Item is not paused")
     
     active_pause = db.item_pause_logs.find_one({
-        "item_checkin_id": checkin_id,
-        "end_time": None
+        "checkin_id": checkin_id,
+        "resumed_at": None
     }, {"_id": 0})
-    
+
     if not active_pause:
         raise HTTPException(status_code=400, detail="No active pause found")
-    
+
     end_time = datetime.now(timezone.utc)
-    start_time = active_pause['start_time']
-    if isinstance(start_time, str):
-        start_time = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-    if start_time.tzinfo is None:
-        start_time = start_time.replace(tzinfo=timezone.utc)
-    
-    pause_duration = int((end_time - start_time).total_seconds() / 60)
-    
+    paused_at = active_pause['paused_at']
+    if isinstance(paused_at, str):
+        paused_at = datetime.fromisoformat(paused_at.replace('Z', '+00:00'))
+    if paused_at.tzinfo is None:
+        paused_at = paused_at.replace(tzinfo=timezone.utc)
+
+    pause_duration = int((end_time - paused_at).total_seconds() / 60)
+
     db.item_pause_logs.update_one(
         {"id": active_pause["id"]},
-        {"$set": {"end_time": end_time.isoformat(), "duration_minutes": pause_duration}}
+        {"$set": {"resumed_at": end_time.isoformat(), "duration_minutes": pause_duration}}
     )
     
     db.item_checkins.update_one(
@@ -744,15 +738,15 @@ async def get_item_pause_logs(
 ):
     """Get all pause logs for an item checkin"""
     pause_logs = db.item_pause_logs.find(
-        {"item_checkin_id": checkin_id},
+        {"checkin_id": checkin_id},
         {"_id": 0}
     )
-    
+
     for log in pause_logs:
         log["reason_label"] = PAUSE_REASON_LABELS.get(log.get("reason"), log.get("reason"))
-    
+
     total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs if p.get("duration_minutes"))
-    active_pause = next((p for p in pause_logs if p.get("end_time") is None), None)
+    active_pause = next((p for p in pause_logs if p.get("resumed_at") is None), None)
     
     return {
         "pauses": pause_logs,
