@@ -13,8 +13,6 @@ from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_CLAIMS_EMAIL
-from pywebpush import webpush, WebPushException
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -41,14 +39,16 @@ class PushNotificationRequest(BaseModel):
 
 async def send_push_notification(user_id: str, title: str, body: str, url: str = "/", data: dict = None):
     """Send push notification to a specific user."""
+    from pywebpush import webpush, WebPushException
+
     subscription = db.push_subscriptions.find_one(
         {"user_id": user_id, "is_active": True}
     )
-    
+
     if not subscription:
         logger.info(f"No active push subscription for user {user_id}")
         return False
-    
+
     try:
         payload = json.dumps({
             "title": title,
@@ -58,7 +58,7 @@ async def send_push_notification(user_id: str, title: str, body: str, url: str =
             "url": url,
             "data": data or {}
         })
-        
+
         webpush(
             subscription_info={
                 "endpoint": subscription["endpoint"],

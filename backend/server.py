@@ -178,10 +178,17 @@ def get_location_alerts(current_user: User = Depends(get_current_user)):
         limit=50
     )
 
+    # Bulk fetch jobs and installers to avoid N+1
+    job_ids = list({a["job_id"] for a in alerts if a.get("job_id")})
+    installer_ids = list({a["installer_id"] for a in alerts if a.get("installer_id")})
+
+    jobs_map = {j["id"]: j for j in db.jobs.find({"id": {"$in": job_ids}}, {"id": 1, "title": 1, "client_name": 1})}
+    installers_map = {i["id"]: i for i in db.installers.find({"id": {"$in": installer_ids}}, {"id": 1, "full_name": 1})}
+
     enriched = []
     for alert in alerts:
-        job = db.jobs.find_one({"id": alert.get("job_id")})
-        installer = db.installers.find_one({"id": alert.get("installer_id")})
+        job = jobs_map.get(alert.get("job_id"), {})
+        installer = installers_map.get(alert.get("installer_id"), {})
 
         enriched.append({
             "id": alert.get("id"),

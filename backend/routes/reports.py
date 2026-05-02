@@ -14,10 +14,6 @@ from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
-# Excel imports
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
@@ -826,8 +822,11 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
 @router.get("/reports/export")
 async def export_reports(current_user: User = Depends(get_current_user)):
     """Export consolidated report to Excel"""
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     checkins = db.item_checkins.find({}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
     installers = db.installers.find({}, {"_id": 0})
