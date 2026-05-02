@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import uuid
 import logging
 
-from db_supabase import db
+from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
@@ -266,7 +266,12 @@ async def create_checkin(
     job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
+    # Validate installer is assigned to this job
+    assigned = job.get("assigned_installers", [])
+    if assigned and installer['id'] not in assigned and current_user.id not in assigned:
+        raise HTTPException(status_code=403, detail="Você não está atribuído a este job")
+
     existing = db.checkins.find_one({
         "job_id": job_id,
         "installer_id": installer['id'],
@@ -279,6 +284,10 @@ async def create_checkin(
         compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
 
         checkin_id = str(uuid.uuid4())
+        photo_url = upload_photo_to_storage(
+            compressed_photo, f"checkins/{checkin_id}_checkin.jpg"
+        )
+
         checkin = CheckIn(
             id=checkin_id,
             job_id=job_id,
@@ -291,6 +300,8 @@ async def create_checkin(
 
         checkin_dict = {k: v for k, v in checkin.model_dump().items() if v is not None}
         checkin_dict['checkin_at'] = checkin.checkin_at.isoformat()
+        if photo_url:
+            checkin_dict['checkin_photo_url'] = photo_url
 
         db.checkins.insert_one(checkin_dict)
 
@@ -356,10 +367,14 @@ async def _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy
         productivity_m2_h = round(installed_m2 / hours, 2)
     
     compressed_checkout_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
-    
+    checkout_photo_url = upload_photo_to_storage(
+        compressed_checkout_photo, f"checkins/{checkin_id}_checkout.jpg"
+    )
+
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         "checkout_photo": compressed_checkout_photo,
+        **({"checkout_photo_url": checkout_photo_url} if checkout_photo_url else {}),
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,

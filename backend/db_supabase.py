@@ -3,6 +3,7 @@ Supabase Database Module - Native Implementation
 Industria Visual PWA
 
 This module provides direct Supabase access with a simplified interface.
+All JSONB columns are handled natively — no json.dumps on write, no json.loads on read.
 """
 
 import os
@@ -21,9 +22,10 @@ from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-SUPABASE_URL = os.environ.get('SUPABASE_URL', 'https://otyrrvkixegiqsthmaaj.supabase.co')
-SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', os.environ.get('SUPABASE_ANON_KEY', ''))
+# Configuration — env-driven only. instal-visual.com.br usa qfsxtwkltfraounsjjah;
+# o projeto otyrrvkixegiqsthmaaj é do somos-industriavisual.com.br (banco separado).
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_KEY') or os.environ.get('SUPABASE_ANON_KEY')
 
 # Global client
 _client: Optional[Client] = None
@@ -33,38 +35,30 @@ def get_client() -> Client:
     """Get or create Supabase client"""
     global _client
     if _client is None:
+        if not SUPABASE_URL:
+            raise RuntimeError(
+                "SUPABASE_URL não definida. Configure a env var no Vercel ou no .env local. "
+                "Em produção deve ser https://qfsxtwkltfraounsjjah.supabase.co (instal-visual.com.br)."
+            )
+        if not SUPABASE_KEY:
+            raise RuntimeError(
+                "SUPABASE_SERVICE_KEY (ou SUPABASE_ANON_KEY como fallback) não definida."
+            )
         _client = create_client(SUPABASE_URL, SUPABASE_KEY)
-        logger.info(f"✅ Supabase connected: {SUPABASE_URL}")
+        logger.info(f"Supabase connected: {SUPABASE_URL}")
     return _client
 
 
-def _serialize(value: Any) -> Any:
-    """Serialize value for Supabase"""
-    if value is None:
-        return None
-    if isinstance(value, datetime):
-        return value.isoformat()
-    if isinstance(value, (list, dict)):
-        # Check if it's already a string (JSONB)
-        if isinstance(value, str):
-            return value
-        return json.dumps(value)
-    return value
-
-
-"""
-Campos TEXT que armazenam JSON e precisam ser desserializados automaticamente.
-Centralizado aqui para evitar duplicacao. Adicione novos campos JSON nesta lista.
-"""
-JSON_TEXT_FIELDS = frozenset([
+# JSONB columns — supabase-py handles these natively as Python list/dict.
+# No json.dumps on write, no json.loads on read.
+JSONB_FIELDS = frozenset([
     'items', 'holdprint_data', 'products_with_area', 'item_assignments',
     'archived_items', 'products_installed', 'breakdown', 'keys',
     'assigned_installers', 'checklists', 'scopes', 'token',
-    'justification', 'installation_config', 'subscription'
+    'justification', 'installation_config', 'subscription', 'keywords'
 ])
 
-# Registry of actual Supabase table columns (from 001_schema_completo.sql + 002_cleanup_and_fix.sql)
-# Used to auto-filter insert/update payloads and prevent PGRST204 errors
+# Registry of actual Supabase table columns (from 001_schema_completo.sql)
 TABLE_COLUMNS = {
     "users": frozenset([
         "id", "email", "name", "full_name", "password_hash", "role", "phone",
@@ -85,13 +79,16 @@ TABLE_COLUMNS = {
     ]),
     "checkins": frozenset([
         "id", "job_id", "installer_id", "status", "checkin_at", "checkout_at",
-        "duration_minutes", "checkin_photo", "checkout_photo", "gps_lat", "gps_long",
-        "checkout_gps_lat", "checkout_gps_long", "notes", "created_at"
+        "duration_minutes", "checkin_photo", "checkout_photo",
+        "checkin_photo_url", "checkout_photo_url",
+        "gps_lat", "gps_long", "checkout_gps_lat", "checkout_gps_long",
+        "notes", "created_at"
     ]),
     "item_checkins": frozenset([
         "id", "job_id", "installer_id", "item_index", "status", "checkin_at",
         "checkout_at", "duration_minutes", "net_duration_minutes", "total_pause_minutes",
-        "checkin_photo", "checkout_photo", "gps_lat", "gps_long", "gps_accuracy",
+        "checkin_photo", "checkout_photo", "checkin_photo_url", "checkout_photo_url",
+        "gps_lat", "gps_long", "gps_accuracy",
         "checkout_gps_lat", "checkout_gps_long", "checkout_gps_accuracy", "product_name",
         "family_name", "installed_m2", "complexity_level", "height_category",
         "scenario_category", "notes", "productivity_m2_h", "is_archived",
@@ -152,6 +149,9 @@ TABLE_COLUMNS = {
     ]),
 }
 
+# Keep backward-compatible name for any external references
+JSON_TEXT_FIELDS = JSONB_FIELDS
+
 
 def _filter_columns(table_name: str, data: dict) -> dict:
     """Filter dict to only include columns that exist in the actual Supabase table."""
@@ -164,33 +164,97 @@ def _filter_columns(table_name: str, data: dict) -> dict:
     return {k: v for k, v in data.items() if k in allowed}
 
 
+def _serialize(value: Any) -> Any:
+    """Serialize value for Supabase. Datetimes become ISO strings. Everything else passes through."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.isoformat()
+    return value
+
+
 def _deserialize(doc: Dict[str, Any]) -> Dict[str, Any]:
-    """Deserialize JSON TEXT fields from Supabase"""
+    """Handle legacy data: if a JSONB field came back as string, parse it."""
     if not doc:
         return doc
-
-    for field in JSON_TEXT_FIELDS:
-        if field in doc and isinstance(doc[field], str):
+    for field in JSONB_FIELDS:
+        val = doc.get(field)
+        if isinstance(val, str):
             try:
-                doc[field] = json.loads(doc[field])
+                doc[field] = json.loads(val)
             except (json.JSONDecodeError, TypeError):
                 pass
-
     return doc
+
+
+def _apply_filter(builder, key: str, value: Any):
+    """Apply a single filter condition to a query builder."""
+    if isinstance(value, dict):
+        for op, op_val in value.items():
+            if op == '$in':
+                builder = builder.in_(key, op_val)
+            elif op == '$gte':
+                builder = builder.gte(key, op_val)
+            elif op == '$lte':
+                builder = builder.lte(key, op_val)
+            elif op == '$ne':
+                builder = builder.neq(key, op_val)
+            elif op == '$regex':
+                builder = builder.ilike(key, f'%{op_val}%')
+            elif op == '$contains':
+                builder = builder.contains(key, op_val)
+    elif value is not None:
+        if key in JSONB_FIELDS and isinstance(value, str):
+            # "Find rows where this JSONB array contains this string"
+            builder = builder.contains(key, [value])
+        else:
+            builder = builder.eq(key, value)
+    return builder
+
+
+def _build_or_filter(or_conditions: list) -> str:
+    """Build a PostgREST OR filter string from $or conditions.
+
+    Each condition is a dict like {"field": "value"} or {"field": {"$in": [...]}}.
+    Returns a string like: 'field.eq.val1,field.eq.val2'
+    """
+    parts = []
+    for condition in or_conditions:
+        for key, val in condition.items():
+            if isinstance(val, dict):
+                for op, op_val in val.items():
+                    if op == '$in':
+                        parts.append(f"{key}.in.({','.join(str(v) for v in op_val)})")
+                    elif op == '$gte':
+                        parts.append(f"{key}.gte.{op_val}")
+                    elif op == '$lte':
+                        parts.append(f"{key}.lte.{op_val}")
+                    elif op == '$ne':
+                        parts.append(f"{key}.neq.{op_val}")
+                    elif op == '$contains':
+                        parts.append(f"{key}.cs.{json.dumps(op_val)}")
+            elif isinstance(val, list):
+                parts.append(f"{key}.cs.{json.dumps(val)}")
+            elif key in JSONB_FIELDS and isinstance(val, str):
+                # JSONB array contains scalar value
+                parts.append(f'{key}.cs.["{val}"]')
+            elif val is not None:
+                parts.append(f"{key}.eq.{val}")
+    return ",".join(parts)
 
 
 class SupabaseTable:
     """Wrapper for Supabase table operations"""
-    
+
     def __init__(self, table_name: str):
         self.table_name = table_name
         self._client = get_client()
-    
+
     def _table(self):
         return self._client.table(self.table_name)
-    
+
     # ============ FIND OPERATIONS ============
-    
+
     def find_one(self, query: Dict[str, Any], projection: Dict[str, Any] = None) -> Optional[Dict]:
         """Find single document"""
         try:
@@ -199,36 +263,23 @@ class SupabaseTable:
                 cols = [k for k, v in projection.items() if v and k != '_id']
                 if cols:
                     columns = ','.join(cols)
-            
+
             builder = self._table().select(columns)
-            
             for key, value in query.items():
-                if isinstance(value, dict):
-                    for op, op_val in value.items():
-                        if op == '$in':
-                            builder = builder.in_(key, op_val)
-                        elif op == '$gte':
-                            builder = builder.gte(key, op_val)
-                        elif op == '$lte':
-                            builder = builder.lte(key, op_val)
-                        elif op == '$ne':
-                            builder = builder.neq(key, op_val)
-                else:
-                    builder = builder.eq(key, value)
-            
+                builder = _apply_filter(builder, key, value)
+
             result = builder.limit(1).execute()
-            
             if result.data:
                 return _deserialize(result.data[0])
             return None
-            
+
         except Exception as e:
             logger.error(f"find_one error on {self.table_name}: {e}")
             return None
-    
+
     def find(
-        self, 
-        query: Dict[str, Any] = None, 
+        self,
+        query: Dict[str, Any] = None,
         projection: Dict[str, Any] = None,
         sort: List[tuple] = None,
         limit: int = None,
@@ -236,152 +287,61 @@ class SupabaseTable:
     ) -> List[Dict]:
         """Find multiple documents"""
         try:
-            query = query or {}
-            
+            query = dict(query) if query else {}
+
             columns = '*'
             if projection:
                 cols = [k for k, v in projection.items() if v and k != '_id']
                 if cols:
                     columns = ','.join(cols)
-            
+
             builder = self._table().select(columns)
-            
-            # Handle $or operator specially
+
+            # Extract $or before applying standard filters
             or_conditions = query.pop('$or', None)
-            
+
             # Apply standard filters
             for key, value in query.items():
-                if isinstance(value, dict):
-                    for op, op_val in value.items():
-                        if op == '$in':
-                            builder = builder.in_(key, op_val)
-                        elif op == '$gte':
-                            builder = builder.gte(key, op_val)
-                        elif op == '$lte':
-                            builder = builder.lte(key, op_val)
-                        elif op == '$ne':
-                            builder = builder.neq(key, op_val)
-                        elif op == '$regex':
-                            builder = builder.ilike(key, f'%{op_val}%')
-                        elif op == '$contains':
-                            builder = builder.contains(key, op_val)
-                elif value is not None:
-                    builder = builder.eq(key, value)
-            
-            # Handle $or by making separate queries and combining results
+                builder = _apply_filter(builder, key, value)
+
+            # Handle $or using PostgREST native or filter (single query)
             if or_conditions:
-                all_results = []
-                seen_ids = set()
-                
-                for condition in or_conditions:
-                    # Create a new builder for each OR condition
-                    or_builder = self._table().select(columns)
-                    
-                    # Apply the same base filters (excluding $or)
-                    for key, value in query.items():
-                        if isinstance(value, dict):
-                            for op, op_val in value.items():
-                                if op == '$in':
-                                    or_builder = or_builder.in_(key, op_val)
-                                elif op == '$gte':
-                                    or_builder = or_builder.gte(key, op_val)
-                                elif op == '$lte':
-                                    or_builder = or_builder.lte(key, op_val)
-                                elif op == '$ne':
-                                    or_builder = or_builder.neq(key, op_val)
-                                elif op == '$regex':
-                                    or_builder = or_builder.ilike(key, f'%{op_val}%')
-                        elif value is not None:
-                            or_builder = or_builder.eq(key, value)
-                    
-                    # Apply the OR condition - handle array contains for JSONB/TEXT fields
-                    for cond_key, cond_val in condition.items():
-                        if isinstance(cond_val, dict):
-                            # Handle operators like $in
-                            for op, op_val in cond_val.items():
-                                if op == '$in':
-                                    or_builder = or_builder.in_(cond_key, op_val)
-                                elif op == '$contains':
-                                    # Use ilike for TEXT columns storing JSON arrays
-                                    or_builder = or_builder.ilike(cond_key, f'%{op_val}%')
-                        elif isinstance(cond_val, list):
-                            # For array contains - use ilike since column may be TEXT
-                            for val in cond_val:
-                                or_builder = or_builder.ilike(cond_key, f'%{val}%')
-                        else:
-                            # For checking if a value is contained in a JSON array stored as TEXT
-                            # Use ilike to search for the value as substring
-                            or_builder = or_builder.ilike(cond_key, f'%{cond_val}%')
-                    
-                    # Apply sorting
-                    if sort:
-                        for field, direction in sort:
-                            or_builder = or_builder.order(field, desc=(direction == -1))
-                    
-                    try:
-                        result = or_builder.execute()
-                        for doc in (result.data or []):
-                            doc_id = doc.get('id')
-                            if doc_id and doc_id not in seen_ids:
-                                seen_ids.add(doc_id)
-                                all_results.append(_deserialize(doc))
-                    except Exception as or_err:
-                        logger.warning(f"$or condition query failed: {or_err}")
-                        continue
-                
-                # Sort combined results if needed
-                if sort and all_results:
-                    for field, direction in reversed(sort):
-                        reverse = (direction == -1)
-                        all_results.sort(key=lambda x: x.get(field) or '', reverse=reverse)
-                
-                # Apply skip first, then limit
-                if skip:
-                    all_results = all_results[skip:]
-                if limit:
-                    all_results = all_results[:limit]
-                    
-                return all_results
-            
-            # Apply sorting
+                or_filter = _build_or_filter(or_conditions)
+                if or_filter:
+                    builder = builder.or_(or_filter)
+
+            # Non-$or path
             if sort:
                 for field, direction in sort:
                     builder = builder.order(field, desc=(direction == -1))
-            
-            # Apply limit
             if limit:
                 builder = builder.limit(limit)
-            
-            # Apply skip/offset
             if skip:
                 builder = builder.offset(skip)
-            
+
             result = builder.execute()
             return [_deserialize(doc) for doc in (result.data or [])]
-            
+
         except Exception as e:
             logger.error(f"find error on {self.table_name}: {e}")
             return []
-    
+
     # ============ INSERT OPERATIONS ============
-    
+
     def insert_one(self, document: Dict[str, Any]) -> Dict:
         """Insert single document"""
         try:
-            # Remove _id if present
             document.pop('_id', None)
-
-            # Serialize values and filter to valid columns
             clean_doc = {k: _serialize(v) for k, v in document.items() if v is not None}
             clean_doc = _filter_columns(self.table_name, clean_doc)
 
             result = self._table().insert(clean_doc).execute()
             return {'inserted_id': result.data[0]['id'] if result.data else None}
-            
+
         except Exception as e:
             logger.error(f"insert_one error on {self.table_name}: {e}")
             raise
-    
+
     def insert_many(self, documents: List[Dict[str, Any]]) -> Dict:
         """Insert multiple documents"""
         try:
@@ -390,163 +350,172 @@ class SupabaseTable:
                 doc.pop('_id', None)
                 clean = {k: _serialize(v) for k, v in doc.items() if v is not None}
                 clean_docs.append(_filter_columns(self.table_name, clean))
-            
+
             result = self._table().insert(clean_docs).execute()
             return {'inserted_count': len(result.data) if result.data else 0}
-            
+
         except Exception as e:
             logger.error(f"insert_many error on {self.table_name}: {e}")
             raise
-    
+
     # ============ UPDATE OPERATIONS ============
-    
+
     def update_one(self, query: Dict[str, Any], update: Dict[str, Any], upsert: bool = False) -> Dict:
         """Update single document"""
         try:
-            # Handle $set, $inc, $push operators
             update_data = {}
-            
+
             if '$set' in update:
                 update_data.update(update['$set'])
             elif '$inc' in update:
-                # For increment, we need to fetch first then update
                 existing = self.find_one(query)
                 if existing:
                     for field, inc_val in update['$inc'].items():
                         update_data[field] = (existing.get(field, 0) or 0) + inc_val
             elif '$push' in update:
-                # For push, fetch first then append
                 existing = self.find_one(query)
                 if existing:
                     for field, push_val in update['$push'].items():
                         current = existing.get(field, []) or []
                         if isinstance(current, str):
-                            current = json.loads(current)
+                            try:
+                                current = json.loads(current)
+                            except (json.JSONDecodeError, TypeError):
+                                current = []
                         current.append(push_val)
                         update_data[field] = current
             else:
                 update_data = update
-            
-            # Serialize and filter to valid columns
+
             clean_update = {k: _serialize(v) for k, v in update_data.items() if v is not None}
             clean_update = _filter_columns(self.table_name, clean_update)
-            
+
             if not clean_update:
                 return {'modified_count': 0, 'matched_count': 0}
-            
+
             builder = self._table().update(clean_update)
-            
+
             for key, value in query.items():
                 if not key.startswith('$'):
                     builder = builder.eq(key, value)
-            
+
             result = builder.execute()
-            
+
             return {
                 'modified_count': len(result.data) if result.data else 0,
                 'matched_count': len(result.data) if result.data else 0
             }
-            
+
         except Exception as e:
             logger.error(f"update_one error on {self.table_name}: {e}")
             raise
-    
+
     def update_many(self, query: Dict[str, Any], update: Dict[str, Any]) -> Dict:
         """Update multiple documents"""
         return self.update_one(query, update)
-    
+
     def find_one_and_update(
-        self, 
-        query: Dict[str, Any], 
+        self,
+        query: Dict[str, Any],
         update: Dict[str, Any],
         return_document: str = 'after',
-        projection: Dict[str, Any] = None  # Ignored for Supabase compatibility
+        projection: Dict[str, Any] = None
     ) -> Optional[Dict]:
         """Find and update, returning the document"""
         try:
-            # First update
             self.update_one(query, update)
-            
-            # Then fetch
             return self.find_one(query)
-            
         except Exception as e:
             logger.error(f"find_one_and_update error on {self.table_name}: {e}")
             return None
-    
+
     # ============ DELETE OPERATIONS ============
-    
+
     def delete_one(self, query: Dict[str, Any]) -> Dict:
         """Delete single document"""
         try:
             builder = self._table().delete()
-            
             for key, value in query.items():
                 builder = builder.eq(key, value)
-            
+
             result = builder.execute()
             return {'deleted_count': len(result.data) if result.data else 0}
-            
+
         except Exception as e:
             logger.error(f"delete_one error on {self.table_name}: {e}")
             raise
-    
+
     def delete_many(self, query: Dict[str, Any]) -> Dict:
         """Delete multiple documents"""
         return self.delete_one(query)
-    
+
     # ============ COUNT OPERATIONS ============
-    
+
     def count_documents(self, query: Dict[str, Any] = None) -> int:
         """Count documents matching query"""
         try:
             builder = self._table().select('id', count='exact')
-            
+
             if query:
                 for key, value in query.items():
-                    if isinstance(value, dict):
-                        for op, op_val in value.items():
-                            if op == '$in':
-                                builder = builder.in_(key, op_val)
-                            elif op == '$gte':
-                                builder = builder.gte(key, op_val)
-                            elif op == '$lte':
-                                builder = builder.lte(key, op_val)
-                    elif value is not None:
-                        builder = builder.eq(key, value)
-            
+                    builder = _apply_filter(builder, key, value)
+
             result = builder.execute()
             return result.count if hasattr(result, 'count') and result.count else len(result.data or [])
-            
+
         except Exception as e:
             logger.error(f"count_documents error on {self.table_name}: {e}")
             return 0
-    
+
     # ============ AGGREGATION (LIMITED) ============
-    
+
     def aggregate(self, pipeline: List[Dict]) -> List[Dict]:
         """Basic aggregation support"""
-        # For now, just return all documents
-        # Complex aggregations should use Supabase RPC functions
         return self.find({})
 
 
 class SupabaseDB:
     """Database wrapper providing table access"""
-    
+
     def __init__(self):
         self._tables: Dict[str, SupabaseTable] = {}
-    
+
     def __getattr__(self, name: str) -> SupabaseTable:
         if name.startswith('_'):
             raise AttributeError(name)
-        
         if name not in self._tables:
             self._tables[name] = SupabaseTable(name)
-        
         return self._tables[name]
 
 
 # Create singleton instance
 db = SupabaseDB()
 client = get_client()
+
+
+def upload_photo_to_storage(
+    base64_string: str,
+    file_path: str,
+    bucket: str = "checkin-photos"
+) -> Optional[str]:
+    """Upload a base64-encoded JPEG to Supabase Storage.
+
+    Returns the public URL on success, or None if the upload fails so the
+    caller can fall back to keeping the base64 value in the DB.
+    """
+    if not base64_string:
+        return None
+    try:
+        import base64 as _b64
+        raw = base64_string.split(',', 1)[-1] if ',' in base64_string else base64_string
+        file_bytes = _b64.b64decode(raw)
+        c = get_client()
+        c.storage.from_(bucket).upload(
+            file_path,
+            file_bytes,
+            file_options={"content-type": "image/jpeg", "upsert": "true"},
+        )
+        return c.storage.from_(bucket).get_public_url(file_path)
+    except Exception as exc:
+        logger.warning(f"Storage upload failed [{file_path}]: {exc}")
+        return None
