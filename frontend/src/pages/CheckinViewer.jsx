@@ -28,6 +28,12 @@ const CheckinViewer = () => {
     }
   };
 
+  const getPhotoSrc = (photo, photoUrl) => {
+    if (photoUrl) return photoUrl;
+    if (!photo) return null;
+    return photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`;
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -160,7 +166,7 @@ const CheckinViewer = () => {
           </div>
 
           {/* Check-in Photo */}
-          {checkin.checkin_photo && (
+          {(checkin.checkin_photo_url || checkin.checkin_photo) && (
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <Image className="h-4 w-4" />
@@ -168,7 +174,7 @@ const CheckinViewer = () => {
               </p>
               <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                 <img
-                  src={checkin.checkin_photo.startsWith('data:') ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
+                  src={getPhotoSrc(checkin.checkin_photo, checkin.checkin_photo_url)}
                   alt="Check-in"
                   className="w-full h-full object-contain"
                 />
@@ -250,7 +256,7 @@ const CheckinViewer = () => {
             </div>
 
             {/* Check-out Photo */}
-            {checkin.checkout_photo && (
+            {(checkin.checkout_photo_url || checkin.checkout_photo) && (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground flex items-center gap-2">
                   <Image className="h-4 w-4" />
@@ -258,7 +264,7 @@ const CheckinViewer = () => {
                 </p>
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden">
                   <img
-                    src={checkin.checkout_photo.startsWith('data:') ? checkin.checkout_photo : `data:image/jpeg;base64,${checkin.checkout_photo}`}
+                    src={getPhotoSrc(checkin.checkout_photo, checkin.checkout_photo_url)}
                     alt="Check-out"
                     className="w-full h-full object-contain"
                   />

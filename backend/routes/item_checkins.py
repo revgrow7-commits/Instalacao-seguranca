@@ -9,7 +9,7 @@ import uuid
 import logging
 import math
 
-from db_supabase import db
+from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
 
@@ -233,21 +233,24 @@ async def create_item_checkin(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     
-    # Check if installer is assigned
+    # Check if installer is assigned (check both installer.id and user.id for legacy compat)
     job_assigned_installers = job.get("assigned_installers", [])
     item_assignments = job.get("item_assignments", [])
-    
+    installer_id = installer["id"]
+    user_id = current_user.id
+
     item_assigned = False
     for assignment in item_assignments:
         if assignment.get("item_index") == item_index:
-            if assignment.get("installer_id") == installer["id"]:
+            if assignment.get("installer_id") in [installer_id, user_id]:
                 item_assigned = True
                 break
-            if installer["id"] in assignment.get("installer_ids", []):
+            if installer_id in assignment.get("installer_ids", []) or user_id in assignment.get("installer_ids", []):
                 item_assigned = True
                 break
-    
-    if not item_assigned and installer["id"] not in job_assigned_installers:
+
+    is_job_assigned = installer_id in job_assigned_installers or user_id in job_assigned_installers
+    if not item_assigned and not is_job_assigned:
         raise HTTPException(status_code=403, detail="Você não está atribuído a este item")
     
     products = job.get("products_with_area", [])
@@ -271,9 +274,10 @@ async def create_item_checkin(
     family_id, family_name = await detect_product_family([product.get("name", "")])
     
     compressed_photo = None
+    photo_url = None
     if photo_base64:
         compressed_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
-    
+
     item_checkin = ItemCheckin(
         job_id=job_id,
         item_index=item_index,
@@ -285,9 +289,16 @@ async def create_item_checkin(
         product_name=product.get("name", f"Item {item_index}"),
         family_name=family_name
     )
-    
+
+    if compressed_photo:
+        photo_url = upload_photo_to_storage(
+            compressed_photo, f"item-checkins/{item_checkin.id}_checkin.jpg"
+        )
+
     checkin_dict = item_checkin.model_dump()
     checkin_dict['checkin_at'] = checkin_dict['checkin_at'].isoformat()
+    if photo_url:
+        checkin_dict['checkin_photo_url'] = photo_url
     db.item_checkins.insert_one(checkin_dict)
     
     checkin_dict.pop('_id', None)
@@ -508,12 +519,17 @@ async def complete_item_checkout(
         productivity_m2_h = round(installed_m2 / hours, 2)
     
     compressed_checkout_photo = None
+    checkout_photo_url = None
     if photo_base64:
         compressed_checkout_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
-    
+        checkout_photo_url = upload_photo_to_storage(
+            compressed_checkout_photo, f"item-checkins/{checkin_id}_checkout.jpg"
+        )
+
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         "checkout_photo": compressed_checkout_photo,
+        **({"checkout_photo_url": checkout_photo_url} if checkout_photo_url else {}),
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
