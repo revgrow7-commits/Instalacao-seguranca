@@ -1,11 +1,13 @@
 {
   "version": 2,
+  "regions": ["gru1"],
   "builds": [
     {
       "src": "api/index.py",
       "use": "@vercel/python",
       "config": {
-        "maxLambdaSize": "50mb"
+        "maxLambdaSize": "50mb",
+        "maxDuration": 60
       }
     }
   ],

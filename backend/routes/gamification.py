@@ -571,19 +571,23 @@ async def get_my_redemptions(current_user: User = Depends(get_current_user)):
 async def get_all_redemptions(current_user: User = Depends(get_current_user)):
     """Get all redemption requests (admin/manager only)"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     redemptions = db.reward_requests.find({}, {"_id": 0}, sort=[("created_at", -1)])
-    
-    # Enrich with user info
+
+    # Bulk fetch users to avoid N+1
+    user_ids = list({r["user_id"] for r in redemptions if r.get("user_id")})
+    users_list = db.users.find({"id": {"$in": user_ids}}, {"_id": 0, "id": 1, "name": 1, "email": 1})
+    users_map = {u["id"]: u for u in users_list}
+
     enriched = []
     for redemption in redemptions:
-        user = db.users.find_one({"id": redemption["user_id"]}, {"_id": 0, "name": 1, "email": 1})
+        user = users_map.get(redemption.get("user_id"), {})
         enriched.append({
             **redemption,
-            "user_name": user.get("name") if user else "N/A",
-            "user_email": user.get("email") if user else "N/A"
+            "user_name": user.get("name", "N/A"),
+            "user_email": user.get("email", "N/A")
         })
-    
+
     return enriched
 
 
@@ -755,17 +759,23 @@ async def get_leaderboard(
     # Sort and limit
     sorted_users = sorted(user_coins.items(), key=lambda x: x[1], reverse=True)[:limit]
     
-    # Enrich with user info
+    # Bulk fetch installers and balances to avoid N+1
+    top_user_ids = [user_id for user_id, _ in sorted_users]
+    installers_list = db.installers.find({"user_id": {"$in": top_user_ids}}, {"_id": 0, "user_id": 1, "full_name": 1})
+    installers_map = {i["user_id"]: i for i in installers_list}
+    balances_list = db.gamification_balances.find({"user_id": {"$in": top_user_ids}}, {"_id": 0, "user_id": 1, "lifetime_coins": 1})
+    balances_map = {b["user_id"]: b for b in balances_list}
+
     leaderboard = []
     for rank, (user_id, coins) in enumerate(sorted_users, 1):
-        installer = db.installers.find_one({"user_id": user_id}, {"_id": 0})
-        balance = db.gamification_balances.find_one({"user_id": user_id}, {"_id": 0})
+        installer = installers_map.get(user_id, {})
+        balance = balances_map.get(user_id, {})
         level_info = get_level_from_coins(balance.get("lifetime_coins", 0) if balance else 0)
-        
+
         leaderboard.append({
             "rank": rank,
             "user_id": user_id,
-            "name": installer.get("full_name") if installer else "N/A",
+            "name": installer.get("full_name", "N/A"),
             "coins_earned": coins,
             "level": level_info["name"],
             "level_icon": level_info["icon"]

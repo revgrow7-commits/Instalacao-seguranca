@@ -4,13 +4,13 @@ Image compression service.
 import base64
 import logging
 from io import BytesIO
-from PIL import Image
 
 
 def compress_image_to_base64(image_data: bytes, max_size_kb: int = 300, max_dimension: int = 1200) -> str:
     """
     Compress image and return base64 string.
     """
+    from PIL import Image
     try:
         img = Image.open(BytesIO(image_data))
         

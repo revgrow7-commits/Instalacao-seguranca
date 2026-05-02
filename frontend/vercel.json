@@ -3,6 +3,26 @@
   "buildCommand": "craco build",
   "outputDirectory": "build",
   "installCommand": "yarn install",
+  "headers": [
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*\\.js|.*\\.css|.*\\.woff2)$",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" }
+      ]
+    }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

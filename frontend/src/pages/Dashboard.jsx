@@ -103,32 +103,28 @@ const Dashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Load jobs
-      const jobsRes = await api.getJobs();
-      setJobs(jobsRes.data);
-
-      // Load metrics if admin or manager
       if (isAdmin || isManager) {
-        const metricsRes = await api.getMetrics();
+        // All calls are independent — run in parallel
+        const [jobsRes, metricsRes, installersRes, checkinsRes, pendingRes, locationRes] =
+          await Promise.all([
+            api.getJobs({ days: 7 }),
+            api.getMetrics(),
+            api.getInstallers().catch((e) => { console.log('Could not load installers:', e); return { data: [] }; }),
+            api.getAllItemCheckins(),
+            api.getPendingCheckins().catch((e) => { console.log('Could not load pending checkins:', e); return { data: { pending_checkins: [] } }; }),
+            api.getLocationAlerts().catch((e) => { console.log('Could not load location alerts:', e); return { data: [] }; }),
+          ]);
+
+        setJobs(jobsRes.data);
         setMetrics(metricsRes.data);
-        
-        // Load installers for WhatsApp contacts
-        try {
-          const installersRes = await api.getInstallers();
-          setInstallers(installersRes.data);
-        } catch (e) {
-          console.log('Could not load installers:', e);
-        }
-        
-        // Load all item checkins and filter for late/paused
-        const checkinsRes = await api.getAllItemCheckins();
-        const now = new Date();
-        
+        setInstallers(installersRes.data);
+
         // Filter paused check-ins (status = 'paused')
         const paused = checkinsRes.data.filter(c => c.status === 'paused');
         setPausedCheckins(paused);
-        
+
         // Filter late check-ins (in_progress for more than 4 hours)
+        const now = new Date();
         const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
         const late = checkinsRes.data.filter(c => {
           if (c.status !== 'in_progress') return false;
@@ -136,22 +132,13 @@ const Dashboard = () => {
           return checkinTime < fourHoursAgo;
         });
         setLateCheckins(late);
-        
-        // Load pending check-ins (scheduled but not started)
-        try {
-          const pendingRes = await api.getPendingCheckins();
-          setPendingCheckins(pendingRes.data.pending_checkins || []);
-        } catch (e) {
-          console.log('Could not load pending checkins:', e);
-        }
-        
-        // Load location alerts
-        try {
-          const locationRes = await api.getLocationAlerts();
-          setLocationAlerts(locationRes.data || []);
-        } catch (e) {
-          console.log('Could not load location alerts:', e);
-        }
+
+        setPendingCheckins(pendingRes.data.pending_checkins || []);
+        setLocationAlerts(locationRes.data || []);
+      } else {
+        // Non-admin/manager: only load jobs
+        const jobsRes = await api.getJobs({ days: 7 });
+        setJobs(jobsRes.data);
       }
     } catch (error) {
       toast.error('Erro ao carregar dados do dashboard');

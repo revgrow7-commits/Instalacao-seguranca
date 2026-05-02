@@ -40,8 +40,9 @@ const UpdateNotification = () => {
       });
     }
 
-    // Check for updates periodically
+    // Check for updates periodically — skip when tab is not visible
     const checkForUpdates = setInterval(() => {
+      if (document.visibilityState !== 'visible') return; // don't fire in inactive tab
       if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
       }
