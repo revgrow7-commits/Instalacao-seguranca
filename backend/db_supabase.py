@@ -92,7 +92,7 @@ TABLE_COLUMNS = {
         "checkout_gps_lat", "checkout_gps_long", "checkout_gps_accuracy", "product_name",
         "family_name", "installed_m2", "complexity_level", "height_category",
         "scenario_category", "notes", "productivity_m2_h", "is_archived",
-        "products_installed", "created_at"
+        "products_installed", "is_late", "created_at"
     ]),
     "item_pause_logs": frozenset([
         "id", "checkin_id", "reason", "paused_at", "resumed_at", "duration_minutes",
@@ -160,7 +160,7 @@ def _filter_columns(table_name: str, data: dict) -> dict:
         return data
     rejected = set(data.keys()) - allowed
     if rejected:
-        logger.debug(f"Filtered non-DB fields from {table_name}: {rejected}")
+        logger.warning(f"_filter_columns: dropping unknown fields from '{table_name}': {rejected}")
     return {k: v for k, v in data.items() if k in allowed}
 
 
@@ -193,8 +193,12 @@ def _apply_filter(builder, key: str, value: Any):
         for op, op_val in value.items():
             if op == '$in':
                 builder = builder.in_(key, op_val)
+            elif op == '$gt':
+                builder = builder.gt(key, op_val)
             elif op == '$gte':
                 builder = builder.gte(key, op_val)
+            elif op == '$lt':
+                builder = builder.lt(key, op_val)
             elif op == '$lte':
                 builder = builder.lte(key, op_val)
             elif op == '$ne':
