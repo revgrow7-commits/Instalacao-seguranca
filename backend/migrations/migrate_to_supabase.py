@@ -16,9 +16,16 @@ from typing import Any, Dict, List
 from pymongo import MongoClient
 from supabase import create_client, Client
 
-# Configurações do Supabase
-SUPABASE_URL = "https://otyrrkvixegiqsthmaaj.supabase.co"
-SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY', 'REDACTED_SUPABASE_SERVICE_KEY')
+# Configurações do Supabase — env-driven. instal-visual.com.br = qfsxtwkltfraounsjjah.
+# A URL antiga aqui tinha typo (otyrrKVixe… em vez de otyrrVKixe…) e apontava
+# para banco separado de outro produto (somos-industriavisual.com.br).
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+    raise RuntimeError(
+        "SUPABASE_URL e SUPABASE_SERVICE_KEY são obrigatórias. "
+        "Defina via env vars antes de executar a migração."
+    )
 
 # Configurações do MongoDB
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
