@@ -15,31 +15,31 @@ Este guia detalha o processo completo de deploy do sistema Indústria Visual no 
 
 ## 🔧 PARTE 1: DEPLOY DO BACKEND (API)
 
-### Passo 1: Preparar repositório
+### Passo 1: Preparar repositório Git
 
 ```bash
-# Criar novo repositório para o backend (se ainda não existir)
+# Na pasta backend/
 cd /path/to/backend
 git init
 git add .
 git commit -m "Initial commit - Backend API"
+
+# Criar repositório no GitHub e conectar
+gh repo create industria-visual-api --private --source=. --push
 ```
 
-### Passo 2: Deploy inicial
+### Passo 2: Importar projeto no Vercel (via Git)
 
-```bash
-# Na pasta backend/
-vercel login
-vercel
+1. Acesse **vercel.com/new**
+2. Clique em **Import Git Repository**
+3. Selecione o repositório `industria-visual-api`
+4. Configure as seguintes opções:
+   - **Framework Preset**: `Other`
+   - **Build Command**: (deixar vazio)
+   - **Output Directory**: (deixar vazio)
+5. Clique em **Deploy**
 
-# Responda às perguntas:
-# - Set up and deploy? Y
-# - Which scope? [sua conta]
-# - Link to existing project? N
-# - Project name: industria-visual-api
-# - Directory with code? ./
-# - Override settings? N
-```
+> **Nota:** O backend usa `@vercel/python` via `vercel.json`. As rotas são configuradas automaticamente.
 
 ### Passo 3: Configurar variáveis de ambiente
 
@@ -50,12 +50,12 @@ Adicione TODAS as variáveis abaixo:
 | Nome | Valor |
 |------|-------|
 | `SUPABASE_URL` | `https://otyrrvkixegiqsthmaaj.supabase.co` |
-| `SUPABASE_SERVICE_KEY` | `sb_secret_uMmCrswTXuAAI0buga8NQQ_vFRSMRWb` |
-| `SUPABASE_ANON_KEY` | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `JWT_SECRET` | `your-secret-key-change-in-production-123456789` |
-| `HOLDPRINT_API_KEY_POA` | `84ae7df8-893c-4b0d-9b6e-516def1367f0` |
-| `HOLDPRINT_API_KEY_SP` | `4e20f4c2-6f84-49e7-9ab9-e27d6930a13a` |
-| `RESEND_API_KEY` | `re_hh6JyAXw_6sykfRUqxqkE1FbDzja6H7V5` |
+| `SUPABASE_SERVICE_KEY` | `<rotacionar no Supabase Dashboard → Settings → API>` |
+| `SUPABASE_ANON_KEY` | `<ver Supabase Dashboard → Settings → API>` |
+| `JWT_SECRET` | `<gerar com: openssl rand -hex 32>` |
+| `HOLDPRINT_API_KEY_POA` | `<ver Vercel Env Vars — não commitar>` |
+| `HOLDPRINT_API_KEY_SP` | `<ver Vercel Env Vars — não commitar>` |
+| `RESEND_API_KEY` | `<ver Resend Dashboard — não commitar>` |
 | `SENDER_EMAIL` | `bruno@industriavisual.com.br` |
 | `FRONTEND_URL` | `https://instal-visual.com.br` |
 | `VAPID_PUBLIC_KEY` | `BEB4S64ZcE5l5YAzZv4Ey3NaP3FBnprFE0vm...` |
@@ -100,31 +100,32 @@ curl https://api.instal-visual.com.br/api/auth/login \
 
 ## 🎨 PARTE 2: DEPLOY DO FRONTEND
 
-### Passo 1: Preparar repositório
+### Passo 1: Preparar repositório Git
 
 ```bash
-# Criar novo repositório para o frontend (se ainda não existir)
+# Na pasta frontend/
 cd /path/to/frontend
 git init
 git add .
 git commit -m "Initial commit - Frontend"
+
+# Criar repositório no GitHub e conectar
+gh repo create industria-visual-frontend --private --source=. --push
 ```
 
-### Passo 2: Deploy inicial
+### Passo 2: Importar projeto no Vercel (via Git)
 
-```bash
-# Na pasta frontend/
-vercel login
-vercel
+1. Acesse **vercel.com/new**
+2. Clique em **Import Git Repository**
+3. Selecione o repositório `industria-visual-frontend`
+4. Configure as seguintes opções:
+   - **Framework Preset**: `Create React App`
+   - **Build Command**: `craco build`
+   - **Output Directory**: `build`
+   - **Install Command**: `yarn install`
+5. Clique em **Deploy**
 
-# Responda às perguntas:
-# - Set up and deploy? Y
-# - Which scope? [sua conta]
-# - Link to existing project? N
-# - Project name: industria-visual
-# - Directory with code? ./
-# - Override settings? N
-```
+> **Nota:** O `vercel.json` já contém essas configurações. O Vercel deve detectá-las automaticamente ao importar via Git.
 
 ### Passo 3: Configurar variável de ambiente
 
