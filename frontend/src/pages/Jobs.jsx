@@ -343,6 +343,7 @@ const Jobs = () => {
   const [selectedBranch, setSelectedBranch] = useState('SP');
   const [loadingHoldprint, setLoadingHoldprint] = useState(false);
   const [loadingCurrentMonth, setLoadingCurrentMonth] = useState(false);
+  const [importMonth, setImportMonth] = useState('');
   const [processingJobId, setProcessingJobId] = useState(null);
   const [visibleCount, setVisibleCount] = useState(12);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
@@ -398,24 +399,30 @@ const Jobs = () => {
   const loadHoldprintJobs = async () => {
     setLoadingHoldprint(true);
     try {
-      const response = await api.importAllJobs(selectedBranch);
-      const { imported, skipped } = response.data;
-      
+      let month = null;
+      let year = null;
+      if (importMonth) {
+        const [y, m] = importMonth.split('-').map(Number);
+        month = m;
+        year = y;
+      }
+      const response = await api.importAllJobs(selectedBranch, month, year);
+      const { imported, skipped, holdprint_total_received } = response.data;
+      const totalReceived = holdprint_total_received ?? (imported + skipped);
+
       if (imported > 0) {
         toast.success(`${imported} job(s) importado(s) com sucesso!`);
         loadJobs();
       }
-      
-      if (skipped > 0 && imported === 0) {
-        toast.info(`Todos os ${skipped} jobs já estavam importados`);
+
+      if (totalReceived === 0) {
+        toast.info(`Holdprint não retornou jobs para ${selectedBranch}. Verifique as configurações da API.`);
+      } else if (skipped > 0 && imported === 0) {
+        toast.info(`Todos os ${skipped} jobs já estavam importados (sincronizado pelo cron diário).`);
       } else if (skipped > 0) {
         toast.info(`${skipped} job(s) já existiam`);
       }
-      
-      if (imported === 0 && skipped === 0) {
-        toast.info('Nenhum job encontrado para importar');
-      }
-      
+
       setShowImportDialog(false);
     } catch (error) {
       console.error('Error importing jobs:', error);
@@ -1206,6 +1213,15 @@ const Jobs = () => {
                   <SelectItem value="POA">Porto Alegre</SelectItem>
                 </SelectContent>
               </Select>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Filtrar por mês (opcional)</label>
+                <Input
+                  type="month"
+                  value={importMonth}
+                  onChange={(e) => setImportMonth(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
               <Button
                 onClick={loadHoldprintJobs}
                 disabled={loadingHoldprint || loadingCurrentMonth}
@@ -1220,7 +1236,7 @@ const Jobs = () => {
                 ) : (
                   <>
                     <Download className="h-4 w-4 mr-2" />
-                    Importar só {selectedBranch}
+                    Importar {selectedBranch}{importMonth ? ` — ${importMonth}` : ''}
                   </>
                 )}
               </Button>

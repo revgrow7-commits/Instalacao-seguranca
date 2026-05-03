@@ -1,6 +1,7 @@
 """
 Security utilities: password hashing, JWT, and authentication.
 """
+import uuid
 from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -28,8 +29,12 @@ def get_password_hash(password: str) -> str:
 def create_access_token(data: dict) -> str:
     """Create JWT access token."""
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire})
+    now = datetime.now(timezone.utc)
+    to_encode.update({
+        "iat": now,
+        "exp": now + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS),
+        "jti": str(uuid.uuid4()),
+    })
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -49,18 +54,18 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    
+
     # Use synchronous Supabase wrapper
     users = db.users.find({"id": user_id})
     user_doc = users[0] if users else None
-    
+
     if user_doc is None:
         raise credentials_exception
-    
+
     # Convert datetime if needed
     if isinstance(user_doc.get('created_at'), str):
         user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
-    
+
     return User(**user_doc)
 
 

@@ -2,20 +2,22 @@
 Configuration and constants for the application.
 """
 import os
-import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# JWT Settings - derived from SUPABASE_SERVICE_KEY (required)
-_supabase_key = os.environ.get('SUPABASE_SERVICE_KEY')
-if not _supabase_key:
-    raise RuntimeError("SUPABASE_SERVICE_KEY environment variable is required. Cannot start without a secure JWT secret.")
-SECRET_KEY = hashlib.sha256(_supabase_key.encode()).hexdigest()
+# Supabase (required)
+if not os.environ.get('SUPABASE_SERVICE_KEY'):
+    raise RuntimeError("SUPABASE_SERVICE_KEY environment variable is required.")
+
+# JWT Settings - independent secret, never derived from Supabase key
+SECRET_KEY = os.environ.get('JWT_SECRET')
+if not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET environment variable is required. Generate with: openssl rand -hex 32")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_DAYS = 1
 
 # Holdprint API Keys
 HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
@@ -55,7 +57,7 @@ except OSError:
 PAUSE_REASONS = [
     "aguardando_cliente",
     "chuva",
-    "falta_material", 
+    "falta_material",
     "almoco_intervalo",
     "problema_acesso",
     "problema_equipamento",
@@ -83,7 +85,7 @@ PRODUCT_FAMILY_MAPPING = {
         "lona", "banner", "faixa", "empena", "faixa de gradil"
     ],
     "Chapas e Placas": [
-        "chapa", "placa", "acm", "acrílico", "mdf", "ps", "pvc", "polionda", 
+        "chapa", "placa", "acm", "acrílico", "mdf", "ps", "pvc", "polionda",
         "policarbonato", "petg", "compensado", "xps"
     ],
     "Estruturas Metálicas": [
@@ -105,7 +107,7 @@ PRODUCT_FAMILY_MAPPING = {
         "painel backlight", "painel luminoso", "backlight"
     ],
     "Serviços": [
-        "serviço", "serviços", "instalação", "entrega", "montagem", 
+        "serviço", "serviços", "instalação", "entrega", "montagem",
         "pintura", "serralheria", "solda", "corte", "aplicação"
     ],
     "Materiais Promocionais": [

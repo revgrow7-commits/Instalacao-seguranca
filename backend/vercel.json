@@ -24,7 +24,7 @@
   "crons": [
     {
       "path": "/api/cron/sync-holdprint",
-      "schedule": "0 6 * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }

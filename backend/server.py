@@ -20,15 +20,6 @@ from services.sync_holdprint import sync_holdprint_jobs_sync
 # Serverless detection
 IS_SERVERLESS = os.environ.get('VERCEL', '').lower() == '1' or os.environ.get('SERVERLESS', '').lower() == 'true'
 
-# Scheduler (only for non-serverless)
-SCHEDULER_AVAILABLE = False
-if not IS_SERVERLESS:
-    try:
-        from services.scheduler import setup_scheduler, start_scheduler, shutdown_scheduler, pause_job, resume_job, run_job_now
-        SCHEDULER_AVAILABLE = True
-    except ImportError:
-        pass
-
 # ============ APP SETUP ============
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -94,40 +85,36 @@ def get_scheduler_jobs(current_user: User = Depends(get_current_user)):
     """Status dos jobs agendados."""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    last_sync = db.scheduler_sync_status.find_one({"sync_type": "holdprint"})
+    last_sync = db.system_config.find_one({"key": "last_holdprint_sync"})
+
+    last_run = None
+    if last_sync:
+        last_run = last_sync.get("value") or last_sync.get("last_sync_at")
 
     jobs = [{
         "id": "holdprint_sync",
         "name": "Sincronizacao Holdprint",
-        "trigger": "Vercel Cron (*/30 * * * *)" if IS_SERVERLESS else "APScheduler",
-        "next_run": "N/A (Serverless)" if IS_SERVERLESS else "Check APScheduler",
-        "last_run": last_sync.get("last_sync_at") if last_sync else None,
+        "trigger": "Vercel Cron (09:00 UTC / 06:00 BRT, diario)",
+        "next_run": "09:00 UTC diario",
+        "last_run": last_run,
+        "total_imported": last_sync.get("total_imported", 0) if last_sync else 0,
+        "total_skipped": last_sync.get("total_skipped", 0) if last_sync else 0,
         "status": "active"
     }]
 
-    return {"scheduler_running": not IS_SERVERLESS, "serverless_mode": IS_SERVERLESS, "jobs": jobs}
+    return {"scheduler_running": True, "serverless_mode": IS_SERVERLESS, "jobs": jobs}
 
 
 @api_router.post("/scheduler/jobs/{job_id}/pause")
 def pause_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     require_role(current_user, [UserRole.ADMIN])
-    if IS_SERVERLESS:
-        raise HTTPException(status_code=400, detail="Nao disponivel em modo serverless.")
-    if SCHEDULER_AVAILABLE:
-        pause_job(job_id)
-        return {"success": True, "message": f"Job {job_id} pausado"}
-    raise HTTPException(status_code=400, detail="Scheduler nao disponivel")
+    raise HTTPException(status_code=400, detail="Cron gerenciado pelo Vercel — use o dashboard do Vercel para pausar.")
 
 
 @api_router.post("/scheduler/jobs/{job_id}/resume")
 def resume_scheduler_job(job_id: str, current_user: User = Depends(get_current_user)):
     require_role(current_user, [UserRole.ADMIN])
-    if IS_SERVERLESS:
-        raise HTTPException(status_code=400, detail="Nao disponivel em modo serverless.")
-    if SCHEDULER_AVAILABLE:
-        resume_job(job_id)
-        return {"success": True, "message": f"Job {job_id} retomado"}
-    raise HTTPException(status_code=400, detail="Scheduler nao disponivel")
+    raise HTTPException(status_code=400, detail="Cron gerenciado pelo Vercel — use o dashboard do Vercel para retomar.")
 
 
 @api_router.post("/scheduler/jobs/{job_id}/run-now")
@@ -136,11 +123,6 @@ def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_current_
     if job_id == "holdprint_sync":
         result = sync_holdprint_jobs_sync(db)
         return {"success": True, "message": f"Sync executado: {result.get('total_imported', 0)} importados", "result": result}
-    if IS_SERVERLESS:
-        raise HTTPException(status_code=404, detail=f"Job {job_id} nao encontrado")
-    if SCHEDULER_AVAILABLE:
-        if run_job_now(job_id):
-            return {"success": True, "message": f"Job {job_id} sera executado em instantes"}
     raise HTTPException(status_code=404, detail=f"Job {job_id} nao encontrado")
 
 
@@ -149,12 +131,16 @@ def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_current_
 @api_router.get("/cron/sync-holdprint")
 @api_router.post("/cron/sync-holdprint")
 def cron_sync_holdprint(request: Request):
-    """Endpoint para Vercel Cron - sincronizacao Holdprint a cada 30 min."""
+    """Endpoint para Vercel Cron - sincronizacao Holdprint diaria (09:00 UTC / 06:00 BRT)."""
+    # Vercel envia x-vercel-cron: 1 em requests de cron autenticados
+    is_vercel_cron = request.headers.get('x-vercel-cron') == '1'
     cron_secret = os.environ.get('CRON_SECRET')
     if cron_secret:
         auth_header = request.headers.get('Authorization', '')
-        if auth_header != f"Bearer {cron_secret}":
+        if not is_vercel_cron and auth_header != f"Bearer {cron_secret}":
             raise HTTPException(status_code=401, detail="Unauthorized cron request")
+    elif not is_vercel_cron and os.environ.get('VERCEL') == '1':
+        raise HTTPException(status_code=401, detail="Unauthorized cron request")
 
     result = sync_holdprint_jobs_sync(db)
     return {
@@ -231,18 +217,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    if IS_SERVERLESS:
-        logger.info("Aplicacao iniciada em modo SERVERLESS (Vercel)")
-    elif SCHEDULER_AVAILABLE:
-        setup_scheduler(db)
-        start_scheduler()
-        logger.info("Aplicacao iniciada com scheduler ativo")
-    else:
-        logger.info("Aplicacao iniciada sem scheduler")
+    logger.info("Aplicacao iniciada em modo SERVERLESS (Vercel)" if IS_SERVERLESS else "Aplicacao iniciada")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    if not IS_SERVERLESS and SCHEDULER_AVAILABLE:
-        shutdown_scheduler()
     logger.info("Aplicacao encerrada")

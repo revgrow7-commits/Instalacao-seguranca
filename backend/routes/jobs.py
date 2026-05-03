@@ -77,6 +77,8 @@ class ItemAssignment(BaseModel):
 
 class BatchImportRequest(BaseModel):
     branch: str
+    month: Optional[int] = None
+    year: Optional[int] = None
 
 
 class SyncResult(BaseModel):
@@ -170,9 +172,9 @@ async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None,
         "x-api-key": api_key,
         "Accept": "application/json"
     }
-    
-    api_url = "https://api.holdworks.ai/api-key/jobs/data"
-    
+
+    api_url = HOLDPRINT_API_URL
+
     all_jobs = []
     page = 1
     
@@ -376,20 +378,42 @@ async def get_team_calendar_jobs(current_user: User = Depends(get_current_user))
     return cleaned_jobs
 
 
+def _persist_sync_result(total_imported: int, total_skipped: int, errors: list, sync_type: str = "manual"):
+    """Persist sync result to system_config for sync-status endpoint."""
+    status = "success" if not errors else ("partial" if total_imported > 0 else "error")
+    db.system_config.update_one(
+        {"key": "last_holdprint_sync"},
+        {"$set": {
+            "key": "last_holdprint_sync",
+            "value": datetime.now(timezone.utc).isoformat(),
+            "total_imported": total_imported,
+            "total_skipped": total_skipped,
+            "total_errors": len(errors),
+            "status": status,
+            "sync_type": sync_type,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+
 @router.get("/jobs/sync-status")
 async def get_sync_status(current_user: User = Depends(get_current_user)):
     """Check last Holdprint sync status"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     last_sync = db.system_config.find_one({"key": "last_holdprint_sync"}, {"_id": 0})
-    
+
     if not last_sync:
-        return {"last_sync": None, "message": "Nenhuma sincronização realizada ainda"}
-    
+        return {"last_sync": None, "status": None, "message": "Nenhuma sincronização realizada ainda"}
+
     return {
         "last_sync": last_sync.get("value"),
+        "status": last_sync.get("status", "success"),
+        "sync_type": last_sync.get("sync_type", "unknown"),
         "total_imported": last_sync.get("total_imported", 0),
-        "total_skipped": last_sync.get("total_skipped", 0)
+        "total_skipped": last_sync.get("total_skipped", 0),
+        "total_errors": last_sync.get("total_errors", 0),
     }
 
 
@@ -1195,27 +1219,31 @@ async def update_assignment_status(job_id: str, item_index: int, status_update: 
 async def import_all_jobs(request: BatchImportRequest, current_user: User = Depends(get_current_user)):
     """Import all jobs from Holdprint in batch"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     holdprint_jobs = await fetch_holdprint_jobs(request.branch)
-    
+    holdprint_total_received = len(holdprint_jobs)
     imported = 0
     skipped = 0
     errors = []
-    
+
     for holdprint_job in holdprint_jobs:
         holdprint_job_id = str(holdprint_job.get('id', ''))
-        
+
         existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
         if existing:
             skipped += 1
             continue
-        
+
         try:
-            products = holdprint_job.get('production', {}).get('products', [])
+            products = (
+                holdprint_job.get('production', {}).get('products')
+                or holdprint_job.get('products')
+                or []
+            )
             products_with_area = []
             total_area_m2 = 0.0
             total_quantity = 0
-            
+
             for product in products:
                 product_info = extract_product_dimensions(product)
                 product_with_area = {
@@ -1230,7 +1258,7 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
                 products_with_area.append(product_with_area)
                 total_area_m2 += product_with_area['total_area_m2']
                 total_quantity += product.get('quantity', 1)
-            
+
             job = Job(
                 holdprint_job_id=holdprint_job_id,
                 title=holdprint_job.get('title', 'Sem título'),
@@ -1244,23 +1272,25 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
                 total_products=len(products),
                 total_quantity=total_quantity
             )
-            
+
             job_dict = job.model_dump()
             job_dict['created_at'] = job_dict['created_at'].isoformat()
             if job_dict.get('scheduled_date'):
                 job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
-            
+
             db.jobs.insert_one(job_dict)
             imported += 1
-            
+
         except Exception as e:
             errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
-    
+
+    _persist_sync_result(imported, skipped, errors, sync_type="manual_branch")
     return {
         "success": True,
         "imported": imported,
         "skipped": skipped,
-        "total": len(holdprint_jobs),
+        "total": holdprint_total_received,
+        "holdprint_total_received": holdprint_total_received,
         "errors": errors[:5] if errors else []
     }
 
@@ -1370,6 +1400,7 @@ async def import_current_month_jobs(current_user: User = Depends(get_current_use
             })
             total_errors.append(f"{branch}: {str(e)}")
     
+    _persist_sync_result(total_imported, total_skipped, total_errors, sync_type="manual_current_month")
     return {
         "success": total_imported > 0 or total_skipped > 0,
         "month": current_month,
