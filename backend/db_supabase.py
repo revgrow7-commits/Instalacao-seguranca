@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Configuration — env-driven only. instal-visual.com.br usa qfsxtwkltfraounsjjah;
 # o projeto otyrrvkixegiqsthmaaj é do somos-industriavisual.com.br (banco separado).
-SUPABASE_URL = os.environ.get('SUPABASE_URL')
-SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_KEY') or os.environ.get('SUPABASE_ANON_KEY')
+SUPABASE_URL = (os.environ.get('SUPABASE_URL') or '').strip()
+SUPABASE_KEY = (os.environ.get('SUPABASE_SERVICE_KEY') or os.environ.get('SUPABASE_ANON_KEY') or '').strip()
 
 # Global client
 _client: Optional[Client] = None
