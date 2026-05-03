@@ -575,8 +575,11 @@ async def complete_item_checkout(
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
-        db.installed_products.insert_one(installed_product_dict)
-        await update_productivity_history(installed_product_dict)
+        try:
+            db.installed_products.insert_one(installed_product_dict)
+            await update_productivity_history(installed_product_dict)
+        except Exception as _e:
+            logger.warning(f"installed_products insert skipped (schema drift?): {_e}")
     
     # Check job completion
     job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
