@@ -73,7 +73,7 @@ export const api = {
   },
 
   // Holdprint & Jobs
-  importAllJobs: (branch) => axios.post(`${API_URL}/jobs/import-all`, { branch }, { headers: getAuthHeader() }),
+  importAllJobs: (branch, month, year) => axios.post(`${API_URL}/jobs/import-all`, { branch, ...(month != null && year != null ? { month, year } : {}) }, { headers: getAuthHeader() }),
   importCurrentMonthJobs: () => axios.post(`${API_URL}/jobs/import-current-month`, {}, { headers: getAuthHeader() }),
   getHoldprintJobs: (branch, month, year) => {
     let url = `${API_URL}/holdprint/jobs/${branch}`;

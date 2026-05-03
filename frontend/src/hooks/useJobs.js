@@ -51,17 +51,20 @@ export function useJobs() {
   const syncHoldprint = useCallback(async () => {
     try {
       setSyncing(true);
-      await api.importCurrentMonthJobs();
-      toast.success('Sincronização iniciada');
-      
-      // Refresh jobs after sync
-      setTimeout(() => {
-        fetchJobs();
-        setSyncing(false);
-      }, 2000);
+      const response = await api.importCurrentMonthJobs();
+      const { total_imported = 0, total_skipped = 0 } = response.data || {};
+      if (total_imported > 0) {
+        toast.success(`${total_imported} job(s) importado(s) com sucesso!`);
+      } else if (total_skipped > 0) {
+        toast.info(`Todos os ${total_skipped} jobs já estavam importados`);
+      } else {
+        toast.info('Nenhum job encontrado para importar');
+      }
+      await fetchJobs();
     } catch (err) {
       console.error('Error syncing:', err);
       toast.error('Erro na sincronização');
+    } finally {
       setSyncing(false);
     }
   }, [fetchJobs]);

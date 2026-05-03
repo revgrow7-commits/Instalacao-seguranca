@@ -9,11 +9,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple
 from services.holdprint import extract_product_dimensions  # noqa: F401 – re-exported for callers
+from config import HOLDPRINT_API_URL
 
 logger = logging.getLogger(__name__)
-
-# API Configuration
-HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 
 
 
