@@ -489,7 +489,7 @@ async def complete_item_checkout(
                 paused_at = datetime.fromisoformat(paused_at.replace('Z', '+00:00'))
             if paused_at.tzinfo is None:
                 paused_at = paused_at.replace(tzinfo=timezone.utc)
-            pause_duration = int((end_time - paused_at).total_seconds() / 60)
+            pause_duration = round((end_time - paused_at).total_seconds() / 60, 2)
             db.item_pause_logs.update_one(
                 {"id": active_pause["id"]},
                 {"$set": {"resumed_at": end_time.isoformat(), "duration_minutes": pause_duration}}
@@ -732,7 +732,7 @@ async def resume_item_checkin(
     if paused_at.tzinfo is None:
         paused_at = paused_at.replace(tzinfo=timezone.utc)
 
-    pause_duration = int((end_time - paused_at).total_seconds() / 60)
+    pause_duration = round((end_time - paused_at).total_seconds() / 60, 2)
 
     db.item_pause_logs.update_one(
         {"id": active_pause["id"]},

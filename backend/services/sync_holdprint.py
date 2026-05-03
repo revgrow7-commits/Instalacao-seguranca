@@ -8,39 +8,13 @@ import httpx
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple
+from services.holdprint import extract_product_dimensions  # noqa: F401 – re-exported for callers
 
 logger = logging.getLogger(__name__)
 
 # API Configuration
 HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 
-
-def extract_product_dimensions(product: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract dimensions from product data"""
-    width_m = 0.0
-    height_m = 0.0
-    quantity = product.get('quantity', 1) or 1
-    
-    # Try to get dimensions from various possible fields
-    if 'width' in product and 'height' in product:
-        width_m = float(product.get('width', 0) or 0) / 1000  # mm to m
-        height_m = float(product.get('height', 0) or 0) / 1000
-    elif 'widthMm' in product and 'heightMm' in product:
-        width_m = float(product.get('widthMm', 0) or 0) / 1000
-        height_m = float(product.get('heightMm', 0) or 0) / 1000
-    
-    area_m2 = width_m * height_m
-    total_area_m2 = area_m2 * quantity
-    
-    return {
-        "name": product.get('name', product.get('title', 'Produto sem nome')),
-        "width_m": round(width_m, 4),
-        "height_m": round(height_m, 4),
-        "quantity": quantity,
-        "area_m2": round(area_m2, 4),
-        "total_area_m2": round(total_area_m2, 4),
-        "family": product.get('family', product.get('category', 'Outros'))
-    }
 
 
 def sync_holdprint_jobs_sync(db) -> Dict[str, Any]:

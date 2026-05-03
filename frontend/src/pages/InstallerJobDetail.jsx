@@ -16,6 +16,8 @@ import {
 import { toast } from 'sonner';
 import CoinAnimation from '../components/CoinAnimation';
 
+const GPS_ACCURACY_LIMIT = 100; // metros — rejeita leitura com precisão pior que isso
+
 const PAUSE_REASON_LABELS = {
   "aguardando_cliente": "Aguardando Cliente",
   "chuva": "Chuva/Intempérie",
@@ -69,29 +71,42 @@ const InstallerJobDetail = () => {
   };
 
   const requestGPS = () => {
-    return new Promise((resolve) => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            const location = {
-              lat: position.coords.latitude,
-              long: position.coords.longitude,
-              accuracy: position.coords.accuracy
-            };
-            setGpsLocation(location);
-            resolve(location);
-          },
-          (error) => {
-            console.log('GPS error:', error);
-            setGpsError('Não foi possível obter localização');
-            // Return default location if GPS fails
-            resolve({ lat: -29.9, long: -51.1, accuracy: 100 });
-          },
-          { enableHighAccuracy: true, timeout: 10000 }
-        );
-      } else {
-        resolve({ lat: -29.9, long: -51.1, accuracy: 100 });
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        const msg = 'Este dispositivo não suporta GPS. Use um smartphone com localização ativada.';
+        setGpsError(msg);
+        reject(new Error(msg));
+        return;
       }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (position.coords.accuracy > GPS_ACCURACY_LIMIT) {
+            const msg = `Sinal GPS muito fraco (precisão ${Math.round(position.coords.accuracy)} m). Vá para um local aberto e tente novamente.`;
+            setGpsError(msg);
+            reject(new Error(msg));
+            return;
+          }
+          const location = {
+            lat: position.coords.latitude,
+            long: position.coords.longitude,
+            accuracy: position.coords.accuracy
+          };
+          setGpsLocation(location);
+          setGpsError(null);
+          resolve(location);
+        },
+        (error) => {
+          const messages = {
+            1: 'Permissão de localização negada. Ative o GPS nas configurações do navegador.',
+            2: 'Posição não disponível. Verifique se o GPS está ativado.',
+            3: 'Tempo esgotado ao obter GPS. Vá para um local aberto e tente novamente.'
+          };
+          const msg = messages[error.code] || 'Não foi possível obter localização GPS.';
+          setGpsError(msg);
+          reject(new Error(msg));
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
     });
   };
 
@@ -222,19 +237,23 @@ const InstallerJobDetail = () => {
   };
 
   const handleItemCheckin = async (itemIndex, photoBase64) => {
+    setProcessingItem(itemIndex);
+    let location;
     try {
-      setProcessingItem(itemIndex);
-      
-      // Request GPS when user initiates check-in (avoids Android overlay error)
-      const location = await requestGPS();
-      
+      location = await requestGPS();
+    } catch (gpsErr) {
+      toast.error(gpsErr.message, { duration: 6000 });
+      setProcessingItem(null);
+      return;
+    }
+    try {
       const formData = new FormData();
       formData.append('job_id', jobId);
       formData.append('item_index', itemIndex);
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', location?.lat || -29.9);
-      formData.append('gps_long', location?.long || -51.1);
-      formData.append('gps_accuracy', location?.accuracy || 10);
+      formData.append('gps_lat', location.lat);
+      formData.append('gps_long', location.long);
+      formData.append('gps_accuracy', location.accuracy);
 
       await api.createItemCheckin(formData);
       toast.success('Check-in do item realizado!');
@@ -248,17 +267,23 @@ const InstallerJobDetail = () => {
   };
 
   const handleItemCheckout = async (itemIndex, photoBase64) => {
-    try {
-      setProcessingItem(itemIndex);
-      
-      const checkin = itemCheckins[itemIndex];
-      if (!checkin) {
-        toast.error('Faça o check-in primeiro');
-        return;
-      }
+    const checkin = itemCheckins[itemIndex];
+    if (!checkin) {
+      toast.error('Faça o check-in primeiro');
+      return;
+    }
 
-      // Request GPS when user initiates checkout (avoids Android overlay error)
-      const location = await requestGPS();
+    setProcessingItem(itemIndex);
+    let location;
+    try {
+      location = await requestGPS();
+    } catch (gpsErr) {
+      toast.error(gpsErr.message, { duration: 6000 });
+      setProcessingItem(null);
+      return;
+    }
+
+    try {
 
       const item = getItemByIndex(itemIndex);
       const assignment = getItemAssignment(itemIndex);
@@ -271,9 +296,9 @@ const InstallerJobDetail = () => {
       
       const formData = new FormData();
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', location?.lat || -29.9);
-      formData.append('gps_long', location?.long || -51.1);
-      formData.append('gps_accuracy', location?.accuracy || 10);
+      formData.append('gps_lat', location.lat);
+      formData.append('gps_long', location.long);
+      formData.append('gps_accuracy', location.accuracy);
       formData.append('installed_m2', installedM2);
       formData.append('complexity_level', complexityLevel);
       formData.append('height_category', heightCategory);

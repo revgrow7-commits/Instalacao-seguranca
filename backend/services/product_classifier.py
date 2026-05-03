@@ -1,9 +1,8 @@
 """
 Product classification service.
 """
-import re
-from typing import Optional
 from config import PRODUCT_FAMILY_MAPPING
+from services.holdprint import extract_product_dimensions
 
 
 def classify_product_to_family(product_name: str) -> tuple:
@@ -68,61 +67,14 @@ def classify_product_to_family(product_name: str) -> tuple:
 
 
 def extract_product_measures(description: str) -> dict:
-    """
-    Extrai medidas (largura, altura, cópias) da descrição HTML do produto.
-    Retorna dict com width_m, height_m, copies e area_m2
-    """
-    result = {
-        "width_m": None,
-        "height_m": None,
-        "copies": 1,
-        "area_m2": None
+    """Legacy shim — delegates to extract_product_dimensions for backwards compatibility."""
+    dims = extract_product_dimensions({"description": description})
+    return {
+        "width_m": dims["width_m"] or None,
+        "height_m": dims["height_m"] or None,
+        "copies": dims["quantity"],
+        "area_m2": dims["area_m2"] or None,
     }
-    
-    if not description:
-        return result
-    
-    # Extrair Largura
-    width_patterns = [
-        r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m',
-        r'Largura:\s*([0-9.,]+)\s*m',
-        r'largura[:\s]+([0-9.,]+)\s*m',
-    ]
-    for pattern in width_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["width_m"] = float(match.group(1).replace(',', '.'))
-            break
-    
-    # Extrair Altura
-    height_patterns = [
-        r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m',
-        r'Altura:\s*([0-9.,]+)\s*m',
-        r'altura[:\s]+([0-9.,]+)\s*m',
-    ]
-    for pattern in height_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["height_m"] = float(match.group(1).replace(',', '.'))
-            break
-    
-    # Extrair Cópias
-    copies_patterns = [
-        r'Cópias:\s*<span[^>]*>([0-9]+)',
-        r'Cópias:\s*([0-9]+)',
-        r'copias[:\s]+([0-9]+)',
-    ]
-    for pattern in copies_patterns:
-        match = re.search(pattern, description, re.IGNORECASE)
-        if match:
-            result["copies"] = int(match.group(1))
-            break
-    
-    # Calcular área
-    if result["width_m"] and result["height_m"]:
-        result["area_m2"] = round(result["width_m"] * result["height_m"] * result["copies"], 2)
-    
-    return result
 
 
 def calculate_job_products_area(holdprint_data: dict) -> tuple:
@@ -132,38 +84,32 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
     """
     products = holdprint_data.get("products", [])
     products_with_area = []
-    total_area_m2 = 0
+    total_area_m2 = 0.0
     total_quantity = 0
-    
+
     for product in products:
-        product_name = product.get("name", "")
-        quantity = product.get("quantity", 1)
-        description = product.get("description", "")
-        
-        measures = extract_product_measures(description)
-        family_name, confidence = classify_product_to_family(product_name)
-        
-        item_area = None
-        if measures["width_m"] and measures["height_m"]:
-            unit_area = measures["width_m"] * measures["height_m"]
-            item_area = round(unit_area * quantity * measures["copies"], 2)
-            total_area_m2 += item_area
-        
-        total_quantity += quantity
-        
+        dims = extract_product_dimensions(product)
+        family_name, confidence = classify_product_to_family(dims["name"])
+
+        if dims["area_m2"]:
+            total_area_m2 += dims["total_area_m2"]
+
+        total_quantity += dims["quantity"]
+
+        unit_area = round(dims["width_m"] * dims["height_m"], 4) if dims["width_m"] and dims["height_m"] else None
         product_data = {
-            "name": product_name,
+            "name": dims["name"],
             "family_name": family_name,
             "confidence": confidence,
-            "quantity": quantity,
-            "width_m": measures["width_m"],
-            "height_m": measures["height_m"],
-            "copies": measures["copies"],
-            "unit_area_m2": round(measures["width_m"] * measures["height_m"], 2) if measures["width_m"] and measures["height_m"] else None,
-            "total_area_m2": item_area,
+            "quantity": dims["quantity"],
+            "width_m": dims["width_m"] or None,
+            "height_m": dims["height_m"] or None,
+            "copies": dims["quantity"],
+            "unit_area_m2": unit_area,
+            "total_area_m2": dims["total_area_m2"] or None,
             "unit_price": product.get("unitPrice", 0),
-            "total_value": product.get("totalValue", 0)
+            "total_value": product.get("totalValue", 0),
         }
         products_with_area.append(product_data)
-    
+
     return (products_with_area, round(total_area_m2, 2), len(products), total_quantity)
