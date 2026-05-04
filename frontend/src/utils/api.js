@@ -85,13 +85,29 @@ export const api = {
   },
   syncHoldprintJobs: (monthsBack = 2) => axios.post(`${API_URL}/jobs/sync-holdprint?months_back=${monthsBack}`, {}, { headers: getAuthHeader() }),
   getSyncStatus: () => axios.get(`${API_URL}/jobs/sync-status`, { headers: getAuthHeader() }),
-  createJob: (data) => axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() }),
-  getJobs: (includeArchived = false) => axios.get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() }),
+  createJob: (data) => {
+    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    return axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() });
+  },
+  getJobs: (includeArchived = false) => getCachedOrFetch(
+    `jobs_${includeArchived}`,
+    () => axios.get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() }),
+    20000
+  ),
   bulkArchivePre2026: () => axios.post(`${API_URL}/jobs/bulk-archive-pre-2026`, {}, { headers: getAuthHeader(), timeout: 120000 }),
   getJob: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
-  updateJob: (jobId, data) => axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() }),
-  assignJob: (jobId, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() }),
-  scheduleJob: (jobId, scheduledDate, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() }),
+  updateJob: (jobId, data) => {
+    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    return axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() });
+  },
+  assignJob: (jobId, installerIds) => {
+    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    return axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() });
+  },
+  scheduleJob: (jobId, scheduledDate, installerIds) => {
+    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    return axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() });
+  },
   
   // Item Assignments
   assignItemsToInstallers: (jobId, itemIndices, installerIds, options = {}) => axios.post(`${API_URL}/jobs/${jobId}/assign-items`, { 
@@ -103,7 +119,11 @@ export const api = {
   }, { headers: getAuthHeader() }),
   getJobAssignments: (jobId) => axios.get(`${API_URL}/jobs/${jobId}/assignments`, { headers: getAuthHeader() }),
   updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
-  getTeamCalendarJobs: () => axios.get(`${API_URL}/jobs/team-calendar`, { headers: getAuthHeader() }),
+  getTeamCalendarJobs: () => getCachedOrFetch(
+    'team_calendar',
+    () => axios.get(`${API_URL}/jobs/team-calendar`, { headers: getAuthHeader() }),
+    30000
+  ),
 
   // Batch Schedule / Archive
   batchScheduleJobs: (jobIds, scheduledDate, assignedInstallers) => axios.post(`${API_URL}/jobs/batch-schedule`, { job_ids: jobIds, scheduled_date: scheduledDate, assigned_installers: assignedInstallers }, { headers: getAuthHeader(), timeout: 60000 }),
@@ -114,16 +134,22 @@ export const api = {
   unarchiveJobItems: (jobId, itemIndices) => axios.post(`${API_URL}/jobs/${jobId}/unarchive-items`, itemIndices, { headers: getAuthHeader() }),
 
   // Check-ins
-  createCheckin: (formData) => axios.post(`${API_URL}/checkins`, formData, { 
-    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
-  }),
-  checkout: (checkinId, formData) => axios.put(`${API_URL}/checkins/${checkinId}/checkout`, formData, { 
-    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
-  }),
-  getCheckins: (jobId = null) => {
-    const url = jobId ? `${API_URL}/checkins?job_id=${jobId}` : `${API_URL}/checkins`;
-    return axios.get(url, { headers: getAuthHeader() });
+  createCheckin: (formData) => {
+    clearCache('checkins_all');
+    return axios.post(`${API_URL}/checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
   },
+  checkout: (checkinId, formData) => {
+    clearCache('checkins_all');
+    return axios.put(`${API_URL}/checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  getCheckins: (jobId = null) => getCachedOrFetch(
+    `checkins_${jobId || 'all'}`,
+    () => {
+      const url = jobId ? `${API_URL}/checkins?job_id=${jobId}` : `${API_URL}/checkins`;
+      return axios.get(url, { headers: getAuthHeader() });
+    },
+    15000
+  ),
   getCheckinDetails: (checkinId) => axios.get(`${API_URL}/checkins/${checkinId}/details`, { headers: getAuthHeader() }),
   deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
@@ -299,6 +325,11 @@ export const api = {
     if (params.length > 0) url += `?${params.join('&')}`;
     return axios.get(url, { headers: getAuthHeader() });
   },
+
+  // Installer Google Calendar
+  getInstallerCalendarStatus: () => axios.get(`${API_URL}/calendar/installer/status`, { headers: getAuthHeader() }),
+  getInstallerAuthUrl: () => `${API_URL}/calendar/installer/auth/google`,
+  syncJobToInstallerCalendar: (jobId) => axios.post(`${API_URL}/calendar/sync-installer/${jobId}`, {}, { headers: getAuthHeader() }),
 };
 
 export default api;

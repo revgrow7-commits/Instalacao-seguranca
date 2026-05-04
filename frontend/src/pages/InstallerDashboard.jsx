@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, TrendingUp } from 'lucide-react';
+import { MapPin, Calendar, Clock, PlayCircle, StopCircle, CheckCircle2, Coins, TrendingUp, ChevronRight, Settings } from 'lucide-react';
 import { toast } from 'sonner';
 import NotificationPermissionModal from '../components/NotificationPermissionModal';
-import GamificationWidget from '../components/GamificationWidget';
-import WeeklyLeaderboard from '../components/WeeklyLeaderboard';
+
+// Gamificação e leaderboard carregam de forma lazy — não bloqueiam os jobs
+const GamificationWidget = lazy(() => import('../components/GamificationWidget'));
+const WeeklyLeaderboard = lazy(() => import('../components/WeeklyLeaderboard'));
 
 /* ── Skeleton de um card de job ── */
 const JobCardSkeleton = ({ delay = 0 }) => (
@@ -91,22 +93,23 @@ const InstallerDashboard = () => {
   };
 
   const loadData = async () => {
-    try {
-      // 1. Carrega jobs primeiro — libera o skeleton imediatamente
-      const jobsRes = await api.getJobs();
-      setJobs(jobsRes.data);
-    } catch (error) {
+    // Jobs e checkins em paralelo — ambos necessários para exibir status "Em Andamento" correto
+    const [jobsRes, checkinsRes] = await Promise.allSettled([
+      api.getJobs(),
+      api.getCheckins(),
+    ]);
+    if (jobsRes.status === 'fulfilled') {
+      if (Array.isArray(jobsRes.value.data) && jobsRes.value.data.length === 0) {
+        console.warn('[InstallerDashboard] API retornou 0 jobs — verificar atribuição no painel admin');
+      }
+      setJobs(jobsRes.value.data);
+    } else {
       toast.error('Erro ao carregar jobs');
-    } finally {
-      setLoading(false); // remove skeleton assim que jobs chegam
     }
-    // 2. Carrega checkins em segundo plano — atualiza status sem travar UI
-    try {
-      const checkinsRes = await api.getCheckins();
-      setCheckins(checkinsRes.data);
-    } catch {
-      // checkins são opcionais para exibição inicial
+    if (checkinsRes.status === 'fulfilled') {
+      setCheckins(checkinsRes.value.data);
     }
+    setLoading(false);
   };
 
   const loadGamificationData = async () => {
@@ -225,16 +228,27 @@ const InstallerDashboard = () => {
             Seus Jobs de Instalação
           </p>
         </div>
-        {gamificationBalance && (
+        <div className="flex gap-3">
           <Button
-            onClick={() => navigate('/loja-faixa-preta')}
-            className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-bold"
+            onClick={() => navigate('/installer/calendar')}
+            variant="outline"
+            size="sm"
+            className="gap-2 border-white/10 hover:bg-white/5 text-sm"
           >
-            <Coins className="h-4 w-4 mr-2" />
-            {gamificationBalance.total_coins?.toLocaleString() || 0} moedas
-            <span className="ml-2">{gamificationBalance.level_info?.icon || '🥉'}</span>
+            <Calendar className="h-4 w-4" />
+            <span className="hidden sm:inline">Minha Agenda</span>
           </Button>
-        )}
+          {gamificationBalance && (
+            <Button
+              onClick={() => navigate('/loja-faixa-preta')}
+              className="bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-600 hover:to-yellow-700 text-black font-bold"
+            >
+              <Coins className="h-4 w-4 mr-2" />
+              {gamificationBalance.total_coins?.toLocaleString() || 0} moedas
+              <span className="ml-2">{gamificationBalance.level_info?.icon || '🥉'}</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Stats - Primeiro */}
@@ -338,7 +352,7 @@ const InstallerDashboard = () => {
           <Card className="bg-card border-white/5">
             <CardContent className="py-8 md:py-12 text-center">
               <CheckCircle2 className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground mb-3 md:mb-4" />
-              <p className="text-sm md:text-base text-muted-foreground">Nenhum job pendente</p>
+              <p className="text-sm md:text-base text-muted-foreground">Nenhum job atribuído a você. Fale com o gestor para verificar suas atribuições.</p>
             </CardContent>
           </Card>
         ) : (
@@ -370,12 +384,24 @@ const InstallerDashboard = () => {
                   )}
 
                   {job.scheduled_date && (
-                    <div className="flex items-center gap-2 text-xs md:text-sm text-primary">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        {new Date(job.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
-                        {new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                      </span>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-xs md:text-sm text-primary">
+                        <Calendar className="h-4 w-4" />
+                        <span>
+                          {new Date(job.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
+                          {new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {(job.status === 'agendado' || job.status === 'scheduled') && (
+                        <Button
+                          onClick={() => navigate('/installer/calendar')}
+                          size="sm"
+                          variant="ghost"
+                          className="text-xs gap-1 text-primary hover:bg-primary/10 h-auto px-2 py-1"
+                        >
+                          📅 Google
+                        </Button>
+                      )}
                     </div>
                   )}
 
@@ -419,12 +445,60 @@ const InstallerDashboard = () => {
         </div>
       )}
 
-      {/* Gamification Widget - Movido para baixo */}
+      {/* Próximos agendamentos (filtrado dos jobs já carregados — sem novo fetch) */}
+      {(() => {
+        const upcoming = jobs
+          .filter(j => j.scheduled_date && new Date(j.scheduled_date) >= new Date() &&
+            j.status !== 'completed' && j.status !== 'finalizado')
+          .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
+          .slice(0, 5);
+        if (upcoming.length === 0) return null;
+        return (
+          <div>
+            <div className="flex items-center justify-between mb-3 md:mb-4">
+              <h2 className="text-lg md:text-2xl font-heading font-bold text-white">Próximos Agendamentos</h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/installer/calendar')}
+                className="text-primary text-xs gap-1"
+              >
+                Ver agenda <ChevronRight className="h-3 w-3" />
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {upcoming.map(job => (
+                <Card
+                  key={job.id}
+                  className="bg-card border-white/5 hover:border-primary/40 transition-colors cursor-pointer"
+                  onClick={() => handleOpenJob(job.id)}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-primary shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-white truncate">{job.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(job.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
+                        {new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Gamification Widget - carrega em background sem bloquear jobs */}
       {gamificationBalance && (
-        <GamificationWidget 
-          balance={gamificationBalance} 
-          levelInfo={gamificationBalance.level_info} 
-        />
+        <Suspense fallback={null}>
+          <GamificationWidget
+            balance={gamificationBalance}
+            levelInfo={gamificationBalance.level_info}
+          />
+        </Suspense>
       )}
 
       {/* Prêmios - Em Breve */}
@@ -448,8 +522,10 @@ const InstallerDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* Weekly Leaderboard - No final */}
-      <WeeklyLeaderboard />
+      {/* Weekly Leaderboard - carrega em background */}
+      <Suspense fallback={null}>
+        <WeeklyLeaderboard />
+      </Suspense>
     </div>
   );
 };

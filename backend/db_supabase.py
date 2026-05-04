@@ -54,7 +54,7 @@ def get_client() -> Client:
 JSONB_FIELDS = frozenset([
     'items', 'holdprint_data', 'products_with_area', 'item_assignments',
     'archived_items', 'products_installed', 'breakdown', 'keys',
-    'assigned_installers', 'checklists', 'scopes', 'token',
+    'assigned_installers', 'checklists', 'scopes', 'token', 'google_token',
     'justification', 'installation_config', 'subscription', 'keywords'
 ])
 
@@ -66,11 +66,11 @@ TABLE_COLUMNS = {
     ]),
     "installers": frozenset([
         "id", "user_id", "full_name", "phone", "branch", "is_active", "avatar_url",
-        "coins", "level", "total_area_installed", "total_jobs", "created_at"
+        "coins", "level", "total_area_installed", "total_jobs", "google_token", "google_calendar_id", "created_at"
     ]),
     "jobs": frozenset([
         "id", "holdprint_job_id", "title", "client_name", "client_address", "status",
-        "branch", "area_m2", "assigned_installers", "scheduled_date", "items",
+        "branch", "area_m2", "assigned_installers", "scheduled_date", "scheduled_time_end", "items",
         "holdprint_data", "products_with_area", "total_products", "total_quantity",
         "item_assignments", "archived_items", "archived", "archived_at", "archived_by",
         "archived_by_name", "exclude_from_metrics", "no_installation", "notes",
@@ -328,7 +328,7 @@ class SupabaseTable:
             return [_deserialize(doc) for doc in (result.data or [])]
 
         except Exception as e:
-            logger.error(f"find error on {self.table_name}: {e}")
+            logger.exception("find error on %s: %s", self.table_name, e)
             return []
 
     # ============ INSERT OPERATIONS ============

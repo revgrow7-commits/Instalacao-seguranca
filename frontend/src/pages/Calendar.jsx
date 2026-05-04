@@ -46,6 +46,10 @@ const Calendar = () => {
   const [sendEmailNotification, setSendEmailNotification] = useState(true);
   const [scheduling, setScheduling] = useState(false);
 
+  // Week/Day view date tracking
+  const [weekStartDate, setWeekStartDate] = useState(new Date());
+  const [dayViewDate, setDayViewDate] = useState(new Date());
+
   // Detect mobile screen
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -473,14 +477,34 @@ const Calendar = () => {
                   size="sm"
                   onClick={() => setViewMode('month')}
                   className={viewMode === 'month' ? 'bg-primary text-white' : 'text-muted-foreground'}
+                  title="Mês"
                 >
                   <Grid3X3 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'week' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('week')}
+                  className={viewMode === 'week' ? 'bg-primary text-white' : 'text-muted-foreground'}
+                  title="Semana"
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'installer' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('installer')}
+                  className={viewMode === 'installer' ? 'bg-primary text-white' : 'text-muted-foreground'}
+                  title="Dia por Instalador"
+                >
+                  <Users className="h-4 w-4" />
                 </Button>
                 <Button
                   variant={viewMode === 'list' ? 'secondary' : 'ghost'}
                   size="sm"
                   onClick={() => setViewMode('list')}
                   className={viewMode === 'list' ? 'bg-primary text-white' : 'text-muted-foreground'}
+                  title="Lista"
                 >
                   <List className="h-4 w-4" />
                 </Button>
@@ -533,7 +557,40 @@ const Calendar = () => {
 
         {/* Calendar Grid */}
         <div className={`${(isAdmin || isManager) && allJobs.length > 0 ? 'lg:col-span-3' : 'lg:col-span-4'}`}>
-          {viewMode === 'month' ? (
+          {viewMode === 'week' ? (
+            <WeekView
+              jobs={jobs}
+              currentDate={weekStartDate}
+              setCurrentDate={setWeekStartDate}
+              installers={installers}
+              selectedBranch={selectedBranch}
+              onJobClick={(job) => navigate(`/jobs/${job.id}`)}
+              onScheduleSlot={(date, time, installerName) => {
+                setSelectedJob(null);
+                setScheduleDate(date.toISOString().split('T')[0]);
+                setScheduleTime(time);
+                const installer = installers.find(i => i.full_name === installerName);
+                setSelectedInstaller(installer?.id || '');
+                setShowScheduleDialog(true);
+              }}
+            />
+          ) : viewMode === 'installer' ? (
+            <InstallerDayView
+              jobs={jobs}
+              currentDate={dayViewDate}
+              setCurrentDate={setDayViewDate}
+              installers={installers}
+              selectedBranch={selectedBranch}
+              onJobClick={(job) => navigate(`/jobs/${job.id}`)}
+              onScheduleSlot={(date, time, installerId) => {
+                setSelectedJob(null);
+                setScheduleDate(date.toISOString().split('T')[0]);
+                setScheduleTime(time);
+                setSelectedInstaller(installerId);
+                setShowScheduleDialog(true);
+              }}
+            />
+          ) : viewMode === 'month' ? (
             <Card className="bg-card border-white/5">
               <CardContent className="p-4">
                 {/* Week days header */}
@@ -802,6 +859,420 @@ const Calendar = () => {
         </DialogContent>
       </Dialog>
     </div>
+  );
+};
+
+// Week View Component
+const WeekView = ({ jobs, currentDate, setCurrentDate, installers, selectedBranch, onJobClick, onScheduleSlot }) => {
+  // Get Monday of current week
+  const getWeekMonday = (date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+    return new Date(d.setDate(diff));
+  };
+
+  const monday = getWeekMonday(currentDate);
+  const weekDays = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(d.getDate() + i);
+    weekDays.push(d);
+  }
+
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  // Get jobs for a specific day
+  const getJobsForDay = (date) => {
+    return jobs.filter(job => {
+      if (!job.scheduled_date) return false;
+      const jobDate = new Date(job.scheduled_date);
+      return jobDate.getDate() === date.getDate() &&
+             jobDate.getMonth() === date.getMonth() &&
+             jobDate.getFullYear() === date.getFullYear() &&
+             (selectedBranch === 'all' || job.branch === selectedBranch);
+    });
+  };
+
+  // Get installer color from ID hash
+  const getInstallerColor = (installerId) => {
+    if (!installerId) return 'bg-gray-500';
+    const colors = ['bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-rose-500', 'bg-amber-500', 'bg-lime-500'];
+    const hash = installerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  const getInstallerName = (installerId) => {
+    if (!installerId) return 'Sin asignar';
+    const installer = installers.find(i => i.id === installerId);
+    return installer?.full_name || 'Unknown';
+  };
+
+  // Parse time from ISO string
+  const getTimeFromDate = (isoString) => {
+    const d = new Date(isoString);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // Calculate pixel position based on time
+  const getTimePosition = (isoString) => {
+    const d = new Date(isoString);
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    return (hours - 7) * 60 + minutes; // 7:00 is start
+  };
+
+  // Calculate duration in minutes
+  const getDuration = (job) => {
+    if (!job.scheduled_time_end) return 120; // default 2h
+    const start = new Date(job.scheduled_date);
+    const end = new Date(job.scheduled_time_end);
+    return (end.getTime() - start.getTime()) / (1000 * 60);
+  };
+
+  return (
+    <Card className="bg-card border-white/5">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentDate(new Date(monday.getTime() - 7 * 24 * 60 * 60 * 1000))}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-white font-medium min-w-[180px] text-center">
+              {`${monday.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} - ${new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}`}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentDate(new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000))}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentDate(new Date())}
+              className="border-white/20 text-white hover:bg-white/5 ml-2"
+            >
+              Hoje
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-4 overflow-x-auto">
+        <div className="min-w-full">
+          {/* Days Header */}
+          <div className="grid gap-1 mb-4" style={{ gridTemplateColumns: '70px repeat(7, 1fr)' }}>
+            <div className="text-xs font-medium text-muted-foreground"></div>
+            {weekDays.map((day, idx) => (
+              <div
+                key={idx}
+                className={`text-center p-2 rounded-lg border ${
+                  isToday(day)
+                    ? 'border-primary bg-primary/10'
+                    : 'border-white/10 bg-white/5'
+                }`}
+              >
+                <div className="text-xs font-medium text-white">
+                  {day.toLocaleDateString('pt-BR', { weekday: 'short' }).substring(0, 3)}
+                </div>
+                <div className={`text-sm font-bold ${isToday(day) ? 'text-primary' : 'text-muted-foreground'}`}>
+                  {day.getDate()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Grid */}
+          <div className="grid gap-1 relative" style={{ gridTemplateColumns: '70px repeat(7, 1fr)' }}>
+            {/* Time labels */}
+            <div className="space-y-0">
+              {Array.from({ length: 14 }).map((_, idx) => (
+                <div key={idx} className="h-[60px] text-xs text-muted-foreground text-center pr-1 font-medium flex items-center justify-end">
+                  {String(7 + idx).padStart(2, '0')}:00
+                </div>
+              ))}
+            </div>
+
+            {/* Day columns */}
+            {weekDays.map((day, dayIdx) => (
+              <div
+                key={dayIdx}
+                className="border-l border-white/10 relative bg-white/[0.02]"
+                style={{ minHeight: '840px' }}
+              >
+                {/* Hour rows for background */}
+                {Array.from({ length: 14 }).map((_, hourIdx) => (
+                  <div
+                    key={hourIdx}
+                    className="h-[60px] border-b border-white/5 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={() => {
+                      onScheduleSlot(day, `${String(7 + hourIdx).padStart(2, '0')}:00`, '');
+                    }}
+                  />
+                ))}
+
+                {/* Job cards */}
+                {getJobsForDay(day).map((job) => {
+                  const mainInstallerIndex = job.assigned_installers?.length > 0 ? 0 : -1;
+                  const mainInstallerId = mainInstallerIndex >= 0 ? job.assigned_installers[mainInstallerIndex] : null;
+                  const topPosition = getTimePosition(job.scheduled_date);
+                  const duration = getDuration(job);
+
+                  return (
+                    <div
+                      key={job.id}
+                      className={`
+                        absolute left-1 right-1 rounded-lg p-1 text-xs cursor-pointer
+                        border border-white/20 transition-all hover:z-10 hover:shadow-lg hover:scale-105
+                        ${getInstallerColor(mainInstallerId)} bg-opacity-80 text-white
+                      `}
+                      style={{
+                        top: `${topPosition}px`,
+                        height: `${Math.max(duration, 40)}px`,
+                        overflow: 'hidden'
+                      }}
+                      onClick={() => onJobClick(job)}
+                      title={`${job.title} - ${getTimeFromDate(job.scheduled_date)}`}
+                    >
+                      <div className="font-bold truncate">
+                        #{job.holdprint_data?.code || job.id?.slice(0, 4)}
+                      </div>
+                      <div className="truncate text-[10px] opacity-90">
+                        {job.client_name}
+                      </div>
+                      {mainInstallerId && (
+                        <div className="truncate text-[10px] opacity-75">
+                          {getInstallerName(mainInstallerId)}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+// Installer Day View Component
+const InstallerDayView = ({ jobs, currentDate, setCurrentDate, installers, selectedBranch, onJobClick, onScheduleSlot }) => {
+  const isToday = (date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  // Get jobs for a specific day and installer
+  const getJobsForDayAndInstaller = (date, installerId) => {
+    return jobs.filter(job => {
+      if (!job.scheduled_date) return false;
+      const jobDate = new Date(job.scheduled_date);
+      const isOnDate = jobDate.getDate() === date.getDate() &&
+                      jobDate.getMonth() === date.getMonth() &&
+                      jobDate.getFullYear() === date.getFullYear();
+      const isBranch = selectedBranch === 'all' || job.branch === selectedBranch;
+      const isAssigned = job.assigned_installers?.includes(installerId);
+
+      return isOnDate && isBranch && isAssigned;
+    });
+  };
+
+  // Get installer color from ID hash
+  const getInstallerColor = (installerId) => {
+    const colors = ['bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-cyan-500', 'bg-indigo-500', 'bg-rose-500', 'bg-amber-500', 'bg-lime-500'];
+    const hash = installerId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  // Parse time from ISO string
+  const getTimeFromDate = (isoString) => {
+    const d = new Date(isoString);
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  // Calculate pixel position based on time
+  const getTimePosition = (isoString) => {
+    const d = new Date(isoString);
+    const hours = d.getHours();
+    const minutes = d.getMinutes();
+    return (hours - 7) * 60 + minutes;
+  };
+
+  // Calculate duration in minutes
+  const getDuration = (job) => {
+    if (!job.scheduled_time_end) return 120; // default 2h
+    const start = new Date(job.scheduled_date);
+    const end = new Date(job.scheduled_time_end);
+    return (end.getTime() - start.getTime()) / (1000 * 60);
+  };
+
+  // Check for conflicts
+  const hasConflict = (installerId, job) => {
+    const jobStart = new Date(job.scheduled_date).getTime();
+    const jobEnd = job.scheduled_time_end
+      ? new Date(job.scheduled_time_end).getTime()
+      : jobStart + 2 * 60 * 60 * 1000;
+
+    return getJobsForDayAndInstaller(currentDate, installerId).some(j => {
+      if (j.id === job.id) return false;
+      const otherStart = new Date(j.scheduled_date).getTime();
+      const otherEnd = j.scheduled_time_end
+        ? new Date(j.scheduled_time_end).getTime()
+        : otherStart + 2 * 60 * 60 * 1000;
+
+      return !(jobEnd <= otherStart || jobStart >= otherEnd);
+    });
+  };
+
+  return (
+    <Card className="bg-card border-white/5">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentDate(new Date(currentDate.getTime() - 24 * 60 * 60 * 1000))}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-white font-medium min-w-[150px] text-center">
+              {currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'short' })}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setCurrentDate(new Date(currentDate.getTime() + 24 * 60 * 60 * 1000))}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentDate(new Date())}
+              className="border-white/20 text-white hover:bg-white/5 ml-2"
+            >
+              Hoje
+            </Button>
+          </div>
+          {isToday(currentDate) && (
+            <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded">
+              Hoje
+            </span>
+          )}
+        </div>
+      </CardHeader>
+
+      <CardContent className="p-4 overflow-x-auto">
+        <div className="min-w-full">
+          {/* Installers Header */}
+          <div className="grid gap-1 mb-4" style={{ gridTemplateColumns: '70px repeat(auto-fit, minmax(150px, 1fr))' }}>
+            <div className="text-xs font-medium text-muted-foreground"></div>
+            {installers.map((installer) => (
+              <div
+                key={installer.id}
+                className="text-center p-3 rounded-lg border border-white/10 bg-white/5"
+              >
+                <div className={`w-8 h-8 rounded-full mx-auto mb-1 ${getInstallerColor(installer.id)} flex items-center justify-center text-white text-xs font-bold`}>
+                  {installer.full_name?.[0]}
+                </div>
+                <div className="text-xs font-medium text-white truncate">
+                  {installer.full_name}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Time Grid */}
+          <div className="grid gap-1 relative" style={{ gridTemplateColumns: '70px repeat(auto-fit, minmax(150px, 1fr))' }}>
+            {/* Time labels */}
+            <div className="space-y-0">
+              {Array.from({ length: 14 }).map((_, idx) => (
+                <div key={idx} className="h-[60px] text-xs text-muted-foreground text-center pr-1 font-medium flex items-center justify-end">
+                  {String(7 + idx).padStart(2, '0')}:00
+                </div>
+              ))}
+            </div>
+
+            {/* Installer columns */}
+            {installers.map((installer) => (
+              <div
+                key={installer.id}
+                className="border-l border-white/10 relative bg-white/[0.02]"
+                style={{ minHeight: '840px' }}
+              >
+                {/* Hour rows for background */}
+                {Array.from({ length: 14 }).map((_, hourIdx) => (
+                  <div
+                    key={hourIdx}
+                    className="h-[60px] border-b border-white/5 hover:bg-primary/5 transition-colors cursor-pointer"
+                    onClick={() => {
+                      onScheduleSlot(currentDate, `${String(7 + hourIdx).padStart(2, '0')}:00`, installer.id);
+                    }}
+                  />
+                ))}
+
+                {/* Job cards */}
+                {getJobsForDayAndInstaller(currentDate, installer.id).map((job) => {
+                  const topPosition = getTimePosition(job.scheduled_date);
+                  const duration = getDuration(job);
+                  const conflict = hasConflict(installer.id, job);
+
+                  return (
+                    <div
+                      key={job.id}
+                      className={`
+                        absolute left-1 right-1 rounded-lg p-1 text-xs cursor-pointer
+                        transition-all hover:z-10 hover:shadow-lg hover:scale-105
+                        ${getInstallerColor(installer.id)} bg-opacity-80 text-white
+                        ${conflict ? 'ring-2 ring-red-500' : 'border border-white/20'}
+                      `}
+                      style={{
+                        top: `${topPosition}px`,
+                        height: `${Math.max(duration, 40)}px`,
+                        overflow: 'hidden'
+                      }}
+                      onClick={() => onJobClick(job)}
+                      title={`${job.title} - ${getTimeFromDate(job.scheduled_date)}${conflict ? ' (Conflito!)' : ''}`}
+                    >
+                      <div className="font-bold truncate">
+                        #{job.holdprint_data?.code || job.id?.slice(0, 4)}
+                      </div>
+                      <div className="truncate text-[10px] opacity-90">
+                        {job.client_name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

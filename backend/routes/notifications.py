@@ -8,6 +8,7 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import logging
 import json
+import uuid
 
 from db_supabase import db
 from security import get_current_user, require_role
@@ -88,6 +89,8 @@ async def send_push_notification(user_id: str, title: str, body: str, url: str =
 @router.get("/notifications/vapid-public-key")
 async def get_vapid_public_key():
     """Get VAPID public key for push subscription."""
+    if not VAPID_PUBLIC_KEY:
+        raise HTTPException(status_code=503, detail="Notificações push não configuradas no servidor")
     return {"publicKey": VAPID_PUBLIC_KEY}
 
 
@@ -98,21 +101,24 @@ async def subscribe_to_notifications(
 ):
     """Subscribe user to push notifications."""
     try:
-        # Store subscription in database
-        db.push_subscriptions.update_one(
-            {"user_id": current_user.id},
-            {
-                "$set": {
-                    "user_id": current_user.id,
-                    "endpoint": subscription.endpoint,
-                    "keys": subscription.keys,
-                    "subscribed_at": datetime.now(timezone.utc).isoformat(),
-                    "is_active": True
-                }
-            },
-            upsert=True
-        )
-        logger.info(f"Push subscription saved for user {current_user.id}")
+        user_id = str(current_user.id)
+        sub_data = {
+            "user_id": user_id,
+            "endpoint": subscription.endpoint,
+            "keys": subscription.keys,
+            "subscribed_at": datetime.now(timezone.utc).isoformat(),
+            "is_active": True,
+        }
+        existing = db.push_subscriptions.find_one({"user_id": user_id})
+        if existing:
+            db.push_subscriptions.update_one(
+                {"user_id": user_id},
+                {"$set": sub_data},
+            )
+        else:
+            sub_data["id"] = str(uuid.uuid4())
+            db.push_subscriptions.insert_one(sub_data)
+        logger.info(f"Push subscription saved for user {user_id}")
         return {"message": "Notificações ativadas com sucesso!"}
     except Exception as e:
         logger.error(f"Error saving push subscription: {str(e)}")
@@ -123,7 +129,7 @@ async def subscribe_to_notifications(
 async def unsubscribe_from_notifications(current_user: User = Depends(get_current_user)):
     """Unsubscribe user from push notifications."""
     db.push_subscriptions.update_one(
-        {"user_id": current_user.id},
+        {"user_id": str(current_user.id)},
         {"$set": {"is_active": False}}
     )
     return {"message": "Notificações desativadas"}
@@ -133,7 +139,7 @@ async def unsubscribe_from_notifications(current_user: User = Depends(get_curren
 async def get_notification_status(current_user: User = Depends(get_current_user)):
     """Check if user is subscribed to notifications."""
     subscription = db.push_subscriptions.find_one(
-        {"user_id": current_user.id, "is_active": True},
+        {"user_id": str(current_user.id), "is_active": True},
         {"_id": 0}
     )
     return {"subscribed": subscription is not None}
