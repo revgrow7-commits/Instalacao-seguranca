@@ -47,6 +47,7 @@ class Job(BaseModel):
     branch: str
     assigned_installers: List[str] = []
     scheduled_date: Optional[datetime] = None
+    scheduled_time_end: Optional[datetime] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[str] = None
     items: List[dict] = []
@@ -69,6 +70,7 @@ class JobAssign(BaseModel):
 
 class JobSchedule(BaseModel):
     scheduled_date: datetime
+    scheduled_time_end: Optional[datetime] = None
     installer_ids: Optional[List[str]] = None
 
 
@@ -324,16 +326,26 @@ async def list_jobs(
     
     if current_user.role == UserRole.INSTALLER:
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
-        installer_ids = {current_user.id}
-        if installer:
-            installer_ids.add(installer['id'])
+        if not installer:
+            logger.warning(
+                "list_jobs: row em installers ausente para user_id=%s email=%s",
+                current_user.id, current_user.email,
+            )
+        ids = [current_user.id] + ([installer["id"]] if installer else [])
 
-        # Busca todos os jobs não-arquivados e filtra por instalador no Python
-        all_jobs = db.jobs.find(query, projection) or []
-        jobs = [
-            j for j in all_jobs
-            if installer_ids.intersection(j.get('assigned_installers') or [])
-        ]
+        from db_supabase import _deserialize
+        cols = [k for k in projection if k != "_id"]
+        builder = get_client().table("jobs").select(",".join(cols))
+
+        if not include_archived:
+            builder = builder.neq("archived", True)  # cobre NULL e false
+
+        # OR entre os ids do instalador (PostgREST cs. = array contains)
+        id_or = ",".join(f'assigned_installers.cs.["{i}"]' for i in ids)
+        builder = builder.or_(id_or)
+
+        result = builder.execute()
+        jobs = [_deserialize(d) for d in (result.data or [])]
     else:
         # Busca otimizada com projeção
         jobs = db.jobs.find(query, projection)
@@ -373,12 +385,19 @@ async def list_jobs(
 
 
 @router.get("/jobs/team-calendar")
-async def get_team_calendar_jobs(current_user: User = Depends(get_current_user)):
-    """Get all scheduled jobs for the team calendar view."""
-    jobs = db.jobs.find(
-        {"scheduled_date": {"$exists": True, "$ne": None}}, 
-        {"_id": 0}
-    )
+async def get_team_calendar_jobs(
+    mine: bool = Query(False, description="Retorna apenas jobs atribuídos ao instalador logado"),
+    current_user: User = Depends(get_current_user)
+):
+    """Get scheduled jobs for the team calendar view."""
+    query = {"scheduled_date": {"$exists": True, "$ne": None}}
+    if mine and current_user.role == UserRole.INSTALLER:
+        installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+        if installer:
+            query["assigned_installers"] = installer["id"]
+        else:
+            query["$or"] = [{"assigned_installers": current_user.id}, {"assigned_user_id": current_user.id}]
+    jobs = db.jobs.find(query, {"_id": 0})
     
     cleaned_jobs = []
     for job in jobs:
@@ -386,18 +405,24 @@ async def get_team_calendar_jobs(current_user: User = Depends(get_current_user))
             pass
         elif job.get('created_at'):
             job['created_at'] = job['created_at'].isoformat() if hasattr(job['created_at'], 'isoformat') else str(job['created_at'])
-        
+
         if isinstance(job.get('scheduled_date'), str):
             pass
         elif job.get('scheduled_date'):
             job['scheduled_date'] = job['scheduled_date'].isoformat() if hasattr(job['scheduled_date'], 'isoformat') else str(job['scheduled_date'])
-        
+
+        if isinstance(job.get('scheduled_time_end'), str):
+            pass
+        elif job.get('scheduled_time_end'):
+            job['scheduled_time_end'] = job['scheduled_time_end'].isoformat() if hasattr(job['scheduled_time_end'], 'isoformat') else str(job['scheduled_time_end'])
+
         clean_job = {
             "id": job.get("id"),
             "title": job.get("title"),
             "status": job.get("status"),
             "branch": job.get("branch"),
             "scheduled_date": job.get("scheduled_date"),
+            "scheduled_time_end": job.get("scheduled_time_end"),
             "created_at": job.get("created_at"),
             "assigned_installers": job.get("assigned_installers", []),
             "holdprint_data": job.get("holdprint_data", {}),
@@ -739,6 +764,8 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
     update_data = {"scheduled_date": schedule_data.scheduled_date.isoformat()}
+    if schedule_data.scheduled_time_end:
+        update_data["scheduled_time_end"] = schedule_data.scheduled_time_end.isoformat()
     if schedule_data.installer_ids:
         update_data["assigned_installers"] = schedule_data.installer_ids
         update_data["status"] = "agendado"
@@ -755,6 +782,14 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
         job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
     if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
         job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+
+    # Trigger async Google Calendar sync for assigned installers
+    try:
+        from routes.calendar import sync_job_to_installer_calendar
+        asyncio.create_task(sync_job_to_installer_calendar(job_id, current_user))
+    except Exception as e:
+        logger.warning(f"Failed to sync job {job_id} to installer calendars: {str(e)}")
+
     return Job(**job_doc)
 
 
@@ -978,6 +1013,7 @@ class ArchiveItemsRequest(BaseModel):
 async def batch_schedule_jobs(
     job_ids: List[str] = Body(..., embed=True),
     scheduled_date: Optional[str] = Body(None, embed=True),
+    scheduled_time_end: Optional[str] = Body(None, embed=True),
     assigned_installers: List[str] = Body(default=[], embed=True),
     current_user: User = Depends(get_current_user),
 ):
@@ -998,6 +1034,12 @@ async def batch_schedule_jobs(
     else:
         update_data["scheduled_date"] = None
 
+    if scheduled_time_end:
+        try:
+            update_data["scheduled_time_end"] = datetime.fromisoformat(scheduled_time_end.replace("Z", "+00:00")).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Hora de término inválida")
+
     if assigned_installers:
         update_data["assigned_installers"] = assigned_installers
 
@@ -1007,6 +1049,15 @@ async def batch_schedule_jobs(
     try:
         client = get_client()
         client.table("jobs").update(update_data).in_("id", job_ids).execute()
+
+        # Trigger async Google Calendar sync for each job
+        try:
+            from routes.calendar import sync_job_to_installer_calendar
+            for job_id in job_ids:
+                asyncio.create_task(sync_job_to_installer_calendar(job_id, current_user))
+        except Exception as e:
+            logger.warning(f"Failed to sync jobs to installer calendars: {str(e)}")
+
     except Exception as e:
         logger.error(f"batch_schedule_jobs error: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao agendar jobs: {str(e)}")

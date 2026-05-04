@@ -10,11 +10,11 @@ from pydantic import BaseModel
 import logging
 import requests
 
-from db_supabase import db
+from db_supabase import db, get_client
 from security import get_current_user
 from models.user import User
 from config import (
-    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, 
+    GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI, GOOGLE_CALENDAR_SCOPES,
     FRONTEND_URL
 )
@@ -217,8 +217,127 @@ async def google_auth_status(current_user: User = Depends(get_current_user)):
 async def google_disconnect(current_user: User = Depends(get_current_user)):
     """Disconnect Google Calendar from user account."""
     db.google_tokens.delete_one({"user_id": current_user.id})
-    
+
     return {"message": "Google Calendar desconectado com sucesso"}
+
+
+# ============ INSTALLER GOOGLE AUTH ROUTES ============
+
+@router.get("/calendar/installer/auth/google")
+async def installer_google_auth(current_user: User = Depends(get_current_user)):
+    """Initiates Google OAuth flow for installer calendar access."""
+    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google OAuth não configurado")
+
+    # Store user_id with installer prefix to associate tokens later
+    state = f"installer:{current_user.id}"
+
+    auth_url = (
+        f"https://accounts.google.com/o/oauth2/v2/auth?"
+        f"client_id={GOOGLE_CLIENT_ID}&"
+        f"redirect_uri={GOOGLE_REDIRECT_URI}&"
+        f"response_type=code&"
+        f"scope={'%20'.join(GOOGLE_CALENDAR_SCOPES)}&"
+        f"access_type=offline&"
+        f"prompt=consent&"
+        f"state={state}"
+    )
+
+    return {"authorization_url": auth_url}
+
+
+@router.get("/calendar/installer/auth/google/callback")
+async def installer_google_callback(code: str, state: str = None):
+    """Handles Google OAuth callback for installers."""
+    try:
+        # Parse state to get installer user_id
+        if not state or not state.startswith("installer:"):
+            return RedirectResponse(
+                url=f"{FRONTEND_URL}/installer/calendar?google_error=invalid_state"
+            )
+
+        user_id = state.replace("installer:", "")
+
+        # Exchange code for tokens
+        token_response = requests.post(
+            'https://oauth2.googleapis.com/token',
+            data={
+                'code': code,
+                'client_id': GOOGLE_CLIENT_ID,
+                'client_secret': GOOGLE_CLIENT_SECRET,
+                'redirect_uri': GOOGLE_REDIRECT_URI,
+                'grant_type': 'authorization_code'
+            }
+        )
+
+        if token_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Falha ao obter tokens do Google")
+
+        tokens = token_response.json()
+
+        # Get user email from Google
+        userinfo_response = requests.get(
+            'https://www.googleapis.com/oauth2/v2/userinfo',
+            headers={'Authorization': f'Bearer {tokens["access_token"]}'}
+        )
+
+        if userinfo_response.status_code != 200:
+            raise HTTPException(status_code=400, detail="Falha ao obter informações do usuário")
+
+        google_user = userinfo_response.json()
+        google_email = google_user.get('email')
+
+        # Store Google token in installers table
+        token_data = {
+            "access_token": tokens.get('access_token'),
+            "refresh_token": tokens.get('refresh_token'),
+            "expires_in": tokens.get('expires_in'),
+            "token_type": tokens.get('token_type'),
+            "scope": tokens.get('scope'),
+            "google_email": google_email,
+            "obtained_at": datetime.now(timezone.utc).isoformat()
+        }
+
+        client = get_client()
+        client.table("installers").update({
+            "google_token": token_data
+        }).eq("user_id", user_id).execute()
+
+        logger.info(f"Installer {user_id} connected Google Calendar with email {google_email}")
+
+        # Redirect back to installer calendar page with success
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/installer/calendar?google_connected=true"
+        )
+
+    except Exception as e:
+        logger.error(f"Installer Google callback error: {str(e)}")
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/installer/calendar?google_error=auth_failed"
+        )
+
+
+@router.get("/calendar/installer/status")
+async def installer_calendar_status(current_user: User = Depends(get_current_user)):
+    """Check if installer has connected Google Calendar."""
+    client = get_client()
+    result = client.table("installers").select("google_token").eq("user_id", current_user.id).execute()
+
+    has_google = False
+    google_email = None
+
+    if result.data and len(result.data) > 0:
+        installer = result.data[0]
+        google_token = installer.get('google_token')
+        if google_token and isinstance(google_token, dict):
+            if google_token.get('access_token'):
+                has_google = True
+                google_email = google_token.get('google_email')
+
+    return {
+        "connected": has_google,
+        "google_email": google_email
+    }
 
 
 # ============ CALENDAR EVENTS ROUTES ============
@@ -318,13 +437,199 @@ async def delete_google_calendar_event(
     google_creds = await get_google_credentials(current_user.id)
     if not google_creds:
         raise HTTPException(status_code=401, detail="Google Calendar não conectado")
-    
+
     try:
         service = build('calendar', 'v3', credentials=google_creds)
         service.events().delete(calendarId='primary', eventId=event_id).execute()
-        
+
         return {"message": "Evento removido do Google Calendar"}
-        
+
     except Exception as e:
         logger.error(f"Error deleting Google Calendar event: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao remover evento: {str(e)}")
+
+
+# ============ HELPER FUNCTIONS FOR INSTALLER CALENDAR SYNC ============
+
+async def get_installer_google_credentials(user_id: str):
+    """Get and refresh Google credentials for an installer."""
+    client = get_client()
+    result = client.table("installers").select("google_token").eq("user_id", user_id).execute()
+
+    if not result.data or len(result.data) == 0:
+        return None
+
+    installer = result.data[0]
+    tokens = installer.get('google_token')
+
+    if not tokens or not isinstance(tokens, dict):
+        return None
+
+    if not tokens.get('access_token'):
+        return None
+
+    creds = Credentials(
+        token=tokens.get('access_token'),
+        refresh_token=tokens.get('refresh_token'),
+        token_uri='https://oauth2.googleapis.com/token',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        scopes=GOOGLE_CALENDAR_SCOPES
+    )
+
+    # Refresh if expired
+    if creds.expired and creds.refresh_token:
+        try:
+            creds.refresh(GoogleRequest())
+            tokens['access_token'] = creds.token
+            tokens['obtained_at'] = datetime.now(timezone.utc).isoformat()
+            client.table("installers").update({
+                "google_token": tokens
+            }).eq("user_id", user_id).execute()
+        except Exception as e:
+            logger.error(f"Failed to refresh installer Google token for {user_id}: {str(e)}")
+            return None
+
+    return creds
+
+
+@router.post("/calendar/sync-installer/{job_id}")
+async def sync_job_to_installer_calendar(job_id: str, current_user: User = Depends(get_current_user)):
+    """Sync a job to assigned installers' Google Calendars."""
+    try:
+        client = get_client()
+
+        # Fetch job from Supabase
+        job_result = client.table("jobs").select("*").eq("id", job_id).execute()
+
+        if not job_result.data or len(job_result.data) == 0:
+            raise HTTPException(status_code=404, detail="Job não encontrado")
+
+        job = job_result.data[0]
+        assigned_installers = job.get("assigned_installers", [])
+
+        if not assigned_installers:
+            return {
+                "message": "Nenhum instalador atribuído para sincronizar",
+                "synced": 0
+            }
+
+        synced_count = 0
+        errors = []
+
+        # Get job details for calendar event
+        job_title = job.get("title", "Job")
+        job_code = job.get("holdprint_data", {}).get("code", job_id[:8])
+        client_name = job.get("client_name", "Cliente")
+        branch = job.get("branch", "")
+        scheduled_date = job.get("scheduled_date")
+        scheduled_time_end = job.get("scheduled_time_end")
+
+        if not scheduled_date:
+            return {
+                "message": "Job não possui data agendada para sincronizar",
+                "synced": 0
+            }
+
+        # Parse dates
+        try:
+            if isinstance(scheduled_date, str):
+                start_dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+            else:
+                start_dt = scheduled_date
+
+            if scheduled_time_end:
+                if isinstance(scheduled_time_end, str):
+                    end_dt = datetime.fromisoformat(scheduled_time_end.replace('Z', '+00:00'))
+                else:
+                    end_dt = scheduled_time_end
+            else:
+                # Default to 2 hours duration if not specified
+                end_dt = start_dt + timedelta(hours=2)
+        except (ValueError, TypeError) as e:
+            logger.error(f"Date parsing error: {str(e)}")
+            return {
+                "message": "Erro ao processar datas do job",
+                "synced": 0
+            }
+
+        # For each assigned installer, sync to their Google Calendar
+        for installer_id in assigned_installers:
+            try:
+                # Get installer details
+                installer_result = client.table("installers").select("user_id, full_name, google_token").eq("id", installer_id).execute()
+
+                if not installer_result.data:
+                    # Try by user_id
+                    installer_result = client.table("installers").select("user_id, full_name, google_token").eq("user_id", installer_id).execute()
+
+                if not installer_result.data:
+                    logger.warning(f"Installer {installer_id} not found")
+                    continue
+
+                installer = installer_result.data[0]
+                installer_user_id = installer.get("user_id")
+                installer_name = installer.get("full_name", "Instalador")
+                google_token = installer.get("google_token")
+
+                # Check if installer has Google Calendar connected
+                if not google_token or not isinstance(google_token, dict) or not google_token.get("access_token"):
+                    logger.info(f"Installer {installer_id} does not have Google Calendar connected")
+                    continue
+
+                # Get credentials for this installer
+                installer_creds = await get_installer_google_credentials(installer_user_id)
+
+                if not installer_creds:
+                    logger.warning(f"Could not get credentials for installer {installer_user_id}")
+                    continue
+
+                # Create calendar event
+                try:
+                    service = build('calendar', 'v3', credentials=installer_creds)
+
+                    event_body = {
+                        'summary': f'Job #{job_code} - {client_name}',
+                        'description': f'Filial: {branch}\nCliente: {client_name}\nTítulo: {job_title}',
+                        'start': {
+                            'dateTime': start_dt.isoformat(),
+                            'timeZone': 'America/Sao_Paulo'
+                        },
+                        'end': {
+                            'dateTime': end_dt.isoformat(),
+                            'timeZone': 'America/Sao_Paulo'
+                        }
+                    }
+
+                    event = service.events().insert(
+                        calendarId='primary',
+                        body=event_body,
+                        sendUpdates='none'
+                    ).execute()
+
+                    google_event_id = event.get('id')
+                    logger.info(f"Created calendar event {google_event_id} for installer {installer_user_id}")
+                    synced_count += 1
+
+                except Exception as e:
+                    error_msg = f"Failed to create calendar event for installer {installer_id}: {str(e)}"
+                    logger.error(error_msg)
+                    errors.append(error_msg)
+
+            except Exception as e:
+                error_msg = f"Error processing installer {installer_id}: {str(e)}"
+                logger.error(error_msg)
+                errors.append(error_msg)
+
+        return {
+            "message": f"Sincronização concluída",
+            "synced": synced_count,
+            "total_assigned": len(assigned_installers),
+            "errors": errors if errors else None
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"sync_job_to_installer_calendar error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao sincronizar com Google Calendar: {str(e)}")

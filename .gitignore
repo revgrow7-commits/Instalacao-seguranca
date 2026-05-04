@@ -90,3 +90,5 @@ credentials.json
 HOLDPRINT_API_INFO.md
 VERCEL_ENV_BACKEND.txt
 VERCEL_ENV_*.txt
+
+.vercel

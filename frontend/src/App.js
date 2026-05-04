@@ -58,8 +58,52 @@ import UpdateNotification from './components/UpdateNotification';
 
 // Loading spinner component
 const PageLoader = () => (
-  <div className="flex items-center justify-center h-[50vh]">
+  <div className="flex items-center justify-center h-[40vh]">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
+
+// App-shell skeleton: renderiza estrutura (sidebar + conteúdo) antes do auth resolver
+const AppShellSkeleton = () => (
+  <div className="min-h-screen bg-background">
+    {/* Sidebar placeholder (desktop) */}
+    <div className="hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col bg-card border-r border-white/5" />
+    <div className="md:pl-64 flex flex-col flex-1">
+      <main className="flex-1 pb-20 md:pb-0">
+        <div className="p-4 md:p-8 space-y-6 animate-pulse">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-2">
+              <div className="h-7 w-40 rounded bg-white/10" />
+              <div className="h-3 w-24 rounded bg-white/7" />
+            </div>
+            <div className="h-10 w-36 rounded-lg bg-white/10" />
+          </div>
+          {/* Stats skeleton */}
+          <div className="grid grid-cols-3 gap-3 md:gap-6">
+            {[0,1,2].map(i => (
+              <div key={i} className="rounded-xl bg-card border border-white/5 p-4 space-y-2">
+                <div className="h-3 w-16 rounded bg-white/10" />
+                <div className="h-7 w-8 rounded bg-white/15" />
+              </div>
+            ))}
+          </div>
+          {/* Card skeletons */}
+          <div className="space-y-3">
+            <div className="h-5 w-36 rounded bg-white/10" />
+            {[0,1].map(i => (
+              <div key={i} className="rounded-xl bg-card border border-white/5 p-4 space-y-3">
+                <div className="h-4 w-3/4 rounded bg-white/10" />
+                <div className="h-3 w-1/2 rounded bg-white/7" />
+                <div className="h-11 w-full rounded-lg bg-primary/20" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+      {/* Bottom nav placeholder (mobile) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-card border-t border-white/5" />
+    </div>
   </div>
 );
 
@@ -67,11 +111,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-background">
-        <div className="loading-pulse text-primary text-2xl font-heading">Carregando...</div>
-      </div>
-    );
+    return <AppShellSkeleton />;
   }
 
   if (!user) {

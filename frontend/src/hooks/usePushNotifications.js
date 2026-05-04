@@ -85,11 +85,17 @@ const usePushNotifications = () => {
       const registration = await registerServiceWorker();
 
       // Get VAPID public key from server
-      const vapidResponse = await api.getVapidPublicKey();
-      const vapidPublicKey = vapidResponse.data.publicKey;
+      let vapidPublicKey;
+      try {
+        const vapidResponse = await api.getVapidPublicKey();
+        vapidPublicKey = vapidResponse.data.publicKey;
+      } catch (vapidErr) {
+        const detail = vapidErr.response?.data?.detail;
+        throw new Error(detail || 'Servidor não configurado para notificações push');
+      }
 
       if (!vapidPublicKey) {
-        throw new Error('VAPID public key not configured');
+        throw new Error('Chave VAPID não configurada no servidor');
       }
 
       // Subscribe to push notifications

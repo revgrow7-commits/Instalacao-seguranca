@@ -7,9 +7,32 @@ const AuthContext = createContext();
 
 const API_URL = (process.env.REACT_APP_BACKEND_URL?.trim() || window.location.origin) + '/api';
 
+const SESSION_KEY = 'auth_user_snapshot';
+const SESSION_TTL = 5 * 60 * 1000; // 5 min
+
+const readSessionSnapshot = () => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const { user, ts } = JSON.parse(raw);
+    if (Date.now() - ts > SESSION_TTL) return null;
+    return user;
+  } catch {
+    return null;
+  }
+};
+
+const writeSessionSnapshot = (user) => {
+  try {
+    if (user) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user, ts: Date.now() }));
+    else sessionStorage.removeItem(SESSION_KEY);
+  } catch {}
+};
+
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const snapshot = readSessionSnapshot();
+  const [user, setUser] = useState(snapshot);
+  const [loading, setLoading] = useState(!snapshot); // se já temos snapshot, não bloqueia
   const [tokenVersion, setTokenVersion] = useState(0); // Force re-render when token changes
 
   // Migrate from localStorage on first load (one-time)
@@ -26,11 +49,15 @@ export const AuthProvider = ({ children }) => {
           headers: tokenManager.getAuthHeader()
         });
         setUser(response.data);
+        writeSessionSnapshot(response.data);
       } catch (error) {
         // Token invalid, logout
         tokenManager.clearToken();
         setUser(null);
+        writeSessionSnapshot(null);
       }
+    } else {
+      writeSessionSnapshot(null);
     }
     setLoading(false);
   }, []);
@@ -49,6 +76,7 @@ export const AuthProvider = ({ children }) => {
       const { access_token, user: userData } = response.data;
       tokenManager.setToken(access_token);
       setUser(userData);
+      writeSessionSnapshot(userData);
       setTokenVersion(v => v + 1); // Trigger re-render
       return { success: true };
     } catch (error) {
@@ -63,6 +91,7 @@ export const AuthProvider = ({ children }) => {
     tokenManager.clearToken();
     api.clearCache();
     setUser(null);
+    writeSessionSnapshot(null);
     setTokenVersion(v => v + 1); // Trigger re-render
   };
 
