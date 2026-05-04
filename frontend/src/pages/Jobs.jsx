@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar as CalendarComponent } from '../components/ui/calendar';
-import { 
-  Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users, 
+import {
+  Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users,
   Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
-  Clock, CheckCircle, MessageSquareWarning, AlertTriangle, ChevronRight, Archive, ArchiveRestore
+  Clock, CheckCircle, MessageSquareWarning, AlertTriangle, ChevronRight,
+  Archive, ArchiveRestore, CheckSquare, Square, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '../components/ui/label';
@@ -41,7 +42,7 @@ const JobCardSkeleton = () => (
 );
 
 // Mini Job Card Component for better performance
-const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, isAdmin, isManager, isLoading }) => {
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, isAdmin, isManager, isLoading, selectionMode, isSelected, onToggleSelect }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
   const isScheduled = !!job.scheduled_date;
   const isArchived = job.archived || job.status === 'arquivado';
@@ -151,11 +152,28 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
   };
 
   return (
-    <Card className={`bg-card border-white/5 hover:border-primary/30 transition-all duration-200 group ${isLate ? 'border-l-4 border-l-red-500' : ''} ${jobIsStalled ? 'border-l-4 border-l-orange-500' : ''}`}>
+    <Card
+      className={`bg-card border-white/5 hover:border-primary/30 transition-all duration-200 group
+        ${isLate ? 'border-l-4 border-l-red-500' : ''}
+        ${jobIsStalled ? 'border-l-4 border-l-orange-500' : ''}
+        ${selectionMode ? 'cursor-pointer' : ''}
+        ${isSelected ? 'ring-2 ring-primary border-primary/50 bg-primary/5' : ''}
+      `}
+      onClick={selectionMode ? () => onToggleSelect(job.id) : undefined}
+    >
       <CardContent className="p-4">
         {/* Header Row */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
+            {/* Checkbox in selection mode */}
+            {selectionMode && (
+              <span className="flex-shrink-0 text-primary">
+                {isSelected
+                  ? <CheckSquare className="h-4 w-4" />
+                  : <Square className="h-4 w-4 text-muted-foreground" />
+                }
+              </span>
+            )}
             <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded flex items-center gap-1">
               <Hash className="h-3 w-3" />
               {jobNumber}
@@ -163,7 +181,6 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
             <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">
               {job.branch || 'N/A'}
             </span>
-            {/* Late indicator icon */}
             {isLate && (
               <span className="flex items-center text-red-400" title="Job atrasado">
                 <AlertTriangle className="h-4 w-4" />
@@ -175,10 +192,11 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
           </span>
         </div>
 
-        {/* Title - Clickable */}
-        <h3 
-          onClick={() => onNavigate(job.id)}
-          className="text-sm font-medium text-white line-clamp-2 mb-2 cursor-pointer hover:text-primary transition-colors"
+        {/* Title - Clickable only when NOT in selection mode */}
+        <h3
+          onClick={selectionMode ? undefined : () => onNavigate(job.id)}
+          className={`text-sm font-medium text-white line-clamp-2 mb-2 transition-colors
+            ${selectionMode ? '' : 'cursor-pointer hover:text-primary'}`}
         >
           {job.title}
         </h3>
@@ -346,6 +364,15 @@ const Jobs = () => {
   const [importMonth, setImportMonth] = useState('');
   const [processingJobId, setProcessingJobId] = useState(null);
   const [visibleCount, setVisibleCount] = useState(12);
+  const [bulkArchiving, setBulkArchiving] = useState(false);
+  const archivedLoadedRef = useRef(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedJobIds, setSelectedJobIds] = useState(new Set());
+  const [batchArchiving, setBatchArchiving] = useState(false);
+  const [showBatchScheduleDialog, setShowBatchScheduleDialog] = useState(false);
+  const [batchScheduleDate, setBatchScheduleDate] = useState('');
+  const [batchScheduleInstallerIds, setBatchScheduleInstallerIds] = useState(new Set());
+  const [batchScheduling, setBatchScheduling] = useState(false);
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
@@ -370,10 +397,7 @@ const Jobs = () => {
     return options;
   }, []);
 
-  useEffect(() => {
-    loadJobs();
-    loadInstallers();
-  }, []);
+  // ── Callbacks estáveis (deps vazias — declarados antes de qualquer useEffect) ──
 
   const loadInstallers = useCallback(async () => {
     try {
@@ -384,17 +408,37 @@ const Jobs = () => {
     }
   }, []);
 
-  const loadJobs = useCallback(async () => {
+  const loadJobs = useCallback(async (includeArchived = false) => {
     setLoading(true);
+    setVisibleCount(12);
     try {
-      const response = await api.getJobs();
+      const response = await api.getJobs(includeArchived);
       setJobs(response.data);
+      archivedLoadedRef.current = includeArchived;
     } catch (error) {
       toast.error('Erro ao carregar jobs');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const toggleJobSelection = useCallback((jobId) => {
+    setSelectedJobIds(prev => {
+      const next = new Set(prev);
+      if (next.has(jobId)) next.delete(jobId);
+      else next.add(jobId);
+      return next;
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedJobIds(new Set()), []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedJobIds(new Set());
+  }, []);
+
+  // ── Handlers regulares (funções normais, sem arrays de deps) ──
 
   const loadHoldprintJobs = async () => {
     setLoadingHoldprint(true);
@@ -437,41 +481,33 @@ const Jobs = () => {
     setLoadingCurrentMonth(true);
     try {
       const response = await api.importCurrentMonthJobs();
-      const { total_imported, total_skipped, branches, month, year, errors } = response.data;
-      
-      const monthNames = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
-                          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
-      
+      const { total_imported, total_skipped, period, branches, errors, partial } = response.data;
+
       if (total_imported > 0) {
-        toast.success(`${total_imported} job(s) importado(s) de ${monthNames[month]}/${year}!`);
+        toast.success(`${total_imported} job(s) importado(s) das últimas 2 semanas!`);
         loadJobs();
       }
-      
+
       if (total_skipped > 0 && total_imported === 0) {
-        toast.info(`Todos os ${total_skipped} jobs de ${monthNames[month]} já estavam importados`);
+        toast.info(`Todos os ${total_skipped} jobs das últimas 2 semanas já estavam importados`);
       }
-      
+
       if (total_imported === 0 && total_skipped === 0 && (!errors || errors.length === 0)) {
-        toast.info(`Nenhum job encontrado em ${monthNames[month]}/${year}`);
+        toast.info(`Nenhum job encontrado nas últimas 2 semanas`);
       }
-      
+
+      if (partial) {
+        toast.warning('Importação parcial: limite de tempo atingido. Rode novamente para importar o restante.');
+      }
+
       if (errors && errors.length > 0) {
         errors.forEach(err => toast.error(err));
       }
-      
-      // Mostrar detalhes por filial
-      if (branches) {
-        branches.forEach(b => {
-          if (b.error) {
-            toast.error(`${b.branch}: ${b.error}`);
-          }
-        });
-      }
-      
+
       setShowImportDialog(false);
     } catch (error) {
-      console.error('Error importing current month jobs:', error);
-      const errorMsg = error.response?.data?.detail || 'Erro ao importar jobs do mês atual';
+      console.error('Error importing last 2 weeks jobs:', error);
+      const errorMsg = error.response?.data?.detail || 'Erro ao importar jobs das últimas 2 semanas';
       toast.error(errorMsg);
     } finally {
       setLoadingCurrentMonth(false);
@@ -615,6 +651,100 @@ const Jobs = () => {
     }
   };
 
+  const toggleBatchInstaller = (id) => {
+    setBatchScheduleInstallerIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const handleBatchSchedule = async () => {
+    if (selectedJobIds.size === 0 || !batchScheduleDate) return;
+    setBatchScheduling(true);
+    try {
+      const ids = [...selectedJobIds];
+      const installerIds = [...batchScheduleInstallerIds];
+      await api.batchScheduleJobs(ids, new Date(batchScheduleDate).toISOString(), installerIds);
+      toast.success(`${ids.length} job(s) agendados com sucesso!`);
+      setJobs(prev => prev.map(j =>
+        selectedJobIds.has(j.id)
+          ? { ...j, scheduled_date: new Date(batchScheduleDate).toISOString(), assigned_installers: installerIds }
+          : j
+      ));
+      setShowBatchScheduleDialog(false);
+      setBatchScheduleDate('');
+      setBatchScheduleInstallerIds(new Set());
+      exitSelectionMode();
+    } catch (error) {
+      const msg = error.response?.data?.detail || 'Erro ao agendar jobs';
+      toast.error(msg);
+    } finally {
+      setBatchScheduling(false);
+    }
+  };
+
+  const selectAllVisible = () => {
+    setSelectedJobIds(new Set(filteredJobs.slice(0, visibleCount).map(j => j.id)));
+  };
+
+  const handleBatchArchive = async () => {
+    if (selectedJobIds.size === 0) return;
+    if (!window.confirm(
+      `Arquivar ${selectedJobIds.size} job(s) selecionado(s)?\n\n` +
+      `Os jobs arquivados serão removidos da lista principal e das métricas.\n\n` +
+      `Confirmar?`
+    )) return;
+
+    const ids = [...selectedJobIds];
+    setBatchArchiving(true);
+    try {
+      await api.batchArchiveJobs(ids);
+      toast.success(`${ids.length} job(s) arquivados com sucesso!`);
+      setJobs(prev => prev.map(j =>
+        selectedJobIds.has(j.id)
+          ? { ...j, archived: true, status: 'arquivado' }
+          : j
+      ));
+      exitSelectionMode();
+    } catch (error) {
+      console.error('Error batch archiving jobs:', error);
+      const msg = error.response?.data?.detail || 'Erro ao arquivar jobs selecionados';
+      toast.error(msg);
+    } finally {
+      setBatchArchiving(false);
+    }
+  };
+
+  const handleBulkArchivePre2026 = async () => {
+    if (!window.confirm(
+      'Arquivar TODOS os jobs anteriores a 2026?\n\n' +
+      '⚠️ Esta ação irá:\n' +
+      '• Arquivar todos os jobs criados antes de 01/01/2026\n' +
+      '• Excluí-los das métricas\n' +
+      '• Tornar a página muito mais rápida\n\n' +
+      'Os jobs arquivados ainda podem ser visualizados pelo filtro "Arquivado".\n\n' +
+      'Confirmar?'
+    )) return;
+
+    setBulkArchiving(true);
+    try {
+      const response = await api.bulkArchivePre2026();
+      const { archived_count, message } = response.data;
+      toast.success(message);
+      if (archived_count > 0) {
+        loadJobs(false);
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail || 'Erro ao arquivar jobs';
+      toast.error(errorMsg);
+    } finally {
+      setBulkArchiving(false);
+    }
+  };
+
+  // ── useMemo — declarado após todos os handlers ──
+
   // Memoized filtered jobs - sorted by most recent
   const filteredJobs = useMemo(() => {
     const filtered = jobs.filter(job => {
@@ -739,6 +869,24 @@ const Jobs = () => {
 
   const loadMore = () => setVisibleCount(prev => prev + 12);
 
+  // ── useEffect — sempre declarados POR ÚLTIMO, após todos os hooks e funções ──
+  // Regra: arrays de dependência só referenciam variáveis declaradas acima.
+
+  useEffect(() => {
+    loadJobs(false);
+    loadInstallers();
+  }, []);
+
+  // Quando o filtro muda para "arquivado", recarrega incluindo arquivados.
+  // Quando sai de "arquivado", recarrega só os ativos (mais rápido).
+  useEffect(() => {
+    if (statusFilter === 'arquivado' && !archivedLoadedRef.current) {
+      loadJobs(true);
+    } else if (statusFilter !== 'arquivado' && archivedLoadedRef.current) {
+      loadJobs(false);
+    }
+  }, [statusFilter, loadJobs]);
+
   if (loading) {
     return (
       <div className="p-4 md:p-8 space-y-6">
@@ -751,7 +899,7 @@ const Jobs = () => {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
+    <div className={`p-4 md:p-8 space-y-6 ${selectionMode ? 'pb-24' : ''}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -764,9 +912,9 @@ const Jobs = () => {
         </div>
 
         {(isAdmin || isManager) && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
-              onClick={loadJobs}
+              onClick={() => loadJobs(archivedLoadedRef.current)}
               variant="outline"
               size="sm"
               className="border-white/20 text-white hover:bg-white/5"
@@ -774,6 +922,32 @@ const Jobs = () => {
               <RefreshCw className="h-4 w-4 mr-2" />
               Atualizar
             </Button>
+            <Button
+              onClick={() => { setSelectionMode(v => !v); setSelectedJobIds(new Set()); }}
+              variant={selectionMode ? 'default' : 'outline'}
+              size="sm"
+              className={selectionMode ? 'bg-primary hover:bg-primary/90' : 'border-white/20 text-white hover:bg-white/5'}
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              {selectionMode ? 'Cancelar seleção' : 'Selecionar'}
+            </Button>
+            {isAdmin && (
+              <Button
+                onClick={handleBulkArchivePre2026}
+                variant="outline"
+                size="sm"
+                disabled={bulkArchiving}
+                className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                title="Arquivar todos os jobs anteriores a 2026"
+              >
+                {bulkArchiving ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-orange-400 border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <Archive className="h-4 w-4 mr-2" />
+                )}
+                Arquivar Pré-2026
+              </Button>
+            )}
             <Button
               onClick={() => setShowImportDialog(true)}
               className="bg-primary hover:bg-primary/90"
@@ -1134,6 +1308,9 @@ const Jobs = () => {
                 isAdmin={isAdmin}
                 isManager={isManager}
                 isLoading={processingJobId}
+                selectionMode={selectionMode}
+                isSelected={selectedJobIds.has(job.id)}
+                onToggleSelect={toggleJobSelection}
               />
             ))}
           </div>
@@ -1154,24 +1331,159 @@ const Jobs = () => {
         </>
       )}
 
+      {/* Batch Selection Action Bar */}
+      {selectionMode && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur border-t border-white/10 px-4 py-3">
+          <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-white font-medium text-sm">
+                {selectedJobIds.size > 0
+                  ? `${selectedJobIds.size} job(s) selecionado(s)`
+                  : 'Clique nos cards para selecionar'}
+              </span>
+              <button
+                onClick={selectAllVisible}
+                className="text-xs text-primary hover:underline"
+              >
+                Selecionar todos visíveis ({Math.min(visibleCount, filteredJobs.length)})
+              </button>
+              {selectedJobIds.size > 0 && (
+                <button
+                  onClick={clearSelection}
+                  className="text-xs text-muted-foreground hover:text-white"
+                >
+                  Limpar seleção
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exitSelectionMode}
+                className="border-white/20 text-white hover:bg-white/5"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => { setBatchScheduleDate(''); setBatchScheduleInstallerIds(new Set()); setShowBatchScheduleDialog(true); }}
+                disabled={selectedJobIds.size === 0}
+                className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Agendar {selectedJobIds.size > 0 ? `${selectedJobIds.size}` : ''}
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleBatchArchive}
+                disabled={selectedJobIds.size === 0 || batchArchiving}
+                className="bg-orange-500 hover:bg-orange-600 text-white disabled:opacity-50"
+              >
+                {batchArchiving ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <Archive className="h-4 w-4 mr-2" />
+                )}
+                Arquivar {selectedJobIds.size > 0 ? `${selectedJobIds.size}` : ''}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch Schedule Dialog */}
+      <Dialog open={showBatchScheduleDialog} onOpenChange={setShowBatchScheduleDialog}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-blue-400" />
+              Agendar {selectedJobIds.size} job(s)
+            </DialogTitle>
+            <DialogDescription>
+              Data e instaladores serão aplicados a todos os jobs selecionados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">Data de Agendamento *</label>
+              <Input
+                type="date"
+                value={batchScheduleDate}
+                onChange={(e) => setBatchScheduleDate(e.target.value)}
+                className="bg-white/5 border-white/10 text-white"
+              />
+            </div>
+            <div>
+              <label className="text-sm text-muted-foreground mb-2 block">
+                Instaladores ({batchScheduleInstallerIds.size} selecionado(s))
+              </label>
+              <div className="max-h-48 overflow-y-auto space-y-1 rounded border border-white/10 p-2">
+                {installers.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">Nenhum instalador cadastrado</p>
+                )}
+                {installers.map(inst => (
+                  <label
+                    key={inst.id}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors
+                      ${batchScheduleInstallerIds.has(inst.id) ? 'bg-blue-600/20 text-blue-300' : 'hover:bg-white/5 text-white'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={batchScheduleInstallerIds.has(inst.id)}
+                      onChange={() => toggleBatchInstaller(inst.id)}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-sm">{inst.full_name || inst.name}</span>
+                    {inst.branch && <span className="text-xs text-muted-foreground ml-auto">{inst.branch}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="outline"
+                onClick={() => setShowBatchScheduleDialog(false)}
+                className="flex-1 border-white/20 text-white hover:bg-white/5"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBatchSchedule}
+                disabled={!batchScheduleDate || batchScheduling}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+              >
+                {batchScheduling ? (
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                ) : (
+                  <CalendarCheck className="h-4 w-4 mr-2" />
+                )}
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Import Dialog */}
       <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
         <DialogContent className="bg-card border-white/10">
           <DialogHeader>
             <DialogTitle className="text-white">Importar Jobs da Holdprint</DialogTitle>
             <DialogDescription>
-              Importe jobs do mês atual ou selecione uma filial específica
+              Importe jobs das últimas 2 semanas ou selecione uma filial específica
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-4">
-            {/* Importar Mês Atual - Opção Principal */}
+            {/* Importar Últimas 2 Semanas - Opção Principal */}
             <div className="p-4 bg-primary/10 border border-primary/30 rounded-lg">
               <h4 className="text-white font-medium mb-2 flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
                 Importação Rápida
               </h4>
               <p className="text-sm text-muted-foreground mb-3">
-                Importa automaticamente todos os jobs do mês atual de SP e POA
+                Importa automaticamente todos os jobs das últimas 2 semanas de SP e POA
               </p>
               <Button
                 onClick={loadCurrentMonthJobs}
@@ -1181,12 +1493,12 @@ const Jobs = () => {
                 {loadingCurrentMonth ? (
                   <>
                     <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                    Importando mês atual...
+                    Importando últimas 2 semanas...
                   </>
                 ) : (
                   <>
                     <Download className="h-4 w-4 mr-2" />
-                    Importar Mês Atual (SP + POA)
+                    Importar Últimas 2 Semanas (SP + POA)
                   </>
                 )}
               </Button>

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import tokenManager from './tokenManager';
 
-const API_URL = (process.env.REACT_APP_BACKEND_URL || window.location.origin) + '/api';
+const API_URL = (process.env.REACT_APP_BACKEND_URL?.trim() || window.location.origin) + '/api';
 
 // Simple in-memory cache
 const cache = new Map();
@@ -73,8 +73,8 @@ export const api = {
   },
 
   // Holdprint & Jobs
-  importAllJobs: (branch, month, year) => axios.post(`${API_URL}/jobs/import-all`, { branch, ...(month != null && year != null ? { month, year } : {}) }, { headers: getAuthHeader() }),
-  importCurrentMonthJobs: () => axios.post(`${API_URL}/jobs/import-current-month`, {}, { headers: getAuthHeader() }),
+  importAllJobs: (branch, month, year) => axios.post(`${API_URL}/jobs/import-all`, { branch, ...(month != null && year != null ? { month, year } : {}) }, { headers: getAuthHeader(), timeout: 90000 }),
+  importCurrentMonthJobs: () => axios.post(`${API_URL}/jobs/import-current-month`, {}, { headers: getAuthHeader(), timeout: 90000 }),
   getHoldprintJobs: (branch, month, year) => {
     let url = `${API_URL}/holdprint/jobs/${branch}`;
     const params = [];
@@ -86,7 +86,8 @@ export const api = {
   syncHoldprintJobs: (monthsBack = 2) => axios.post(`${API_URL}/jobs/sync-holdprint?months_back=${monthsBack}`, {}, { headers: getAuthHeader() }),
   getSyncStatus: () => axios.get(`${API_URL}/jobs/sync-status`, { headers: getAuthHeader() }),
   createJob: (data) => axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() }),
-  getJobs: () => axios.get(`${API_URL}/jobs`, { headers: getAuthHeader() }),
+  getJobs: (includeArchived = false) => axios.get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() }),
+  bulkArchivePre2026: () => axios.post(`${API_URL}/jobs/bulk-archive-pre-2026`, {}, { headers: getAuthHeader(), timeout: 120000 }),
   getJob: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
   updateJob: (jobId, data) => axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() }),
   assignJob: (jobId, installerIds) => axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() }),
@@ -104,7 +105,9 @@ export const api = {
   updateAssignmentStatus: (jobId, itemIndex, data) => axios.put(`${API_URL}/jobs/${jobId}/assignments/${itemIndex}/status`, data, { headers: getAuthHeader() }),
   getTeamCalendarJobs: () => axios.get(`${API_URL}/jobs/team-calendar`, { headers: getAuthHeader() }),
 
-  // Archive Jobs
+  // Batch Schedule / Archive
+  batchScheduleJobs: (jobIds, scheduledDate, assignedInstallers) => axios.post(`${API_URL}/jobs/batch-schedule`, { job_ids: jobIds, scheduled_date: scheduledDate, assigned_installers: assignedInstallers }, { headers: getAuthHeader(), timeout: 60000 }),
+  batchArchiveJobs: (jobIds) => axios.post(`${API_URL}/jobs/batch-archive`, { job_ids: jobIds }, { headers: getAuthHeader(), timeout: 60000 }),
   archiveJob: (jobId, excludeFromMetrics) => axios.post(`${API_URL}/jobs/${jobId}/archive`, { exclude_from_metrics: excludeFromMetrics }, { headers: getAuthHeader() }),
   unarchiveJob: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/unarchive`, {}, { headers: getAuthHeader() }),
   archiveJobItems: (jobId, itemIndices, excludeFromMetrics) => axios.post(`${API_URL}/jobs/${jobId}/archive-items`, { item_indices: itemIndices, exclude_from_metrics: excludeFromMetrics }, { headers: getAuthHeader() }),
