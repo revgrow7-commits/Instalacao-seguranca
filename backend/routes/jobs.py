@@ -1006,8 +1006,10 @@ async def batch_schedule_jobs(
         update_data["scheduled_date"] = None
 
     if assigned_installers:
-        import json as _json
-        update_data["assigned_installers"] = _json.dumps(assigned_installers)
+        update_data["assigned_installers"] = assigned_installers
+
+    if scheduled_date:
+        update_data["status"] = "agendado"
 
     try:
         client = get_client()
