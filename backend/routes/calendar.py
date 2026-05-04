@@ -15,8 +15,8 @@ from security import get_current_user
 from models.user import User
 from config import (
     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
-    GOOGLE_REDIRECT_URI, GOOGLE_CALENDAR_SCOPES,
-    FRONTEND_URL
+    GOOGLE_REDIRECT_URI, GOOGLE_INSTALLER_REDIRECT_URI,
+    GOOGLE_CALENDAR_SCOPES, FRONTEND_URL
 )
 
 # Google imports
@@ -235,7 +235,7 @@ async def installer_google_auth(current_user: User = Depends(get_current_user)):
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
         f"client_id={GOOGLE_CLIENT_ID}&"
-        f"redirect_uri={GOOGLE_REDIRECT_URI}&"
+        f"redirect_uri={GOOGLE_INSTALLER_REDIRECT_URI}&"
         f"response_type=code&"
         f"scope={'%20'.join(GOOGLE_CALENDAR_SCOPES)}&"
         f"access_type=offline&"
@@ -265,7 +265,7 @@ async def installer_google_callback(code: str, state: str = None):
                 'code': code,
                 'client_id': GOOGLE_CLIENT_ID,
                 'client_secret': GOOGLE_CLIENT_SECRET,
-                'redirect_uri': GOOGLE_REDIRECT_URI,
+                'redirect_uri': GOOGLE_INSTALLER_REDIRECT_URI,
                 'grant_type': 'authorization_code'
             }
         )

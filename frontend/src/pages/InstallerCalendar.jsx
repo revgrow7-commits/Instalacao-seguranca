@@ -18,8 +18,11 @@ export default function InstallerCalendar() {
   const [syncedJobs, setSyncedJobs] = useState(new Set());
 
   useEffect(() => {
-    if (searchParams.get('connected') === 'true') {
+    if (searchParams.get('google_connected') === 'true' || searchParams.get('connected') === 'true') {
       toast.success('Google Calendar conectado com sucesso!');
+    }
+    if (searchParams.get('google_error')) {
+      toast.error('Erro ao conectar Google Calendar. Tente novamente.');
     }
     loadData();
   }, []);
