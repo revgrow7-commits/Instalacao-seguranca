@@ -323,29 +323,17 @@ async def list_jobs(
     }
     
     if current_user.role == UserRole.INSTALLER:
-        # Usar cliente Supabase diretamente para garantir filtro JSONB correto
-        import json as _json
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
-        installer_ids = [current_user.id]
+        installer_ids = {current_user.id}
         if installer:
-            installer_ids.append(installer['id'])
+            installer_ids.add(installer['id'])
 
-        cols = [k for k, v in projection.items() if v and k != '_id']
-        columns = ','.join(cols) if cols else '*'
-
-        client = get_client()
-        builder = client.table("jobs").select(columns)
-        if not include_archived:
-            builder = builder.eq("archived", False)
-
-        # OR: assigned_installers contém user_id OU installer_id
-        or_clauses = ",".join(
-            f'assigned_installers.cs.{_json.dumps([id_])}' for id_ in installer_ids
-        )
-        builder = builder.or_(or_clauses)
-        result = builder.execute()
-        from db_supabase import _deserialize
-        jobs = [_deserialize(doc) for doc in (result.data or [])]
+        # Busca todos os jobs não-arquivados e filtra por instalador no Python
+        all_jobs = db.jobs.find(query, projection) or []
+        jobs = [
+            j for j in all_jobs
+            if installer_ids.intersection(j.get('assigned_installers') or [])
+        ]
     else:
         # Busca otimizada com projeção
         jobs = db.jobs.find(query, projection)
@@ -727,50 +715,47 @@ async def get_job(job_id: str, current_user: User = Depends(get_current_user)):
 async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = Depends(get_current_user)):
     """Assign installers to a job"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
-    result = db.jobs.find_one_and_update(
-        {"id": job_id},
-        {"$set": {"assigned_installers": assign_data.installer_ids}},
-        return_document=True,
-        projection={"_id": 0}
-    )
-    
-    if not result:
+
+    client = get_client()
+    result = client.table("jobs").update(
+        {"assigned_installers": assign_data.installer_ids}
+    ).eq("id", job_id).execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    if isinstance(result['created_at'], str):
-        result['created_at'] = datetime.fromisoformat(result['created_at'])
-    if result.get('scheduled_date') and isinstance(result['scheduled_date'], str):
-        result['scheduled_date'] = datetime.fromisoformat(result['scheduled_date'])
-    
-    return Job(**result)
+
+    from db_supabase import _deserialize
+    job_doc = _deserialize(result.data[0])
+    if isinstance(job_doc.get('created_at'), str):
+        job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
+    if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
+        job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+    return Job(**job_doc)
 
 
 @router.put("/jobs/{job_id}/schedule", response_model=Job)
 async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: User = Depends(get_current_user)):
     """Schedule a job"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     update_data = {"scheduled_date": schedule_data.scheduled_date.isoformat()}
     if schedule_data.installer_ids:
         update_data["assigned_installers"] = schedule_data.installer_ids
-    
-    result = db.jobs.find_one_and_update(
-        {"id": job_id},
-        {"$set": update_data},
-        return_document=True,
-        projection={"_id": 0}
-    )
-    
-    if not result:
+        update_data["status"] = "agendado"
+
+    client = get_client()
+    result = client.table("jobs").update(update_data).eq("id", job_id).execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    if isinstance(result['created_at'], str):
-        result['created_at'] = datetime.fromisoformat(result['created_at'])
-    if result.get('scheduled_date') and isinstance(result['scheduled_date'], str):
-        result['scheduled_date'] = datetime.fromisoformat(result['scheduled_date'])
-    
-    return Job(**result)
+
+    from db_supabase import _deserialize
+    job_doc = _deserialize(result.data[0])
+    if isinstance(job_doc.get('created_at'), str):
+        job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
+    if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
+        job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+    return Job(**job_doc)
 
 
 @router.put("/jobs/{job_id}", response_model=Job)
@@ -813,22 +798,19 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
                 detail="Não é possível definir status 'Instalando' sem instaladores atribuídos. Atribua pelo menos um instalador primeiro."
             )
     
-    result = db.jobs.find_one_and_update(
-        {"id": job_id},
-        {"$set": update_data},
-        return_document=True,
-        projection={"_id": 0}
-    )
-    
-    if not result:
+    client = get_client()
+    result = client.table("jobs").update(update_data).eq("id", job_id).execute()
+
+    if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    if isinstance(result['created_at'], str):
-        result['created_at'] = datetime.fromisoformat(result['created_at'])
-    if result.get('scheduled_date') and isinstance(result['scheduled_date'], str):
-        result['scheduled_date'] = datetime.fromisoformat(result['scheduled_date'])
-    
-    return Job(**result)
+
+    from db_supabase import _deserialize
+    job_doc = _deserialize(result.data[0])
+    if isinstance(job_doc.get('created_at'), str):
+        job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
+    if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
+        job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+    return Job(**job_doc)
 
 
 @router.post("/jobs/{job_id}/finalize")
