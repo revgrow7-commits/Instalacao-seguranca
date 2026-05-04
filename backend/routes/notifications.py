@@ -4,7 +4,7 @@ Handles push notifications, VAPID keys, and schedule conflict checks.
 """
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import logging
 import json
@@ -183,14 +183,15 @@ async def check_schedule_conflicts(
 ):
     """Check if installer has schedule conflicts on a specific date/time."""
     try:
-        # Parse date
+        # Parse date and compute UTC day boundaries for range filter
         target_date = datetime.fromisoformat(date.replace('Z', '+00:00'))
-        target_date_str = target_date.strftime('%Y-%m-%d')
-        
+        day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+
         # Find jobs assigned to this installer on the same date
         query = {
             "assigned_installers": installer_id,
-            "scheduled_date": {"$regex": f"^{target_date_str}"}
+            "scheduled_date": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
         }
         
         if exclude_job_id:
@@ -218,12 +219,13 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     now = datetime.now(timezone.utc)
-    today_str = now.strftime('%Y-%m-%d')
-    
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+
     # Find jobs scheduled for today that are past their scheduled time
     jobs = db.jobs.find({
         "status": "scheduled",
-        "scheduled_date": {"$regex": f"^{today_str}"}
+        "scheduled_date": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
     }, {"_id": 0})
     
     pending = []

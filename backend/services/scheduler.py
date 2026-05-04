@@ -23,117 +23,12 @@ def get_scheduler():
 
 
 async def sync_holdprint_job():
-    """Sync Holdprint data automatically"""
+    """Sync Holdprint data automatically (delegates to sync_holdprint_jobs_sync)."""
     from db_supabase import db
-    
+    from services.sync_holdprint import sync_holdprint_jobs_sync
     logger.info("🔄 Iniciando sincronização automática com Holdprint...")
-    
     try:
-        import os
-        import httpx
-        import uuid
-        from services.holdprint import extract_product_dimensions
-        
-        HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
-        HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
-        API_URL = "https://api.holdworks.ai/api-key/jobs/data"
-        
-        total_imported = 0
-        total_skipped = 0
-        total_errors = 0
-        
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            for branch in ["POA", "SP"]:
-                api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
-                
-                if not api_key:
-                    logger.warning(f"API key not configured for {branch}")
-                    continue
-                
-                headers = {"x-api-key": api_key, "Accept": "application/json"}
-                page = 1
-                
-                try:
-                    while True:
-                        response = await client.get(f"{API_URL}?page={page}", headers=headers)
-                        response.raise_for_status()
-                        data = response.json()
-                        
-                        jobs = data.get('data', []) if isinstance(data, dict) else data
-                        has_next = data.get('hasNextPage', False) if isinstance(data, dict) else False
-                        
-                        if not jobs:
-                            break
-                        
-                        for holdprint_job in jobs:
-                            holdprint_job_id = str(holdprint_job.get('id', ''))
-                            
-                            existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
-                            if existing:
-                                total_skipped += 1
-                                continue
-                            
-                            try:
-                                products = holdprint_job.get('production', {}).get('products', [])
-                                products_with_area = []
-                                total_area_m2 = 0.0
-                                
-                                for product in products:
-                                    product_info = extract_product_dimensions(product)
-                                    products_with_area.append(product_info)
-                                    total_area_m2 += product_info.get('total_area_m2', 0)
-                                
-                                job_doc = {
-                                    "id": str(uuid.uuid4()),
-                                    "holdprint_job_id": holdprint_job_id,
-                                    "title": holdprint_job.get('title', 'Sem título'),
-                                    "client_name": holdprint_job.get('customerName', 'Cliente não informado'),
-                                    "branch": branch,
-                                    "status": "aguardando",
-                                    "scheduled_date": None,
-                                    "assigned_installers": [],
-                                    "item_assignments": [],
-                                    "items": holdprint_job.get('production', {}).get('items', []),
-                                    "holdprint_data": holdprint_job,
-                                    "area_m2": total_area_m2,
-                                    "products_with_area": products_with_area,
-                                    "total_products": len(products),
-                                    "total_quantity": sum(p.get('quantity', 1) for p in products),
-                                    "created_at": datetime.now(timezone.utc).isoformat()
-                                }
-                                
-                                db.jobs.insert_one(job_doc)
-                                total_imported += 1
-                                
-                            except Exception as e:
-                                total_errors += 1
-                                logger.error(f"Error importing job {holdprint_job_id}: {e}")
-                        
-                        if not has_next:
-                            break
-                        page += 1
-                        if page > 50:
-                            break
-                    
-                    logger.info(f"Sync {branch}: {total_imported} imported")
-                    
-                except Exception as e:
-                    logger.error(f"Error syncing {branch}: {e}")
-        
-        db.system_config.update_one(
-            {"key": "last_holdprint_sync"},
-            {"$set": {
-                "key": "last_holdprint_sync",
-                "value": datetime.now(timezone.utc).isoformat(),
-                "total_imported": total_imported,
-                "total_skipped": total_skipped,
-                "total_errors": total_errors
-            }},
-            upsert=True
-        )
-        
-        logger.info(f"✅ Sync concluída: {total_imported} importados, {total_skipped} existentes")
-        
+        sync_holdprint_jobs_sync(db)
     except Exception as e:
         logger.error(f"❌ Erro na sincronização: {e}")
 

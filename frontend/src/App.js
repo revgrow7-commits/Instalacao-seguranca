@@ -1,4 +1,27 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense, lazy, Component } from 'react';
+
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('ErrorBoundary:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#fff' }}>
+          Erro no app, recarregue a página (Ctrl+Shift+R) para limpar cache.
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
@@ -327,7 +350,9 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <div className="dark" data-theme="dark">
-          <AppRoutes />
+          <ErrorBoundary>
+            <AppRoutes />
+          </ErrorBoundary>
           <UpdateNotification />
           <Toaster 
             position="top-right"

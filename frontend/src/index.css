@@ -4,6 +4,31 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-in {
+  animation: card-in 0.24s ease-out both;
+}
+
+/* Fade-in do conteúdo real sobre o mockup */
+@keyframes page-reveal {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-page-reveal {
+  animation: page-reveal 0.3s ease-out both;
+}
+
 body {
     margin: 0;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
@@ -139,14 +164,3 @@ code {
     box-shadow: 0 0 20px rgba(255, 31, 90, 0.4);
 }
 
-/* Hide Emergent badge */
-a[href*="emergent-badge"],
-a[href*="emergentagent.com/badge"],
-a[href*="emergent"],
-.emergent-badge,
-#emergent-badge {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
-}

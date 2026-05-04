@@ -21,24 +21,151 @@ import { Textarea } from '../components/ui/textarea';
 import { format } from 'date-fns';
 
 // Skeleton loader for cards
-const JobCardSkeleton = () => (
-  <Card className="bg-card border-white/5 animate-pulse">
-    <CardHeader className="pb-2">
-      <div className="flex items-center gap-2 mb-2">
-        <div className="h-5 bg-white/10 rounded w-16"></div>
-        <div className="h-4 bg-white/10 rounded w-10"></div>
+const JobCardSkeleton = ({ delay = 0 }) => (
+  <Card
+    className="bg-card border-white/5 animate-pulse"
+    style={{ animationDelay: `${delay}ms` }}
+  >
+    <CardContent className="p-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <div className="h-5 bg-white/10 rounded w-14"></div>
+          <div className="h-5 bg-white/10 rounded w-9"></div>
+        </div>
+        <div className="h-5 bg-white/10 rounded w-20"></div>
       </div>
-      <div className="h-6 bg-white/10 rounded w-3/4"></div>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      <div className="h-4 bg-white/10 rounded w-full"></div>
-      <div className="h-4 bg-white/10 rounded w-2/3"></div>
-      <div className="flex gap-2 mt-2">
+      <div className="h-5 bg-white/10 rounded w-4/5 mb-2"></div>
+      <div className="h-4 bg-white/10 rounded w-3/5 mb-3"></div>
+      <div className="h-4 bg-white/10 rounded w-2/5 mb-4"></div>
+      <div className="flex gap-2 pt-2 border-t border-white/5">
         <div className="h-8 bg-white/10 rounded flex-1"></div>
         <div className="h-8 bg-white/10 rounded flex-1"></div>
+        <div className="h-8 bg-white/10 rounded w-8"></div>
       </div>
     </CardContent>
   </Card>
+);
+
+// Mockup estático — aparece instantaneamente, sem async, sem animations.
+// Representa a estrutura real da página com as cores corretas para que o
+// cérebro reconheça "esta é a página de Jobs" antes dos dados chegarem.
+const MOCKUP_JOBS = [
+  { code: '2006', branch: 'POA', status: 'AGUARDANDO', title: 'BANNER', client: 'INSTITUTO DO CANCER INFANTIL RS', late: true },
+  { code: '2003', branch: 'POA', status: 'AGUARDANDO', title: 'CORTE', client: 'GABRIELLI MACIEL NUNES', late: true },
+  { code: '1707', branch: 'SP',  status: 'AGUARDANDO', title: 'Remendo Lacta', client: 'SET INTEGRATIVE', late: false },
+  { code: '1788', branch: 'SP',  status: 'AGUARDANDO', title: 'PLACAS LACOSTE', client: 'E-INFINITE COMÉRCIO', late: false },
+  { code: '1789', branch: 'SP',  status: 'AGENDADO',   title: 'FACHADA LOJA', client: 'GRUPO SOMA', late: false },
+  { code: '2391', branch: 'POA', status: 'AGUARDANDO', title: 'ADESIVO FROTA', client: 'TRANSPORTES REGIO', late: false },
+  { code: '2392', branch: 'POA', status: 'AGENDADO',   title: 'LETREIRO LED', client: 'FARMÁCIAS NISSEI', late: false },
+  { code: '2393', branch: 'POA', status: 'AGUARDANDO', title: 'BANNER EVENTO', client: 'SICREDI PIONEIRA', late: false },
+];
+
+const JobsMockupCard = ({ job }) => (
+  <Card className={`bg-card border-white/5 ${job.late ? 'border-l-4 border-l-red-500' : ''}`}>
+    <CardContent className="p-4">
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
+            #{job.code}
+          </span>
+          <span className="text-[10px] text-muted-foreground bg-white/5 px-1.5 py-0.5 rounded">
+            {job.branch}
+          </span>
+          {job.late && <AlertTriangle className="h-4 w-4 text-red-400" />}
+        </div>
+        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+          job.status === 'AGENDADO'
+            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+            : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
+        }`}>
+          {job.status}
+        </span>
+      </div>
+      <div className="h-5 w-4/5 bg-white/10 rounded mb-2" />
+      <div className="h-4 w-3/5 bg-white/5 rounded mb-3" />
+      <div className="h-4 w-2/5 bg-white/5 rounded mb-4" />
+      <div className="flex gap-2 pt-2 border-t border-white/5">
+        <div className={`h-8 flex-1 rounded border text-xs flex items-center justify-center gap-1 ${
+          job.status === 'AGENDADO'
+            ? 'border-green-500/30 text-green-400/60'
+            : 'border-blue-500/30 text-blue-400/60'
+        }`}>
+          <CalendarCheck className="h-3 w-3" />
+          {job.status === 'AGENDADO' ? 'Agendado' : 'Agendar'}
+        </div>
+        <div className="h-8 flex-1 rounded border border-orange-500/20 text-orange-400/50 text-xs flex items-center justify-center gap-1">
+          <Ban className="h-3 w-3" />
+          S/ Instalação
+        </div>
+        <div className="h-8 w-8 rounded border border-gray-500/20 flex items-center justify-center">
+          <Archive className="h-3 w-3 text-gray-500/50" />
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const JobsPageSkeleton = () => (
+  <div className="p-4 md:p-8 space-y-6">
+    {/* Header — texto real para reconhecimento imediato */}
+    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h1 className="text-3xl font-heading font-bold text-white/30 tracking-tight">Jobs</h1>
+        <p className="text-muted-foreground/40 text-sm mt-1">Carregando jobs…</p>
+      </div>
+      <div className="flex gap-2">
+        <div className="h-9 bg-white/5 rounded w-24 animate-pulse" />
+        <div className="h-9 bg-white/5 rounded w-28 animate-pulse" />
+        <div className="h-9 bg-primary/10 rounded w-36 animate-pulse" />
+      </div>
+    </div>
+
+    {/* Stats Cards — cores reais + labels visíveis */}
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {[
+        { color: 'bg-primary/20', label: 'Total',      num: '—' },
+        { color: 'bg-yellow-500/20', label: 'Aguardando', num: '—' },
+        { color: 'bg-blue-500/20',  label: 'Instalando', num: '—' },
+        { color: 'bg-green-500/20', label: 'Agendados',  num: '—' },
+      ].map(({ color, label, num }, i) => (
+        <Card key={i} className="bg-card border-white/5">
+          <CardContent className="p-3 flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${color}`}>
+              <div className="h-4 w-4 bg-white/10 rounded animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xl font-bold text-white/20">{num}</p>
+              <p className="text-[10px] text-muted-foreground">{label}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+
+    {/* Filter bar */}
+    <Card className="bg-card border-white/5">
+      <CardContent className="p-4 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2 h-9 bg-white/5 rounded animate-pulse" />
+          <div className="h-9 bg-white/5 rounded animate-pulse" />
+          <div className="h-9 bg-white/5 rounded animate-pulse" />
+        </div>
+        <div className="flex gap-3">
+          <div className="h-9 bg-white/5 rounded w-48 animate-pulse" />
+          <div className="h-9 bg-white/5 rounded w-36 animate-pulse" />
+          <div className="h-9 bg-white/5 rounded w-36 animate-pulse" />
+          <div className="h-9 bg-white/5 rounded w-40 animate-pulse" />
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Mockup de cards com estrutura real (cores, badges, botões) — sem pulse */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 opacity-40">
+      {MOCKUP_JOBS.map((job) => (
+        <JobsMockupCard key={job.code} job={job} />
+      ))}
+    </div>
+  </div>
 );
 
 // Mini Job Card Component for better performance
@@ -366,6 +493,14 @@ const Jobs = () => {
   const [visibleCount, setVisibleCount] = useState(12);
   const [bulkArchiving, setBulkArchiving] = useState(false);
   const archivedLoadedRef = useRef(false);
+
+  // Wave reveal: cards aparecem em grupos de 4
+  const WAVE_SIZE = 4;
+  const [revealedCount, setRevealedCount] = useState(0);
+  const prevFilteredRef = useRef(null);
+
+  // IntersectionObserver: scroll infinito automático
+  const sentinelRef = useRef(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedJobIds, setSelectedJobIds] = useState(new Set());
   const [batchArchiving, setBatchArchiving] = useState(false);
@@ -376,6 +511,7 @@ const Jobs = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleInstallerIds, setScheduleInstallerIds] = useState(new Set());
   
   // Justification dialog states
   const [showJustifyDialog, setShowJustifyDialog] = useState(false);
@@ -587,29 +723,41 @@ const Jobs = () => {
   const handleOpenScheduleDialog = (job) => {
     setSelectedJob(job);
     setScheduleDate(job.scheduled_date ? job.scheduled_date.split('T')[0] : '');
+    setScheduleInstallerIds(new Set(Array.isArray(job.assigned_installers) ? job.assigned_installers : []));
     setShowScheduleDialog(true);
   };
 
   const handleScheduleJob = async () => {
     if (!selectedJob) return;
-    
+
+    const installerIds = [...scheduleInstallerIds];
+    const isoDate = scheduleDate ? new Date(scheduleDate).toISOString() : null;
+
     try {
       setProcessingJobId(selectedJob.id);
-      await api.updateJob(selectedJob.id, { 
-        scheduled_date: scheduleDate ? new Date(scheduleDate).toISOString() : null
+      await api.updateJob(selectedJob.id, {
+        scheduled_date: isoDate,
+        assigned_installers: installerIds,
+        status: isoDate ? 'agendado' : selectedJob.status === 'agendado' ? 'aguardando' : selectedJob.status,
       });
-      
-      toast.success(scheduleDate ? 'Job agendado com sucesso!' : 'Agendamento removido');
-      
-      setJobs(prev => prev.map(j => 
-        j.id === selectedJob.id 
-          ? { ...j, scheduled_date: scheduleDate ? new Date(scheduleDate).toISOString() : null }
+
+      toast.success(isoDate ? 'Job agendado com sucesso!' : 'Agendamento removido');
+
+      setJobs(prev => prev.map(j =>
+        j.id === selectedJob.id
+          ? {
+              ...j,
+              scheduled_date: isoDate,
+              assigned_installers: installerIds,
+              status: isoDate ? 'agendado' : (j.status === 'agendado' ? 'aguardando' : j.status),
+            }
           : j
       ));
-      
+
       setShowScheduleDialog(false);
       setSelectedJob(null);
       setScheduleDate('');
+      setScheduleInstallerIds(new Set());
     } catch (error) {
       console.error('Error scheduling job:', error);
       const errorMsg = error.response?.data?.detail || error.message || 'Erro ao agendar job';
@@ -665,11 +813,12 @@ const Jobs = () => {
     try {
       const ids = [...selectedJobIds];
       const installerIds = [...batchScheduleInstallerIds];
-      await api.batchScheduleJobs(ids, new Date(batchScheduleDate).toISOString(), installerIds);
+      const isoDate = new Date(batchScheduleDate).toISOString();
+      await api.batchScheduleJobs(ids, isoDate, installerIds);
       toast.success(`${ids.length} job(s) agendados com sucesso!`);
       setJobs(prev => prev.map(j =>
         selectedJobIds.has(j.id)
-          ? { ...j, scheduled_date: new Date(batchScheduleDate).toISOString(), assigned_installers: installerIds }
+          ? { ...j, scheduled_date: isoDate, assigned_installers: installerIds, status: 'agendado' }
           : j
       ));
       setShowBatchScheduleDialog(false);
@@ -887,19 +1036,75 @@ const Jobs = () => {
     }
   }, [statusFilter, loadJobs]);
 
-  if (loading) {
-    return (
-      <div className="p-4 md:p-8 space-y-6">
-        <div className="h-10 bg-white/10 rounded w-48 animate-pulse"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => <JobCardSkeleton key={i} />)}
-        </div>
-      </div>
+  // Wave reveal — libera cards em grupos de 4 usando idle time do browser.
+  // Detecta mudança de filtro (nova referência de filteredJobs) e reseta do zero.
+  // Detecta "Carregar mais" (visibleCount sobe) e continua de onde parou.
+  useEffect(() => {
+    if (loading) { setRevealedCount(0); return; }
+
+    const isNewFilter = prevFilteredRef.current !== filteredJobs;
+    prevFilteredRef.current = filteredJobs;
+
+    const target = Math.min(visibleCount, filteredJobs.length);
+
+    if (isNewFilter) setRevealedCount(0);
+    if (filteredJobs.length === 0) return;
+
+    let cancelled = false;
+
+    const scheduleNext = (fn) => {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(fn, { timeout: 150 });
+      } else {
+        setTimeout(fn, 80);
+      }
+    };
+
+    const reveal = () => {
+      if (cancelled) return;
+      setRevealedCount(prev => {
+        if (prev >= target) return prev;
+        const next = Math.min(prev + WAVE_SIZE, target);
+        if (next < target) scheduleNext(reveal);
+        return next;
+      });
+    };
+
+    requestAnimationFrame(reveal);
+    return () => { cancelled = true; };
+  }, [loading, filteredJobs, visibleCount]);
+
+  // IntersectionObserver — carrega mais ao chegar no fim do grid.
+  // Só ativa quando a onda atual terminou (revealedCount atingiu visibleCount)
+  // e ainda há jobs para mostrar. rootMargin de 200px faz pré-fetch antes
+  // do sentinel entrar na viewport.
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+
+    const waveComplete = revealedCount >= Math.min(visibleCount, filteredJobs.length);
+    const hasMore = visibleCount < filteredJobs.length;
+    if (!waveComplete || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount(prev => prev + 12);
+        }
+      },
+      { rootMargin: '200px', threshold: 0 }
     );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [revealedCount, visibleCount, filteredJobs.length]);
+
+  if (loading) {
+    return <JobsPageSkeleton />;
   }
 
   return (
-    <div className={`p-4 md:p-8 space-y-6 ${selectionMode ? 'pb-24' : ''}`}>
+    <div className={`p-4 md:p-8 space-y-6 animate-page-reveal ${selectionMode ? 'pb-24' : ''}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -1296,37 +1501,56 @@ const Jobs = () => {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredJobs.slice(0, visibleCount).map((job) => (
-              <JobCard
+            {/* Cards já revelados — cada um entra com fade-in escalonado dentro da sua onda */}
+            {filteredJobs.slice(0, revealedCount).map((job, idx) => (
+              <div
                 key={job.id}
-                job={job}
-                onNavigate={(id) => navigate(`/jobs/${id}`)}
-                onFinalize={handleFinalizeNoInstallation}
-                onSchedule={handleOpenScheduleDialog}
-                onJustify={handleOpenJustifyDialog}
-                onArchive={handleArchiveJob}
-                isAdmin={isAdmin}
-                isManager={isManager}
-                isLoading={processingJobId}
-                selectionMode={selectionMode}
-                isSelected={selectedJobIds.has(job.id)}
-                onToggleSelect={toggleJobSelection}
-              />
-            ))}
-          </div>
-          
-          {/* Load More */}
-          {visibleCount < filteredJobs.length && (
-            <div className="flex justify-center mt-6">
-              <Button
-                onClick={loadMore}
-                variant="outline"
-                className="border-white/20 text-white hover:bg-white/5"
+                className="animate-card-in"
+                style={{ animationDelay: `${(idx % WAVE_SIZE) * 55}ms` }}
               >
-                <ChevronDown className="h-4 w-4 mr-2" />
-                Carregar mais ({filteredJobs.length - visibleCount} restantes)
-              </Button>
+                <JobCard
+                  job={job}
+                  onNavigate={(id) => navigate(`/jobs/${id}`)}
+                  onFinalize={handleFinalizeNoInstallation}
+                  onSchedule={handleOpenScheduleDialog}
+                  onJustify={handleOpenJustifyDialog}
+                  onArchive={handleArchiveJob}
+                  isAdmin={isAdmin}
+                  isManager={isManager}
+                  isLoading={processingJobId}
+                  selectionMode={selectionMode}
+                  isSelected={selectedJobIds.has(job.id)}
+                  onToggleSelect={toggleJobSelection}
+                />
+              </div>
+            ))}
+
+            {/* Skeletons para a próxima onda ainda em carregamento */}
+            {revealedCount < Math.min(visibleCount, filteredJobs.length) &&
+              [...Array(Math.min(WAVE_SIZE, Math.min(visibleCount, filteredJobs.length) - revealedCount))].map((_, i) => (
+                <JobCardSkeleton key={`wsk-${i}`} delay={i * 55} />
+              ))
+            }
+          </div>
+
+          {/* Sentinel invisível — IntersectionObserver dispara loadMore ao entrar na viewport */}
+          {visibleCount < filteredJobs.length && (
+            <div ref={sentinelRef} className="w-full h-1" aria-hidden />
+          )}
+
+          {/* Indicador de carregamento da próxima onda */}
+          {revealedCount < Math.min(visibleCount, filteredJobs.length) && visibleCount > 12 && (
+            <div className="flex justify-center items-center gap-2 py-4 text-muted-foreground text-sm">
+              <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              Carregando mais jobs…
             </div>
+          )}
+
+          {/* Fim da lista — mostra total quando tudo foi revelado */}
+          {revealedCount >= filteredJobs.length && filteredJobs.length > 0 && visibleCount >= filteredJobs.length && (
+            <p className="text-center text-xs text-muted-foreground/50 py-2">
+              {filteredJobs.length} job(s) exibido(s)
+            </p>
           )}
         </>
       )}
@@ -1406,6 +1630,28 @@ const Jobs = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {/* Preview dos jobs selecionados */}
+            {(() => {
+              const selectedJobs = jobs.filter(j => selectedJobIds.has(j.id));
+              const preview = selectedJobs.slice(0, 4);
+              const remaining = selectedJobs.length - preview.length;
+              return (
+                <div className="rounded border border-white/10 bg-white/5 p-2 space-y-1">
+                  {preview.map(j => (
+                    <div key={j.id} className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span className="font-mono text-primary">#{j.holdprint_data?.code || j.id?.slice(0, 6)}</span>
+                      <span className="truncate text-white/70">{j.title}</span>
+                    </div>
+                  ))}
+                  {remaining > 0 && (
+                    <p className="text-xs text-muted-foreground/60 pt-0.5">
+                      + {remaining} job(s) a mais
+                    </p>
+                  )}
+                </div>
+              );
+            })()}
+
             <div>
               <label className="text-sm text-muted-foreground mb-2 block">Data de Agendamento *</label>
               <Input
@@ -1416,17 +1662,36 @@ const Jobs = () => {
               />
             </div>
             <div>
-              <label className="text-sm text-muted-foreground mb-2 block">
-                Instaladores ({batchScheduleInstallerIds.size} selecionado(s))
-              </label>
-              <div className="max-h-48 overflow-y-auto space-y-1 rounded border border-white/10 p-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-muted-foreground">
+                  Instaladores ({batchScheduleInstallerIds.size} selecionado(s))
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setBatchScheduleInstallerIds(new Set(installers.map(i => i.id)))}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Todos
+                  </button>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setBatchScheduleInstallerIds(new Set())}
+                    className="text-xs text-muted-foreground hover:text-white"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-44 overflow-y-auto space-y-1 rounded border border-white/10 p-2">
                 {installers.length === 0 && (
                   <p className="text-xs text-muted-foreground text-center py-2">Nenhum instalador cadastrado</p>
                 )}
                 {installers.map(inst => (
                   <label
                     key={inst.id}
-                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors select-none
                       ${batchScheduleInstallerIds.has(inst.id) ? 'bg-blue-600/20 text-blue-300' : 'hover:bg-white/5 text-white'}`}
                   >
                     <input
@@ -1459,7 +1724,7 @@ const Jobs = () => {
                 ) : (
                   <CalendarCheck className="h-4 w-4 mr-2" />
                 )}
-                Confirmar
+                Confirmar Agendamento
               </Button>
             </div>
           </div>
@@ -1558,15 +1823,21 @@ const Jobs = () => {
       </Dialog>
 
       {/* Schedule Dialog */}
-      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
-        <DialogContent className="bg-card border-white/10">
+      <Dialog open={showScheduleDialog} onOpenChange={(open) => {
+        setShowScheduleDialog(open);
+        if (!open) { setSelectedJob(null); setScheduleDate(''); setScheduleInstallerIds(new Set()); }
+      }}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-white">Agendar Job</DialogTitle>
-            <DialogDescription>
-              {selectedJob?.title}
+            <DialogTitle className="text-white flex items-center gap-2">
+              <CalendarPlus className="h-5 w-5 text-primary" />
+              Agendar Job
+            </DialogTitle>
+            <DialogDescription className="font-mono text-primary/80 text-xs">
+              #{selectedJob?.holdprint_data?.code || selectedJob?.id?.slice(0, 8)} — {selectedJob?.title}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 mt-4">
+          <div className="space-y-4 mt-2">
             <div>
               <label className="text-sm text-muted-foreground mb-2 block">Data de Agendamento</label>
               <Input
@@ -1576,6 +1847,58 @@ const Jobs = () => {
                 className="bg-white/5 border-white/10 text-white"
               />
             </div>
+
+            {/* Instaladores */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm text-muted-foreground">
+                  Instaladores ({scheduleInstallerIds.size} selecionado(s))
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleInstallerIds(new Set(installers.map(i => i.id)))}
+                    className="text-xs text-primary hover:underline"
+                  >
+                    Todos
+                  </button>
+                  <span className="text-xs text-muted-foreground">·</span>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleInstallerIds(new Set())}
+                    className="text-xs text-muted-foreground hover:text-white"
+                  >
+                    Limpar
+                  </button>
+                </div>
+              </div>
+              <div className="max-h-44 overflow-y-auto space-y-1 rounded border border-white/10 p-2">
+                {installers.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">Nenhum instalador cadastrado</p>
+                )}
+                {installers.map(inst => (
+                  <label
+                    key={inst.id}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer transition-colors select-none
+                      ${scheduleInstallerIds.has(inst.id) ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-white'}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={scheduleInstallerIds.has(inst.id)}
+                      onChange={() => setScheduleInstallerIds(prev => {
+                        const next = new Set(prev);
+                        next.has(inst.id) ? next.delete(inst.id) : next.add(inst.id);
+                        return next;
+                      })}
+                      className="accent-pink-500"
+                    />
+                    <span className="text-sm">{inst.full_name || inst.name}</span>
+                    {inst.branch && <span className="text-xs text-muted-foreground ml-auto">{inst.branch}</span>}
+                  </label>
+                ))}
+              </div>
+            </div>
+
             <div className="flex gap-2">
               <Button
                 onClick={handleScheduleJob}

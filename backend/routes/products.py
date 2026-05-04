@@ -180,7 +180,7 @@ async def update_product_family(family_id: str, family: ProductFamilyCreate, cur
         {"id": family_id},
         {"$set": family.model_dump()}
     )
-    if result.modified_count == 0:
+    if result.get('modified_count', 0) == 0:
         raise HTTPException(status_code=404, detail="Family not found")
     
     updated = db.product_families.find_one({"id": family_id}, {"_id": 0})
@@ -193,7 +193,7 @@ async def delete_product_family(family_id: str, current_user: User = Depends(get
     require_role(current_user, [UserRole.ADMIN])
     
     result = db.product_families.delete_one({"id": family_id})
-    if result.deleted_count == 0:
+    if result.get('deleted_count', 0) == 0:
         raise HTTPException(status_code=404, detail="Family not found")
     return {"message": "Family deleted"}
 
