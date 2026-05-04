@@ -311,8 +311,8 @@ async def list_jobs(
     if not include_archived:
         query["archived"] = False
 
-    # Projeção otimizada - apenas campos necessários para listagem
-    # Nota: Supabase não suporta projeção com "." - retornar campo completo
+    # Projeção enxuta para listagem — campos pesados excluídos para reduzir payload
+    # holdprint_data incluído apenas para extrair o code; trimado após a busca
     projection = {
         "_id": 0,
         "id": 1, "title": 1, "status": 1, "branch": 1, "client_name": 1,
@@ -320,8 +320,6 @@ async def list_jobs(
         "archived": 1, "holdprint_job_id": 1, "area_m2": 1,
         "total_products": 1, "total_quantity": 1, "completed_at": 1,
         "holdprint_data": 1,
-        "products_with_area": 1, "items": 1, "archived_items": 1,
-        "item_assignments": 1
     }
     
     if current_user.role == UserRole.INSTALLER:
@@ -375,12 +373,19 @@ async def list_jobs(
             job['created_at'] = datetime.fromisoformat(job['created_at'])
         if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
             job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])
-        
+
+        # Trim holdprint_data — listagem só precisa do code para exibição no card
+        hd = job.get('holdprint_data')
+        if isinstance(hd, dict):
+            job['holdprint_data'] = {'code': hd.get('code', '')}
+        else:
+            job['holdprint_data'] = {}
+
         job_id = job.get('id')
         if job_id in job_start_times:
             job['started_at'] = job_start_times[job_id].isoformat()
             job['last_checkin_at'] = job_start_times[job_id].isoformat()
-    
+
     return jobs
 
 
@@ -416,6 +421,7 @@ async def get_team_calendar_jobs(
         elif job.get('scheduled_time_end'):
             job['scheduled_time_end'] = job['scheduled_time_end'].isoformat() if hasattr(job['scheduled_time_end'], 'isoformat') else str(job['scheduled_time_end'])
 
+        hd = job.get("holdprint_data") or {}
         clean_job = {
             "id": job.get("id"),
             "title": job.get("title"),
@@ -425,7 +431,7 @@ async def get_team_calendar_jobs(
             "scheduled_time_end": job.get("scheduled_time_end"),
             "created_at": job.get("created_at"),
             "assigned_installers": job.get("assigned_installers", []),
-            "holdprint_data": job.get("holdprint_data", {}),
+            "holdprint_data": {"code": hd.get("code", "")},
             "client_name": job.get("client_name"),
         }
         cleaned_jobs.append(clean_job)
@@ -759,7 +765,7 @@ async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = D
 
 
 @router.put("/jobs/{job_id}/schedule", response_model=Job)
-async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: User = Depends(get_current_user)):
+async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """Schedule a job"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
@@ -778,17 +784,25 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, current_user: Us
 
     from db_supabase import _deserialize
     job_doc = _deserialize(result.data[0])
-    if isinstance(job_doc.get('created_at'), str):
-        job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
-    if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
-        job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+    for dt_field in ("created_at", "scheduled_date", "scheduled_time_end"):
+        val = job_doc.get(dt_field)
+        if val and isinstance(val, str):
+            try:
+                job_doc[dt_field] = datetime.fromisoformat(val.replace("Z", "+00:00"))
+            except ValueError:
+                pass
 
-    # Trigger async Google Calendar sync for assigned installers
-    try:
-        from routes.calendar import sync_job_to_installer_calendar
-        asyncio.create_task(sync_job_to_installer_calendar(job_id, current_user))
-    except Exception as e:
-        logger.warning(f"Failed to sync job {job_id} to installer calendars: {str(e)}")
+    # Sync to installer Google Calendars in background (best-effort)
+    def _sync_calendar():
+        try:
+            import asyncio as _asyncio
+            from routes.calendar import sync_job_to_installer_calendar
+            _asyncio.run(sync_job_to_installer_calendar(job_id, current_user))
+        except Exception as e:
+            logger.warning(f"Google Calendar sync falhou para job {job_id}: {e}")
+
+    if update_data.get("assigned_installers"):
+        background_tasks.add_task(_sync_calendar)
 
     return Job(**job_doc)
 
@@ -1050,13 +1064,7 @@ async def batch_schedule_jobs(
         client = get_client()
         client.table("jobs").update(update_data).in_("id", job_ids).execute()
 
-        # Trigger async Google Calendar sync for each job
-        try:
-            from routes.calendar import sync_job_to_installer_calendar
-            for job_id in job_ids:
-                asyncio.create_task(sync_job_to_installer_calendar(job_id, current_user))
-        except Exception as e:
-            logger.warning(f"Failed to sync jobs to installer calendars: {str(e)}")
+        # Google Calendar sync omitido no batch — feito sob demanda pelo instalador
 
     except Exception as e:
         logger.error(f"batch_schedule_jobs error: {e}")
@@ -1647,38 +1655,70 @@ async def import_month_jobs(request: ImportMonthRequest, current_user: User = De
 
 @router.post("/jobs/sync-holdprint")
 async def sync_holdprint_jobs(
-    months_back: int = Query(2, ge=1, le=12, description="Quantos meses para trás buscar"),
+    months_back: int = Query(2, ge=1, le=12, description="Meses para trás (usado apenas com full_resync=true)"),
+    full_resync: bool = Query(False, description="Ignorar cursor e refazer sync completo dos últimos months_back meses"),
     current_user: User = Depends(get_current_user)
 ):
-    """Sync jobs from Holdprint for multiple months"""
+    """
+    Sync jobs from Holdprint.
+
+    Delta sync (default, full_resync=false): fetches only jobs created since the
+    last successful sync timestamp stored in system_config, with a 1-day overlap
+    to cover clock-boundary edge cases.
+
+    Full resync (full_resync=true): iterates over the last `months_back` months —
+    use this to force a complete reprocessing from the admin panel.
+    """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     results = []
     total_imported = 0
     total_skipped = 0
     total_errors = []
-    
+
     now = datetime.now(timezone.utc)
-    months_to_sync = []
-    
-    for i in range(months_back + 1):
-        target_date = now - timedelta(days=i * 30)
-        month_year = (target_date.month, target_date.year)
-        if month_year not in months_to_sync:
-            months_to_sync.append(month_year)
-    
-    for branch in ["POA", "SP"]:
+
+    # ── Build date window(s) ─────────────────────────────────────────────────
+    if full_resync:
+        months_to_sync = []
+        for i in range(months_back + 1):
+            target_date = now - timedelta(days=i * 30)
+            month_year = (target_date.month, target_date.year)
+            if month_year not in months_to_sync:
+                months_to_sync.append(month_year)
+        windows = []
         for month, year in months_to_sync:
+            last_day = monthrange(year, month)[1]
+            windows.append((f"{year}-{month:02d}-01", f"{year}-{month:02d}-{last_day:02d}", month, year))
+    else:
+        # Delta sync: single window from cursor (or start of current month)
+        cursor_row = db.system_config.find_one({"key": "last_holdprint_sync"})
+        if cursor_row and cursor_row.get("value"):
+            cursor_dt = datetime.fromisoformat(cursor_row["value"].replace('Z', '+00:00'))
+            # 1-day overlap so jobs created right at the clock boundary are not missed
+            start_dt = cursor_dt - timedelta(days=1)
+        else:
+            # First run: start of current month
+            start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        windows = [(start_dt.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d"), now.month, now.year)]
+
+    logger.info(f"sync-holdprint: windows={[(w[0], w[1]) for w in windows]}, full_resync={full_resync}")
+
+    for branch in ["POA", "SP"]:
+        for start_date, end_date, month, year in windows:
             try:
-                holdprint_jobs = await fetch_holdprint_jobs(branch, month, year)
-                
+                holdprint_jobs = await fetch_holdprint_jobs(
+                    branch, start_date=start_date, end_date=end_date
+                )
+
                 imported = 0
                 skipped = 0
                 errors = []
-                
+
                 for holdprint_job in holdprint_jobs:
                     holdprint_job_id = str(holdprint_job.get('id', ''))
 
+                    # Defence-in-depth: skip if already imported
                     existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                     if existing:
                         skipped += 1
@@ -1689,35 +1729,39 @@ async def sync_holdprint_jobs(
                         imported += 1
                     except Exception as e:
                         errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
-                
+
                 results.append({
                     "branch": branch,
                     "month": month,
                     "year": year,
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "imported": imported,
                     "skipped": skipped,
                     "total": len(holdprint_jobs),
                     "errors": errors[:3]
                 })
-                
+
                 total_imported += imported
                 total_skipped += skipped
                 total_errors.extend(errors)
-                
-                logger.info(f"Sync {branch} {month}/{year}: {imported} imported, {skipped} skipped")
-                
+
+                logger.info(f"Sync {branch} {start_date}→{end_date}: {imported} imported, {skipped} skipped")
+
             except Exception as e:
-                logger.error(f"Error syncing {branch} {month}/{year}: {str(e)}")
+                logger.error(f"Error syncing {branch} {start_date}→{end_date}: {str(e)}")
                 results.append({
                     "branch": branch,
                     "month": month,
                     "year": year,
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "imported": 0,
                     "skipped": 0,
                     "total": 0,
                     "errors": [str(e)]
                 })
-    
+
     db.system_config.update_one(
         {"key": "last_holdprint_sync"},
         {
@@ -1725,15 +1769,17 @@ async def sync_holdprint_jobs(
                 "key": "last_holdprint_sync",
                 "value": datetime.now(timezone.utc).isoformat(),
                 "total_imported": total_imported,
-                "total_skipped": total_skipped
+                "total_skipped": total_skipped,
+                "sync_type": "full_resync" if full_resync else "delta",
             }
         },
         upsert=True
     )
-    
+
     return {
         "success": True,
         "sync_date": datetime.now(timezone.utc).isoformat(),
+        "sync_type": "full_resync" if full_resync else "delta",
         "summary": {
             "total_imported": total_imported,
             "total_skipped": total_skipped,
