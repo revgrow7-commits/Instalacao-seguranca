@@ -3,7 +3,7 @@ Jobs routes - Migrated from server.py
 Handles all job-related endpoints including Holdprint integration, 
 scheduling, assignments, and justifications.
 """
-from fastapi import APIRouter, HTTPException, Depends, Query, Body
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends, Query, Body
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field, ConfigDict
@@ -1664,6 +1664,7 @@ async def sync_holdprint_jobs(
 async def submit_job_justification(
     job_id: str,
     justification: JobJustificationRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user)
 ):
     """Submit justification for a job that wasn't completed"""
@@ -1708,65 +1709,50 @@ async def submit_job_justification(
         }}
     )
     
-    # Send email notification
-    try:
-        scheduled_date = job.get("scheduled_date", "")
-        if scheduled_date:
-            try:
-                dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
-                scheduled_date = dt.strftime("%d/%m/%Y às %H:%M")
-            except (ValueError, TypeError):
-                pass
-        
-        html_content = f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background: #dc2626; color: white; padding: 20px; border-radius: 8px 8px 0 0; }}
-                .content {{ background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }}
-                .footer {{ background: #f3f4f6; padding: 15px; border-radius: 0 0 8px 8px; font-size: 12px; color: #6b7280; }}
-                .highlight {{ background: #fef3c7; padding: 10px; border-left: 4px solid #f59e0b; margin: 15px 0; }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <h2 style="margin: 0;">Job Justificado</h2>
-                </div>
-                <div class="content">
-                    <div class="highlight">
-                        <strong>Motivo:</strong> {justification.reason}
-                    </div>
-                    <p><strong>Código:</strong> #{justification.job_code}</p>
-                    <p><strong>Título:</strong> {justification.job_title}</p>
-                    <p><strong>Tipo:</strong> {type_label}</p>
-                    <p><strong>Data:</strong> {scheduled_date or 'N/A'}</p>
-                    <p><strong>Por:</strong> {current_user.name}</p>
-                </div>
-                <div class="footer">
-                    <p>Sistema Indústria Visual</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        """
-        
-        params = {
-            "from": SENDER_EMAIL,
-            "to": NOTIFICATION_EMAILS,
-            "subject": f"Job Justificado: #{justification.job_code} - {justification.job_title}",
-            "html": html_content
-        }
-        
-        await asyncio.to_thread(resend.Emails.send, params)
-        logger.info(f"Justification email sent for job {job_id}")
-        
-    except Exception as e:
-        logger.error(f"Failed to send justification email: {str(e)}")
-    
+    def send_justification_email():
+        try:
+            scheduled_date = job.get("scheduled_date", "")
+            if scheduled_date:
+                try:
+                    dt = datetime.fromisoformat(scheduled_date.replace('Z', '+00:00'))
+                    scheduled_date = dt.strftime("%d/%m/%Y às %H:%M")
+                except (ValueError, TypeError):
+                    pass
+
+            html_content = f"""<!DOCTYPE html>
+<html><head><style>
+body{{font-family:Arial,sans-serif;line-height:1.6;color:#333}}
+.container{{max-width:600px;margin:0 auto;padding:20px}}
+.header{{background:#dc2626;color:white;padding:20px;border-radius:8px 8px 0 0}}
+.content{{background:#f9fafb;padding:20px;border:1px solid #e5e7eb}}
+.footer{{background:#f3f4f6;padding:15px;border-radius:0 0 8px 8px;font-size:12px;color:#6b7280}}
+.highlight{{background:#fef3c7;padding:10px;border-left:4px solid #f59e0b;margin:15px 0}}
+</style></head><body>
+<div class="container">
+  <div class="header"><h2 style="margin:0">Job Justificado</h2></div>
+  <div class="content">
+    <div class="highlight"><strong>Motivo:</strong> {justification.reason}</div>
+    <p><strong>Código:</strong> #{justification.job_code}</p>
+    <p><strong>Título:</strong> {justification.job_title}</p>
+    <p><strong>Tipo:</strong> {type_label}</p>
+    <p><strong>Data:</strong> {scheduled_date or 'N/A'}</p>
+    <p><strong>Por:</strong> {current_user.name}</p>
+  </div>
+  <div class="footer"><p>Sistema Indústria Visual</p></div>
+</div></body></html>"""
+
+            resend.Emails.send({
+                "from": SENDER_EMAIL,
+                "to": NOTIFICATION_EMAILS,
+                "subject": f"Job Justificado: #{justification.job_code} - {justification.job_title}",
+                "html": html_content,
+            })
+            logger.info(f"Justification email sent for job {job_id}")
+        except Exception as e:
+            logger.error(f"Failed to send justification email: {str(e)}")
+
+    background_tasks.add_task(send_justification_email)
+
     return {
         "message": "Justificativa registrada com sucesso",
         "justification_id": justification_record["id"],
