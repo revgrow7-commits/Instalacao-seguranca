@@ -28,6 +28,10 @@ HOLDPRINT_API_URL = "https://api.holdworks.ai/api-key/jobs/data"
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET')
 GOOGLE_REDIRECT_URI = os.environ.get('GOOGLE_REDIRECT_URI')
+GOOGLE_INSTALLER_REDIRECT_URI = os.environ.get(
+    'GOOGLE_INSTALLER_REDIRECT_URI',
+    'https://instal-visual.com.br/_/backend/calendar/installer/auth/google/callback'
+)
 GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/userinfo.email']
 
 # Resend Email Config
