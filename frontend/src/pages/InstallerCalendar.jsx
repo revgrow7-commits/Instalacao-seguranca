@@ -1,288 +1,164 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import {
-  Calendar as CalendarIcon,
-  ArrowLeft,
-  Check,
-  Loader2,
-  ExternalLink
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
-const InstallerCalendar = () => {
+export default function InstallerCalendar() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [isGoogleConnected, setIsGoogleConnected] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [isConnected, setIsConnected] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [syncedJobs, setSyncedJobs] = useState(new Set());
-  const [syncing, setSyncing] = useState(null);
 
-  // Check if we just came back from Google auth
   useEffect(() => {
     if (searchParams.get('connected') === 'true') {
-      toast.success('Google Calendar conectado com sucesso!', { duration: 4000 });
+      toast.success('Google Calendar conectado com sucesso!');
     }
-  }, [searchParams]);
-
-  // Load calendar status and jobs
-  useEffect(() => {
-    loadCalendarData();
+    loadData();
   }, []);
 
-  const loadCalendarData = async () => {
+  const loadData = async () => {
     try {
-      setLoading(true);
       const [statusRes, jobsRes] = await Promise.all([
         api.getInstallerCalendarStatus(),
         api.getJobs(),
       ]);
-
-      setIsGoogleConnected(statusRes.data.is_connected);
-      setJobs(jobsRes.data || []);
-    } catch (error) {
-      console.error('Error loading calendar data:', error);
-      toast.error('Erro ao carregar dados do calendário');
+      setIsConnected(statusRes.data?.connected || false);
+      // Filter jobs with scheduled_date
+      const scheduledJobs = (jobsRes.data || []).filter(j => j.scheduled_date);
+      setJobs(scheduledJobs);
+    } catch (e) {
+      console.error('Error loading data:', e);
+      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleConnect = () => {
-    const authUrl = api.getInstallerAuthUrl();
-    window.location.href = authUrl;
+    window.location.href = api.getInstallerAuthUrl();
   };
 
-  const handleSyncJob = async (jobId) => {
+  const handleSync = async (jobId) => {
     try {
-      setSyncing(jobId);
       await api.syncJobToInstallerCalendar(jobId);
-      setSyncedJobs(prev => new Set(prev).add(jobId));
-      toast.success('Job adicionado ao Google Calendar!', { duration: 3000 });
-    } catch (error) {
-      console.error('Error syncing job:', error);
+      setSyncedJobs(prev => new Set([...prev, jobId]));
+      toast.success('Job salvo no Google Calendar!');
+    } catch (e) {
+      console.error('Error syncing:', e);
       toast.error('Erro ao sincronizar com Google Calendar');
-    } finally {
-      setSyncing(null);
     }
   };
 
-  // Filter jobs for current month and that have scheduled_date
-  const monthJobs = jobs.filter(job => {
-    if (!job.scheduled_date) return false;
-    const jobDate = new Date(job.scheduled_date);
-    return (
-      jobDate.getFullYear() === currentMonth.getFullYear() &&
-      jobDate.getMonth() === currentMonth.getMonth()
-    );
-  }).sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date));
+  const monthJobs = jobs.filter(j => {
+    if (!j.scheduled_date) return false;
+    const d = new Date(j.scheduled_date);
+    return d.getMonth() === currentMonth.getMonth() && d.getFullYear() === currentMonth.getFullYear();
+  });
 
-  const prevMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1));
+  const prevMonth = () => setCurrentMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1));
+  const nextMonth = () => setCurrentMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1));
+
+  const formatDate = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+      ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
-
-  const nextMonth = () => {
-    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1));
-  };
-
-  const monthName = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-  if (loading) {
-    return (
-      <div className="p-4 md:p-8 space-y-6 pb-24 md:pb-8 animate-page-reveal">
-        <div className="flex items-center gap-2 mb-6">
-          <div className="h-10 w-10 rounded-lg bg-white/10 animate-pulse" />
-          <div className="h-8 w-32 rounded bg-white/10 animate-pulse" />
-        </div>
-        <div className="h-32 rounded-xl bg-card border border-white/5 animate-pulse" />
-        <div className="space-y-3">
-          {[0, 1, 2].map(i => (
-            <div key={i} className="h-24 rounded-xl bg-card border border-white/5 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="p-4 md:p-8 space-y-6 pb-24 md:pb-8 animate-page-reveal">
+    <div className="min-h-screen bg-background p-4 md:p-8 pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate('/installer/dashboard')}
-            className="h-10 w-10"
-          >
-            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-          </Button>
-          <h1 className="text-2xl md:text-3xl font-heading font-bold text-white">
-            Minha Agenda
-          </h1>
+          <button onClick={() => navigate('/installer/dashboard')}
+            className="text-muted-foreground hover:text-white transition-colors text-sm">
+            ← Voltar
+          </button>
+          <h1 className="text-2xl font-bold text-white">Minha Agenda</h1>
         </div>
-        <CalendarIcon className="h-6 w-6 md:h-8 md:w-8 text-primary flex-shrink-0" />
       </div>
 
-      {/* Google Calendar Connection Card */}
-      <Card className="bg-card border-white/5">
-        <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z" fill="#4285F4" />
-            </svg>
-            Google Calendar
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isGoogleConnected ? (
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2">
-                <Check className="h-5 w-5 text-green-500" />
-                <span className="text-sm text-muted-foreground">Conectado com sucesso</span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleGoogleConnect}
-                className="text-xs"
-              >
-                Reconectar
-              </Button>
+      {/* Google Calendar card */}
+      <div className="rounded-xl bg-card border border-white/5 p-4 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-white font-medium">Google Calendar</p>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {isConnected ? 'Seus jobs agendados serão sincronizados automaticamente' : 'Conecte para salvar seus agendamentos'}
+            </p>
+          </div>
+          {isConnected ? (
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400 text-sm font-medium">✓ Conectado</span>
             </div>
           ) : (
-            <Button
+            <button
               onClick={handleGoogleConnect}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white gap-2"
+              className="flex items-center gap-2 bg-white text-gray-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
             >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z" fill="white" />
-              </svg>
+              <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
               Conectar Google Calendar
-            </Button>
+            </button>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      {/* Month Navigation */}
-      <div className="flex items-center justify-between">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={prevMonth}
-          className="text-primary"
-        >
-          ← Anterior
-        </Button>
-        <h2 className="text-lg md:text-xl font-heading font-bold text-white capitalize">
-          {monthName}
+      {/* Month navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={prevMonth} className="text-muted-foreground hover:text-white p-2">
+          <ChevronLeft className="h-5 w-5" />
+        </button>
+        <h2 className="text-white font-semibold capitalize">
+          {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
         </h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={nextMonth}
-          className="text-primary"
-        >
-          Próximo →
-        </Button>
+        <button onClick={nextMonth} className="text-muted-foreground hover:text-white p-2">
+          <ChevronRight className="h-5 w-5" />
+        </button>
       </div>
 
-      {/* Jobs List */}
-      <div>
-        <h3 className="text-lg font-heading font-semibold text-white mb-4">
-          Jobs agendados este mês
-        </h3>
-        {monthJobs.length === 0 ? (
-          <Card className="bg-card border-white/5">
-            <CardContent className="py-8 md:py-12 text-center">
-              <CalendarIcon className="h-10 w-10 md:h-12 md:w-12 mx-auto text-muted-foreground mb-3 md:mb-4" />
-              <p className="text-sm md:text-base text-muted-foreground">
-                Nenhum job agendado para {monthName.toLowerCase()}.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3 md:space-y-4">
-            {monthJobs.map(job => {
-              const jobDate = new Date(job.scheduled_date);
-              const formattedDate = jobDate.toLocaleDateString('pt-BR');
-              const formattedTime = jobDate.toLocaleTimeString('pt-BR', {
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-              const isSynced = syncedJobs.has(job.id);
-
-              return (
-                <Card
-                  key={job.id}
-                  className="bg-card border-white/5 hover:border-primary/30 transition-colors"
-                >
-                  <CardContent className="p-4 md:p-6">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h4 className="text-base md:text-lg font-medium text-white truncate">
-                            Job #{job.code || job.id}
-                          </h4>
-                          {isSynced && (
-                            <Check className="h-4 w-4 md:h-5 md:w-5 text-green-500 flex-shrink-0" />
-                          )}
-                        </div>
-                        <p className="text-xs md:text-sm text-muted-foreground truncate mb-2">
-                          {job.client_name}
-                        </p>
-                        <div className="flex items-center gap-4 text-xs md:text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            📅 {formattedDate} às {formattedTime}
-                          </span>
-                          {job.branch && (
-                            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                              {job.branch}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      {isGoogleConnected && !isSynced && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleSyncJob(job.id)}
-                          disabled={syncing === job.id}
-                          className="flex-shrink-0 gap-1 whitespace-nowrap bg-primary hover:bg-primary/90"
-                        >
-                          {syncing === job.id ? (
-                            <>
-                              <Loader2 className="h-3 w-3 md:h-4 md:w-4 animate-spin" />
-                              <span className="hidden sm:inline text-xs md:text-sm">Sincronizando</span>
-                            </>
-                          ) : (
-                            <>
-                              <ExternalLink className="h-3 w-3 md:h-4 md:w-4" />
-                              <span className="text-xs md:text-sm">Google</span>
-                            </>
-                          )}
-                        </Button>
-                      )}
-                      {isSynced && (
-                        <div className="flex-shrink-0 text-xs text-green-500 font-medium">
-                          ✓ Salvo
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </div>
+      {/* Jobs list */}
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => <div key={i} className="rounded-xl bg-card border border-white/5 p-4 h-24 animate-pulse" />)}
+        </div>
+      ) : monthJobs.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12">
+          Nenhum job agendado para este mês
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {monthJobs.map(job => (
+            <div key={job.id} className="rounded-xl bg-card border border-white/5 p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-white font-semibold">#{job.holdprint_data?.code || job.code || job.id?.slice(0, 6)} — {job.title}</p>
+                  <p className="text-muted-foreground text-sm mt-1">📅 {formatDate(job.scheduled_date)}</p>
+                  {job.branch && <p className="text-muted-foreground text-sm">📍 {job.branch}</p>}
+                </div>
+                {isConnected && (
+                  syncedJobs.has(job.id) ? (
+                    <span className="text-emerald-400 text-sm font-medium">✓ Salvo</span>
+                  ) : (
+                    <button
+                      onClick={() => handleSync(job.id)}
+                      className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
+                    >
+                      Salvar no Google ↗
+                    </button>
+                  )
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
-};
-
-export default InstallerCalendar;
+}

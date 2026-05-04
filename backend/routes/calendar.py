@@ -493,9 +493,10 @@ async def get_installer_google_credentials(user_id: str):
     return creds
 
 
-@router.post("/calendar/sync-installer/{job_id}")
-async def sync_job_to_installer_calendar(job_id: str, current_user: User = Depends(get_current_user)):
-    """Sync a job to assigned installers' Google Calendars."""
+async def sync_job_to_installer_calendar(job_id: str, current_user = None):
+    """Sync a job to assigned installers' Google Calendars (standalone function, also exposed as endpoint)."""
+    # If called without current_user (background task), skip permission checks
+    # If called with current_user (endpoint), permission is already enforced by the endpoint
     try:
         client = get_client()
 
@@ -633,3 +634,9 @@ async def sync_job_to_installer_calendar(job_id: str, current_user: User = Depen
     except Exception as e:
         logger.error(f"sync_job_to_installer_calendar error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao sincronizar com Google Calendar: {str(e)}")
+
+
+@router.post("/calendar/sync-installer/{job_id}")
+async def sync_job_to_installer_calendar_endpoint(job_id: str, current_user: User = Depends(get_current_user)):
+    """Endpoint wrapper for syncing a job to assigned installers' Google Calendars."""
+    return await sync_job_to_installer_calendar(job_id, current_user)
