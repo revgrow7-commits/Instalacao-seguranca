@@ -3,19 +3,21 @@ Jobs routes - Migrated from server.py
 Handles all job-related endpoints including Holdprint integration, 
 scheduling, assignments, and justifications.
 """
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, Body
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel, Field, ConfigDict
 import logging
+import time
 import uuid
 import asyncio
+import httpx
 import requests
 from calendar import monthrange
 
 import resend
 
-from db_supabase import db
+from db_supabase import db, get_client
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import (
@@ -161,55 +163,75 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
     return (products_with_area, round(total_area_m2, 2), len(products), total_quantity)
 
 
-async def fetch_holdprint_jobs(branch: str, month: int = None, year: int = None, include_finalized: bool = True):
-    """Fetch ALL jobs from Holdprint API with pagination"""
+async def fetch_holdprint_jobs(
+    branch: str,
+    month: int = None,
+    year: int = None,
+    include_finalized: bool = True,
+    start_date: str = None,
+    end_date: str = None,
+    max_pages: int = 50,
+    page_timeout_s: float = 15.0,
+):
+    """Fetch jobs from Holdprint API with pagination. Async/non-blocking via httpx."""
+    import calendar
     api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
-    
+
     if not api_key:
         raise HTTPException(status_code=500, detail=f"Chave de API não configurada para a filial {branch}")
-    
+
     headers = {
         "x-api-key": api_key,
-        "Accept": "application/json"
+        "Accept": "application/json",
     }
 
-    api_url = HOLDPRINT_API_URL
+    if not start_date or not end_date:
+        now = datetime.now(timezone.utc)
+        month = month or now.month
+        year = year or now.year
+        last_day = calendar.monthrange(year, month)[1]
+        start_date = f"{year}-{month:02d}-01"
+        end_date = f"{year}-{month:02d}-{last_day:02d}"
 
+    api_url = HOLDPRINT_API_URL
     all_jobs = []
-    page = 1
-    
+
     try:
-        while True:
-            response = requests.get(f"{api_url}?page={page}", headers=headers, timeout=60)
-            
-            if response.status_code == 401:
-                raise HTTPException(status_code=401, detail=f"Chave de API inválida para {branch}")
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            jobs = data.get('data', []) if isinstance(data, dict) else data
-            has_next = data.get('hasNextPage', False) if isinstance(data, dict) else False
-            
-            if not jobs:
-                break
-            
-            all_jobs.extend(jobs)
-            
-            if not has_next:
-                break
-            
-            page += 1
-            if page > 50:
-                break
-        
+        async with httpx.AsyncClient(timeout=page_timeout_s) as client:
+            for page in range(1, max_pages + 1):
+                params = {
+                    "page": page,
+                    "pageSize": 100,
+                    "startDate": start_date,
+                    "endDate": end_date,
+                    "language": "pt-BR",
+                }
+                response = await client.get(api_url, params=params, headers=headers)
+
+                if response.status_code == 401:
+                    raise HTTPException(status_code=401, detail=f"Chave de API inválida para {branch}")
+
+                response.raise_for_status()
+                data = response.json()
+
+                jobs = data.get('data', []) if isinstance(data, dict) else data
+                has_next = data.get('hasNextPage', False) if isinstance(data, dict) else False
+
+                if not jobs:
+                    break
+
+                all_jobs.extend(jobs)
+
+                if not has_next:
+                    break
+
         if not include_finalized:
             all_jobs = [j for j in all_jobs if not j.get('isFinalized', False)]
-        
-        logger.info(f"Holdprint {branch}: {len(all_jobs)} jobs encontrados")
+
+        logger.info(f"Holdprint {branch}: {len(all_jobs)} jobs encontrados (pages<= {max_pages})")
         return all_jobs
-        
-    except requests.RequestException as e:
+
+    except httpx.HTTPError as e:
         logger.error(f"Erro Holdprint {branch}: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao conectar com Holdprint: {e}")
 
@@ -274,10 +296,16 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
 
 
 @router.get("/jobs", response_model=List[Job])
-async def list_jobs(current_user: User = Depends(get_current_user)):
-    """List jobs based on user role - optimized"""
+async def list_jobs(
+    current_user: User = Depends(get_current_user),
+    include_archived: bool = Query(False),
+):
+    """List jobs based on user role - optimized. By default excludes archived jobs."""
     query = {}
-    
+
+    if not include_archived:
+        query["archived"] = False
+
     # Projeção otimizada - apenas campos necessários para listagem
     # Nota: Supabase não suporta projeção com "." - retornar campo completo
     projection = {
@@ -378,23 +406,69 @@ async def get_team_calendar_jobs(current_user: User = Depends(get_current_user))
     return cleaned_jobs
 
 
+def _build_job_doc(holdprint_job: dict, branch: str) -> dict:
+    """Build a job document from a Holdprint job. Single source of truth for all import endpoints."""
+    # Top-level 'products' has description with dimensions; 'production.products' is always empty
+    products = holdprint_job.get('products', [])
+    products_with_area = []
+    total_area_m2 = 0.0
+    total_quantity = 0
+
+    for product in products:
+        product_info = extract_product_dimensions(product)
+        pw = {
+            "name": product.get('name', ''),
+            "quantity": product.get('quantity', 1),
+            "copies": product_info.get('copies', 1),
+            "width_m": product_info.get('width_m', 0),
+            "height_m": product_info.get('height_m', 0),
+            "unit_area_m2": product_info.get('area_m2', 0),
+            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1),
+        }
+        products_with_area.append(pw)
+        total_area_m2 += pw['total_area_m2']
+        total_quantity += product.get('quantity', 1)
+
+    job = Job(
+        holdprint_job_id=str(holdprint_job.get('id', '')),
+        title=holdprint_job.get('title', 'Sem título'),
+        client_name=holdprint_job.get('customerName', 'Cliente não informado'),
+        client_address='',
+        branch=branch,
+        items=holdprint_job.get('production', {}).get('items', []),
+        holdprint_data=holdprint_job,
+        area_m2=round(total_area_m2, 4),
+        products_with_area=products_with_area,
+        total_products=len(products),
+        total_quantity=total_quantity,
+    )
+    d = job.model_dump()
+    d['created_at'] = d['created_at'].isoformat()
+    if d.get('scheduled_date'):
+        d['scheduled_date'] = d['scheduled_date'].isoformat()
+    return d
+
+
 def _persist_sync_result(total_imported: int, total_skipped: int, errors: list, sync_type: str = "manual"):
     """Persist sync result to system_config for sync-status endpoint."""
-    status = "success" if not errors else ("partial" if total_imported > 0 else "error")
-    db.system_config.update_one(
-        {"key": "last_holdprint_sync"},
-        {"$set": {
-            "key": "last_holdprint_sync",
-            "value": datetime.now(timezone.utc).isoformat(),
-            "total_imported": total_imported,
-            "total_skipped": total_skipped,
-            "total_errors": len(errors),
-            "status": status,
-            "sync_type": sync_type,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }},
-        upsert=True,
-    )
+    try:
+        status = "success" if not errors else ("partial" if total_imported > 0 else "error")
+        db.system_config.update_one(
+            {"key": "last_holdprint_sync"},
+            {"$set": {
+                "key": "last_holdprint_sync",
+                "value": datetime.now(timezone.utc).isoformat(),
+                "total_imported": total_imported,
+                "total_skipped": total_skipped,
+                "total_errors": len(errors),
+                "status": status,
+                "sync_type": sync_type,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            }},
+            upsert=True,
+        )
+    except Exception as e:
+        logger.warning(f"_persist_sync_result failed (non-critical): {e}")
 
 
 @router.get("/jobs/sync-status")
@@ -495,6 +569,46 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
         "message": f"Corrigidos {fixed_count} jobs inconsistentes",
         "fixed_count": fixed_count,
         "jobs": fixed_jobs
+    }
+
+
+@router.post("/jobs/bulk-archive-pre-2026")
+async def bulk_archive_pre_2026(current_user: User = Depends(get_current_user)):
+    """Archive all non-archived jobs created before 2026-01-01. Admin only."""
+    require_role(current_user, [UserRole.ADMIN])
+
+    cutoff = "2026-01-01"
+    now = datetime.now(timezone.utc).isoformat()
+    archived_by_name = getattr(current_user, "name", None) or current_user.email
+
+    client = get_client()
+
+    # Count first (exact=True for header-based count)
+    count_res = (
+        client.table("jobs")
+        .select("id", count="exact")
+        .lt("created_at", cutoff)
+        .or_("archived.is.null,archived.eq.false")
+        .execute()
+    )
+    count = count_res.count or 0
+
+    if count == 0:
+        return {"archived_count": 0, "message": "Nenhum job anterior a 2026 encontrado para arquivar"}
+
+    # Batch update via Supabase client (single SQL round-trip)
+    client.table("jobs").update({
+        "archived": True,
+        "archived_at": now,
+        "archived_by": current_user.id,
+        "archived_by_name": archived_by_name,
+        "exclude_from_metrics": True,
+    }).lt("created_at", cutoff).or_("archived.is.null,archived.eq.false").execute()
+
+    logger.info(f"bulk_archive_pre_2026: {count} jobs arquivados por {current_user.email}")
+    return {
+        "archived_count": count,
+        "message": f"{count} job(s) anteriores a 2026 arquivados com sucesso",
     }
 
 
@@ -864,6 +978,44 @@ class ArchiveItemsRequest(BaseModel):
     exclude_from_metrics: bool = False
 
 
+@router.post("/jobs/batch-archive")
+async def batch_archive_jobs(
+    job_ids: List[str] = Body(..., embed=True),
+    current_user: User = Depends(get_current_user),
+):
+    """Archive multiple jobs in a single DB round-trip."""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    if not job_ids:
+        return {"archived_count": 0, "message": "Nenhum job selecionado"}
+
+    if len(job_ids) > 500:
+        raise HTTPException(status_code=400, detail="Máximo de 500 jobs por operação")
+
+    now = datetime.now(timezone.utc).isoformat()
+    archived_by_name = getattr(current_user, "name", None) or current_user.email
+
+    try:
+        client = get_client()
+        client.table("jobs").update({
+            "archived": True,
+            "archived_at": now,
+            "archived_by": current_user.id,
+            "archived_by_name": archived_by_name,
+            "exclude_from_metrics": True,
+            "status": "arquivado",
+        }).in_("id", job_ids).execute()
+    except Exception as e:
+        logger.error(f"batch_archive_jobs error: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao arquivar jobs: {str(e)}")
+
+    logger.info(f"batch_archive_jobs: {len(job_ids)} jobs arquivados por {current_user.email}")
+    return {
+        "archived_count": len(job_ids),
+        "message": f"{len(job_ids)} job(s) arquivados com sucesso",
+    }
+
+
 @router.post("/jobs/{job_id}/archive")
 async def archive_job(job_id: str, request: ArchiveJobRequest, current_user: User = Depends(get_current_user)):
     """
@@ -982,7 +1134,7 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
 
 
 @router.post("/jobs/{job_id}/unarchive-items")
-async def unarchive_job_items(job_id: str, item_indices: List[int], current_user: User = Depends(get_current_user)):
+async def unarchive_job_items(job_id: str, item_indices: List[int] = Body(...), current_user: User = Depends(get_current_user)):
     """Desarquiva itens específicos de um job."""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
@@ -1235,52 +1387,8 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
             continue
 
         try:
-            products = (
-                holdprint_job.get('production', {}).get('products')
-                or holdprint_job.get('products')
-                or []
-            )
-            products_with_area = []
-            total_area_m2 = 0.0
-            total_quantity = 0
-
-            for product in products:
-                product_info = extract_product_dimensions(product)
-                product_with_area = {
-                    "name": product.get('name', ''),
-                    "quantity": product.get('quantity', 1),
-                    "copies": product_info.get('copies', 1),
-                    "width_m": product_info.get('width_m', 0),
-                    "height_m": product_info.get('height_m', 0),
-                    "unit_area_m2": product_info.get('area_m2', 0),
-                    "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                }
-                products_with_area.append(product_with_area)
-                total_area_m2 += product_with_area['total_area_m2']
-                total_quantity += product.get('quantity', 1)
-
-            job = Job(
-                holdprint_job_id=holdprint_job_id,
-                title=holdprint_job.get('title', 'Sem título'),
-                client_name=holdprint_job.get('customerName', 'Cliente não informado'),
-                client_address='',
-                branch=request.branch,
-                items=holdprint_job.get('production', {}).get('items', []),
-                holdprint_data=holdprint_job,
-                area_m2=total_area_m2,
-                products_with_area=products_with_area,
-                total_products=len(products),
-                total_quantity=total_quantity
-            )
-
-            job_dict = job.model_dump()
-            job_dict['created_at'] = job_dict['created_at'].isoformat()
-            if job_dict.get('scheduled_date'):
-                job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
-
-            db.jobs.insert_one(job_dict)
+            db.jobs.insert_one(_build_job_doc(holdprint_job, request.branch))
             imported += 1
-
         except Exception as e:
             errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
 
@@ -1295,120 +1403,89 @@ async def import_all_jobs(request: BatchImportRequest, current_user: User = Depe
     }
 
 
+async def _fetch_branch_jobs(branch: str, start_date: str, end_date: str, max_pages: int = 10):
+    """Fetch a single branch's jobs; return (branch, jobs, error_or_none)."""
+    try:
+        jobs = await fetch_holdprint_jobs(
+            branch,
+            start_date=start_date,
+            end_date=end_date,
+            max_pages=max_pages,
+        )
+        return (branch, jobs, None)
+    except HTTPException as he:
+        return (branch, [], f"{branch}: {he.detail}")
+    except Exception as e:
+        return (branch, [], f"{branch}: {str(e)}")
+
+
 @router.post("/jobs/import-current-month")
 async def import_current_month_jobs(current_user: User = Depends(get_current_user)):
-    """Import all jobs from current month for both branches"""
+    """Import jobs from the last 2 weeks for both branches (POA + SP)."""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
-    now = datetime.now(timezone.utc)
-    current_month = now.month
-    current_year = now.year
-    
+
+    # Vercel cap is 60s; reserve 10s for response + DB writes.
+    BUDGET_S = 50.0
+    started = time.monotonic()
+
+    now = datetime.now(timezone.utc).date()
+    start_date = (now - timedelta(days=14)).strftime("%Y-%m-%d")
+    end_date = now.strftime("%Y-%m-%d")
+
     total_imported = 0
     total_skipped = 0
     total_errors = []
     branch_results = []
-    
-    for branch in ["SP", "POA"]:
-        try:
-            holdprint_jobs = await fetch_holdprint_jobs(branch, current_month, current_year)
-            
-            imported = 0
-            skipped = 0
-            errors = []
-            
-            for holdprint_job in holdprint_jobs:
-                holdprint_job_id = str(holdprint_job.get('id', ''))
-                
-                existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
-                if existing:
-                    skipped += 1
-                    continue
-                
-                try:
-                    products = holdprint_job.get('production', {}).get('products', [])
-                    products_with_area = []
-                    total_area_m2 = 0.0
-                    total_quantity = 0
-                    
-                    for product in products:
-                        product_info = extract_product_dimensions(product)
-                        product_with_area = {
-                            "name": product.get('name', ''),
-                            "quantity": product.get('quantity', 1),
-                            "copies": product_info.get('copies', 1),
-                            "width_m": product_info.get('width_m', 0),
-                            "height_m": product_info.get('height_m', 0),
-                            "unit_area_m2": product_info.get('area_m2', 0),
-                            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                        }
-                        products_with_area.append(product_with_area)
-                        total_area_m2 += product_with_area['total_area_m2']
-                        total_quantity += product.get('quantity', 1)
-                    
-                    job = Job(
-                        holdprint_job_id=holdprint_job_id,
-                        title=holdprint_job.get('title', 'Sem título'),
-                        client_name=holdprint_job.get('customerName', 'Cliente não informado'),
-                        client_address='',
-                        branch=branch,
-                        items=holdprint_job.get('production', {}).get('items', []),
-                        holdprint_data=holdprint_job,
-                        area_m2=total_area_m2,
-                        products_with_area=products_with_area,
-                        total_products=len(products),
-                        total_quantity=total_quantity
-                    )
-                    
-                    job_dict = job.model_dump()
-                    job_dict['created_at'] = job_dict['created_at'].isoformat()
-                    if job_dict.get('scheduled_date'):
-                        job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
-                    
-                    db.jobs.insert_one(job_dict)
-                    imported += 1
-                    
-                except Exception as e:
-                    errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
-            
-            branch_results.append({
-                "branch": branch,
-                "imported": imported,
-                "skipped": skipped,
-                "total": len(holdprint_jobs)
-            })
-            total_imported += imported
-            total_skipped += skipped
-            total_errors.extend(errors)
-            
-        except HTTPException as he:
-            branch_results.append({
-                "branch": branch,
-                "imported": 0,
-                "skipped": 0,
-                "total": 0,
-                "error": str(he.detail)
-            })
-            total_errors.append(f"{branch}: {str(he.detail)}")
-        except Exception as e:
-            branch_results.append({
-                "branch": branch,
-                "imported": 0,
-                "skipped": 0,
-                "total": 0,
-                "error": str(e)
-            })
-            total_errors.append(f"{branch}: {str(e)}")
-    
-    _persist_sync_result(total_imported, total_skipped, total_errors, sync_type="manual_current_month")
+    partial = False
+
+    # Fetch both branches in parallel (network-bound)
+    fetch_results = await asyncio.gather(
+        _fetch_branch_jobs("POA", start_date, end_date, max_pages=10),
+        _fetch_branch_jobs("SP", start_date, end_date, max_pages=10),
+    )
+
+    # Insert sequentially (PostgREST sync); abort once we approach Vercel cap.
+    for branch, holdprint_jobs, fetch_error in fetch_results:
+        branch_imported = 0
+        branch_skipped = 0
+        branch_errors = []
+        if fetch_error:
+            branch_errors.append(fetch_error)
+
+        for holdprint_job in holdprint_jobs:
+            if time.monotonic() - started > BUDGET_S:
+                partial = True
+                break
+            holdprint_job_id = str(holdprint_job.get('id', ''))
+            existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
+            if existing:
+                branch_skipped += 1
+                continue
+            try:
+                db.jobs.insert_one(_build_job_doc(holdprint_job, branch))
+                branch_imported += 1
+            except Exception as e:
+                branch_errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
+
+        branch_results.append({
+            "branch": branch,
+            "imported": branch_imported,
+            "skipped": branch_skipped,
+        })
+        total_imported += branch_imported
+        total_skipped += branch_skipped
+        total_errors.extend(branch_errors)
+
+    _persist_sync_result(total_imported, total_skipped, total_errors, sync_type="manual_last_2_weeks")
     return {
         "success": total_imported > 0 or total_skipped > 0,
-        "month": current_month,
-        "year": current_year,
+        "period": f"{start_date} a {end_date}",
         "total_imported": total_imported,
         "total_skipped": total_skipped,
         "branches": branch_results,
-        "errors": total_errors[:5] if total_errors else []
+        "errors": total_errors[:5] if total_errors else [],
+        "partial": partial,
+        "elapsed_s": round(time.monotonic() - started, 2),
     }
 
 
@@ -1440,87 +1517,35 @@ async def import_month_jobs(request: ImportMonthRequest, current_user: User = De
             
             for holdprint_job in holdprint_jobs:
                 holdprint_job_id = str(holdprint_job.get('id', ''))
-                
+
                 existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                 if existing:
                     skipped += 1
                     continue
-                
+
                 try:
-                    products = holdprint_job.get('production', {}).get('products', [])
-                    products_with_area = []
-                    total_area_m2 = 0.0
-                    total_quantity = 0
-                    
-                    for product in products:
-                        product_info = extract_product_dimensions(product)
-                        product_with_area = {
-                            "name": product.get('name', ''),
-                            "quantity": product.get('quantity', 1),
-                            "copies": product_info.get('copies', 1),
-                            "width_m": product_info.get('width_m', 0),
-                            "height_m": product_info.get('height_m', 0),
-                            "unit_area_m2": product_info.get('area_m2', 0),
-                            "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                        }
-                        products_with_area.append(product_with_area)
-                        total_area_m2 += product_with_area['total_area_m2']
-                        total_quantity += product.get('quantity', 1)
-                    
-                    job = Job(
-                        holdprint_job_id=holdprint_job_id,
-                        title=holdprint_job.get('title', 'Sem título'),
-                        client_name=holdprint_job.get('customerName', 'Cliente não informado'),
-                        client_address='',
-                        branch=branch,
-                        items=holdprint_job.get('production', {}).get('items', []),
-                        holdprint_data=holdprint_job,
-                        area_m2=total_area_m2,
-                        products_with_area=products_with_area,
-                        total_products=len(products),
-                        total_quantity=total_quantity
-                    )
-                    
-                    job_dict = job.model_dump()
-                    job_dict['created_at'] = job_dict['created_at'].isoformat()
-                    if job_dict.get('scheduled_date'):
-                        job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
-                    
-                    db.jobs.insert_one(job_dict)
+                    db.jobs.insert_one(_build_job_doc(holdprint_job, branch))
                     imported += 1
-                    
                 except Exception as e:
                     errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
-            
+
             branch_results.append({
                 "branch": branch,
                 "imported": imported,
                 "skipped": skipped,
-                "total": imported + skipped
+                "total": imported + skipped,
             })
-            
+
             total_imported += imported
             total_skipped += skipped
-            
+
         except HTTPException as he:
-            branch_results.append({
-                "branch": branch,
-                "imported": 0,
-                "skipped": 0,
-                "total": 0,
-                "error": str(he.detail)
-            })
+            branch_results.append({"branch": branch, "imported": 0, "skipped": 0, "total": 0, "error": str(he.detail)})
             total_errors.append(f"{branch}: {str(he.detail)}")
         except Exception as e:
-            branch_results.append({
-                "branch": branch,
-                "imported": 0,
-                "skipped": 0,
-                "total": 0,
-                "error": str(e)
-            })
+            branch_results.append({"branch": branch, "imported": 0, "skipped": 0, "total": 0, "error": str(e)})
             total_errors.append(f"{branch}: {str(e)}")
-    
+
     return {
         "success": total_imported > 0 or total_skipped > 0,
         "month": target_month,
@@ -1528,7 +1553,7 @@ async def import_month_jobs(request: ImportMonthRequest, current_user: User = De
         "total_imported": total_imported,
         "total_skipped": total_skipped,
         "branches": branch_results,
-        "errors": total_errors[:5] if total_errors else []
+        "errors": total_errors[:5] if total_errors else [],
     }
 
 
@@ -1565,55 +1590,15 @@ async def sync_holdprint_jobs(
                 
                 for holdprint_job in holdprint_jobs:
                     holdprint_job_id = str(holdprint_job.get('id', ''))
-                    
+
                     existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                     if existing:
                         skipped += 1
                         continue
-                    
+
                     try:
-                        products = holdprint_job.get('production', {}).get('products', [])
-                        products_with_area = []
-                        total_area_m2 = 0.0
-                        total_quantity = 0
-                        
-                        for product in products:
-                            product_info = extract_product_dimensions(product)
-                            product_with_area = {
-                                "name": product.get('name', ''),
-                                "quantity": product.get('quantity', 1),
-                                "copies": product_info.get('copies', 1),
-                                "width_m": product_info.get('width_m', 0),
-                                "height_m": product_info.get('height_m', 0),
-                                "unit_area_m2": product_info.get('area_m2', 0),
-                                "total_area_m2": product_info.get('area_m2', 0) * product.get('quantity', 1)
-                            }
-                            products_with_area.append(product_with_area)
-                            total_area_m2 += product_with_area['total_area_m2']
-                            total_quantity += product.get('quantity', 1)
-                        
-                        job = Job(
-                            holdprint_job_id=holdprint_job_id,
-                            title=holdprint_job.get('title', 'Sem título'),
-                            client_name=holdprint_job.get('customerName', 'Cliente não informado'),
-                            client_address='',
-                            branch=branch,
-                            items=holdprint_job.get('production', {}).get('items', []),
-                            holdprint_data=holdprint_job,
-                            area_m2=total_area_m2,
-                            products_with_area=products_with_area,
-                            total_products=len(products),
-                            total_quantity=total_quantity
-                        )
-                        
-                        job_dict = job.model_dump()
-                        job_dict['created_at'] = job_dict['created_at'].isoformat()
-                        if job_dict.get('scheduled_date'):
-                            job_dict['scheduled_date'] = job_dict['scheduled_date'].isoformat()
-                        
-                        db.jobs.insert_one(job_dict)
+                        db.jobs.insert_one(_build_job_doc(holdprint_job, branch))
                         imported += 1
-                        
                     except Exception as e:
                         errors.append(f"{holdprint_job.get('title', 'Unknown')}: {str(e)}")
                 
