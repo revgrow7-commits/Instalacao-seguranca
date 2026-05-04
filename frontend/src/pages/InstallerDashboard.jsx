@@ -10,6 +10,57 @@ import NotificationPermissionModal from '../components/NotificationPermissionMod
 import GamificationWidget from '../components/GamificationWidget';
 import WeeklyLeaderboard from '../components/WeeklyLeaderboard';
 
+/* ── Skeleton de um card de job ── */
+const JobCardSkeleton = ({ delay = 0 }) => (
+  <div
+    className="rounded-xl bg-card border border-white/5 p-4 space-y-3 animate-card-in"
+    style={{ animationDelay: `${delay}ms` }}
+  >
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-3/4 rounded bg-white/10 loading-pulse" />
+        <div className="h-3 w-1/2 rounded bg-white/7 loading-pulse" />
+      </div>
+      <div className="h-5 w-16 rounded-full bg-yellow-500/20 loading-pulse shrink-0" />
+    </div>
+    <div className="h-3 w-5/6 rounded bg-white/7 loading-pulse" />
+    <div className="h-11 w-full rounded-lg bg-primary/20 loading-pulse" />
+  </div>
+);
+
+/* ── Skeleton completo do dashboard ── */
+const DashboardSkeleton = ({ userName }) => (
+  <div className="p-4 md:p-8 space-y-6 pb-24 animate-page-reveal">
+    {/* Header */}
+    <div className="flex items-center justify-between">
+      <div className="space-y-2">
+        <div className="text-2xl font-heading font-bold text-white">
+          Olá, {userName || '…'}
+        </div>
+        <div className="h-3 w-36 rounded bg-white/10 loading-pulse" />
+      </div>
+      <div className="h-10 w-36 rounded-lg bg-yellow-500/20 loading-pulse" />
+    </div>
+    {/* Stats */}
+    <div className="grid grid-cols-3 gap-3">
+      {[0, 1, 2].map(i => (
+        <div key={i} className="rounded-xl bg-card border border-white/5 p-4 space-y-2 animate-card-in" style={{ animationDelay: `${i * 60}ms` }}>
+          <div className="h-3 w-16 rounded bg-white/10 loading-pulse" />
+          <div className="h-7 w-8 rounded bg-white/15 loading-pulse" />
+        </div>
+      ))}
+    </div>
+    {/* Job cards */}
+    <div>
+      <div className="h-5 w-36 rounded bg-white/10 loading-pulse mb-4" />
+      <div className="space-y-3">
+        <JobCardSkeleton delay={80} />
+        <JobCardSkeleton delay={160} />
+      </div>
+    </div>
+  </div>
+);
+
 const InstallerDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -41,16 +92,20 @@ const InstallerDashboard = () => {
 
   const loadData = async () => {
     try {
-      const [jobsRes, checkinsRes] = await Promise.all([
-        api.getJobs(),
-        api.getCheckins()
-      ]);
+      // 1. Carrega jobs primeiro — libera o skeleton imediatamente
+      const jobsRes = await api.getJobs();
       setJobs(jobsRes.data);
-      setCheckins(checkinsRes.data);
     } catch (error) {
-      toast.error('Erro ao carregar dados');
+      toast.error('Erro ao carregar jobs');
     } finally {
-      setLoading(false);
+      setLoading(false); // remove skeleton assim que jobs chegam
+    }
+    // 2. Carrega checkins em segundo plano — atualiza status sem travar UI
+    try {
+      const checkinsRes = await api.getCheckins();
+      setCheckins(checkinsRes.data);
+    } catch {
+      // checkins são opcionais para exibição inicial
     }
   };
 
@@ -139,11 +194,7 @@ const InstallerDashboard = () => {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="loading-pulse text-primary text-2xl font-heading">Carregando...</div>
-      </div>
-    );
+    return <DashboardSkeleton userName={user?.name} />;
   }
 
   // Filtrar jobs - incluir 'aguardando' como pendente
@@ -156,7 +207,7 @@ const InstallerDashboard = () => {
   const completedJobs = jobs.filter(j => j.status === 'completed' || j.status === 'finalizado');
 
   return (
-    <div className="p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8" data-testid="installer-dashboard">
+    <div className="p-4 md:p-8 space-y-6 md:space-y-8 pb-24 md:pb-8 animate-page-reveal" data-testid="installer-dashboard">
       {/* Notification Permission Modal */}
       <NotificationPermissionModal 
         isOpen={showNotificationModal}
@@ -224,7 +275,7 @@ const InstallerDashboard = () => {
         <div>
           <h2 className="text-lg md:text-2xl font-heading font-bold text-white mb-3 md:mb-4">Jobs em Andamento</h2>
           <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-6">
-            {activeJobs.map((job) => {
+            {activeJobs.map((job, idx) => {
               const checkin = getJobCheckin(job.id);
               const startTime = checkin ? new Date(checkin.checkin_at) : null;
               const elapsedMinutes = startTime ? Math.floor((new Date() - startTime) / 60000) : 0;
@@ -232,7 +283,8 @@ const InstallerDashboard = () => {
               return (
                 <Card
                   key={job.id}
-                  className="bg-card border-blue-500/30 neon-glow"
+                  className="bg-card border-blue-500/30 neon-glow animate-card-in"
+                  style={{ animationDelay: `${idx * 60}ms` }}
                   data-testid={`active-job-${job.id}`}
                 >
                   <CardHeader className="p-4 md:p-6">
@@ -291,10 +343,11 @@ const InstallerDashboard = () => {
           </Card>
         ) : (
           <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-2 md:gap-6">
-            {pendingJobs.map((job) => (
+            {pendingJobs.map((job, idx) => (
               <Card
                 key={job.id}
-                className="bg-card border-white/5 hover:border-primary/50 transition-colors"
+                className="bg-card border-white/5 hover:border-primary/50 transition-colors animate-card-in"
+                style={{ animationDelay: `${idx * 60}ms` }}
                 data-testid={`pending-job-${job.id}`}
               >
                 <CardHeader className="p-4 md:p-6">
