@@ -323,21 +323,32 @@ async def list_jobs(
     }
     
     if current_user.role == UserRole.INSTALLER:
-        # Installer can only see jobs where they are assigned
-        # Check both installer.id and user_id for compatibility
+        # Usar cliente Supabase diretamente para garantir filtro JSONB correto
+        import json as _json
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
+        installer_ids = [current_user.id]
         if installer:
-            # Filter by user_id OR installer.id in assigned_installers
-            query["$or"] = [
-                {"assigned_installers": current_user.id},  # user_id
-                {"assigned_installers": installer['id']}   # installer.id
-            ]
-        else:
-            # Fallback to just user_id if no installer record
-            query["assigned_installers"] = current_user.id
-    
-    # Busca otimizada com projeção
-    jobs = db.jobs.find(query, projection)
+            installer_ids.append(installer['id'])
+
+        cols = [k for k, v in projection.items() if v and k != '_id']
+        columns = ','.join(cols) if cols else '*'
+
+        client = get_client()
+        builder = client.table("jobs").select(columns)
+        if not include_archived:
+            builder = builder.eq("archived", False)
+
+        # OR: assigned_installers contém user_id OU installer_id
+        or_clauses = ",".join(
+            f'assigned_installers.cs.{_json.dumps([id_])}' for id_ in installer_ids
+        )
+        builder = builder.or_(or_clauses)
+        result = builder.execute()
+        from db_supabase import _deserialize
+        jobs = [_deserialize(doc) for doc in (result.data or [])]
+    else:
+        # Busca otimizada com projeção
+        jobs = db.jobs.find(query, projection)
     
     if not jobs:
         return []
