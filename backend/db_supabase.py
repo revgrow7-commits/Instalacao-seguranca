@@ -75,7 +75,7 @@ TABLE_COLUMNS = {
         "item_assignments", "archived_items", "archived", "archived_at", "archived_by",
         "archived_by_name", "exclude_from_metrics", "no_installation", "notes",
         "cancelled_at", "justification", "justified_at", "installation_config",
-        "completed_at", "created_at"
+        "completed_at", "finalized_at", "created_at"
     ]),
     "checkins": frozenset([
         "id", "job_id", "installer_id", "status", "checkin_at", "checkout_at",
@@ -141,7 +141,8 @@ TABLE_COLUMNS = {
         "subscribed_at", "created_at"
     ]),
     "system_config": frozenset([
-        "id", "key", "value", "total_imported", "total_skipped", "updated_at"
+        "id", "key", "value", "total_imported", "total_skipped",
+        "total_errors", "status", "sync_type", "updated_at"
     ]),
     "scheduler_sync_status": frozenset([
         "id", "sync_type", "last_sync_at", "total_imported", "total_skipped",

@@ -3,54 +3,8 @@ Holdprint API integration service.
 """
 import re
 import logging
-import requests
-from fastapi import HTTPException
-from config import HOLDPRINT_API_KEY_POA, HOLDPRINT_API_KEY_SP, HOLDPRINT_API_URL
 
 logger = logging.getLogger(__name__)
-
-
-async def fetch_holdprint_jobs(branch: str):
-    """Fetch jobs from Holdprint API - Janeiro 2026 (1 a 7)"""
-    api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
-    
-    if not api_key:
-        raise HTTPException(status_code=500, detail=f"API key not configured for branch {branch}")
-    
-    headers = {"x-api-key": api_key}
-    
-    # Período fixo: 1 a 7 de Janeiro de 2026
-    start_date_str = "2026-01-01"
-    end_date_str = "2026-01-07"
-    
-    params = {
-        "page": 1,
-        "pageSize": 100,
-        "startDate": start_date_str,
-        "endDate": end_date_str,
-        "language": "pt-BR"
-    }
-    
-    try:
-        response = requests.get(HOLDPRINT_API_URL, headers=headers, params=params, timeout=30)
-        response.raise_for_status()
-        data = response.json()
-        
-        jobs = []
-        if isinstance(data, dict) and 'data' in data:
-            jobs = data['data']
-        elif isinstance(data, list):
-            jobs = data
-        
-        # Filtrar jobs NÃO finalizados
-        filtered_jobs = [job for job in jobs if not job.get('isFinalized', False)]
-        
-        logger.info(f"Holdprint {branch}: {len(jobs)} jobs encontrados, {len(filtered_jobs)} não finalizados (período: {start_date_str} a {end_date_str})")
-        
-        return filtered_jobs
-    except requests.RequestException as e:
-        logger.error(f"Error fetching from Holdprint: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching from Holdprint: {str(e)}")
 
 
 def extract_product_dimensions(product: dict) -> dict:
@@ -102,34 +56,40 @@ def extract_product_dimensions(product: dict) -> dict:
         except (ValueError, TypeError):
             pass
 
-    # 3. HTML description — values are already in meters ("Largura: 1.5 m")
+    # 3. HTML description — Holdprint sends values in cm ("Largura: 13cm") or meters ("Largura: 1.5m")
     description = product.get("description", "")
     if description and (not width_m or not height_m):
+        def _parse_dimension(pattern, text):
+            """Return dimension in meters. Handles cm and m units."""
+            m = re.search(pattern, text, re.IGNORECASE)
+            if not m:
+                return 0.0
+            try:
+                value = float(m.group(1).replace(',', '.'))
+                unit = (m.group(2) or 'm').lower().strip()
+                return value / 100 if unit == 'cm' else value
+            except (ValueError, TypeError, IndexError):
+                return 0.0
+
         width_patterns = [
-            r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m',
-            r'Largura[:\s]+([0-9.,]+)\s*m',
+            r'Largura:\s*<span[^>]*>([0-9.,]+)\s*(cm|m)\b',
+            r'Largura[:\s•&#8226;]+([0-9.,]+)\s*(cm|m)\b',
         ]
         for pattern in width_patterns:
-            match = re.search(pattern, description, re.IGNORECASE)
-            if match:
-                try:
-                    width_m = float(match.group(1).replace(',', '.'))
-                    break
-                except (ValueError, TypeError):
-                    pass
+            v = _parse_dimension(pattern, description)
+            if v:
+                width_m = v
+                break
 
         height_patterns = [
-            r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m',
-            r'Altura[:\s]+([0-9.,]+)\s*m',
+            r'Altura:\s*<span[^>]*>([0-9.,]+)\s*(cm|m)\b',
+            r'Altura[:\s•&#8226;]+([0-9.,]+)\s*(cm|m)\b',
         ]
         for pattern in height_patterns:
-            match = re.search(pattern, description, re.IGNORECASE)
-            if match:
-                try:
-                    height_m = float(match.group(1).replace(',', '.'))
-                    break
-                except (ValueError, TypeError):
-                    pass
+            v = _parse_dimension(pattern, description)
+            if v:
+                height_m = v
+                break
 
         if quantity == 1:
             copies_patterns = [
