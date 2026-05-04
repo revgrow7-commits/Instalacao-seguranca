@@ -22,8 +22,11 @@ from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import (
     HOLDPRINT_API_KEY_POA, HOLDPRINT_API_KEY_SP, HOLDPRINT_API_URL,
-    SENDER_EMAIL
+    SENDER_EMAIL, RESEND_API_KEY
 )
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 from services.holdprint import extract_product_dimensions
 
 router = APIRouter()
