@@ -50,6 +50,10 @@ const Calendar = () => {
   const [weekStartDate, setWeekStartDate] = useState(new Date());
   const [dayViewDate, setDayViewDate] = useState(new Date());
 
+  // Day detail modal
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [dayModalDate, setDayModalDate] = useState(null);
+
   // Detect mobile screen
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -346,6 +350,170 @@ const Calendar = () => {
     return colors[status?.toLowerCase()] || 'bg-gray-500';
   };
 
+  const openDayModal = (date) => {
+    if (!date) return;
+    setDayModalDate(date);
+    setShowDayModal(true);
+  };
+
+  const DayDetailModal = () => {
+    if (!dayModalDate) return null;
+    const HOURS = Array.from({ length: 14 }, (_, i) => i + 7); // 07..20
+    const dayJobs = getJobsForDate(dayModalDate);
+
+    // Sort jobs by scheduled_date time
+    const sortedJobs = [...dayJobs].sort((a, b) =>
+      new Date(a.scheduled_date) - new Date(b.scheduled_date)
+    );
+
+    const getJobTop = (job) => {
+      const d = new Date(job.scheduled_date);
+      const hour = d.getHours();
+      const min = d.getMinutes();
+      return ((hour - 7) + min / 60) * 56; // 56px per hour
+    };
+
+    const getJobHeight = (job) => {
+      if (job.scheduled_time_end) {
+        const start = new Date(job.scheduled_date);
+        const end = new Date(job.scheduled_time_end);
+        const diffH = (end - start) / 3600000;
+        return Math.max(32, diffH * 56);
+      }
+      return 48; // default ~1h visual
+    };
+
+    const getInstaller = (job) => {
+      const id = (job.assigned_installers || [])[0];
+      if (!id) return null;
+      return installers.find(i => i.id === id || i.user_id === id);
+    };
+
+    const COLORS = [
+      'bg-blue-500', 'bg-emerald-500', 'bg-amber-500',
+      'bg-purple-500', 'bg-cyan-500', 'bg-rose-500',
+      'bg-orange-500', 'bg-teal-500',
+    ];
+    const getColor = (job) => {
+      const id = (job.assigned_installers || [])[0];
+      if (!id) return 'bg-primary';
+      const idx = installers.findIndex(i => i.id === id || i.user_id === id);
+      return COLORS[(idx < 0 ? 0 : idx) % COLORS.length];
+    };
+
+    const handleScheduleForDay = () => {
+      setShowDayModal(false);
+      const y = dayModalDate.getFullYear();
+      const m = String(dayModalDate.getMonth() + 1).padStart(2, '0');
+      const d = String(dayModalDate.getDate()).padStart(2, '0');
+      setScheduleDate(`${y}-${m}-${d}`);
+      setScheduleTime('08:00');
+      setSelectedJob(null);
+      setShowScheduleDialog(true);
+    };
+
+    const dateLabel = dayModalDate.toLocaleDateString('pt-BR', {
+      weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+    });
+
+    return (
+      <Dialog open={showDayModal} onOpenChange={setShowDayModal}>
+        <DialogContent className="max-w-lg bg-card border-white/10 p-0 overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-3 border-b border-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-white capitalize text-base font-semibold">
+                  {dateLabel}
+                </DialogTitle>
+                <p className="text-muted-foreground text-xs mt-0.5">
+                  {dayJobs.length === 0 ? 'Nenhum job agendado' : `${dayJobs.length} job${dayJobs.length > 1 ? 's' : ''} agendado${dayJobs.length > 1 ? 's' : ''}`}
+                </p>
+              </div>
+              {(isAdmin || isManager) && (
+                <Button size="sm" onClick={handleScheduleForDay}
+                        className="bg-primary hover:bg-primary/90 text-white text-xs h-8 gap-1">
+                  <Plus className="h-3 w-3" /> Agendar
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          {/* Hourly timeline */}
+          <div className="overflow-y-auto" style={{ maxHeight: '70vh' }}>
+            <div className="relative flex" style={{ minHeight: `${HOURS.length * 56}px` }}>
+              {/* Hour labels */}
+              <div className="w-12 flex-shrink-0 relative">
+                {HOURS.map(h => (
+                  <div key={h} className="absolute w-full flex items-start justify-end pr-2"
+                       style={{ top: `${(h - 7) * 56}px`, height: '56px' }}>
+                    <span className="text-[10px] text-muted-foreground pt-1">
+                      {String(h).padStart(2, '0')}h
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Grid lines + job area */}
+              <div className="flex-1 relative border-l border-white/10">
+                {HOURS.map(h => (
+                  <div key={h} className="absolute w-full border-b border-white/5"
+                       style={{ top: `${(h - 7) * 56}px`, height: '56px' }} />
+                ))}
+
+                {/* Jobs without a time (only date) */}
+                {sortedJobs.filter(j => {
+                  const d = new Date(j.scheduled_date);
+                  return d.getHours() === 0 && d.getMinutes() === 0;
+                }).map((job, i) => {
+                  const inst = getInstaller(job);
+                  return (
+                    <div key={job.id}
+                         className={`absolute left-1 right-1 rounded px-2 py-1 cursor-pointer hover:brightness-110 ${getColor(job)}`}
+                         style={{ top: `${i * 38}px`, minHeight: '32px' }}
+                         onClick={() => { setShowDayModal(false); navigate(`/jobs/${job.id}`); }}>
+                      <p className="text-white text-xs font-semibold truncate">#{job.holdprint_data?.code || job.code} {job.title || job.client_name}</p>
+                      {inst && <p className="text-white/80 text-[10px] truncate">{inst.full_name || inst.name}</p>}
+                    </div>
+                  );
+                })}
+
+                {/* Jobs with a real time */}
+                {sortedJobs.filter(j => {
+                  const d = new Date(j.scheduled_date);
+                  return d.getHours() !== 0 || d.getMinutes() !== 0;
+                }).map(job => {
+                  const top = getJobTop(job);
+                  const height = getJobHeight(job);
+                  const inst = getInstaller(job);
+                  const startTime = new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                  const endTime = job.scheduled_time_end
+                    ? new Date(job.scheduled_time_end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                    : null;
+                  return (
+                    <div key={job.id}
+                         className={`absolute left-1 right-1 rounded px-2 py-1 cursor-pointer hover:brightness-110 ${getColor(job)}`}
+                         style={{ top: `${top}px`, height: `${height}px`, overflow: 'hidden' }}
+                         onClick={() => { setShowDayModal(false); navigate(`/jobs/${job.id}`); }}>
+                      <p className="text-white text-[10px] font-bold">
+                        {startTime}{endTime ? ` – ${endTime}` : ''}
+                      </p>
+                      <p className="text-white text-xs font-semibold truncate">
+                        #{job.holdprint_data?.code || job.code} {job.title || job.client_name}
+                      </p>
+                      {inst && height >= 40 && (
+                        <p className="text-white/80 text-[10px] truncate">{inst.full_name || inst.name}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[60vh]">
@@ -608,31 +776,32 @@ const Calendar = () => {
                     const dayJobs = date ? getJobsForDate(date) : [];
                     const isDragOver = dragOverDate === date?.toISOString();
                     const dateKey = date ? `day-${date.toISOString()}` : `empty-${index}`;
-                    
+
                     return (
                       <div
                         key={dateKey}
                         onDragOver={(e) => handleDragOver(e, date)}
                         onDragLeave={handleDragLeave}
                         onDrop={(e) => handleDrop(e, date)}
+                        onClick={() => date && openDayModal(date)}
                         className={`
                           min-h-[100px] p-1 rounded-lg border transition-all
                           ${date ? 'bg-white/5 border-white/5' : 'bg-transparent border-transparent'}
                           ${isToday(date) ? 'ring-2 ring-primary' : ''}
                           ${isDragOver ? 'bg-primary/20 border-primary border-dashed' : ''}
-                          ${(isAdmin || isManager) && date ? 'cursor-pointer hover:border-primary/50' : ''}
+                          ${date ? 'cursor-pointer hover:border-primary/50 hover:bg-white/10' : ''}
                         `}
                       >
                         {date && (
                           <>
-                            <div className={`text-xs font-medium mb-1 ${isToday(date) ? 'text-primary' : 'text-muted-foreground'}`}>
+                            <div className={`text-xs font-medium mb-1 ${isToday(date) ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
                               {date.getDate()}
                             </div>
                             <div className="space-y-1">
                               {dayJobs.slice(0, 3).map(job => (
                                 <div
                                   key={job.id}
-                                  onClick={() => navigate(`/jobs/${job.id}`)}
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${job.id}`); }}
                                   className={`
                                     text-[10px] p-1 rounded truncate cursor-pointer
                                     ${getStatusColor(job.status)} text-white
@@ -858,6 +1027,9 @@ const Calendar = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Day Detail Modal */}
+      <DayDetailModal />
     </div>
   );
 };
