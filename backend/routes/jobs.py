@@ -981,6 +981,45 @@ class ArchiveItemsRequest(BaseModel):
     exclude_from_metrics: bool = False
 
 
+@router.post("/jobs/batch-schedule")
+async def batch_schedule_jobs(
+    job_ids: List[str] = Body(..., embed=True),
+    scheduled_date: Optional[str] = Body(None, embed=True),
+    assigned_installers: List[str] = Body(default=[], embed=True),
+    current_user: User = Depends(get_current_user),
+):
+    """Schedule multiple jobs in a single DB round-trip."""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    if not job_ids:
+        return {"updated_count": 0, "message": "Nenhum job selecionado"}
+    if len(job_ids) > 500:
+        raise HTTPException(status_code=400, detail="Máximo de 500 jobs por operação")
+
+    update_data: dict = {}
+    if scheduled_date:
+        try:
+            update_data["scheduled_date"] = datetime.fromisoformat(scheduled_date.replace("Z", "+00:00")).isoformat()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Data inválida")
+    else:
+        update_data["scheduled_date"] = None
+
+    if assigned_installers:
+        import json as _json
+        update_data["assigned_installers"] = _json.dumps(assigned_installers)
+
+    try:
+        client = get_client()
+        client.table("jobs").update(update_data).in_("id", job_ids).execute()
+    except Exception as e:
+        logger.error(f"batch_schedule_jobs error: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao agendar jobs: {str(e)}")
+
+    logger.info(f"batch_schedule_jobs: {len(job_ids)} jobs agendados por {current_user.email}")
+    return {"updated_count": len(job_ids), "message": f"{len(job_ids)} job(s) agendados com sucesso"}
+
+
 @router.post("/jobs/batch-archive")
 async def batch_archive_jobs(
     job_ids: List[str] = Body(..., embed=True),
