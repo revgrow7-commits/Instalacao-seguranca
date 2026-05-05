@@ -186,14 +186,14 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
     if (job.holdprint_data?.deliveryNeeded) {
       return {
         date: job.holdprint_data.deliveryNeeded,
-        label: 'Previsão de Entrega Hold',
+        label: 'Entrega Prevista',
         isScheduledDate: false
       };
     }
     if (job.holdprint_data?.creationTime) {
       return {
         date: job.holdprint_data.creationTime,
-        label: 'Data de Criação',
+        label: 'Criado em',
         isScheduledDate: false
       };
     }
@@ -335,25 +335,25 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
         </div>
 
         {/* Date Row */}
-        <div className="flex flex-col gap-1 text-xs mb-3">
-          {dateInfo.label && (
-            <span className="text-[10px] text-muted-foreground/70 uppercase tracking-wide">{dateInfo.label}</span>
+        <div className="flex items-center justify-between mb-3">
+          {formattedStartDate ? (
+            <div className={`flex items-center gap-1.5 text-sm font-medium ${isLate ? 'text-red-400' : dateInfo.isScheduledDate ? 'text-green-400' : 'text-slate-200'}`}>
+              {dateInfo.isScheduledDate
+                ? <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                : <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+              }
+              <span>{formattedStartDate}</span>
+              {isLate && <span className="text-[10px] font-normal">(atrasado)</span>}
+            </div>
+          ) : (
+            <span className="text-xs text-muted-foreground/50 italic">Sem data</span>
           )}
-          <div className="flex items-center gap-3">
-            {formattedStartDate && (
-              <div className={`flex items-center ${isLate ? 'text-red-400' : dateInfo.label ? 'text-blue-400' : 'text-muted-foreground'}`}>
-                <Clock className="h-3 w-3 mr-1" />
-                {formattedStartDate}
-                {isLate && <span className="ml-1 text-[10px]">(atrasado)</span>}
-              </div>
-            )}
-            {isScheduled && !isLate && (
-              <div className="flex items-center text-green-400">
-                <CalendarCheck className="h-3 w-3 mr-1" />
-                Agendado
-              </div>
-            )}
-          </div>
+          {dateInfo.label && (
+            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">{dateInfo.label}</span>
+          )}
+          {isScheduled && !dateInfo.label && !isLate && (
+            <span className="text-[10px] text-green-400 uppercase tracking-wide">Agendado</span>
+          )}
         </div>
 
         {/* Elapsed time indicator for jobs in progress */}
@@ -511,6 +511,7 @@ const Jobs = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
+  const [scheduleTime, setScheduleTime] = useState('08:00');
   const [scheduleInstallerIds, setScheduleInstallerIds] = useState(new Set());
   
   // Justification dialog states
@@ -731,7 +732,7 @@ const Jobs = () => {
     if (!selectedJob) return;
 
     const installerIds = [...scheduleInstallerIds];
-    const isoDate = scheduleDate ? new Date(scheduleDate).toISOString() : null;
+    const isoDate = scheduleDate ? new Date(`${scheduleDate}T${scheduleTime || '08:00'}:00`).toISOString() : null;
 
     try {
       setProcessingJobId(selectedJob.id);
@@ -813,7 +814,7 @@ const Jobs = () => {
     try {
       const ids = [...selectedJobIds];
       const installerIds = [...batchScheduleInstallerIds];
-      const isoDate = new Date(batchScheduleDate).toISOString();
+      const isoDate = new Date(`${batchScheduleDate}T12:00:00`).toISOString();
       await api.batchScheduleJobs(ids, isoDate, installerIds);
       toast.success(`${ids.length} job(s) agendados com sucesso!`);
       setJobs(prev => prev.map(j =>
@@ -900,8 +901,8 @@ const Jobs = () => {
       // Search filter - includes job code (e.g., #1959 or 1959)
       const searchLower = searchTerm.toLowerCase().replace('#', '');
       const jobCode = job.holdprint_data?.code || job.code || '';
-      const matchesSearch = !searchTerm || 
-        job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch = !searchTerm ||
+        (job.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (job.client_name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (job.holdprint_data?.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         jobCode.toString().includes(searchLower);
@@ -934,9 +935,16 @@ const Jobs = () => {
       
       const matchesBranch = branchFilter === 'all' || job.branch === branchFilter;
       
-      // Installer filter - checks if the selected installer is assigned to this job
-      const matchesInstaller = installerFilter === 'all' || 
-        (job.assigned_installers && job.assigned_installers.includes(installerFilter));
+      // Installer filter - checks if the selected installer is assigned to this job.
+      // assigned_installers historicamente teve mistura de installer.id e user.id, então
+      // cobrimos ambos buscando o user_id do instalador selecionado.
+      const selectedInstaller = installers.find(i => i.id === installerFilter);
+      const installerUserId = selectedInstaller?.user_id;
+      const matchesInstaller = installerFilter === 'all' ||
+        (Array.isArray(job.assigned_installers) && (
+          job.assigned_installers.includes(installerFilter) ||
+          (installerUserId && job.assigned_installers.includes(installerUserId))
+        ));
       
       // Get job date
       const getJobDate = () => {
@@ -1014,7 +1022,7 @@ const Jobs = () => {
       };
       return getDate(a) - getDate(b); // Ascending (oldest first)
     });
-  }, [jobs, searchTerm, statusFilter, branchFilter, installerFilter, startDateFilter, endDateFilter, monthFilter]);
+  }, [jobs, searchTerm, statusFilter, branchFilter, installerFilter, installers, startDateFilter, endDateFilter, monthFilter]);
 
   const loadMore = () => setVisibleCount(prev => prev + 12);
 
@@ -1825,7 +1833,7 @@ const Jobs = () => {
       {/* Schedule Dialog */}
       <Dialog open={showScheduleDialog} onOpenChange={(open) => {
         setShowScheduleDialog(open);
-        if (!open) { setSelectedJob(null); setScheduleDate(''); setScheduleInstallerIds(new Set()); }
+        if (!open) { setSelectedJob(null); setScheduleDate(''); setScheduleTime('08:00'); setScheduleInstallerIds(new Set()); }
       }}>
         <DialogContent className="bg-card border-white/10 max-w-md">
           <DialogHeader>
@@ -1838,14 +1846,25 @@ const Jobs = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div>
-              <label className="text-sm text-muted-foreground mb-2 block">Data de Agendamento</label>
-              <Input
-                type="date"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-                className="bg-white/5 border-white/10 text-white"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-2 block">Data</label>
+                <Input
+                  type="date"
+                  value={scheduleDate}
+                  onChange={(e) => setScheduleDate(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-2 block">Horário</label>
+                <Input
+                  type="time"
+                  value={scheduleTime}
+                  onChange={(e) => setScheduleTime(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
             </div>
 
             {/* Instaladores */}
