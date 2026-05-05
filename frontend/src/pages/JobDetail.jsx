@@ -134,7 +134,10 @@ const JobDetail = () => {
       
       if (jobData.scheduled_date) {
         const date = new Date(jobData.scheduled_date);
-        setScheduledDate(date.toISOString().slice(0, 16));
+        const pad = n => String(n).padStart(2, '0');
+        setScheduledDate(
+          `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+        );
       }
       
       // Carregar atribuições de itens
@@ -412,12 +415,14 @@ const JobDetail = () => {
     }
 
     try {
-      await api.scheduleJob(jobId, scheduledDate, selectedInstallers.length > 0 ? selectedInstallers : null);
+      await api.scheduleJob(jobId, new Date(scheduledDate).toISOString(), selectedInstallers.length > 0 ? selectedInstallers : null);
       toast.success('Job agendado com sucesso!');
       setShowScheduleDialog(false);
       loadData();
     } catch (error) {
-      toast.error('Erro ao agendar job');
+      console.error('Erro ao agendar job:', error?.response?.status, error?.response?.data);
+      const detail = error?.response?.data?.detail;
+      toast.error(detail ? `Erro: ${detail}` : 'Erro ao agendar job');
     }
   };
 
