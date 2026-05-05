@@ -24,7 +24,6 @@ export function useVisitas(filters = {}) {
     } finally {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.role, user?.id]);
 
   useEffect(() => {
