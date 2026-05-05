@@ -393,6 +393,20 @@ export const api = {
     return axios.get(url, { headers: getAuthHeader() });
   },
 
+  // Visitas Técnicas
+  listVisitas: (params = {}) => axios.get(`${API_URL}/visitas`, { params, headers: getAuthHeader() }),
+  createVisita: (data) => axios.post(`${API_URL}/visitas`, data, { headers: getAuthHeader() }),
+  updateVisita: (id, data) => axios.patch(`${API_URL}/visitas/${id}`, data, { headers: getAuthHeader() }),
+  agendarVisita: (id, data) => axios.post(`${API_URL}/visitas/${id}/agendar`, data, { headers: getAuthHeader() }),
+  cancelarVisita: (id) => axios.post(`${API_URL}/visitas/${id}/cancelar`, {}, { headers: getAuthHeader() }),
+  getVisita: (id) => axios.get(`${API_URL}/visitas/${id}`, { headers: getAuthHeader() }),
+  submitRelatorioVisita: (id, formData) =>
+    axios.post(`${API_URL}/visitas/${id}/relatorio`, formData, {
+      headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' },
+    }),
+  exportVisitasTecnicas: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/excel`, { params, headers: getAuthHeader(), responseType: 'blob' }),
+
   // Installer Google Calendar
   getInstallerCalendarStatus: () => getCachedOrFetch(
     'installer_calendar_status',

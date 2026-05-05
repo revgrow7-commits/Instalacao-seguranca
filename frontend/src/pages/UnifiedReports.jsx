@@ -9,11 +9,11 @@ import { Label } from '../components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { 
-  FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp, 
-  Calendar, Download, Layers, User, Camera, Image, X, MapPin, Pause, 
+import {
+  FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp,
+  Calendar, Download, Layers, User, Camera, Image, X, MapPin, Pause,
   ChevronLeft, ChevronRight, Loader2, BarChart3, Ruler, RefreshCw,
-  Filter, ChevronDown, ChevronUp, Package
+  Filter, ChevronDown, ChevronUp, Package, Navigation, DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -77,6 +77,15 @@ const UnifiedReports = () => {
   // Expanded rows
   const [expandedInstallers, setExpandedInstallers] = useState({});
   const [expandedJobs, setExpandedJobs] = useState({});
+
+  // Visitas Técnicas tab state
+  const [visitas, setVisitas] = useState([]);
+  const [visitasLoading, setVisitasLoading] = useState(false);
+  const [visitasExporting, setVisitasExporting] = useState(false);
+  const [visitasStartDate, setVisitasStartDate] = useState('');
+  const [visitasEndDate, setVisitasEndDate] = useState('');
+  const [visitasInstalador, setVisitasInstalador] = useState('all');
+  const [visitasStatus, setVisitasStatus] = useState('all');
 
   useEffect(() => {
     if (!isAdmin && !isManager) {
@@ -231,6 +240,62 @@ const UnifiedReports = () => {
     });
   }, [itemCheckins, selectedInstaller, selectedJob, selectedProductFamily, startDate, endDate]);
 
+  const loadVisitas = useCallback(async () => {
+    setVisitasLoading(true);
+    try {
+      const params = {};
+      if (visitasStartDate) params.start_date = visitasStartDate;
+      if (visitasEndDate) params.end_date = visitasEndDate;
+      if (visitasInstalador !== 'all') params.installer_id = visitasInstalador;
+      if (visitasStatus !== 'all') params.status = visitasStatus;
+      const res = await api.listVisitas(params);
+      setVisitas(res.data || []);
+    } catch {
+      toast.error('Erro ao carregar visitas técnicas');
+    } finally {
+      setVisitasLoading(false);
+    }
+  }, [visitasStartDate, visitasEndDate, visitasInstalador, visitasStatus]);
+
+  const handleExportVisitas = async () => {
+    setVisitasExporting(true);
+    try {
+      const params = {};
+      if (visitasStartDate) params.start_date = visitasStartDate;
+      if (visitasEndDate) params.end_date = visitasEndDate;
+      if (visitasInstalador !== 'all') params.installer_id = visitasInstalador;
+      if (visitasStatus !== 'all') params.status = visitasStatus;
+      const response = await api.exportVisitasTecnicas(params);
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `visitas_tecnicas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      toast.success('Exportação concluída!');
+    } catch {
+      toast.error('Erro ao exportar visitas técnicas');
+    } finally {
+      setVisitasExporting(false);
+    }
+  };
+
+  const visitasStatusStyle = (status) => {
+    const map = {
+      AGUARDANDO: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      EM_VISITA:  'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      CONCLUIDA:  'bg-green-500/20 text-green-400 border-green-500/30',
+      CANCELADA:  'bg-red-500/20 text-red-400 border-red-500/30',
+    };
+    return map[status?.toUpperCase()] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  };
+
+  const formatCurrency = (value) => {
+    if (!value && value !== 0) return '—';
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  };
+
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-[60vh]">
@@ -368,7 +433,7 @@ const UnifiedReports = () => {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 bg-white/5 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-5 bg-white/5 h-auto p-1">
           <TabsTrigger value="overview" className="data-[state=active]:bg-primary text-xs md:text-sm py-2">
             <TrendingUp className="h-4 w-4 mr-1 md:mr-2" />
             <span className="hidden md:inline">Visão Geral</span>
@@ -386,6 +451,15 @@ const UnifiedReports = () => {
           <TabsTrigger value="photos" className="data-[state=active]:bg-primary text-xs md:text-sm py-2">
             <Camera className="h-4 w-4 mr-1 md:mr-2" />
             Fotos
+          </TabsTrigger>
+          <TabsTrigger
+            value="visitas"
+            className="data-[state=active]:bg-primary text-xs md:text-sm py-2"
+            onClick={() => { if (visitas.length === 0 && !visitasLoading) loadVisitas(); }}
+          >
+            <Navigation className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden md:inline">Visitas Técnicas</span>
+            <span className="md:hidden">Visitas</span>
           </TabsTrigger>
         </TabsList>
 
@@ -857,6 +931,218 @@ const UnifiedReports = () => {
               </Button>
             </div>
           )}
+        </TabsContent>
+        {/* Visitas Técnicas Tab */}
+        <TabsContent value="visitas" className="mt-6 space-y-4">
+          {/* Métricas de cabeçalho */}
+          {(() => {
+            const concluidas = visitas.filter(v => v.status?.toUpperCase() === 'CONCLUIDA');
+            const totalKm = concluidas.reduce((s, v) => s + (v.km_rodados || 0), 0);
+            const totalValor = concluidas.reduce((s, v) => s + (v.valor_total || 0), 0);
+            const totalInstaladores = new Set(visitas.map(v => v.installer_id || v.instalador_id)).size;
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <Card className="bg-card border-white/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-purple-500/20">
+                        <Navigation className="h-5 w-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{visitas.length}</p>
+                        <p className="text-xs text-muted-foreground">Total de Visitas</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-white/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-blue-500/20">
+                        <MapPin className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{totalKm.toFixed(0)}</p>
+                        <p className="text-xs text-muted-foreground">KM Rodados</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-white/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-green-500/20">
+                        <DollarSign className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-white">{formatCurrency(totalValor)}</p>
+                        <p className="text-xs text-muted-foreground">Valor Total a Pagar</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border-white/5">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-cyan-500/20">
+                        <Users className="h-5 w-5 text-cyan-400" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-white">{totalInstaladores}</p>
+                        <p className="text-xs text-muted-foreground">Instaladores</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          })()}
+
+          {/* Filtros */}
+          <Card className="bg-card border-white/5">
+            <CardContent className="p-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Data Início</Label>
+                  <Input
+                    type="date"
+                    value={visitasStartDate}
+                    onChange={(e) => setVisitasStartDate(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Data Fim</Label>
+                  <Input
+                    type="date"
+                    value={visitasEndDate}
+                    onChange={(e) => setVisitasEndDate(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Instalador</Label>
+                  <Select value={visitasInstalador} onValueChange={setVisitasInstalador}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10">
+                      <SelectItem value="all">Todos</SelectItem>
+                      {installers.map(inst => (
+                        <SelectItem key={inst.id} value={inst.id}>{inst.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <Select value={visitasStatus} onValueChange={setVisitasStatus}>
+                    <SelectTrigger className="bg-white/5 border-white/10 text-white h-9">
+                      <SelectValue placeholder="Todos" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-white/10">
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                      <SelectItem value="EM_VISITA">Em Visita</SelectItem>
+                      <SelectItem value="CONCLUIDA">Concluída</SelectItem>
+                      <SelectItem value="CANCELADA">Cancelada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-end gap-2">
+                  <Button
+                    onClick={loadVisitas}
+                    disabled={visitasLoading}
+                    className="flex-1 bg-primary hover:bg-primary/90 h-9"
+                  >
+                    {visitasLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    onClick={handleExportVisitas}
+                    disabled={visitasExporting}
+                    className="flex-1 bg-green-600 hover:bg-green-700 h-9"
+                  >
+                    {visitasExporting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabela */}
+          <Card className="bg-card border-white/5">
+            <CardContent className="p-4">
+              {visitasLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary mr-3" />
+                  <span className="text-muted-foreground">Carregando visitas...</span>
+                </div>
+              ) : visitas.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Navigation className="h-10 w-10 mx-auto mb-3 opacity-30" />
+                  <p>Nenhuma visita técnica encontrada.</p>
+                  <p className="text-xs mt-1">Ajuste os filtros ou clique em atualizar.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Nº VT</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Cliente</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Filial</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Instalador</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Data</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">KM</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">R$/KM</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">Total (R$)</th>
+                        <th className="text-center text-xs text-muted-foreground font-medium py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitas.map(v => (
+                        <tr key={v.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
+                          <td className="py-2 pr-4">
+                            <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">
+                              {v.numero || v.codigo || v.id?.slice(0, 8)}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-4 text-white text-xs max-w-[160px] truncate">
+                            {v.cliente_nome || v.client_name || '—'}
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-muted-foreground">{v.filial || v.branch || '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-white">
+                            {v.instalador_nome || v.installer_name || '—'}
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-muted-foreground">
+                            {formatDate(v.data_visita || v.scheduled_date || v.created_at)}
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-white text-right">
+                            {v.km_rodados != null ? Number(v.km_rodados).toFixed(1) : '—'}
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-muted-foreground text-right">
+                            {v.valor_km != null ? formatCurrency(v.valor_km) : '—'}
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-white text-right font-medium">
+                            {v.valor_total != null ? formatCurrency(v.valor_total) : '—'}
+                          </td>
+                          <td className="py-2 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${visitasStatusStyle(v.status)}`}>
+                              {v.status || 'N/A'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

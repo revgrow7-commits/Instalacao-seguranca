@@ -402,9 +402,11 @@ async def list_jobs(
 @router.get("/jobs/team-calendar")
 async def get_team_calendar_jobs(
     mine: bool = Query(False, description="Retorna apenas jobs atribuídos ao instalador logado"),
+    branch: Optional[str] = Query(None, description="Filtra por filial"),
+    installer_id: Optional[str] = Query(None, description="Filtra por instalador"),
     current_user: User = Depends(get_current_user)
 ):
-    """Get scheduled jobs for the team calendar view."""
+    """Get scheduled jobs for the team calendar view, including visitas técnicas."""
     query = {"scheduled_date": {"$exists": True, "$ne": None}}
     if mine and current_user.role == UserRole.INSTALLER:
         installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0, "id": 1})
@@ -412,34 +414,34 @@ async def get_team_calendar_jobs(
             query["assigned_installers"] = installer["id"]
         else:
             query["$or"] = [{"assigned_installers": current_user.id}, {"assigned_user_id": current_user.id}]
+
+    # Apply optional filters for jobs
+    if branch:
+        query["branch"] = branch
+    if installer_id:
+        query.setdefault("assigned_installers", installer_id)
+
     jobs = db.jobs.find(query, {"_id": 0})
-    
+
+    def _iso(val):
+        """Ensure a date/datetime value is returned as an ISO string."""
+        if val is None:
+            return None
+        if isinstance(val, str):
+            return val
+        return val.isoformat() if hasattr(val, 'isoformat') else str(val)
+
     cleaned_jobs = []
     for job in jobs:
-        if isinstance(job.get('created_at'), str):
-            pass
-        elif job.get('created_at'):
-            job['created_at'] = job['created_at'].isoformat() if hasattr(job['created_at'], 'isoformat') else str(job['created_at'])
-
-        if isinstance(job.get('scheduled_date'), str):
-            pass
-        elif job.get('scheduled_date'):
-            job['scheduled_date'] = job['scheduled_date'].isoformat() if hasattr(job['scheduled_date'], 'isoformat') else str(job['scheduled_date'])
-
-        if isinstance(job.get('scheduled_time_end'), str):
-            pass
-        elif job.get('scheduled_time_end'):
-            job['scheduled_time_end'] = job['scheduled_time_end'].isoformat() if hasattr(job['scheduled_time_end'], 'isoformat') else str(job['scheduled_time_end'])
-
         hd = job.get("holdprint_data") or {}
         clean_job = {
             "id": job.get("id"),
             "title": job.get("title"),
             "status": job.get("status"),
             "branch": job.get("branch"),
-            "scheduled_date": job.get("scheduled_date"),
-            "scheduled_time_end": job.get("scheduled_time_end"),
-            "created_at": job.get("created_at"),
+            "scheduled_date": _iso(job.get("scheduled_date")),
+            "scheduled_time_end": _iso(job.get("scheduled_time_end")),
+            "created_at": _iso(job.get("created_at")),
             "assigned_installers": job.get("assigned_installers", []),
             "holdprint_data": {
                 "code": hd.get("code", ""),
@@ -448,9 +450,42 @@ async def get_team_calendar_jobs(
                 "creationTime": hd.get("creationTime"),
             },
             "client_name": job.get("client_name"),
+            "kind": "job",
         }
         cleaned_jobs.append(clean_job)
-    
+
+    # ---- Visitas Técnicas ----
+    vt_query = {
+        "scheduled_date": {"$ne": None},
+        "status": {"$nin": ["CANCELADA"]},
+    }
+    if branch:
+        vt_query["branch"] = branch
+    if installer_id:
+        vt_query["installer_id"] = installer_id
+    if mine and current_user.role == UserRole.INSTALLER:
+        vt_query["installer_id"] = current_user.id
+
+    visitas = db.visitas_tecnicas.find(vt_query, {"_id": 0}) or []
+    for v in visitas:
+        numero_vt = v.get("numero_vt") or ""
+        clean_vt = {
+            "id": v.get("id"),
+            "title": f"VISITA TÉCNICA — {numero_vt}".rstrip("— ").strip() if not numero_vt else f"VISITA TÉCNICA — {numero_vt}",
+            "status": v.get("status"),
+            "branch": v.get("branch"),
+            "scheduled_date": _iso(v.get("scheduled_date")),
+            "scheduled_time_end": _iso(v.get("scheduled_time_end")),
+            "created_at": _iso(v.get("created_at")),
+            "assigned_installers": [v["installer_id"]] if v.get("installer_id") else [],
+            "holdprint_data": None,
+            "client_name": v.get("client_name", ""),
+            "installer_id": v.get("installer_id"),
+            "numero_vt": numero_vt,
+            "kind": "visita_tecnica",
+        }
+        cleaned_jobs.append(clean_vt)
+
     return cleaned_jobs
 
 

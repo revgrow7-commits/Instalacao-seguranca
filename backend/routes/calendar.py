@@ -9,6 +9,10 @@ from datetime import datetime, timezone, timedelta
 from pydantic import BaseModel
 import logging
 import requests
+import hmac
+import hashlib
+import secrets
+import base64
 
 from db_supabase import db, get_client
 from security import get_current_user
@@ -16,8 +20,40 @@ from models.user import User
 from config import (
     GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI, GOOGLE_INSTALLER_REDIRECT_URI,
-    GOOGLE_CALENDAR_SCOPES, FRONTEND_URL
+    GOOGLE_CALENDAR_SCOPES, FRONTEND_URL, SECRET_KEY
 )
+
+_OAUTH_STATE_TTL_SECONDS = 600  # 10 min
+
+
+def _make_oauth_state(user_id: str) -> str:
+    """Gera state assinado com HMAC: base64(user_id|timestamp|nonce|sig)."""
+    nonce = secrets.token_hex(8)
+    ts = str(int(datetime.now(timezone.utc).timestamp()))
+    payload = f"{user_id}|{ts}|{nonce}"
+    sig = hmac.new(SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    raw = f"{payload}|{sig}"
+    return base64.urlsafe_b64encode(raw.encode()).decode()
+
+
+def _verify_oauth_state(state: str) -> str:
+    """Valida state e retorna user_id. Levanta HTTPException em caso de falha."""
+    try:
+        raw = base64.urlsafe_b64decode(state.encode()).decode()
+        user_id, ts, nonce, sig = raw.rsplit("|", 3)
+    except Exception:
+        raise HTTPException(status_code=400, detail="OAuth state inválido")
+
+    payload = f"{user_id}|{ts}|{nonce}"
+    expected = hmac.new(SECRET_KEY.encode(), payload.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        raise HTTPException(status_code=400, detail="OAuth state inválido")
+
+    age = int(datetime.now(timezone.utc).timestamp()) - int(ts)
+    if age > _OAUTH_STATE_TTL_SECONDS:
+        raise HTTPException(status_code=400, detail="OAuth state expirado — inicie o login novamente")
+
+    return user_id
 
 # Google imports
 from google.oauth2.credentials import Credentials
@@ -89,8 +125,8 @@ async def google_login(current_user: User = Depends(get_current_user)):
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth não configurado")
     
-    # Store user_id in state to associate tokens later
-    state = f"{current_user.id}"
+    # State assinado com HMAC — previne CSRF/linkagem forjada de conta Google
+    state = _make_oauth_state(current_user.id)
     
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -139,10 +175,11 @@ async def google_callback(code: str, state: str = None):
         google_user = userinfo_response.json()
         google_email = google_user.get('email')
         
-        # Find user by state (user_id) or by google email
+        # Valida state HMAC — rejeita tentativas forjadas de CSRF
         user = None
         if state:
-            user = db.users.find_one({"id": state}, {"_id": 0})
+            verified_user_id = _verify_oauth_state(state)
+            user = db.users.find_one({"id": verified_user_id}, {"_id": 0})
         
         if not user:
             user = db.users.find_one({"email": google_email}, {"_id": 0})

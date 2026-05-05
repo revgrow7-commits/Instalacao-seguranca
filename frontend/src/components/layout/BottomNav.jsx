@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Briefcase, 
+import {
+  LayoutDashboard,
+  Briefcase,
   Calendar,
-  User
+  User,
+  MapPin
 } from 'lucide-react';
 
 const BottomNav = () => {
@@ -23,7 +24,13 @@ const BottomNav = () => {
       name: 'Jobs',
       href: '/jobs',
       icon: Briefcase,
-      roles: ['admin', 'manager'] // Hidden for installers on mobile
+      roles: ['admin', 'manager']
+    },
+    {
+      name: 'Visitas',
+      href: '/visitas-tecnicas',
+      icon: MapPin,
+      roles: ['admin', 'manager', 'installer']
     },
     {
       name: 'Calendário',

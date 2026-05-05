@@ -50,6 +50,8 @@ const Profile = lazy(() => import('./pages/Profile'));
 const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
 const GamificationReport = lazy(() => import('./pages/GamificationReport'));
 const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
+const VisitasTecnicas = lazy(() => import('./pages/VisitasTecnicas'));
+const VisitaDetail = lazy(() => import('./pages/VisitaDetail'));
 
 // Non-lazy imports for layout components (always needed)
 import Sidebar from './components/layout/Sidebar';
@@ -372,6 +374,26 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['admin']}>
             <MainLayout>
               <SchedulerAdmin />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/visitas-tecnicas"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'manager', 'installer']}>
+            <MainLayout>
+              <VisitasTecnicas />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/visitas-tecnicas/:id"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'manager', 'installer']}>
+            <MainLayout>
+              <VisitaDetail />
             </MainLayout>
           </ProtectedRoute>
         }
