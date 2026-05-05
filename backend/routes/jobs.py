@@ -471,7 +471,7 @@ async def get_team_calendar_jobs(
         numero_vt = v.get("numero_vt") or ""
         clean_vt = {
             "id": v.get("id"),
-            "title": f"VISITA TÉCNICA — {numero_vt}".rstrip("— ").strip() if not numero_vt else f"VISITA TÉCNICA — {numero_vt}",
+            "title": f"VISITA TÉCNICA — {numero_vt}" if numero_vt else "VISITA TÉCNICA",
             "status": v.get("status"),
             "branch": v.get("branch"),
             "scheduled_date": _iso(v.get("scheduled_date")),

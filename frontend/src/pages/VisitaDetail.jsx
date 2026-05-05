@@ -155,7 +155,7 @@ const VisitaDetail = () => {
             <InfoRow label="Cliente" value={visita.client_name} icon={User} />
             <InfoRow label="Endereço" value={visita.client_address} icon={MapPin} />
             <InfoRow label="Filial" value={visita.branch} icon={Building2} />
-            <InfoRow label="Instalador" value={visita.installer_name || '—'} icon={User} />
+            <InfoRow label="Instalador" value={visita.installer_id ? `ID: ${visita.installer_id.slice(0, 8)}…` : '—'} icon={User} />
             <InfoRow
               label="Data Agendada"
               value={formattedDate ? `${formattedDate}${visita.scheduled_time_end ? ' até ' + visita.scheduled_time_end : ''}` : '—'}
@@ -201,51 +201,51 @@ const VisitaDetail = () => {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Chegada</p>
-                  <p className="text-sm text-white">{formatDatetime(visita.chegada)}</p>
+                  <p className="text-sm text-white">{formatDatetime(visita.relatorio_chegada)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Saída</p>
-                  <p className="text-sm text-white">{formatDatetime(visita.saida)}</p>
+                  <p className="text-sm text-white">{formatDatetime(visita.relatorio_saida)}</p>
                 </div>
               </div>
 
-              {visita.situacao && (
+              {visita.relatorio_situacao && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Situação</p>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${SITUACAO_STYLES[visita.situacao] || ''}`}>
-                    {SITUACAO_LABELS[visita.situacao] || visita.situacao}
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${SITUACAO_STYLES[visita.relatorio_situacao] || ''}`}>
+                    {SITUACAO_LABELS[visita.relatorio_situacao] || visita.relatorio_situacao}
                   </span>
                 </div>
               )}
 
-              {visita.descricao && (
+              {visita.relatorio_descricao && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Descrição</p>
-                  <p className="text-sm text-white whitespace-pre-line">{visita.descricao}</p>
+                  <p className="text-sm text-white whitespace-pre-line">{visita.relatorio_descricao}</p>
                 </div>
               )}
 
-              {visita.assinatura_confirmada && (
+              {visita.relatorio_assinatura_confirmada && (
                 <div className="flex items-center gap-2 text-green-400 text-sm">
                   <CheckCircle2 className="h-4 w-4" />
                   Cliente confirmou presença/assinatura
                 </div>
               )}
 
-              {visita.fotos && visita.fotos.length > 0 && (
+              {visita.relatorio_fotos && visita.relatorio_fotos.length > 0 && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
                     <ImageIcon className="h-3 w-3" />
-                    Fotos ({visita.fotos.length})
+                    Fotos ({visita.relatorio_fotos.length})
                   </p>
                   <div className="grid grid-cols-3 gap-2">
-                    {visita.fotos.map((src, i) => (
+                    {visita.relatorio_fotos.map((src, i) => (
                       <img
                         key={i}
-                        src={src}
+                        src={typeof src === 'string' ? src : src?.url}
                         alt={`Foto ${i + 1}`}
                         className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                        onClick={() => setLightboxSrc(src)}
+                        onClick={() => setLightboxSrc(typeof src === 'string' ? src : src?.url)}
                       />
                     ))}
                   </div>
