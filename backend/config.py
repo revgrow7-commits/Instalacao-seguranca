@@ -37,6 +37,7 @@ GOOGLE_CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar', 'https://w
 # Resend Email Config
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Indústria Visual <noreply@instal-visual.com.br>')
 # Production URL - fallback to instal-visual.com.br if env not set
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://instal-visual.com.br')
 

@@ -174,34 +174,21 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
   const isScheduled = !!job.scheduled_date;
   const isArchived = job.archived || job.status === 'arquivado';
   
-  // Determine which date to show and its label
+  // Holdprint delivery date is always the primary date shown on the card
+  const deliveryDate = job.holdprint_data?.deliveryNeeded || job.holdprint_data?.deliveryExpected || job.holdprint_data?.creationTime || null;
+  const deliveryLabel = job.holdprint_data?.deliveryNeeded ? 'Entrega Prevista' : job.holdprint_data?.deliveryExpected ? 'Entrega Esperada' : job.holdprint_data?.creationTime ? 'Criado em' : null;
+  const formattedDeliveryDate = deliveryDate ? new Date(deliveryDate).toLocaleDateString('pt-BR') : null;
+  const formattedScheduledDate = job.scheduled_date ? new Date(job.scheduled_date).toLocaleDateString('pt-BR') : null;
+
+  // Legacy: kept for isLate calculation only
   const getDateInfo = () => {
-    if (job.scheduled_date) {
-      return {
-        date: job.scheduled_date,
-        label: null, // No label for scheduled date (already has "Agendado" indicator)
-        isScheduledDate: true
-      };
-    }
-    if (job.holdprint_data?.deliveryNeeded) {
-      return {
-        date: job.holdprint_data.deliveryNeeded,
-        label: 'Entrega Prevista',
-        isScheduledDate: false
-      };
-    }
-    if (job.holdprint_data?.creationTime) {
-      return {
-        date: job.holdprint_data.creationTime,
-        label: 'Criado em',
-        isScheduledDate: false
-      };
-    }
-    return { date: null, label: null, isScheduledDate: false };
+    if (job.holdprint_data?.deliveryNeeded) return { date: job.holdprint_data.deliveryNeeded, isScheduledDate: false };
+    if (job.holdprint_data?.creationTime) return { date: job.holdprint_data.creationTime, isScheduledDate: false };
+    if (job.scheduled_date) return { date: job.scheduled_date, isScheduledDate: true };
+    return { date: null, isScheduledDate: false };
   };
-  
   const dateInfo = getDateInfo();
-  const formattedStartDate = dateInfo.date ? new Date(dateInfo.date).toLocaleDateString('pt-BR') : null;
+  const formattedStartDate = formattedDeliveryDate || formattedScheduledDate;
   const isLate = job.scheduled_date && new Date(job.scheduled_date) < new Date() && job.status !== 'completed' && job.status !== 'finalizado';
   
   // Calculate time since job started (for "instalando" status)
@@ -335,24 +322,31 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
         </div>
 
         {/* Date Row */}
-        <div className="flex items-center justify-between mb-3">
-          {formattedStartDate ? (
-            <div className={`flex items-center gap-1.5 text-sm font-medium ${isLate ? 'text-red-400' : dateInfo.isScheduledDate ? 'text-green-400' : 'text-slate-200'}`}>
-              {dateInfo.isScheduledDate
-                ? <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0" />
-                : <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
-              }
-              <span>{formattedStartDate}</span>
-              {isLate && <span className="text-[10px] font-normal">(atrasado)</span>}
+        <div className="flex flex-col gap-1 mb-3">
+          <div className="flex items-center justify-between">
+            {formattedDeliveryDate ? (
+              <div className={`flex items-center gap-1.5 text-sm font-medium ${isLate ? 'text-red-400' : 'text-slate-200'}`}>
+                <Calendar className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>{formattedDeliveryDate}</span>
+                {isLate && <span className="text-[10px] font-normal">(atrasado)</span>}
+              </div>
+            ) : formattedScheduledDate ? (
+              <div className="flex items-center gap-1.5 text-sm font-medium text-green-400">
+                <CalendarCheck className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>{formattedScheduledDate}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-muted-foreground/50 italic">Sem data</span>
+            )}
+            {deliveryLabel && (
+              <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">{deliveryLabel}</span>
+            )}
+          </div>
+          {formattedDeliveryDate && formattedScheduledDate && (
+            <div className="flex items-center gap-1 text-[11px] text-green-400">
+              <CalendarCheck className="h-3 w-3 flex-shrink-0" />
+              <span>Agendado: {formattedScheduledDate}</span>
             </div>
-          ) : (
-            <span className="text-xs text-muted-foreground/50 italic">Sem data</span>
-          )}
-          {dateInfo.label && (
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wide">{dateInfo.label}</span>
-          )}
-          {isScheduled && !dateInfo.label && !isLate && (
-            <span className="text-[10px] text-green-400 uppercase tracking-wide">Agendado</span>
           )}
         </div>
 
@@ -552,6 +546,10 @@ const Jobs = () => {
       const response = await api.getJobs(includeArchived);
       setJobs(response.data);
       archivedLoadedRef.current = includeArchived;
+      // Stale-while-revalidate: atualiza o estado quando o fetch fresco chegar
+      if (response._stale && response._fresh) {
+        response._fresh.then(fresh => setJobs(fresh.data)).catch(() => {});
+      }
     } catch (error) {
       toast.error('Erro ao carregar jobs');
     } finally {
@@ -1016,8 +1014,8 @@ const Jobs = () => {
     // Sort by oldest delivery date first (deliveryNeeded from Hold is priority)
     return filtered.sort((a, b) => {
       const getDate = (job) => {
-        // Priority: deliveryNeeded (previsão de entrega Hold) > scheduled_date > creationTime
-        const dateStr = job.holdprint_data?.deliveryNeeded || job.scheduled_date || job.holdprint_data?.creationTime || job.created_at;
+        // Priority: deliveryNeeded > deliveryExpected > scheduled_date > creationTime
+        const dateStr = job.holdprint_data?.deliveryNeeded || job.holdprint_data?.deliveryExpected || job.scheduled_date || job.holdprint_data?.creationTime || job.created_at;
         return dateStr ? new Date(dateStr) : new Date('2099-12-31'); // Jobs without date go to the end
       };
       return getDate(a) - getDate(b); // Ascending (oldest first)
