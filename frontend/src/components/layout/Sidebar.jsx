@@ -1,11 +1,11 @@
 import React, { memo, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Briefcase, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Users,
+  Briefcase,
+  BarChart3,
   Calendar,
   LogOut,
   User,
@@ -13,7 +13,8 @@ import {
   FileText,
   Trophy,
   TrendingUp,
-  Settings
+  Settings,
+  MapPin
 } from 'lucide-react';
 import { Button } from '../ui/button';
 
@@ -51,6 +52,12 @@ const Sidebar = () => {
       name: 'Jobs',
       href: '/jobs',
       icon: Briefcase,
+      roles: ['admin', 'manager', 'installer']
+    },
+    {
+      name: 'Visitas Técnicas',
+      href: '/visitas-tecnicas',
+      icon: MapPin,
       roles: ['admin', 'manager', 'installer']
     },
     {

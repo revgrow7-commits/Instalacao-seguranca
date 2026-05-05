@@ -40,6 +40,7 @@ const Calendar = () => {
   // Schedule dialog
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [pickedJob, setPickedJob] = useState(null);
   const [scheduleDate, setScheduleDate] = useState('');
   const [scheduleTime, setScheduleTime] = useState('08:00');
   const [selectedInstaller, setSelectedInstaller] = useState('');
@@ -217,6 +218,7 @@ const Calendar = () => {
   const handleDrop = async (e, date) => {
     e.preventDefault();
     if (!draggedJob || !date || (!isAdmin && !isManager)) return;
+    if (draggedJob.kind === 'visita_tecnica') return;
     
     setDragOverDate(null);
     
@@ -240,7 +242,8 @@ const Calendar = () => {
   };
 
   const handleScheduleJob = async () => {
-    if (!selectedJob || !scheduleDate) return;
+    const jobToSchedule = selectedJob || pickedJob;
+    if (!jobToSchedule || !scheduleDate) return;
     
     // Check for conflicts if installer is selected
     if (selectedInstaller && selectedInstaller !== 'none') {
@@ -259,32 +262,34 @@ const Calendar = () => {
       
       const updateData = {
         scheduled_date: dateTime.toISOString(),
-        assigned_installers: selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : []
+        assigned_installers: selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : [],
+        status: 'agendado',
       };
       
-      await api.updateJob(selectedJob.id, updateData);
-      
+      await api.updateJob(jobToSchedule.id, updateData);
+
       // Sync to Google Calendar if connected and email notification is enabled
       if (googleConnected && sendEmailNotification) {
         await syncJobToGoogleCalendar({
-          ...selectedJob,
+          ...jobToSchedule,
           scheduled_date: dateTime.toISOString(),
           assigned_installers: updateData.assigned_installers
         }, true);
       }
-      
+
       // Send push notification to assigned installers
       if (updateData.assigned_installers.length > 0) {
         try {
-          await api.notifyJobScheduled(selectedJob.id);
+          await api.notifyJobScheduled(jobToSchedule.id);
         } catch (e) {
           console.log('Could not send push notification:', e);
         }
       }
-      
+
       toast.success('Job agendado com sucesso!');
       setShowScheduleDialog(false);
       setSelectedJob(null);
+      setPickedJob(null);
       loadData();
     } catch (error) {
       console.error('Error scheduling job:', error);
@@ -336,7 +341,8 @@ const Calendar = () => {
            date.getFullYear() === today.getFullYear();
   };
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status, kind) => {
+    if (kind === 'visita_tecnica') return 'bg-purple-500';
     const colors = {
       'aguardando': 'bg-yellow-500',
       'pending': 'bg-yellow-500',
@@ -395,6 +401,7 @@ const Calendar = () => {
       'bg-orange-500', 'bg-teal-500',
     ];
     const getColor = (job) => {
+      if (job.kind === 'visita_tecnica') return 'bg-purple-500';
       const id = (job.assigned_installers || [])[0];
       if (!id) return 'bg-primary';
       const idx = installers.findIndex(i => i.id === id || i.user_id === id);
@@ -801,15 +808,21 @@ const Calendar = () => {
                               {dayJobs.slice(0, 3).map(job => (
                                 <div
                                   key={job.id}
-                                  onClick={(e) => { e.stopPropagation(); navigate(`/jobs/${job.id}`); }}
+                                  onClick={(e) => { e.stopPropagation(); navigate(job.kind === 'visita_tecnica' ? `/visitas/${job.id}` : `/jobs/${job.id}`); }}
                                   className={`
-                                    text-[10px] p-1 rounded truncate cursor-pointer
-                                    ${getStatusColor(job.status)} text-white
+                                    text-[10px] p-1 rounded truncate cursor-pointer flex items-center gap-1
+                                    ${getStatusColor(job.status, job.kind)} text-white
+                                    ${job.kind === 'visita_tecnica' ? 'border-l-2 border-l-purple-300' : ''}
                                     hover:opacity-80 transition-opacity
                                   `}
-                                  title={`#${job.holdprint_data?.code || job.id?.slice(0,4)} - ${job.title} - ${job.client_name || ''}`}
+                                  title={`${job.kind === 'visita_tecnica' ? '[VT]' : ''} #${job.holdprint_data?.code || job.id?.slice(0,4)} - ${job.title} - ${job.client_name || ''}`}
                                 >
-                                  {job.title?.substring(0, 12) || `#${job.holdprint_data?.code || job.id?.slice(0,4)}`}
+                                  {job.kind === 'visita_tecnica' && (
+                                    <span className="inline-block bg-purple-300/30 text-purple-100 text-[9px] font-bold px-1 rounded shrink-0">VT</span>
+                                  )}
+                                  <span className="truncate">
+                                    {job.title?.substring(0, 12) || `#${job.holdprint_data?.code || job.id?.slice(0,4)}`}
+                                  </span>
                                 </div>
                               ))}
                               {dayJobs.length > 3 && (
@@ -927,6 +940,10 @@ const Calendar = () => {
               <div className="w-3 h-3 rounded bg-orange-500" />
               <span className="text-muted-foreground">Pausado</span>
             </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 rounded bg-purple-500" />
+              <span className="text-muted-foreground">Visita Técnica</span>
+            </div>
             {(isAdmin || isManager) && (
               <span className="text-muted-foreground ml-auto">
                 💡 Arraste jobs da lista para agendar
@@ -937,16 +954,41 @@ const Calendar = () => {
       </Card>
 
       {/* Schedule Dialog */}
-      <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
+      <Dialog open={showScheduleDialog} onOpenChange={(open) => { setShowScheduleDialog(open); if (!open) setPickedJob(null); }}>
         <DialogContent className="bg-card border-white/10">
           <DialogHeader>
             <DialogTitle className="text-white">Agendar Job</DialogTitle>
             <DialogDescription>
-              {selectedJob?.title}
+              {(selectedJob || pickedJob)?.title || 'Selecione um job abaixo'}
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-4 mt-4">
+            {/* Job picker — mostrado quando não há job pré-selecionado (ex: botão Agendar do modal de dia) */}
+            {!selectedJob && (
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Job</label>
+                <Select
+                  value={pickedJob?.id || 'none'}
+                  onValueChange={(val) => setPickedJob(allJobs.find(j => j.id === val) || null)}
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder="Selecione um job não agendado" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10 max-h-60">
+                    {allJobs.length === 0 ? (
+                      <SelectItem value="none" disabled>Nenhum job disponível</SelectItem>
+                    ) : (
+                      allJobs.map(j => (
+                        <SelectItem key={j.id} value={j.id}>
+                          #{j.holdprint_data?.code || j.id?.slice(0, 6)} — {j.title}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-muted-foreground mb-1 block">Data</label>
@@ -1004,7 +1046,7 @@ const Calendar = () => {
             <div className="flex gap-2">
               <Button
                 onClick={handleScheduleJob}
-                disabled={scheduling || !scheduleDate}
+                disabled={scheduling || !scheduleDate || (!selectedJob && !pickedJob)}
                 className="flex-1 bg-primary hover:bg-primary/90"
               >
                 {scheduling ? (
