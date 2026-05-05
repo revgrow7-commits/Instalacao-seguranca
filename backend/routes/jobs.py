@@ -38,13 +38,13 @@ logger = logging.getLogger(__name__)
 class Job(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    holdprint_job_id: str
+    holdprint_job_id: Optional[str] = None
     title: str
-    client_name: str
+    client_name: Optional[str] = None
     client_address: Optional[str] = None
     status: str = "aguardando"
     area_m2: Optional[float] = None
-    branch: str
+    branch: Optional[str] = None
     assigned_installers: List[str] = []
     scheduled_date: Optional[datetime] = None
     scheduled_time_end: Optional[datetime] = None
@@ -755,8 +755,9 @@ async def assign_job(job_id: str, assign_data: JobAssign, current_user: User = D
     if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    from db_supabase import _deserialize
-    job_doc = _deserialize(result.data[0])
+    job_doc = db.jobs.find_one({"id": job_id})
+    if not job_doc:
+        raise HTTPException(status_code=404, detail="Job not found after update")
     if isinstance(job_doc.get('created_at'), str):
         job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
     if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
@@ -782,8 +783,11 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
     if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    from db_supabase import _deserialize
-    job_doc = _deserialize(result.data[0])
+    # Fetch fresh full document to ensure all required fields are present
+    job_doc = db.jobs.find_one({"id": job_id})
+    if not job_doc:
+        raise HTTPException(status_code=404, detail="Job not found after update")
+
     for dt_field in ("created_at", "scheduled_date", "scheduled_time_end"):
         val = job_doc.get(dt_field)
         if val and isinstance(val, str):
@@ -804,7 +808,11 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
     if update_data.get("assigned_installers"):
         background_tasks.add_task(_sync_calendar)
 
-    return Job(**job_doc)
+    try:
+        return Job(**job_doc)
+    except Exception as e:
+        logger.error(f"schedule_job: falha ao montar Job model para {job_id}: {e} | doc keys: {list(job_doc.keys())}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar retorno do job: {str(e)}")
 
 
 @router.put("/jobs/{job_id}", response_model=Job)
