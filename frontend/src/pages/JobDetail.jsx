@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { useReschedule } from '../hooks/useReschedule';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
@@ -16,6 +17,10 @@ const JobDetail = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
   const { user, isAdmin, isManager } = useAuth();
+  const { reschedule, loading: rescheduleLoading } = useReschedule((updated) => {
+    setJob(updated);
+    setShowRescheduleDialog(false);
+  });
   const [job, setJob] = useState(null);
   const [installers, setInstallers] = useState([]);
   const [selectedInstallers, setSelectedInstallers] = useState([]);
@@ -25,6 +30,12 @@ const JobDetail = () => {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
   const [showStatusDialog, setShowStatusDialog] = useState(false);
   const [newStatus, setNewStatus] = useState('');
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleTimeEnd, setRescheduleTimeEnd] = useState('');
+  const [rescheduleStatus, setRescheduleStatus] = useState('agendado');
+  const [rescheduleInstallerIds, setRescheduleInstallerIds] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [itemCheckins, setItemCheckins] = useState([]);
   
@@ -448,6 +459,16 @@ const JobDetail = () => {
     } catch (error) {
       toast.error('Erro ao atualizar status');
     }
+  };
+
+  const handleReschedule = async () => {
+    await reschedule(job.id, {
+      date: rescheduleDate,
+      time: rescheduleTime,
+      timeEnd: rescheduleTimeEnd,
+      installerIds: rescheduleInstallerIds,
+      status: rescheduleStatus,
+    });
   };
 
   const getStatusColor = (status) => {
@@ -909,11 +930,30 @@ const JobDetail = () => {
             </DialogContent>
           </Dialog>
 
+          <Button
+            variant="outline"
+            className="border-primary/50 text-primary hover:bg-primary/10 w-full sm:w-auto justify-center text-sm"
+            onClick={() => {
+              if (job.scheduled_date) {
+                const d = new Date(job.scheduled_date);
+                const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+                setRescheduleDate(brt.toISOString().split('T')[0]);
+                setRescheduleTime(brt.toISOString().split('T')[1].substring(0, 5));
+              }
+              setRescheduleStatus(job.status || 'agendado');
+              setRescheduleInstallerIds(job.assigned_installers || []);
+              setShowRescheduleDialog(true);
+            }}
+          >
+            <Calendar className="mr-2 h-4 w-4" />
+            Reagendar
+          </Button>
+
           <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 w-full sm:w-auto justify-center text-sm">
+              <Button variant="outline" className="border-primary/50 text-primary hover:bg-primary/10 w-full sm:w-auto justify-center text-sm hidden">
                 <Calendar className="mr-2 h-4 w-4" />
-                Agendar
+                Agendar (legado)
               </Button>
             </DialogTrigger>
             <DialogContent className="bg-card border-white/10 max-w-md">
@@ -1133,6 +1173,78 @@ const JobDetail = () => {
           </Dialog>
         </div>
       )}
+
+      {/* Dialog Reagendar — unificado (data + status) */}
+      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
+        <DialogContent className="bg-card border-white/10 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-heading text-white">Reagendar Job</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Altere a data, hora e status do job. Instaladores atribuídos receberão notificação.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Data</label>
+                <input
+                  type="date"
+                  value={rescheduleDate}
+                  onChange={(e) => setRescheduleDate(e.target.value)}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-muted-foreground mb-1 block">Hora início</label>
+                <input
+                  type="time"
+                  value={rescheduleTime}
+                  onChange={(e) => setRescheduleTime(e.target.value)}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm text-muted-foreground mb-1 block">Status</label>
+              <Select value={rescheduleStatus} onValueChange={setRescheduleStatus}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="agendado">Agendado</SelectItem>
+                  <SelectItem value="aguardando">Aguardando</SelectItem>
+                  <SelectItem value="instalando">Instalando</SelectItem>
+                  <SelectItem value="concluido">Concluído</SelectItem>
+                  <SelectItem value="cancelado">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              Instaladores atribuídos receberão push e email automaticamente.
+            </p>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRescheduleDialog(false)}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReschedule}
+              disabled={rescheduleLoading}
+              className="bg-primary hover:bg-primary/90"
+            >
+              {rescheduleLoading ? 'Reagendando...' : 'Confirmar Reagendamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Job Information */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">

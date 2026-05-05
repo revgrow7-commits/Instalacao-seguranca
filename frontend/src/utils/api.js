@@ -31,6 +31,37 @@ const clearCache = (key = null) => {
   }
 };
 
+// ── Stale-while-revalidate cache para getJobs (localStorage) ──
+const JOBS_CACHE_KEY = 'cache_jobs_v1';
+const JOBS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
+
+// Retorna { data, _stale: true } instantaneamente se cache válido existe.
+// Sempre dispara o fetch real em background; quando resolver, atualiza localStorage.
+// Se sem cache, aguarda o fetch.
+const getJobsWithCache = async (includeArchived = false) => {
+  const key = `${JOBS_CACHE_KEY}_${includeArchived}`;
+  let stale = null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) stale = JSON.parse(raw);
+  } catch { /* localStorage indisponível */ }
+
+  const freshPromise = axios
+    .get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() })
+    .then(res => {
+      try {
+        localStorage.setItem(key, JSON.stringify({ data: res.data, t: Date.now() }));
+      } catch { /* quota exceeded */ }
+      return res;
+    });
+
+  if (stale && Date.now() - stale.t < JOBS_CACHE_TTL) {
+    // retorna stale agora, fresh continua em background
+    return { data: stale.data, _stale: true, _fresh: freshPromise };
+  }
+  return freshPromise;
+};
+
 export const api = {
   // Cache control
   clearCache,
@@ -89,24 +120,31 @@ export const api = {
     clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
     return axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() });
   },
-  getJobs: (includeArchived = false) => getCachedOrFetch(
-    `jobs_${includeArchived}`,
-    () => axios.get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() }),
+  getJobs: (includeArchived = false) => getJobsWithCache(includeArchived),
+  bulkArchivePre2026: () => axios.post(`${API_URL}/jobs/bulk-archive-pre-2026`, {}, { headers: getAuthHeader(), timeout: 120000 }),
+  getJob: (jobId) => getCachedOrFetch(
+    `job_${jobId}`,
+    () => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
     20000
   ),
-  bulkArchivePre2026: () => axios.post(`${API_URL}/jobs/bulk-archive-pre-2026`, {}, { headers: getAuthHeader(), timeout: 120000 }),
-  getJob: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
   updateJob: (jobId, data) => {
     clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    clearCache(`job_${jobId}`);
     return axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() });
   },
   assignJob: (jobId, installerIds) => {
     clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
     return axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() });
   },
-  scheduleJob: (jobId, scheduledDate, installerIds) => {
+  scheduleJob: async (jobId, { scheduledDate, scheduledTimeEnd, installerIds, status } = {}) => {
     clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
-    return axios.put(`${API_URL}/jobs/${jobId}/schedule`, { scheduled_date: scheduledDate, installer_ids: installerIds }, { headers: getAuthHeader() });
+    const response = await axios.put(`${API_URL}/jobs/${jobId}/schedule`, {
+      scheduled_date: scheduledDate,
+      scheduled_time_end: scheduledTimeEnd || null,
+      installer_ids: installerIds || null,
+      status: status || null,
+    }, { headers: getAuthHeader() });
+    return response.data;
   },
   
   // Item Assignments
@@ -140,6 +178,8 @@ export const api = {
   },
   checkout: (checkinId, formData) => {
     clearCache('checkins_all');
+    clearCache('gamification_balance');
+    clearCache('gamification_transactions');
     return axios.put(`${API_URL}/checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
   },
   getCheckins: (jobId = null) => getCachedOrFetch(
@@ -154,27 +194,46 @@ export const api = {
   deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
   // Item Check-ins (per item)
-  createItemCheckin: (formData) => axios.post(`${API_URL}/item-checkins`, formData, { 
-    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
-  }),
-  completeItemCheckout: (checkinId, formData) => axios.put(`${API_URL}/item-checkins/${checkinId}/checkout`, formData, { 
-    headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
-  }),
-  getItemCheckins: (jobId) => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
+  createItemCheckin: (formData) => {
+    const jobId = formData.get ? formData.get('job_id') : null;
+    if (jobId) clearCache(`item_checkins_${jobId}`);
+    return axios.post(`${API_URL}/item-checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  completeItemCheckout: (checkinId, formData) => {
+    const jobId = formData.get ? formData.get('job_id') : null;
+    if (jobId) clearCache(`item_checkins_${jobId}`);
+    clearCache(`item_pause_logs_${checkinId}`);
+    clearCache('gamification_balance');
+    clearCache('gamification_transactions');
+    return axios.put(`${API_URL}/item-checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+  },
+  getItemCheckins: (jobId) => getCachedOrFetch(
+    `item_checkins_${jobId}`,
+    () => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
+    20000
+  ),
   getAllItemCheckins: () => axios.get(`${API_URL}/item-checkins/all`, { headers: getAuthHeader() }),
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
   archiveItemCheckin: (checkinId) => axios.put(`${API_URL}/item-checkins/${checkinId}/archive`, {}, { headers: getAuthHeader() }),
   
   // Item Pause/Resume
   pauseItemCheckin: (checkinId, reason) => {
+    clearCache(`item_pause_logs_${checkinId}`);
     const formData = new FormData();
     formData.append('reason', reason);
-    return axios.post(`${API_URL}/item-checkins/${checkinId}/pause`, formData, { 
-      headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } 
+    return axios.post(`${API_URL}/item-checkins/${checkinId}/pause`, formData, {
+      headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' }
     });
   },
-  resumeItemCheckin: (checkinId) => axios.post(`${API_URL}/item-checkins/${checkinId}/resume`, {}, { headers: getAuthHeader() }),
-  getItemPauseLogs: (checkinId) => axios.get(`${API_URL}/item-checkins/${checkinId}/pauses`, { headers: getAuthHeader() }),
+  resumeItemCheckin: (checkinId) => {
+    clearCache(`item_pause_logs_${checkinId}`);
+    return axios.post(`${API_URL}/item-checkins/${checkinId}/resume`, {}, { headers: getAuthHeader() });
+  },
+  getItemPauseLogs: (checkinId) => getCachedOrFetch(
+    `item_pause_logs_${checkinId}`,
+    () => axios.get(`${API_URL}/item-checkins/${checkinId}/pauses`, { headers: getAuthHeader() }),
+    30000
+  ),
   getPauseReasons: () => axios.get(`${API_URL}/pause-reasons`, { headers: getAuthHeader() }),
   
   // Job by ID
@@ -266,9 +325,17 @@ export const api = {
   
   // ============ GAMIFICATION ============
   // Balance & Transactions
-  getGamificationBalance: () => axios.get(`${API_URL}/gamification/balance`, { headers: getAuthHeader() }),
+  getGamificationBalance: () => getCachedOrFetch(
+    'gamification_balance',
+    () => axios.get(`${API_URL}/gamification/balance`, { headers: getAuthHeader() }),
+    60000
+  ),
   getUserGamificationBalance: (userId) => axios.get(`${API_URL}/gamification/balance/${userId}`, { headers: getAuthHeader() }),
-  getGamificationTransactions: (limit = 20) => axios.get(`${API_URL}/gamification/transactions?limit=${limit}`, { headers: getAuthHeader() }),
+  getGamificationTransactions: (limit = 20) => getCachedOrFetch(
+    'gamification_transactions',
+    () => axios.get(`${API_URL}/gamification/transactions?limit=${limit}`, { headers: getAuthHeader() }),
+    60000
+  ),
   getUserGamificationTransactions: (userId, limit = 20) => axios.get(`${API_URL}/gamification/transactions/${userId}?limit=${limit}`, { headers: getAuthHeader() }),
   registerDailyEngagement: () => axios.post(`${API_URL}/gamification/daily-engagement`, {}, { headers: getAuthHeader() }),
   processCheckoutGamification: (checkinId) => axios.post(`${API_URL}/gamification/process-checkout/${checkinId}`, {}, { headers: getAuthHeader() }),
@@ -327,7 +394,11 @@ export const api = {
   },
 
   // Installer Google Calendar
-  getInstallerCalendarStatus: () => axios.get(`${API_URL}/calendar/installer/status`, { headers: getAuthHeader() }),
+  getInstallerCalendarStatus: () => getCachedOrFetch(
+    'installer_calendar_status',
+    () => axios.get(`${API_URL}/calendar/installer/status`, { headers: getAuthHeader() }),
+    60000
+  ),
   getInstallerAuthUrl: () => `${API_URL}/calendar/installer/auth/google`,
   syncJobToInstallerCalendar: (jobId) => axios.post(`${API_URL}/calendar/sync-installer/${jobId}`, {}, { headers: getAuthHeader() }),
 };

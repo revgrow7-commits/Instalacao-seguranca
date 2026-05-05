@@ -72,6 +72,7 @@ class JobSchedule(BaseModel):
     scheduled_date: datetime
     scheduled_time_end: Optional[datetime] = None
     installer_ids: Optional[List[str]] = None
+    status: Optional[str] = None
 
 
 class ItemAssignment(BaseModel):
@@ -374,10 +375,19 @@ async def list_jobs(
         if job.get('scheduled_date') and isinstance(job['scheduled_date'], str):
             job['scheduled_date'] = datetime.fromisoformat(job['scheduled_date'])
 
-        # Trim holdprint_data — listagem só precisa do code para exibição no card
+        # Trim holdprint_data — listagem precisa do code, customerName (cliente exibido no
+        # card), deliveryNeeded (previsão de entrega Hold, prioridade no sort) e creationTime
+        # (fallback de data quando scheduled_date e deliveryNeeded ausentes). Demais campos
+        # (description HTML pesada, production, products) ficam de fora.
         hd = job.get('holdprint_data')
         if isinstance(hd, dict):
-            job['holdprint_data'] = {'code': hd.get('code', '')}
+            job['holdprint_data'] = {
+                'code': hd.get('code', ''),
+                'customerName': hd.get('customerName', ''),
+                'deliveryNeeded': hd.get('deliveryNeeded'),
+                'deliveryExpected': hd.get('deliveryExpected'),
+                'creationTime': hd.get('creationTime'),
+            }
         else:
             job['holdprint_data'] = {}
 
@@ -431,7 +441,12 @@ async def get_team_calendar_jobs(
             "scheduled_time_end": job.get("scheduled_time_end"),
             "created_at": job.get("created_at"),
             "assigned_installers": job.get("assigned_installers", []),
-            "holdprint_data": {"code": hd.get("code", "")},
+            "holdprint_data": {
+                "code": hd.get("code", ""),
+                "customerName": hd.get("customerName", ""),
+                "deliveryNeeded": hd.get("deliveryNeeded"),
+                "creationTime": hd.get("creationTime"),
+            },
             "client_name": job.get("client_name"),
         }
         cleaned_jobs.append(clean_job)
@@ -770,12 +785,27 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
     """Schedule a job"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    update_data = {"scheduled_date": schedule_data.scheduled_date.isoformat()}
+    # Normalizar para UTC
+    from datetime import timezone as _tz
+    sched_dt = schedule_data.scheduled_date
+    if sched_dt.tzinfo is None:
+        sched_dt = sched_dt.replace(tzinfo=_tz.utc)
+    sched_dt = sched_dt.astimezone(_tz.utc)
+
+    # Capturar data anterior para email
+    old_job = db.jobs.find_one({"id": job_id}, {"scheduled_date": 1})
+    old_date = old_job.get("scheduled_date") if old_job else None
+
+    update_data = {"scheduled_date": sched_dt.isoformat()}
     if schedule_data.scheduled_time_end:
-        update_data["scheduled_time_end"] = schedule_data.scheduled_time_end.isoformat()
-    if schedule_data.installer_ids:
+        end_dt = schedule_data.scheduled_time_end
+        if end_dt.tzinfo is None:
+            end_dt = end_dt.replace(tzinfo=_tz.utc)
+        update_data["scheduled_time_end"] = end_dt.astimezone(_tz.utc).isoformat()
+    if schedule_data.installer_ids is not None:
         update_data["assigned_installers"] = schedule_data.installer_ids
-        update_data["status"] = "agendado"
+    # Status: explícito no body ou default "agendado"
+    update_data["status"] = schedule_data.status or "agendado"
 
     client = get_client()
     result = client.table("jobs").update(update_data).eq("id", job_id).execute()
@@ -783,7 +813,6 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
     if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Fetch fresh full document to ensure all required fields are present
     job_doc = db.jobs.find_one({"id": job_id})
     if not job_doc:
         raise HTTPException(status_code=404, detail="Job not found after update")
@@ -796,7 +825,7 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
             except ValueError:
                 pass
 
-    # Sync to installer Google Calendars in background (best-effort)
+    # Background: Google Calendar sync
     def _sync_calendar():
         try:
             import asyncio as _asyncio
@@ -807,6 +836,85 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
 
     if update_data.get("assigned_installers"):
         background_tasks.add_task(_sync_calendar)
+
+    # Background: Push Web + Email para todos os instaladores atribuídos
+    assigned = job_doc.get("assigned_installers") or []
+    if assigned:
+        job_title = job_doc.get("title", "Job")
+        job_client = job_doc.get("client_name", "")
+        new_date_iso = job_doc.get("scheduled_date")
+
+        def _notify_all():
+            import asyncio as _asyncio
+
+            async def _push():
+                try:
+                    from routes.notifications import send_push_notification
+                    installers = db.installers.find(
+                        {"id": {"$in": assigned}},
+                        {"_id": 0, "user_id": 1, "full_name": 1}
+                    )
+                    try:
+                        dt = datetime.fromisoformat(str(new_date_iso).replace("Z", "+00:00"))
+                        from zoneinfo import ZoneInfo
+                        date_display = dt.astimezone(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y às %H:%M")
+                    except Exception:
+                        date_display = str(new_date_iso)
+
+                    for inst in installers:
+                        uid = inst.get("user_id")
+                        if uid:
+                            try:
+                                await send_push_notification(
+                                    user_id=uid,
+                                    title="📅 Job Reagendado",
+                                    body=f"{job_title} — nova data: {date_display}",
+                                    url=f"/installer/jobs/{job_id}",
+                                    data={"type": "job_rescheduled", "job_id": job_id}
+                                )
+                            except Exception as e:
+                                logger.warning(f"Push falhou para user {uid}: {e}")
+                except Exception as e:
+                    logger.warning(f"Notificação push falhou para job {job_id}: {e}")
+
+            _asyncio.run(_push())
+
+            # Email
+            try:
+                from services.email import send_reschedule_email
+                installers_for_email = db.installers.find(
+                    {"id": {"$in": assigned}},
+                    {"_id": 0, "user_id": 1, "full_name": 1}
+                )
+                user_ids = [i.get("user_id") for i in installers_for_email if i.get("user_id")]
+                if user_ids:
+                    users = db.users.find(
+                        {"id": {"$in": user_ids}},
+                        {"_id": 0, "id": 1, "email": 1, "name": 1}
+                    )
+                    uid_to_email = {u["id"]: (u.get("email"), u.get("name", "Instalador")) for u in users}
+
+                    installers_final = db.installers.find(
+                        {"id": {"$in": assigned}},
+                        {"_id": 0, "user_id": 1, "full_name": 1}
+                    )
+                    for inst in installers_final:
+                        uid = inst.get("user_id")
+                        if uid and uid in uid_to_email:
+                            email_addr, uname = uid_to_email[uid]
+                            if email_addr:
+                                send_reschedule_email(
+                                    to_email=email_addr,
+                                    installer_name=inst.get("full_name") or uname,
+                                    job_title=job_title,
+                                    job_client=job_client,
+                                    old_date=old_date,
+                                    new_date=new_date_iso,
+                                )
+            except Exception as e:
+                logger.warning(f"Email de reagendamento falhou para job {job_id}: {e}")
+
+        background_tasks.add_task(_notify_all)
 
     try:
         return Job(**job_doc)
