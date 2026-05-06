@@ -7,6 +7,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { 
   ArrowLeft, Package, MapPin, Camera, Check, Clock, 
@@ -510,7 +511,7 @@ const InstallerJobDetail = () => {
   const totalM2Job = job.area_m2 || products.reduce((sum, p) => sum + (p.total_area_m2 || 0), 0);
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <div className={`min-h-screen bg-background ${completedItems === totalItems && totalItems > 0 ? 'pb-28' : 'pb-8'}`}>
       {/* Coin Animation */}
       <CoinAnimation 
         show={showCoinAnimation} 
@@ -521,12 +522,11 @@ const InstallerJobDetail = () => {
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
         <div className="p-4">
-          <button 
+          <button
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-3"
+            className="flex items-center justify-center h-10 w-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-white/10 active:bg-white/20 active:scale-[0.98] transition-transform mb-3"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Voltar
+            <ArrowLeft className="h-5 w-5" />
           </button>
           
           <h1 className="text-xl font-bold text-foreground">{job.title}</h1>
@@ -722,7 +722,7 @@ const InstallerJobDetail = () => {
                         <Button
                           onClick={() => handleFileSelect(index, 'checkin')}
                           disabled={isProcessing}
-                          className="w-full bg-blue-600 hover:bg-blue-700"
+                          className="w-full bg-blue-600 hover:bg-blue-700 h-12 active:scale-[0.98] transition-transform"
                         >
                           {isProcessing ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -805,7 +805,7 @@ const InstallerJobDetail = () => {
                               onClick={() => handleOpenPauseModal(index)}
                               disabled={isProcessing}
                               variant="outline"
-                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-12 active:scale-[0.98] transition-transform"
                             >
                               <Pause className="h-4 w-4 mr-2" />
                               Pausar
@@ -813,7 +813,7 @@ const InstallerJobDetail = () => {
                             <Button
                               onClick={() => handleFileSelect(index, 'checkout')}
                               disabled={isProcessing}
-                              className="flex-1 bg-green-600 hover:bg-green-700"
+                              className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
                             >
                               {isProcessing ? (
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -854,7 +854,7 @@ const InstallerJobDetail = () => {
                           <Button
                             onClick={() => handleResumeItem(index)}
                             disabled={isProcessing}
-                            className="w-full bg-green-600 hover:bg-green-700"
+                            className="w-full bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
                           >
                             {isProcessing ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -876,7 +876,7 @@ const InstallerJobDetail = () => {
 
       {/* Complete Job Button */}
       {completedItems === totalItems && totalItems > 0 && (
-        <div className="fixed bottom-20 left-4 right-4 md:bottom-4">
+        <div className="fixed bottom-6 left-4 right-4 pb-safe">
           <Button
             onClick={async () => {
               try {
@@ -888,7 +888,7 @@ const InstallerJobDetail = () => {
                 toast.error(errorMessage);
               }
             }}
-            className="w-full bg-green-600 hover:bg-green-700 py-6 text-lg"
+            className="w-full bg-green-600 hover:bg-green-700 h-12 text-base active:scale-[0.98] transition-transform"
           >
             <CheckCircle2 className="h-5 w-5 mr-2" />
             Finalizar Job
@@ -896,25 +896,25 @@ const InstallerJobDetail = () => {
         </div>
       )}
 
-      {/* Pause Modal */}
-      <Dialog open={showPauseModal} onOpenChange={setShowPauseModal}>
-        <DialogContent className="bg-card border-white/10 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
+      {/* Pause Drawer (Mobile-First) */}
+      <Drawer open={showPauseModal} onOpenChange={setShowPauseModal}>
+        <DrawerContent className="bg-card border-white/10">
+          <DrawerHeader className="text-left">
+            <DrawerTitle className="text-white flex items-center gap-2">
               <Pause className="h-5 w-5 text-orange-400" />
               Pausar Item
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
+            </DrawerTitle>
+            <p className="text-sm text-muted-foreground mt-2">
               Informe o motivo da pausa. O tempo pausado não será contado na sua produtividade.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
+            </p>
+          </DrawerHeader>
+
+          <div className="px-4 pb-8 space-y-4">
             <div>
               <Label className="text-sm text-muted-foreground">Motivo da Pausa *</Label>
               <Select value={pauseReason} onValueChange={setPauseReason}>
-                <SelectTrigger className="bg-white/5 border-white/10 text-white mt-1">
-                  <SelectValue placeholder="Selecione o motivo" />
+                <SelectTrigger className="bg-background border-white/10 h-12 mt-1">
+                  <SelectValue placeholder="Selecione o motivo..." />
                 </SelectTrigger>
                 <SelectContent className="bg-card border-white/10">
                   {Object.entries(PAUSE_REASON_LABELS).map(([value, label]) => (
@@ -926,35 +926,35 @@ const InstallerJobDetail = () => {
 
             <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
               <p className="text-xs text-orange-400">
-                <strong>Importante:</strong> O tempo em pausa será registrado e excluído do cálculo de produtividade (m²/h), 
+                <strong>Importante:</strong> O tempo em pausa será registrado e excluído do cálculo de produtividade (m²/h),
                 garantindo que sua métrica seja justa e reflita apenas o tempo efetivamente trabalhado.
               </p>
             </div>
-          </div>
 
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowPauseModal(false)}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handlePauseItem}
-              disabled={!pauseReason || processingItem !== null}
-              className="flex-1 bg-orange-500 hover:bg-orange-600"
-            >
-              {processingItem !== null ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-              ) : (
-                <Pause className="h-4 w-4 mr-2" />
-              )}
-              Confirmar Pausa
-            </Button>
+            <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPauseModal(false)}
+                className="flex-1 h-12"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handlePauseItem}
+                disabled={!pauseReason || processingItem !== null}
+                className="flex-1 bg-orange-500 hover:bg-orange-600 h-12 active:scale-[0.98] transition-transform"
+              >
+                {processingItem !== null ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                ) : (
+                  <Pause className="h-4 w-4 mr-2" />
+                )}
+                Confirmar Pausa
+              </Button>
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };
