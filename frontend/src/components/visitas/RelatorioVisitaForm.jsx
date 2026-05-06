@@ -9,7 +9,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Camera, Send, X } from 'lucide-react';
 import { toast } from 'sonner';
-import { api } from '../../utils/api';
+import api from '../../utils/api';
 
 const schema = z.object({
   km_rodados: z.coerce.number({ invalid_type_error: 'Informe os km rodados' }).min(0.1, 'Mínimo 0,1 km'),
