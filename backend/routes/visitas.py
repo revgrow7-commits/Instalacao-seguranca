@@ -125,7 +125,12 @@ async def list_visitas(
     query: dict = {}
 
     if current_user.role == UserRole.INSTALLER:
-        query["installer_id"] = current_user.id
+        # visitas_tecnicas.installer_id aponta para installers.id, não users.id
+        # precisa fazer o mapeamento users.id → installers.id via installers.user_id
+        installer_rec = db.installers.find_one({"user_id": current_user.id})
+        if not installer_rec:
+            return []  # instalador sem registro na tabela installers
+        query["installer_id"] = installer_rec["id"]
     else:
         if installer_id:
             query["installer_id"] = installer_id
@@ -305,8 +310,12 @@ async def get_visita(
     if not doc:
         raise HTTPException(status_code=404, detail="Visita técnica não encontrada")
 
-    if current_user.role == UserRole.INSTALLER and doc.get("installer_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Você não tem acesso a esta visita técnica")
+    if current_user.role == UserRole.INSTALLER:
+        # visitas_tecnicas.installer_id aponta para installers.id, não users.id
+        # precisa fazer o mapeamento users.id → installers.id via installers.user_id
+        installer_rec = db.installers.find_one({"user_id": current_user.id})
+        if not installer_rec or doc.get("installer_id") != installer_rec["id"]:
+            raise HTTPException(status_code=403, detail="Você não tem acesso a esta visita técnica")
 
     return VisitaOut(**_parse_datetimes(doc))
 
@@ -443,7 +452,11 @@ async def enviar_relatorio(
     # 2. Verificar permissão: somente o instalador atribuído
     if current_user.role != UserRole.INSTALLER:
         raise HTTPException(status_code=403, detail="Somente instaladores podem enviar relatórios")
-    if doc.get("installer_id") != current_user.id:
+
+    # visitas_tecnicas.installer_id aponta para installers.id, não users.id
+    # precisa fazer o mapeamento users.id → installers.id via installers.user_id
+    installer_rec = db.installers.find_one({"user_id": current_user.id})
+    if not installer_rec or doc.get("installer_id") != installer_rec["id"]:
         raise HTTPException(status_code=403, detail="Você não está atribuído a esta visita técnica")
 
     # 3. Verificar status

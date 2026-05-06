@@ -68,6 +68,7 @@ const InstallerDashboard = () => {
   const navigate = useNavigate();
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
+  const [upcomingVisitas, setUpcomingVisitas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [checkinsLoading, setCheckinsLoading] = useState(true);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
@@ -77,6 +78,7 @@ const InstallerDashboard = () => {
   useEffect(() => {
     loadJobs();
     loadCheckins();
+    loadVisitas();
     loadGamificationData();
     registerDailyEngagement();
     // Show notification modal after a short delay
@@ -123,6 +125,20 @@ const InstallerDashboard = () => {
       // silencioso — checkin ausente apenas remove badge "Em Andamento"
     } finally {
       setCheckinsLoading(false);
+    }
+  };
+
+  const loadVisitas = async () => {
+    try {
+      const res = await api.listVisitas({ status: 'AGUARDANDO' });
+      const upcoming = (res.data || [])
+        .filter(v => v.scheduled_date && new Date(v.scheduled_date) >= new Date() &&
+          v.status !== 'CONCLUIDA' && v.status !== 'CANCELADA')
+        .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
+        .slice(0, 5);
+      setUpcomingVisitas(upcoming);
+    } catch {
+      // silencioso — visitas não bloqueiam dashboard
     }
   };
 
@@ -455,14 +471,14 @@ const InstallerDashboard = () => {
         </div>
       )}
 
-      {/* Próximos agendamentos (filtrado dos jobs já carregados — sem novo fetch) */}
+      {/* Próximos agendamentos (filtrado dos jobs já carregados + visitas técnicas — sem novo fetch) */}
       {(() => {
         const upcoming = jobs
           .filter(j => j.scheduled_date && new Date(j.scheduled_date) >= new Date() &&
             j.status !== 'completed' && j.status !== 'finalizado')
           .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
           .slice(0, 5);
-        if (upcoming.length === 0) return null;
+        if (upcoming.length === 0 && upcomingVisitas.length === 0) return null;
         return (
           <div>
             <div className="flex items-center justify-between mb-3 md:mb-4">
@@ -477,6 +493,32 @@ const InstallerDashboard = () => {
               </Button>
             </div>
             <div className="space-y-2">
+              {/* Visitas Técnicas agendadas */}
+              {upcomingVisitas.map(visita => (
+                <Card
+                  key={visita.id}
+                  className="bg-card border-purple-500/20 hover:border-purple-500/40 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/visitas-tecnicas/${visita.id}`)}
+                >
+                  <CardContent className="p-3 flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                      <MapPin className="h-3.5 w-3.5 text-purple-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-full leading-none">VT</span>
+                        <p className="text-sm font-medium text-white truncate">{visita.titulo || 'Visita Técnica'} — {visita.client_name}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(visita.scheduled_date).toLocaleDateString('pt-BR')} às{' '}
+                        {new Date(visita.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </CardContent>
+                </Card>
+              ))}
+              {/* Jobs agendados */}
               {upcoming.map(job => (
                 <Card
                   key={job.id}
