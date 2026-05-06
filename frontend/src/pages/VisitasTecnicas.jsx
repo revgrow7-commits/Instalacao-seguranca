@@ -54,6 +54,19 @@ const agendarSchema = z.object({
   observacoes_admin: z.string().optional().nullable(),
 });
 
+// Normaliza strings de inputs de data ("YYYY-MM-DD") e hora ("HH:MM")
+// para ISO datetime completo, que o Pydantic datetime do backend consegue parsear.
+function buildDatetimePayload(data) {
+  const payload = { ...data };
+  const dateStr = payload.scheduled_date || '';
+  const timeStr = payload.scheduled_time_end || '';
+  payload.scheduled_date = dateStr ? `${dateStr}T00:00:00` : null;
+  payload.scheduled_time_end = timeStr
+    ? `${dateStr || new Date().toISOString().slice(0, 10)}T${timeStr}:00`
+    : null;
+  return payload;
+}
+
 const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmin, isManager }) => {
   const navigate = useNavigate();
   const statusStyle = STATUS_STYLES[visita.status] || STATUS_STYLES.AGUARDANDO;
@@ -171,7 +184,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
 
   const onSubmit = async (data) => {
     try {
-      await api.createVisita(data);
+      await api.createVisita(buildDatetimePayload(data));
       toast.success('Visita técnica criada com sucesso');
       reset();
       onSuccess();
@@ -303,7 +316,7 @@ const AgendarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) =>
 
   const onSubmit = async (data) => {
     try {
-      await api.agendarVisita(visita.id, data);
+      await api.agendarVisita(visita.id, buildDatetimePayload(data));
       toast.success('Visita agendada com sucesso');
       reset();
       onSuccess();
@@ -395,8 +408,9 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
       client_address: visita.client_address || '',
       branch: visita.branch || '',
       installer_id: visita.installer_id ? String(visita.installer_id) : null,
-      scheduled_date: visita.scheduled_date || '',
-      scheduled_time_end: visita.scheduled_time_end || '',
+      // API retorna ISO datetime completo; inputs nativos precisam de "YYYY-MM-DD" e "HH:MM"
+      scheduled_date: visita.scheduled_date ? visita.scheduled_date.slice(0, 10) : '',
+      scheduled_time_end: visita.scheduled_time_end ? visita.scheduled_time_end.slice(11, 16) : '',
       valor_por_km: visita.valor_por_km ?? 1.50,
       observacoes_admin: visita.observacoes_admin || '',
     } : {},
@@ -404,7 +418,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
 
   const onSubmit = async (data) => {
     try {
-      await api.updateVisita(visita.id, data);
+      await api.updateVisita(visita.id, buildDatetimePayload(data));
       toast.success('Visita atualizada com sucesso');
       onSuccess();
       onClose();
