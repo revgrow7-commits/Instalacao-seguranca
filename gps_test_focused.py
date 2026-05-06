@@ -10,7 +10,7 @@ import time
 from datetime import datetime
 
 # Test configuration
-BASE_URL = "https://holdprint-sync-hub.preview.emergentagent.com/api"
+BASE_URL = "https://backend-henna-one-82.vercel.app/api"
 
 # Test credentials
 ADMIN_CREDENTIALS = {

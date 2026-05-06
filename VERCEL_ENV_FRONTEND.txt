@@ -6,4 +6,5 @@
 # ============================================================
 
 # URL do Backend (API)
-REACT_APP_BACKEND_URL=https://api.instal-visual.com.br
+REACT_APP_BACKEND_URL=https://backend-henna-one-82.vercel.app
+# IMPORTANTE: não use echo para setar esta variável no Vercel — use printf '%s' ou --value para evitar \n no final
