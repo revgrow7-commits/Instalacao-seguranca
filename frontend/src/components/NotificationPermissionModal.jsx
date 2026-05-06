@@ -6,15 +6,16 @@ import usePushNotifications from '../hooks/usePushNotifications';
 import { toast } from 'sonner';
 
 const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
-  const { 
-    isSupported, 
-    isSubscribed, 
-    permission, 
-    loading, 
-    subscribe, 
-    unsubscribe 
+  const {
+    isSupported,
+    isSubscribed,
+    permission,
+    loading,
+    error,
+    subscribe,
+    unsubscribe
   } = usePushNotifications();
-  
+
   // Show modal only if:
   // 1. Push is supported
   // 2. User is not already subscribed
@@ -29,11 +30,11 @@ const NotificationPermissionModal = ({ isOpen, onClose, onComplete }) => {
         toast.success('Notificações ativadas com sucesso!');
         onComplete && onComplete(true);
       } else {
-        toast.error('Erro ao ativar notificações');
+        toast.error(error || 'Erro ao ativar notificações');
       }
     } catch (err) {
       console.error('Error enabling notifications:', err);
-      toast.error('Erro ao ativar notificações: ' + (err.message || 'Erro desconhecido'));
+      toast.error(err.message || 'Erro ao ativar notificações');
     }
   };
 

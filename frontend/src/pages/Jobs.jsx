@@ -13,7 +13,7 @@ import {
   Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users,
   Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
   Clock, CheckCircle, MessageSquareWarning, AlertTriangle, ChevronRight,
-  Archive, ArchiveRestore, CheckSquare, Square, X
+  Archive, ArchiveRestore, CheckSquare, Square, X, Ticket
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '../components/ui/label';
@@ -169,7 +169,7 @@ const JobsPageSkeleton = () => (
 );
 
 // Mini Job Card Component for better performance
-const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, isAdmin, isManager, isLoading, selectionMode, isSelected, onToggleSelect }) => {
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, onOpenTicket, isAdmin, isManager, isLoading, selectionMode, isSelected, onToggleSelect }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
   const isScheduled = !!job.scheduled_date;
   const isArchived = job.archived || job.status === 'arquivado';
@@ -435,6 +435,20 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
               </Button>
             )}
 
+            {/* Ticket Button */}
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenTicket(job);
+              }}
+              variant="outline"
+              size="sm"
+              className="h-8 text-xs border-red-500/60 text-red-400 hover:bg-red-500/10"
+              title="Abrir ticket de intercorrência no CS"
+            >
+              <Ticket className="h-3 w-3" />
+            </Button>
+
             {/* Archive/Unarchive Button */}
             <Button
               onClick={(e) => {
@@ -514,6 +528,18 @@ const Jobs = () => {
   const [justifyReason, setJustifyReason] = useState('');
   const [justifyType, setJustifyType] = useState('no_checkin'); // no_checkin, no_checkout, cancelled
   const [sendingJustification, setSendingJustification] = useState(false);
+
+  // Ticket dialog states
+  const [showTicketDialog, setShowTicketDialog] = useState(false);
+  const [ticketJob, setTicketJob] = useState(null);
+  const [ticketCategoria, setTicketCategoria] = useState('Instalação');
+  const [ticketPrioridade, setTicketPrioridade] = useState('Média');
+  const [ticketDescricao, setTicketDescricao] = useState('');
+  const [ticketResponsavel, setTicketResponsavel] = useState('');
+  const [responsaveis, setResponsaveis] = useState([]);
+  const [loadingResponsaveis, setLoadingResponsaveis] = useState(false);
+  const [responsavelSearch, setResponsavelSearch] = useState('');
+  const [sendingTicket, setSendingTicket] = useState(false);
 
   // Generate month options
   const monthOptions = useMemo(() => {
@@ -687,6 +713,76 @@ const Jobs = () => {
     setJustifyReason('');
     setJustifyType('no_checkin');
     setShowJustifyDialog(true);
+  };
+
+  const CS_INTEGRATION_URL = 'https://otyrrvkixegiqsthmaaj.supabase.co/functions/v1/cs-integration';
+  const CS_INTEGRATION_TOKEN = '30c98c758c9a29e9a5e1b3235028bd11fcc2cfb822778cc8e5c7c5449704c7c8';
+
+  const handleOpenTicketDialog = (job) => {
+    setTicketJob(job);
+    setTicketCategoria('Instalação');
+    setTicketPrioridade('Média');
+    setTicketDescricao('');
+    setTicketResponsavel('');
+    setResponsavelSearch('');
+    setShowTicketDialog(true);
+    if (responsaveis.length === 0) {
+      setLoadingResponsaveis(true);
+      fetch(`${CS_INTEGRATION_URL}/responsaveis`, {
+        headers: { 'Authorization': `Bearer ${CS_INTEGRATION_TOKEN}` },
+      })
+        .then(r => r.json())
+        .then(data => Array.isArray(data) && setResponsaveis(data))
+        .catch(err => console.error('Erro ao buscar responsáveis:', err))
+        .finally(() => setLoadingResponsaveis(false));
+    }
+  };
+
+  const handleSubmitTicket = async () => {
+    if (ticketDescricao.trim().length < 10) {
+      toast.error('Descreva o problema em ao menos 10 caracteres');
+      return;
+    }
+
+    setSendingTicket(true);
+    try {
+      const jobCode = ticketJob.holdprint_data?.code || ticketJob.code || ticketJob.id?.slice(0, 8);
+      const payload = {
+        cliente:     ticketJob.client_name || ticketJob.holdprint_data?.client?.name || '',
+        job_code:    String(jobCode),
+        job_titulo:  ticketJob.title,
+        categoria:   ticketCategoria,
+        prioridade:  ticketPrioridade,
+        descricao:   ticketDescricao.trim(),
+        responsavel: ticketResponsavel || undefined,
+        unidade:     ticketJob.branch ?? null,
+      };
+
+      const response = await fetch(CS_INTEGRATION_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${CS_INTEGRATION_TOKEN}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        throw new Error(`${response.status} — ${err}`);
+      }
+
+      const ticket = await response.json();
+      toast.success(`Ticket ${ticket.code} criado no CS! 🎫`);
+      setShowTicketDialog(false);
+      setTicketJob(null);
+    } catch (error) {
+      console.error('Erro ao criar ticket CS:', error);
+      toast.error(`Erro ao criar ticket: ${error.message}`);
+    } finally {
+      setSendingTicket(false);
+    }
   };
 
   // Submit justification
@@ -1521,6 +1617,7 @@ const Jobs = () => {
                   onSchedule={handleOpenScheduleDialog}
                   onJustify={handleOpenJustifyDialog}
                   onArchive={handleArchiveJob}
+                  onOpenTicket={handleOpenTicketDialog}
                   isAdmin={isAdmin}
                   isManager={isManager}
                   isLoading={processingJobId}
@@ -2028,6 +2125,151 @@ const Jobs = () => {
                 </>
               ) : (
                 'Enviar e Finalizar Job'
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ticket Dialog */}
+      <Dialog open={showTicketDialog} onOpenChange={(open) => {
+        setShowTicketDialog(open);
+        if (!open) { setTicketJob(null); setTicketDescricao(''); setTicketCategoria('Instalação'); setTicketPrioridade('Média'); setTicketResponsavel(''); setResponsavelSearch(''); }
+      }}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-red-400" />
+              Abrir Ticket de Intercorrência
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground mt-1">
+              {ticketJob && (
+                <>
+                  <span className="font-mono text-primary/80">
+                    #{ticketJob.holdprint_data?.code || ticketJob.code || ticketJob.id?.slice(0, 8)}
+                  </span>
+                  {' — '}
+                  {ticketJob.title}
+                  <br />
+                  <span className="text-muted-foreground/60">
+                    Cliente: {ticketJob.client_name || ticketJob.holdprint_data?.client?.name || '–'}
+                  </span>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Categoria *</Label>
+                <Select value={ticketCategoria} onValueChange={setTicketCategoria}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    {['Atraso', 'Defeito', 'Divergência', 'Instalação', 'Outros'].map(c => (
+                      <SelectItem key={c} value={c} className="text-white hover:bg-white/5">{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm text-muted-foreground mb-2 block">Prioridade *</Label>
+                <Select value={ticketPrioridade} onValueChange={setTicketPrioridade}>
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-card border-white/10">
+                    {['Crítica', 'Alta', 'Média', 'Baixa'].map(p => (
+                      <SelectItem key={p} value={p} className="text-white hover:bg-white/5">{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">Responsável</Label>
+              <Input
+                placeholder="Buscar por nome..."
+                value={responsavelSearch}
+                onChange={(e) => setResponsavelSearch(e.target.value)}
+                className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground/40 mb-1.5 h-8 text-xs"
+              />
+              <Select
+                value={ticketResponsavel}
+                onValueChange={setTicketResponsavel}
+                disabled={loadingResponsaveis}
+              >
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder={loadingResponsaveis ? 'Carregando...' : 'Não atribuído'} />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10 max-h-56">
+                  <SelectItem value="Não atribuído" className="text-muted-foreground hover:bg-white/5">
+                    Não atribuído
+                  </SelectItem>
+                  {responsaveis
+                    .filter(r =>
+                      !responsavelSearch.trim() ||
+                      r.nome_completo.includes(responsavelSearch.trim().toUpperCase())
+                    )
+                    .map(r => (
+                      <SelectItem
+                        key={r.id}
+                        value={r.nome_completo}
+                        className="text-white hover:bg-white/5"
+                      >
+                        {r.nome_completo}
+                        {(r.cargo || r.unidade) && (
+                          <span className="ml-1.5 text-xs text-muted-foreground/50">
+                            {[r.cargo, r.unidade].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">Descrição *</Label>
+              <Textarea
+                placeholder="Descreva o problema detalhadamente (mín. 10 caracteres)..."
+                value={ticketDescricao}
+                onChange={(e) => setTicketDescricao(e.target.value)}
+                className="bg-white/5 border-white/10 text-white placeholder:text-muted-foreground/40 min-h-[100px]"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 justify-end mt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowTicketDialog(false);
+                setTicketJob(null);
+                setTicketDescricao('');
+              }}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSubmitTicket}
+              disabled={sendingTicket || ticketDescricao.trim().length < 10}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {sendingTicket ? (
+                <>
+                  <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <Ticket className="h-4 w-4 mr-2" />
+                  Criar Ticket no CS
+                </>
               )}
             </Button>
           </div>

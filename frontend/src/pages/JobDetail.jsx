@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler, UserPlus, Check, AlertTriangle, Play, MessageCircle, Phone, Archive, ArchiveRestore } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler, UserPlus, Check, AlertTriangle, Play, MessageCircle, Phone, Archive, ArchiveRestore, Wrench, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JobDetail = () => {
@@ -55,6 +55,41 @@ const JobDetail = () => {
   const [showArchiveItemsDialog, setShowArchiveItemsDialog] = useState(false);
   const [archiveExcludeMetrics, setArchiveExcludeMetrics] = useState(false);
   const [selectedItemsToArchive, setSelectedItemsToArchive] = useState([]);
+
+  // Estados para novos campos de classificação
+  const [remocaoPrevisita, setRemocaoPrevisita] = useState(false);
+  const [ferramentasSelecionadas, setFerramentasSelecionadas] = useState([]);
+  const [novaFerramenta, setNovaFerramenta] = useState('');
+
+  // Opções pré-cadastradas de ferramentas
+  const ferramentasOptions = [
+    'Escada simples',
+    'Escada extensível',
+    'Andaime',
+    'Plataforma elevatória (PTA)',
+    'Furadeira',
+    'Martelete',
+    'Veículo de carga',
+    'Caminhão com cesto',
+  ];
+
+  const toggleFerramenta = (ferramenta) => {
+    setFerramentasSelecionadas(prev =>
+      prev.includes(ferramenta) ? prev.filter(f => f !== ferramenta) : [...prev, ferramenta]
+    );
+  };
+
+  const adicionarFerramenta = () => {
+    const trimmed = novaFerramenta.trim();
+    if (trimmed && !ferramentasSelecionadas.includes(trimmed)) {
+      setFerramentasSelecionadas(prev => [...prev, trimmed]);
+    }
+    setNovaFerramenta('');
+  };
+
+  const removerFerramenta = (ferramenta) => {
+    setFerramentasSelecionadas(prev => prev.filter(f => f !== ferramenta));
+  };
 
   // Opções de dificuldade e cenário
   const difficultyOptions = [
@@ -303,7 +338,9 @@ const JobDetail = () => {
       await api.assignItemsToInstallers(jobId, selectedItems, selectedItemInstallers, {
         difficulty_level: assignmentDifficulty && assignmentDifficulty !== 'none' ? assignmentDifficulty : null,
         scenario_category: assignmentScenario && assignmentScenario !== 'none' ? assignmentScenario : null,
-        apply_to_all: applyToAllItems
+        apply_to_all: applyToAllItems,
+        remocao_prevista: remocaoPrevisita,
+        ferramentas: ferramentasSelecionadas.length > 0 ? ferramentasSelecionadas : null,
       });
       toast.success('Itens atribuídos com sucesso!');
       setShowAssignItemsDialog(false);
@@ -311,6 +348,9 @@ const JobDetail = () => {
       setSelectedItemInstallers([]);
       setAssignmentDifficulty('');
       setAssignmentScenario('');
+      setRemocaoPrevisita(false);
+      setFerramentasSelecionadas([]);
+      setNovaFerramenta('');
       loadData();
     } catch (error) {
       console.error('Erro ao atribuir itens:', error);
@@ -882,6 +922,74 @@ const JobDetail = () => {
                     </div>
                   </div>
 
+                  {/* Remoção prevista */}
+                  <div className="flex items-center gap-3 pt-1">
+                    <Checkbox
+                      id="remocaoPrevisita"
+                      checked={remocaoPrevisita}
+                      onCheckedChange={setRemocaoPrevisita}
+                    />
+                    <Label htmlFor="remocaoPrevisita" className="text-white cursor-pointer select-none">
+                      Remoção prevista
+                    </Label>
+                  </div>
+
+                  {/* Ferramentas necessárias */}
+                  <div className="space-y-2">
+                    <Label className="text-white flex items-center gap-2">
+                      <Wrench className="h-4 w-4 text-purple-400" />
+                      Ferramentas necessárias
+                    </Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {ferramentasOptions.map((ferramenta) => (
+                        <div key={ferramenta} className="flex items-center gap-2">
+                          <Checkbox
+                            id={`ferr-${ferramenta}`}
+                            checked={ferramentasSelecionadas.includes(ferramenta)}
+                            onCheckedChange={() => toggleFerramenta(ferramenta)}
+                          />
+                          <Label htmlFor={`ferr-${ferramenta}`} className="text-sm text-white/80 cursor-pointer select-none leading-tight">
+                            {ferramenta}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Itens customizados selecionados */}
+                    {ferramentasSelecionadas.filter(f => !ferramentasOptions.includes(f)).length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ferramentasSelecionadas.filter(f => !ferramentasOptions.includes(f)).map((f) => (
+                          <span key={f} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 text-xs border border-purple-500/30">
+                            {f}
+                            <button type="button" onClick={() => removerFerramenta(f)} className="hover:text-white">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {/* Input para adicionar ferramenta customizada */}
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        value={novaFerramenta}
+                        onChange={(e) => setNovaFerramenta(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), adicionarFerramenta())}
+                        placeholder="Outra ferramenta..."
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 h-8 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={adicionarFerramenta}
+                        disabled={!novaFerramenta.trim()}
+                        className="border-white/20 text-white hover:bg-white/10 h-8 px-2 shrink-0"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
                     Esses valores serão usados para calcular métricas de produtividade e gerar relatórios.
                   </p>
@@ -913,6 +1021,9 @@ const JobDetail = () => {
                     setShowAssignItemsDialog(false);
                     setSelectedItems([]);
                     setSelectedItemInstallers([]);
+                    setRemocaoPrevisita(false);
+                    setFerramentasSelecionadas([]);
+                    setNovaFerramenta('');
                   }}
                   className="border-white/20 text-white hover:bg-white/10"
                 >

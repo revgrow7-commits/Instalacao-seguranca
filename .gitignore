@@ -92,3 +92,4 @@ VERCEL_ENV_BACKEND.txt
 VERCEL_ENV_*.txt
 
 .vercel
+.gstack/

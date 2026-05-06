@@ -81,6 +81,8 @@ class ItemAssignment(BaseModel):
     difficulty_level: Optional[str] = None
     scenario_category: Optional[str] = None
     apply_to_all: bool = True
+    remocao_prevista: bool = False
+    ferramentas: Optional[List[str]] = None
 
 
 class BatchImportRequest(BaseModel):
@@ -1548,12 +1550,14 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
                 "status": "pending",
                 "manager_difficulty_level": assignment.difficulty_level,
                 "manager_scenario_category": assignment.scenario_category,
+                "remocao_prevista": assignment.remocao_prevista,
+                "ferramentas": assignment.ferramentas,
                 "assigned_by": current_user.id
             }
             new_assignments.append(new_assignment)
             total_m2_assigned += m2_per_installer
     
-    if assignment.apply_to_all and (assignment.difficulty_level or assignment.scenario_category):
+    if assignment.apply_to_all and (assignment.difficulty_level or assignment.scenario_category or assignment.remocao_prevista or assignment.ferramentas):
         job_config = job.get("installation_config", {})
         # Ensure job_config is a dict (could be string from DB)
         if isinstance(job_config, str):
@@ -1564,12 +1568,15 @@ async def assign_items_to_installers(job_id: str, assignment: ItemAssignment, cu
                 job_config = {}
         if not isinstance(job_config, dict):
             job_config = {}
-        
+
         if assignment.difficulty_level:
             job_config["default_difficulty_level"] = assignment.difficulty_level
         if assignment.scenario_category:
             job_config["default_scenario_category"] = assignment.scenario_category
-        
+        job_config["remocao_prevista"] = assignment.remocao_prevista
+        if assignment.ferramentas:
+            job_config["ferramentas"] = assignment.ferramentas
+
         db.jobs.update_one(
             {"id": job_id},
             {"$set": {"installation_config": job_config}}
