@@ -157,6 +157,17 @@ TABLE_COLUMNS = {
     "ferramentas_vt": frozenset([
         "id", "nome", "is_active", "created_at", "created_by"
     ]),
+    "visitas_tecnicas": frozenset([
+        "id", "numero_vt", "titulo", "client_name", "client_address", "branch",
+        "installer_id", "scheduled_date", "scheduled_time_end", "valor_por_km",
+        "km_ida", "km_volta", "valor_total", "status", "observacoes_admin",
+        "relatorio_descricao", "relatorio_situacao", "relatorio_fotos",
+        "relatorio_assinatura_confirmada", "relatorio_chegada", "relatorio_saida",
+        "relatorio_enviado_em", "created_by", "created_at", "updated_at",
+        "job_id", "vendedor_nome", "tipos_servico", "ferramentas",
+        "remocao_prevista_os", "remocao_a_realizar", "altura_estimada_m",
+        "nivel_dificuldade", "aprovacao_status",
+    ]),
 }
 
 # Keep backward-compatible name for any external references

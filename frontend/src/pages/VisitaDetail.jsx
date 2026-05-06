@@ -100,7 +100,7 @@ const VisitaDetail = () => {
   const statusLabel = STATUS_LABELS[visita.status] || visita.status;
   const canSendRelatorio =
     isInstaller &&
-    String(visita.installer_id) === String(user?.id) &&
+    String(visita.installer_id) === String(user?.installer_id) &&
     visita.status !== 'CONCLUIDA' &&
     visita.status !== 'CANCELADA';
   const hasRelatorio = !!visita.relatorio_enviado_em;
@@ -155,7 +155,7 @@ const VisitaDetail = () => {
             <InfoRow label="Cliente" value={visita.client_name} icon={User} />
             <InfoRow label="Endereço" value={visita.client_address} icon={MapPin} />
             <InfoRow label="Filial" value={visita.branch} icon={Building2} />
-            <InfoRow label="Instalador" value={visita.installer_id ? `ID: ${visita.installer_id.slice(0, 8)}…` : '—'} icon={User} />
+            <InfoRow label="Instalador" value={visita.installer_name || (visita.installer_id ? visita.installer_id.slice(0, 8) + '…' : '—')} icon={User} />
             <InfoRow
               label="Data Agendada"
               value={formattedDate ? `${formattedDate}${visita.scheduled_time_end ? ' até ' + visita.scheduled_time_end : ''}` : '—'}

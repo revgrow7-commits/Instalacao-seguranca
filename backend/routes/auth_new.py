@@ -104,7 +104,14 @@ def login(request: LoginRequest):
         "role": user.get('role', 'installer')
     }
     access_token = create_access_token(data=token_data)
-    
+
+    # Para instaladores, inclui o installers.id para uso no frontend
+    installer_id = None
+    if user.get('role') == 'installer':
+        installer_rec = db.installers.find_one({"user_id": user['id']})
+        if installer_rec:
+            installer_id = installer_rec['id']
+
     # Return user data without password
     user_response = {
         "id": user['id'],
@@ -114,7 +121,8 @@ def login(request: LoginRequest):
         "role": user.get('role', 'installer'),
         "branch": user.get('branch'),
         "phone": user.get('phone'),
-        "is_active": user.get('is_active', True)
+        "is_active": user.get('is_active', True),
+        "installer_id": installer_id,
     }
     
     logger.info(f"User logged in: {request.email}")
@@ -537,16 +545,22 @@ def change_password(request: ChangePasswordRequest, current_user: User = Depends
 @router.get("/me")
 def get_me(current_user: User = Depends(get_current_user)):
     """Get current authenticated user"""
-    
+
     users = db.users.find({"id": current_user.id})
     user = users[0] if users else None
-    
+
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    
-    # Remove sensitive data
+
     user.pop('password_hash', None)
-    
+
+    # Inclui installer_id para que o frontend possa comparar com visita.installer_id
+    if user.get('role') == 'installer':
+        installer_rec = db.installers.find_one({"user_id": user['id']})
+        user['installer_id'] = installer_rec['id'] if installer_rec else None
+    else:
+        user['installer_id'] = None
+
     return user
 
 

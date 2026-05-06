@@ -175,6 +175,7 @@ class VisitaOut(BaseModel):
     client_address: str
     branch: str
     installer_id: Optional[str] = None
+    installer_name: Optional[str] = None
     scheduled_date: Optional[datetime] = None
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: float = 1.50
