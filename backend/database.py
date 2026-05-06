@@ -11,7 +11,7 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # Import from Supabase module
-from db_supabase import db, client, get_client
+from db_supabase import db, get_client
 
 print("🔌 Database: Supabase (PostgreSQL)")
 
