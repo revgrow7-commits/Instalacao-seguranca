@@ -18,7 +18,13 @@ const BottomNav = () => {
       name: 'Dashboard',
       href: '/dashboard',
       icon: LayoutDashboard,
-      roles: ['admin', 'manager', 'installer']
+      roles: ['admin', 'manager']
+    },
+    {
+      name: 'Dashboard',
+      href: '/installer/dashboard',
+      icon: LayoutDashboard,
+      roles: ['installer']
     },
     {
       name: 'Jobs',
@@ -54,19 +60,27 @@ const BottomNav = () => {
 
   const filteredNav = navigation.filter(item => item.roles.includes(user?.role));
 
+  const isActive = (item) => {
+    if (location.pathname === item.href) return true;
+    if (location.pathname.startsWith(item.href + '/')) return true;
+    // Dashboard do installer deve ficar ativo em qualquer rota /installer/*
+    if (item.href === '/installer/dashboard' && location.pathname.startsWith('/installer/')) return true;
+    return false;
+  };
+
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-white/5 z-50">
       <nav className="flex justify-around items-center h-16" data-testid="bottom-navigation">
         {filteredNav.map((item) => {
-          const isActive = location.pathname === item.href || location.pathname.startsWith(item.href + '/');
+          const active = isActive(item);
           return (
             <Link
-              key={item.name}
+              key={item.name + item.href}
               to={item.href}
               data-testid={`bottom-nav-${item.name.toLowerCase()}`}
               className={
-                `flex flex-col items-center justify-center flex-1 h-full transition-colors ${
-                  isActive
+                `relative flex flex-col items-center justify-center flex-1 min-h-[56px] transition-colors ${
+                  active
                     ? 'text-primary'
                     : 'text-gray-400 hover:text-white'
                 }`
@@ -74,6 +88,9 @@ const BottomNav = () => {
             >
               <item.icon className="h-6 w-6 mb-1" />
               <span className="text-xs font-medium">{item.name}</span>
+              {active && (
+                <span className="absolute bottom-1 w-1 h-1 rounded-full bg-primary" />
+              )}
             </Link>
           );
         })}
