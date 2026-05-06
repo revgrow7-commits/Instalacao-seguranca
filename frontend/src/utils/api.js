@@ -216,7 +216,23 @@ export const api = {
     () => axios.get(`${API_URL}/item-checkins?job_id=${jobId}`, { headers: getAuthHeader() }),
     20000
   ),
-  getAllItemCheckins: () => axios.get(`${API_URL}/item-checkins/all`, { headers: getAuthHeader() }),
+  getAllItemCheckins: async () => {
+    const PAGE = 500;
+    let offset = 0;
+    const all = [];
+    while (true) {
+      const r = await axios.get(
+        `${API_URL}/item-checkins/all?limit=${PAGE}&offset=${offset}`,
+        { headers: getAuthHeader(), timeout: 15000 }
+      );
+      const batch = r.data || [];
+      all.push(...batch);
+      if (batch.length < PAGE) break;
+      offset += PAGE;
+      if (offset > 50000) break;
+    }
+    return all;
+  },
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
   archiveItemCheckin: (checkinId) => axios.put(`${API_URL}/item-checkins/${checkinId}/archive`, {}, { headers: getAuthHeader() }),
   
