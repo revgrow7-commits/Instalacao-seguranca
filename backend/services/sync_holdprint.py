@@ -6,7 +6,7 @@ import os
 import logging
 import httpx
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from services.holdprint import extract_product_dimensions  # noqa: F401 – re-exported for callers
 from config import HOLDPRINT_API_URL
@@ -14,10 +14,20 @@ from config import HOLDPRINT_API_URL
 logger = logging.getLogger(__name__)
 
 
-def sync_holdprint_jobs_sync(db, months_back: int = 0) -> Dict[str, Any]:
+def sync_holdprint_jobs_sync(
+    db,
+    months_back: int = 2,
+    full_resync: bool = False,
+) -> Dict[str, Any]:
     """
     Synchronous version of Holdprint sync for Vercel Cron.
-    months_back=0 means current month only (safe for Vercel 60s timeout).
+
+    Delta sync (default): reads the cursor stored in system_config.last_holdprint_sync
+    and fetches only jobs created/updated since that timestamp (minus 1 day overlap).
+
+    full_resync=True: ignores the cursor and iterates over the last `months_back`
+    months — useful for an admin-triggered reprocessing.
+
     Returns summary of the sync operation.
     """
     import calendar as cal
@@ -27,14 +37,35 @@ def sync_holdprint_jobs_sync(db, months_back: int = 0) -> Dict[str, Any]:
     HOLDPRINT_API_KEY_SP = os.environ.get('HOLDPRINT_API_KEY_SP')
 
     now = datetime.now(timezone.utc)
-    periods = []
-    for delta in range(months_back, -1, -1):
-        month = now.month - delta
-        year = now.year
-        while month < 1:
-            month += 12
-            year -= 1
-        periods.append((year, month))
+
+    # ── Build date window ────────────────────────────────────────────────────
+    if full_resync:
+        # Classic period-based loop for full reprocessing
+        periods = []
+        for delta in range(months_back, -1, -1):
+            month = now.month - delta
+            year = now.year
+            while month < 1:
+                month += 12
+                year -= 1
+            periods.append((year, month))
+        windows = []
+        for year, month in periods:
+            last_day = cal.monthrange(year, month)[1]
+            windows.append((f"{year}-{month:02d}-01", f"{year}-{month:02d}-{last_day:02d}"))
+    else:
+        # Delta sync: single window from cursor (or start of current month)
+        cursor_row = db.system_config.find_one({"key": "last_holdprint_sync"})
+        if cursor_row and cursor_row.get("value"):
+            cursor_dt = datetime.fromisoformat(cursor_row["value"].replace('Z', '+00:00'))
+            # 1-day overlap so jobs created right at the clock boundary are not missed
+            start_dt = cursor_dt - timedelta(days=1)
+        else:
+            # First run: start of current month
+            start_dt = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        windows = [(start_dt.strftime("%Y-%m-%d"), now.strftime("%Y-%m-%d"))]
+
+    logger.info(f"Sync windows: {windows} (full_resync={full_resync})")
 
     total_imported = 0
     total_skipped = 0
@@ -54,10 +85,7 @@ def sync_holdprint_jobs_sync(db, months_back: int = 0) -> Dict[str, Any]:
             branch_skipped = 0
 
             try:
-                for year, month in periods:
-                    last_day = cal.monthrange(year, month)[1]
-                    start_date = f"{year}-{month:02d}-01"
-                    end_date = f"{year}-{month:02d}-{last_day:02d}"
+                for start_date, end_date in windows:
                     page = 1
 
                     while True:
@@ -81,6 +109,7 @@ def sync_holdprint_jobs_sync(db, months_back: int = 0) -> Dict[str, Any]:
                         for holdprint_job in jobs:
                             holdprint_job_id = str(holdprint_job.get('id', ''))
 
+                            # Defence-in-depth: skip if already imported
                             existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
                             if existing:
                                 branch_skipped += 1
@@ -152,7 +181,7 @@ def sync_holdprint_jobs_sync(db, months_back: int = 0) -> Dict[str, Any]:
         "total_imported": total_imported,
         "total_skipped": total_skipped,
         "total_errors": total_errors,
-        "sync_type": "vercel_cron",
+        "sync_type": "full_resync" if full_resync else "delta",
         "branches": branches_synced,
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
