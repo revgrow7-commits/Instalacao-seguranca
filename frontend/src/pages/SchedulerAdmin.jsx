@@ -81,10 +81,13 @@ const SchedulerAdmin = () => {
   const handleRunNow = async (jobId) => {
     setActionLoading(prev => ({ ...prev, [jobId]: 'run' }));
     try {
-      await api.runSchedulerJobNow(jobId);
-      toast.success('Tarefa iniciada! Aguarde alguns segundos...');
-      // Wait a bit and refresh
-      setTimeout(fetchData, 5000);
+      const response = await api.runSchedulerJobNow(jobId);
+      const result = response.data?.result || {};
+      const imported = result.total_imported ?? 0;
+      const skipped = result.total_skipped ?? 0;
+      const syncType = result.sync_type === 'full_resync' ? 'Resync completo' : 'Delta';
+      toast.success(`${syncType}: ${imported} importados, ${skipped} já existentes`);
+      fetchData();
     } catch (error) {
       toast.error('Erro ao executar tarefa');
     } finally {

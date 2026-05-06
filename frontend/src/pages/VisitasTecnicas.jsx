@@ -531,8 +531,10 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
 const VisitasTecnicas = () => {
   const { user, isAdmin, isManager } = useAuth();
 
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterBranch, setFilterBranch] = useState('');
+  // Filtros usam 'all' como sentinela — Radix UI Select proíbe SelectItem
+  // com value="" (lança Error em runtime e quebra a página).
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterBranch, setFilterBranch] = useState('all');
   const [filterDateFrom, setFilterDateFrom] = useState(null);
   const [filterDateTo, setFilterDateTo] = useState(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -563,19 +565,19 @@ const VisitasTecnicas = () => {
 
   const filteredVisitas = useMemo(() => {
     return visitas.filter(v => {
-      if (filterStatus && v.status !== filterStatus) return false;
-      if (filterBranch && v.branch !== filterBranch) return false;
+      if (filterStatus !== 'all' && v.status !== filterStatus) return false;
+      if (filterBranch !== 'all' && v.branch !== filterBranch) return false;
       if (filterDateFrom && v.scheduled_date && new Date(v.scheduled_date) < filterDateFrom) return false;
       if (filterDateTo && v.scheduled_date && new Date(v.scheduled_date) > filterDateTo) return false;
       return true;
     });
   }, [visitas, filterStatus, filterBranch, filterDateFrom, filterDateTo]);
 
-  const hasFilters = filterStatus || filterBranch || filterDateFrom || filterDateTo;
+  const hasFilters = filterStatus !== 'all' || filterBranch !== 'all' || filterDateFrom || filterDateTo;
 
   const clearFilters = () => {
-    setFilterStatus('');
-    setFilterBranch('');
+    setFilterStatus('all');
+    setFilterBranch('all');
     setFilterDateFrom(null);
     setFilterDateTo(null);
   };
@@ -672,7 +674,7 @@ const VisitasTecnicas = () => {
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
-                <SelectItem value="">Todos os status</SelectItem>
+                <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
                 <SelectItem value="EM_VISITA">Em Visita</SelectItem>
                 <SelectItem value="CONCLUIDA">Concluída</SelectItem>
@@ -685,7 +687,7 @@ const VisitasTecnicas = () => {
                 <SelectValue placeholder="Filial" />
               </SelectTrigger>
               <SelectContent className="bg-card border-white/10">
-                <SelectItem value="">Todas filiais</SelectItem>
+                <SelectItem value="all">Todas filiais</SelectItem>
                 <SelectItem value="POA">POA</SelectItem>
                 <SelectItem value="SP">SP</SelectItem>
               </SelectContent>

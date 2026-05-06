@@ -69,12 +69,14 @@ const InstallerDashboard = () => {
   const [jobs, setJobs] = useState([]);
   const [checkins, setCheckins] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [checkinsLoading, setCheckinsLoading] = useState(true);
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [gamificationBalance, setGamificationBalance] = useState(null);
   const [recentTransactions, setRecentTransactions] = useState([]);
 
   useEffect(() => {
-    loadData();
+    loadJobs();
+    loadCheckins();
     loadGamificationData();
     registerDailyEngagement();
     // Show notification modal after a short delay
@@ -92,24 +94,36 @@ const InstallerDashboard = () => {
     setShowNotificationModal(false);
   };
 
-  const loadData = async () => {
-    // Jobs e checkins em paralelo — ambos necessários para exibir status "Em Andamento" correto
-    const [jobsRes, checkinsRes] = await Promise.allSettled([
-      api.getJobs(),
-      api.getCheckins(),
-    ]);
-    if (jobsRes.status === 'fulfilled') {
-      if (Array.isArray(jobsRes.value.data) && jobsRes.value.data.length === 0) {
+  const loadJobs = async () => {
+    try {
+      const res = await api.getJobs();
+      if (Array.isArray(res.data) && res.data.length === 0)
         console.warn('[InstallerDashboard] API retornou 0 jobs — verificar atribuição no painel admin');
+      setJobs(res.data ?? []);
+      setLoading(false);
+
+      // se veio do cache, aguarda fresh em background e atualiza silenciosamente
+      if (res._stale && res._fresh) {
+        res._fresh.then(fresh => {
+          setJobs(fresh.data ?? []);
+        }).catch(() => { /* falha silenciosa — cache já está exibido */ });
       }
-      setJobs(jobsRes.value.data);
-    } else {
+    } catch {
       toast.error('Erro ao carregar jobs');
+      setJobs([]);
+      setLoading(false);
     }
-    if (checkinsRes.status === 'fulfilled') {
-      setCheckins(checkinsRes.value.data);
+  };
+
+  const loadCheckins = async () => {
+    try {
+      const res = await api.getCheckins();
+      setCheckins(res.data ?? []);
+    } catch {
+      // silencioso — checkin ausente apenas remove badge "Em Andamento"
+    } finally {
+      setCheckinsLoading(false);
     }
-    setLoading(false);
   };
 
   const loadGamificationData = async () => {
