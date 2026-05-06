@@ -230,7 +230,7 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
 
     # Find jobs scheduled for today that are past their scheduled time
     jobs = db.jobs.find({
-        "status": "scheduled",
+        "status": "agendado",
         "scheduled_date": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()}
     }, {"_id": 0})
     
