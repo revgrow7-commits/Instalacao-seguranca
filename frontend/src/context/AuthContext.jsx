@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import tokenManager from '../utils/tokenManager';
-import { api } from '../utils/api';
+import api from '../utils/api';
 
 const AuthContext = createContext();
 

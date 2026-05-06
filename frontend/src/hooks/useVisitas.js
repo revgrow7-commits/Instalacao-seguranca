@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { api } from '../utils/api';
+import api from '../utils/api';
 
 const POLL_INTERVAL = 30000;
 
