@@ -122,6 +122,10 @@ export const api = {
   },
   getJobs: (includeArchived = false) => getJobsWithCache(includeArchived),
   bulkArchivePre2026: () => axios.post(`${API_URL}/jobs/bulk-archive-pre-2026`, {}, { headers: getAuthHeader(), timeout: 120000 }),
+  bulkUnarchiveJobs: (year, month) => {
+    const params = year && month ? `?year=${year}&month=${month}` : '';
+    return axios.post(`${API_URL}/jobs/bulk-unarchive${params}`, {}, { headers: getAuthHeader(), timeout: 120000 });
+  },
   getJob: (jobId) => getCachedOrFetch(
     `job_${jobId}`,
     () => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
@@ -406,6 +410,17 @@ export const api = {
     }),
   exportVisitasTecnicas: (params = {}) =>
     axios.get(`${API_URL}/visitas/reports/excel`, { params, headers: getAuthHeader(), responseType: 'blob' }),
+
+  // Pesquisa de Jobs para autocomplete
+  searchJobs: (q) => axios.get(`${API_URL}/jobs/search`, { params: { q, limit: 10 }, headers: getAuthHeader() }),
+
+  // Catálogos VT
+  listVendedores: () => getCachedOrFetch('catalogos_vendedores', () => axios.get(`${API_URL}/catalogos/vendedores`, { headers: getAuthHeader() }), 60000),
+  createVendedor: (nome) => { clearCache('catalogos_vendedores'); return axios.post(`${API_URL}/catalogos/vendedores`, { nome }, { headers: getAuthHeader() }); },
+  listTiposServico: () => getCachedOrFetch('catalogos_tipos_servico', () => axios.get(`${API_URL}/catalogos/tipos-servico`, { headers: getAuthHeader() }), 60000),
+  createTipoServico: (nome) => { clearCache('catalogos_tipos_servico'); return axios.post(`${API_URL}/catalogos/tipos-servico`, { nome }, { headers: getAuthHeader() }); },
+  listFerramentas: () => getCachedOrFetch('catalogos_ferramentas', () => axios.get(`${API_URL}/catalogos/ferramentas`, { headers: getAuthHeader() }), 60000),
+  createFerramenta: (nome) => { clearCache('catalogos_ferramentas'); return axios.post(`${API_URL}/catalogos/ferramentas`, { nome }, { headers: getAuthHeader() }); },
 
   // Installer Google Calendar
   getInstallerCalendarStatus: () => getCachedOrFetch(

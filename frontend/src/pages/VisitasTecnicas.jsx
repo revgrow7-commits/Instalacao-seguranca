@@ -12,9 +12,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Switch } from '../components/ui/switch';
+import { Separator } from '../components/ui/separator';
+import { Badge } from '../components/ui/badge';
+import { JobAutocomplete } from '../components/visitas/JobAutocomplete';
+import { Combobox } from '../components/ui/combobox';
+import { MultiCombobox } from '../components/ui/multi-combobox';
 import {
   MapPin, Plus, Calendar, User, Building2, ChevronDown,
-  Clock, X, RefreshCw, Eye
+  Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -45,6 +51,18 @@ const novaVisitaSchema = z.object({
   scheduled_time_end: z.string().optional().nullable(),
   valor_por_km: z.coerce.number().min(0).default(1.50),
   observacoes_admin: z.string().optional().nullable(),
+  // Novos campos
+  job_id: z.string().optional().nullable(),
+  vendedor_nome: z.string().optional().nullable(),
+  tipos_servico: z.array(z.string()).optional().default([]),
+  ferramentas: z.array(z.string()).optional().default([]),
+  remocao_prevista_os: z.boolean().optional().default(false),
+  remocao_a_realizar: z.boolean().optional().default(false),
+  altura_estimada_m: z.coerce.number().min(0).optional().nullable(),
+  nivel_dificuldade: z.coerce.number().min(1).max(4).optional().nullable(),
+  aprovacao_status: z.string().optional().default('PENDENTE'),
+  km_ida: z.coerce.number().min(0).optional().nullable(),
+  km_volta: z.coerce.number().min(0).optional().nullable(),
 });
 
 const agendarSchema = z.object({
@@ -53,6 +71,60 @@ const agendarSchema = z.object({
   scheduled_time_end: z.string().optional().nullable(),
   observacoes_admin: z.string().optional().nullable(),
 });
+
+function useCatalogos() {
+  const [vendedores, setVendedores] = React.useState([]);
+  const [tiposServico, setTiposServico] = React.useState([]);
+  const [ferramentas, setFerramentas] = React.useState([]);
+
+  React.useEffect(() => {
+    api.listVendedores().then(r => setVendedores((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
+    api.listTiposServico().then(r => setTiposServico((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
+    api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
+  }, []);
+
+  const addVendedor = async (nome) => {
+    try {
+      const res = await api.createVendedor(nome);
+      const item = { value: res.data.nome, label: res.data.nome };
+      setVendedores(prev => [...prev, item]);
+      return res.data.nome;
+    } catch { return null; }
+  };
+
+  const addTipoServico = async (nome) => {
+    try {
+      const res = await api.createTipoServico(nome);
+      const item = { value: res.data.nome, label: res.data.nome };
+      setTiposServico(prev => [...prev, item]);
+      return res.data.nome;
+    } catch { return null; }
+  };
+
+  const addFerramenta = async (nome) => {
+    try {
+      const res = await api.createFerramenta(nome);
+      const item = { value: res.data.nome, label: res.data.nome };
+      setFerramentas(prev => [...prev, item]);
+      return res.data.nome;
+    } catch { return null; }
+  };
+
+  return { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta };
+}
+
+const NIVEL_DIFICULDADE_OPTIONS = [
+  { value: '1', label: '🟢 Nível 1 — Simples' },
+  { value: '2', label: '🟡 Nível 2 — Moderado' },
+  { value: '3', label: '🟠 Nível 3 — Complexo' },
+  { value: '4', label: '🔴 Nível 4 — Crítico' },
+];
+
+const APROVACAO_STYLES = {
+  PENDENTE: { label: '⏳ Pendente', class: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  APROVADO: { label: '✅ Aprovado', class: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  NAO_APROVADO: { label: '❌ Não aprovado', class: 'bg-red-500/20 text-red-400 border-red-500/30' },
+};
 
 // Normaliza strings de inputs de data ("YYYY-MM-DD") e hora ("HH:MM")
 // para ISO datetime completo, que o Pydantic datetime do backend consegue parsear.
@@ -179,14 +251,46 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
 const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(novaVisitaSchema),
-    defaultValues: { valor_por_km: 1.50 },
+    defaultValues: {
+      valor_por_km: 1.50,
+      tipos_servico: [],
+      ferramentas: [],
+      remocao_prevista_os: false,
+      remocao_a_realizar: false,
+      aprovacao_status: 'PENDENTE',
+    },
   });
+
+  const [selectedJob, setSelectedJob] = React.useState(null);
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = useCatalogos();
+
+  const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
+  const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
+
+  const handleJobSelect = (job) => {
+    setSelectedJob(job);
+    if (job) {
+      setValue('client_name', job.client_name || '');
+      setValue('client_address', job.client_address || '');
+      setValue('branch', job.branch || '');
+      setValue('job_id', job.id);
+    } else {
+      setValue('job_id', null);
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    setSelectedJob(null);
+    onClose();
+  };
 
   const onSubmit = async (data) => {
     try {
       await api.createVisita(buildDatetimePayload(data));
       toast.success('Visita técnica criada com sucesso');
       reset();
+      setSelectedJob(null);
       onSuccess();
       onClose();
     } catch (err) {
@@ -195,8 +299,8 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-card border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="bg-card border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
@@ -204,14 +308,51 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+
+          {/* SEÇÃO 1 — IDENTIFICAÇÃO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider">Identificação</p>
+          <Separator className="my-2 bg-white/5" />
+
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Cliente *</Label>
-            <Input
-              {...register('client_name')}
-              placeholder="Nome do cliente"
-              className="bg-background border-white/10 text-white"
+            <Label className="text-xs text-muted-foreground">Job / OS (opcional)</Label>
+            <JobAutocomplete value={selectedJob} onSelect={handleJobSelect} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente *</Label>
+              <Input
+                {...register('client_name')}
+                placeholder="Nome do cliente"
+                className="bg-background border-white/10 text-white"
+              />
+              {errors.client_name && <p className="text-xs text-red-400">{errors.client_name.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Vendedor</Label>
+              <Combobox
+                options={vendedores}
+                value={watch('vendedor_nome') || ''}
+                onChange={(v) => setValue('vendedor_nome', v || null)}
+                placeholder="Selecionar vendedor..."
+                searchPlaceholder="Buscar vendedor..."
+                creatable
+                onCreateOption={() => {}}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Tipos de Serviço</Label>
+            <MultiCombobox
+              options={tiposServico}
+              value={watch('tipos_servico') || []}
+              onChange={(v) => setValue('tipos_servico', v)}
+              placeholder="Selecionar tipos de serviço..."
+              searchPlaceholder="Buscar tipo..."
+              creatable
+              onCreate={addTipoServico}
             />
-            {errors.client_name && <p className="text-xs text-red-400">{errors.client_name.message}</p>}
           </div>
 
           <div className="space-y-1">
@@ -224,36 +365,41 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
             {errors.client_address && <p className="text-xs text-red-400">{errors.client_address.message}</p>}
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Filial *</Label>
-            <Select onValueChange={(v) => setValue('branch', v)}>
-              <SelectTrigger className="bg-background border-white/10 text-white">
-                <SelectValue placeholder="Selecione a filial" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="POA">POA — Porto Alegre</SelectItem>
-                <SelectItem value="SP">SP — São Paulo</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Filial *</Label>
+              <Select onValueChange={(v) => setValue('branch', v)}>
+                <SelectTrigger className="bg-background border-white/10 text-white">
+                  <SelectValue placeholder="Selecione a filial" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="POA">POA — Porto Alegre</SelectItem>
+                  <SelectItem value="SP">SP — São Paulo</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Instalador</Label>
+              <Select onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}>
+                <SelectTrigger className="bg-background border-white/10 text-white">
+                  <SelectValue placeholder="Sem instalador" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="none">Sem instalador</SelectItem>
+                  {installers.map(inst => (
+                    <SelectItem key={inst.id} value={String(inst.id)}>
+                      {inst.name || inst.full_name || inst.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Instalador</Label>
-            <Select onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}>
-              <SelectTrigger className="bg-background border-white/10 text-white">
-                <SelectValue placeholder="Sem instalador" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="none">Sem instalador</SelectItem>
-                {installers.map(inst => (
-                  <SelectItem key={inst.id} value={String(inst.id)}>
-                    {inst.name || inst.full_name || inst.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* SEÇÃO 2 — AGENDAMENTO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Agendamento</p>
+          <Separator className="my-2 bg-white/5" />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -274,15 +420,131 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
             </div>
           </div>
 
+          {/* SEÇÃO 3 — DESLOCAMENTO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Deslocamento</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="grid sm:grid-cols-4 grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">KM Ida</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('km_ida')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">KM Volta</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('km_volta')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Valor por km (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('valor_por_km')}
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Total a Pagar (R$)</Label>
+              <Input
+                readOnly
+                value={totalDeslocamento.toFixed(2)}
+                className="bg-background border-white/10 text-white opacity-70 cursor-default"
+              />
+            </div>
+          </div>
+
+          {/* SEÇÃO 4 — AVALIAÇÃO TÉCNICA */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Avaliação Técnica</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer">Remoção prevista na OS?</Label>
+              <Switch
+                checked={!!watch('remocao_prevista_os')}
+                onCheckedChange={(v) => setValue('remocao_prevista_os', v)}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer">Remoção a realizar no local?</Label>
+              <Switch
+                checked={!!watch('remocao_a_realizar')}
+                onCheckedChange={(v) => setValue('remocao_a_realizar', v)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('altura_estimada_m')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
+              <Combobox
+                options={NIVEL_DIFICULDADE_OPTIONS}
+                value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''}
+                onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)}
+                placeholder="Selecionar nível..."
+              />
+            </div>
+          </div>
+
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Valor por km (R$)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('valor_por_km')}
-              className="bg-background border-white/10 text-white"
+            <Label className="text-xs text-muted-foreground">Ferramentas necessárias</Label>
+            <MultiCombobox
+              options={ferramentas}
+              value={watch('ferramentas') || []}
+              onChange={(v) => setValue('ferramentas', v)}
+              placeholder="Selecionar ferramentas..."
+              searchPlaceholder="Buscar ferramenta..."
+              creatable
+              onCreate={addFerramenta}
             />
+          </div>
+
+          {/* SEÇÃO 5 — RESULTADO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Resultado</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status de aprovação</Label>
+            <Select
+              defaultValue="PENDENTE"
+              onValueChange={(v) => setValue('aprovacao_status', v)}
+            >
+              <SelectTrigger className="bg-background border-white/10 text-white">
+                <SelectValue placeholder="Selecionar status" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-white/10">
+                {Object.entries(APROVACAO_STYLES).map(([key, { label, class: cls }]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${cls}`}>{label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">
@@ -296,7 +558,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
           </div>
 
           <div className="flex gap-3 pt-2">
-            <Button type="button" variant="outline" className="flex-1 border-white/10" onClick={onClose}>
+            <Button type="button" variant="outline" className="flex-1 border-white/10" onClick={handleClose}>
               Cancelar
             </Button>
             <Button type="submit" disabled={isSubmitting} className="flex-1 bg-primary hover:bg-primary/90 neon-glow text-white">
@@ -401,7 +663,7 @@ const AgendarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) =>
 };
 
 const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => {
-  const { register, handleSubmit, setValue, reset, formState: { errors, isSubmitting } } = useForm({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(novaVisitaSchema),
     values: visita ? {
       client_name: visita.client_name || '',
@@ -413,8 +675,25 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
       scheduled_time_end: visita.scheduled_time_end ? visita.scheduled_time_end.slice(11, 16) : '',
       valor_por_km: visita.valor_por_km ?? 1.50,
       observacoes_admin: visita.observacoes_admin || '',
+      // Novos campos
+      job_id: visita.job_id || null,
+      vendedor_nome: visita.vendedor_nome || null,
+      tipos_servico: visita.tipos_servico || [],
+      ferramentas: visita.ferramentas || [],
+      remocao_prevista_os: visita.remocao_prevista_os || false,
+      remocao_a_realizar: visita.remocao_a_realizar || false,
+      altura_estimada_m: visita.altura_estimada_m ?? null,
+      nivel_dificuldade: visita.nivel_dificuldade ?? null,
+      aprovacao_status: visita.aprovacao_status || 'PENDENTE',
+      km_ida: visita.km_ida ?? null,
+      km_volta: visita.km_volta ?? null,
     } : {},
   });
+
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = useCatalogos();
+
+  const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
+  const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
 
   const onSubmit = async (data) => {
     try {
@@ -429,7 +708,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-card border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-card border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
@@ -437,13 +716,45 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-2">
+
+          {/* SEÇÃO 1 — IDENTIFICAÇÃO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider">Identificação</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Cliente *</Label>
+              <Input
+                {...register('client_name')}
+                className="bg-background border-white/10 text-white"
+              />
+              {errors.client_name && <p className="text-xs text-red-400">{errors.client_name.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Vendedor</Label>
+              <Combobox
+                options={vendedores}
+                value={watch('vendedor_nome') || ''}
+                onChange={(v) => setValue('vendedor_nome', v || null)}
+                placeholder="Selecionar vendedor..."
+                searchPlaceholder="Buscar vendedor..."
+                creatable
+                onCreateOption={() => {}}
+              />
+            </div>
+          </div>
+
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Cliente *</Label>
-            <Input
-              {...register('client_name')}
-              className="bg-background border-white/10 text-white"
+            <Label className="text-xs text-muted-foreground">Tipos de Serviço</Label>
+            <MultiCombobox
+              options={tiposServico}
+              value={watch('tipos_servico') || []}
+              onChange={(v) => setValue('tipos_servico', v)}
+              placeholder="Selecionar tipos de serviço..."
+              searchPlaceholder="Buscar tipo..."
+              creatable
+              onCreate={addTipoServico}
             />
-            {errors.client_name && <p className="text-xs text-red-400">{errors.client_name.message}</p>}
           </div>
 
           <div className="space-y-1">
@@ -455,39 +766,44 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
             {errors.client_address && <p className="text-xs text-red-400">{errors.client_address.message}</p>}
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Filial *</Label>
-            <Select defaultValue={visita?.branch} onValueChange={(v) => setValue('branch', v)}>
-              <SelectTrigger className="bg-background border-white/10 text-white">
-                <SelectValue placeholder="Selecione a filial" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="POA">POA — Porto Alegre</SelectItem>
-                <SelectItem value="SP">SP — São Paulo</SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Filial *</Label>
+              <Select defaultValue={visita?.branch} onValueChange={(v) => setValue('branch', v)}>
+                <SelectTrigger className="bg-background border-white/10 text-white">
+                  <SelectValue placeholder="Selecione a filial" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="POA">POA — Porto Alegre</SelectItem>
+                  <SelectItem value="SP">SP — São Paulo</SelectItem>
+                </SelectContent>
+              </Select>
+              {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Instalador</Label>
+              <Select
+                defaultValue={visita?.installer_id ? String(visita.installer_id) : 'none'}
+                onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}
+              >
+                <SelectTrigger className="bg-background border-white/10 text-white">
+                  <SelectValue placeholder="Sem instalador" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="none">Sem instalador</SelectItem>
+                  {installers.map(inst => (
+                    <SelectItem key={inst.id} value={String(inst.id)}>
+                      {inst.name || inst.full_name || inst.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Instalador</Label>
-            <Select
-              defaultValue={visita?.installer_id ? String(visita.installer_id) : 'none'}
-              onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}
-            >
-              <SelectTrigger className="bg-background border-white/10 text-white">
-                <SelectValue placeholder="Sem instalador" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="none">Sem instalador</SelectItem>
-                {installers.map(inst => (
-                  <SelectItem key={inst.id} value={String(inst.id)}>
-                    {inst.name || inst.full_name || inst.email}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* SEÇÃO 2 — AGENDAMENTO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Agendamento</p>
+          <Separator className="my-2 bg-white/5" />
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -508,15 +824,131 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
             </div>
           </div>
 
+          {/* SEÇÃO 3 — DESLOCAMENTO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Deslocamento</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="grid sm:grid-cols-4 grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">KM Ida</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('km_ida')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">KM Volta</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('km_volta')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Valor por km (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('valor_por_km')}
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Total a Pagar (R$)</Label>
+              <Input
+                readOnly
+                value={totalDeslocamento.toFixed(2)}
+                className="bg-background border-white/10 text-white opacity-70 cursor-default"
+              />
+            </div>
+          </div>
+
+          {/* SEÇÃO 4 — AVALIAÇÃO TÉCNICA */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Avaliação Técnica</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer">Remoção prevista na OS?</Label>
+              <Switch
+                checked={!!watch('remocao_prevista_os')}
+                onCheckedChange={(v) => setValue('remocao_prevista_os', v)}
+              />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer">Remoção a realizar no local?</Label>
+              <Switch
+                checked={!!watch('remocao_a_realizar')}
+                onCheckedChange={(v) => setValue('remocao_a_realizar', v)}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                {...register('altura_estimada_m')}
+                placeholder="0.0"
+                className="bg-background border-white/10 text-white"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
+              <Combobox
+                options={NIVEL_DIFICULDADE_OPTIONS}
+                value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''}
+                onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)}
+                placeholder="Selecionar nível..."
+              />
+            </div>
+          </div>
+
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Valor por km (R$)</Label>
-            <Input
-              type="number"
-              step="0.01"
-              min="0"
-              {...register('valor_por_km')}
-              className="bg-background border-white/10 text-white"
+            <Label className="text-xs text-muted-foreground">Ferramentas necessárias</Label>
+            <MultiCombobox
+              options={ferramentas}
+              value={watch('ferramentas') || []}
+              onChange={(v) => setValue('ferramentas', v)}
+              placeholder="Selecionar ferramentas..."
+              searchPlaceholder="Buscar ferramenta..."
+              creatable
+              onCreate={addFerramenta}
             />
+          </div>
+
+          {/* SEÇÃO 5 — RESULTADO */}
+          <p className="text-xs font-semibold text-primary uppercase tracking-wider pt-2">Resultado</p>
+          <Separator className="my-2 bg-white/5" />
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status de aprovação</Label>
+            <Select
+              defaultValue={visita?.aprovacao_status || 'PENDENTE'}
+              onValueChange={(v) => setValue('aprovacao_status', v)}
+            >
+              <SelectTrigger className="bg-background border-white/10 text-white">
+                <SelectValue placeholder="Selecionar status" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-white/10">
+                {Object.entries(APROVACAO_STYLES).map(([key, { label, class: cls }]) => (
+                  <SelectItem key={key} value={key}>
+                    <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold border ${cls}`}>{label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-1">

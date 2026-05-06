@@ -655,6 +655,49 @@ async def fix_inconsistent_jobs(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.post("/jobs/bulk-unarchive")
+async def bulk_unarchive_jobs(
+    year: Optional[int] = Query(None),
+    month: Optional[int] = Query(None),
+    current_user: User = Depends(get_current_user),
+):
+    """Desarquiva jobs arquivados. Se year+month fornecidos, filtra por archived_at no mês. Admin only."""
+    require_role(current_user, [UserRole.ADMIN])
+
+    client = get_client()
+
+    count_builder = client.table("jobs").select("id", count="exact").eq("archived", True)
+    update_builder = client.table("jobs").update({
+        "archived": False,
+        "archived_at": None,
+        "archived_by": None,
+        "archived_by_name": None,
+        "exclude_from_metrics": False,
+    }).eq("archived", True)
+
+    if year and month:
+        _, last_day = monthrange(year, month)
+        date_from = f"{year}-{month:02d}-01"
+        date_to = f"{year}-{month:02d}-{last_day:02d}T23:59:59"
+        count_builder = count_builder.gte("archived_at", date_from).lte("archived_at", date_to)
+        update_builder = update_builder.gte("archived_at", date_from).lte("archived_at", date_to)
+
+    count = (count_builder.execute().count or 0)
+
+    if count == 0:
+        period = f"{month:02d}/{year}" if year and month else "todos"
+        return {"unarchived_count": 0, "message": f"Nenhum job arquivado encontrado ({period})"}
+
+    update_builder.execute()
+
+    period_label = f"{month:02d}/{year}" if year and month else "todos os arquivados"
+    logger.info(f"bulk_unarchive: {count} jobs desarquivados por {current_user.email} (período: {period_label})")
+    return {
+        "unarchived_count": count,
+        "message": f"{count} job(s) desarquivados com sucesso",
+    }
+
+
 @router.post("/jobs/bulk-archive-pre-2026")
 async def bulk_archive_pre_2026(current_user: User = Depends(get_current_user)):
     """Archive all non-archived jobs created before 2026-01-01. Admin only."""
@@ -693,6 +736,41 @@ async def bulk_archive_pre_2026(current_user: User = Depends(get_current_user)):
         "archived_count": count,
         "message": f"{count} job(s) anteriores a 2026 arquivados com sucesso",
     }
+
+
+@router.get("/jobs/search")
+async def search_jobs(
+    q: str = Query("", description="Texto livre: pesquisa em holdprint_job_id, title, client_name"),
+    limit: int = Query(10, ge=1, le=50),
+    current_user: User = Depends(get_current_user),
+):
+    """Autocomplete de Jobs/OS para formulário de Visita Técnica."""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    all_jobs = db.jobs.find({"archived": {"$ne": True}}, {"_id": 0}) or []
+    q_lower = q.strip().lower()
+
+    if not q_lower:
+        results = list(all_jobs)[:limit]
+    else:
+        results = [
+            j for j in all_jobs
+            if q_lower in (j.get("holdprint_job_id") or "").lower()
+            or q_lower in (j.get("title") or "").lower()
+            or q_lower in (j.get("client_name") or "").lower()
+        ][:limit]
+
+    return [
+        {
+            "id": j.get("id"),
+            "holdprint_job_id": j.get("holdprint_job_id"),
+            "title": j.get("title"),
+            "client_name": j.get("client_name"),
+            "client_address": j.get("client_address"),
+            "branch": j.get("branch"),
+        }
+        for j in results
+    ]
 
 
 @router.get("/jobs/{job_id}", response_model=Job)
@@ -2046,6 +2124,6 @@ body{{font-family:Arial,sans-serif;line-height:1.6;color:#333}}
 async def get_job_justifications(current_user: User = Depends(get_current_user)):
     """Get all job justifications"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     justifications = db.job_justifications.find({}, {"_id": 0}, sort=[("created_at", -1)])
     return justifications
