@@ -13,6 +13,7 @@ export default function InstallerCalendar() {
   const [searchParams] = useSearchParams();
   const [isConnected, setIsConnected] = useState(false);
   const [jobs, setJobs] = useState([]);
+  const [visitas, setVisitas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [syncedJobs, setSyncedJobs] = useState(new Set());
@@ -29,14 +30,17 @@ export default function InstallerCalendar() {
 
   const loadData = async () => {
     try {
-      const [statusRes, jobsRes] = await Promise.all([
+      const [statusRes, jobsRes, visitasRes] = await Promise.all([
         api.getInstallerCalendarStatus(),
         api.getJobs(),
+        api.listVisitas({ status: 'AGUARDANDO' }).catch(() => ({ data: [] })),
       ]);
       setIsConnected(statusRes.data?.connected || false);
       // Filter jobs with scheduled_date
       const scheduledJobs = (jobsRes.data || []).filter(j => j.scheduled_date);
       setJobs(scheduledJobs);
+      // Filter visitas with scheduled_date
+      setVisitas((visitasRes.data || []).filter(v => v.scheduled_date));
     } catch (e) {
       console.error('Error loading data:', e);
       toast.error('Erro ao carregar dados');
@@ -63,6 +67,12 @@ export default function InstallerCalendar() {
   const monthJobs = jobs.filter(j => {
     if (!j.scheduled_date) return false;
     const d = new Date(j.scheduled_date);
+    return d.getMonth() === currentMonth.getMonth() && d.getFullYear() === currentMonth.getFullYear();
+  });
+
+  const monthVisitas = visitas.filter(v => {
+    if (!v.scheduled_date) return false;
+    const d = new Date(v.scheduled_date);
     return d.getMonth() === currentMonth.getMonth() && d.getFullYear() === currentMonth.getFullYear();
   });
 
@@ -131,12 +141,16 @@ export default function InstallerCalendar() {
         <div className="space-y-3">
           {[1, 2, 3].map(i => <div key={i} className="rounded-xl bg-card border border-white/5 p-4 h-24 animate-pulse" />)}
         </div>
-      ) : monthJobs.length === 0 ? (
+      ) : monthJobs.length === 0 && monthVisitas.length === 0 ? (
         <div className="text-center text-muted-foreground py-12">
-          Nenhum job agendado para este mês
+          Nenhum item agendado para este mês
         </div>
       ) : (
         <div className="space-y-3">
+          {/* Jobs section */}
+          {monthJobs.length > 0 && (
+            <p className="text-xs text-muted-foreground uppercase tracking-wide px-1">Jobs</p>
+          )}
           {monthJobs.map(job => (
             <div key={job.id} className="rounded-xl bg-card border border-white/5 p-4">
               <div className="flex items-start justify-between">
@@ -157,6 +171,39 @@ export default function InstallerCalendar() {
                     </button>
                   )
                 )}
+              </div>
+            </div>
+          ))}
+
+          {/* Visitas Técnicas section */}
+          {monthVisitas.length > 0 && (
+            <p className="text-xs text-muted-foreground uppercase tracking-wide px-1 mt-4">Visitas Técnicas</p>
+          )}
+          {monthVisitas.map(visita => (
+            <div
+              key={visita.id}
+              className="rounded-xl bg-card border border-purple-500/30 p-4 cursor-pointer hover:border-purple-500/60 transition-colors"
+              onClick={() => navigate(`/visitas-tecnicas/${visita.id}`)}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full">
+                      VT
+                    </span>
+                    <span className="text-xs text-muted-foreground">{visita.numero_vt}</span>
+                  </div>
+                  <p className="text-white font-semibold truncate">{visita.titulo || 'VISITA TÉCNICA'}</p>
+                  {visita.client_name && (
+                    <p className="text-muted-foreground text-sm mt-0.5 truncate">📍 {visita.client_name}</p>
+                  )}
+                  <p className="text-muted-foreground text-sm mt-1">📅 {formatDate(visita.scheduled_date)}</p>
+                </div>
+                <span className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 shrink-0">
+                  {visita.status === 'AGUARDANDO' ? 'Aguardando' :
+                   visita.status === 'EM_VISITA' ? 'Em Visita' :
+                   visita.status === 'CONCLUIDA' ? 'Concluída' : visita.status}
+                </span>
               </div>
             </div>
           ))}
