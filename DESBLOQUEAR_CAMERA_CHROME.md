@@ -42,7 +42,7 @@ Clique na opção e mude de **"Bloquear"** para **"Permitir"**
 2. Selecione **"Configurações"**
 3. Vá em **"Configurações do site"**
 4. Toque em **"Câmera"**
-5. Encontre o site `emergentagent.com` na lista
+5. Encontre o site `instal-visual.com.br` na lista
 6. Toque nele
 7. Mude de **"Bloquear"** para **"Permitir"**
 8. Volte ao site e recarregue
@@ -110,7 +110,7 @@ Após desbloquear, o ícone na barra de endereço deve mudar:
 **R:** Pode estar usando HTTP ao invés de HTTPS. Verifique se a URL começa com `https://`
 
 ### P: O ícone diz "Não seguro"
-**R:** Você está usando HTTP. A câmera **só funciona com HTTPS**. Use: `https://holdprint-sync-hub.preview.emergentagent.com`
+**R:** Você está usando HTTP. A câmera **só funciona com HTTPS**. Use: `https://holdprint-sync-hub.preview.instal-visual.com.br`
 
 ### P: Removi o bloqueio mas continua bloqueado
 **R:** 
@@ -132,7 +132,7 @@ Se quiser limpar TODAS as permissões do site:
 
 1. Cole na barra de endereço:
    ```
-   chrome://settings/content/siteDetails?site=https://holdprint-sync-hub.preview.emergentagent.com
+   chrome://settings/content/siteDetails?site=https://holdprint-sync-hub.preview.instal-visual.com.br
    ```
 2. Role até "Câmera"
 3. Mude para "Permitir"
