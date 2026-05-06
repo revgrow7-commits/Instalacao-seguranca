@@ -344,19 +344,21 @@ async def get_item_checkins(
 
 @router.get("/item-checkins/all")
 async def get_all_item_checkins(
+    limit: int = 500,
+    offset: int = 0,
     current_user: User = Depends(get_current_user)
 ):
-    """Get all item check-ins for reports (Admin/Manager only) - optimized"""
+    """Get all item check-ins for reports (Admin/Manager only) - paginated"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     # Projeção otimizada - exclui fotos base64 pesadas
     projection = {
         "_id": 0,
         "checkin_photo": 0,
         "checkout_photo": 0
     }
-    
-    checkins = db.item_checkins.find({}, projection, sort=[("checkin_at", -1)])
+
+    checkins = db.item_checkins.find({}, projection, sort=[("checkin_at", -1)], skip=offset, limit=limit)
     
     # Busca jobs e installers em paralelo com projeção mínima
     jobs_list = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})

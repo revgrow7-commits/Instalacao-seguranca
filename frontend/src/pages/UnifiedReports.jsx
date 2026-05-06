@@ -97,31 +97,47 @@ const UnifiedReports = () => {
 
   const loadData = async () => {
     setLoading(true);
-    try {
-      const [jobsRes, itemCheckinsRes, installersRes] = await Promise.all([
-        api.getJobs(),
-        api.getAllItemCheckins(),
-        api.getInstallers()
-      ]);
-      
-      setJobs(jobsRes.data || []);
-      setItemCheckins(itemCheckinsRes.data || []);
-      setInstallers(installersRes.data || []);
-      
-      // Load old checkins separately (may fail)
-      try {
-        const checkinsRes = await api.getCheckins();
-        setCheckins(checkinsRes.data || []);
-      } catch {
-        setCheckins([]);
-      }
-      
-    } catch (error) {
-      console.error('Error loading data:', error);
-      toast.error('Erro ao carregar relatórios');
-    } finally {
-      setLoading(false);
+    const [jobsR, checkinsR, installersR] = await Promise.allSettled([
+      api.getJobs(),
+      api.getAllItemCheckins(),
+      api.getInstallers(),
+    ]);
+
+    const failures = [];
+
+    if (jobsR.status === 'fulfilled') {
+      setJobs(jobsR.value?.data || []);
+    } else {
+      failures.push('jobs');
+      console.error('[reports] getJobs falhou:', jobsR.reason);
     }
+
+    if (checkinsR.status === 'fulfilled') {
+      setItemCheckins(checkinsR.value || []);
+    } else {
+      failures.push('item-checkins');
+      console.error('[reports] getAllItemCheckins falhou:', checkinsR.reason);
+    }
+
+    if (installersR.status === 'fulfilled') {
+      setInstallers(installersR.value?.data || []);
+    } else {
+      failures.push('installers');
+      console.error('[reports] getInstallers falhou:', installersR.reason);
+    }
+
+    if (failures.length > 0) {
+      toast.error(`Falha ao carregar: ${failures.join(', ')}. Dados parciais exibidos.`);
+    }
+
+    try {
+      const checkinsRes = await api.getCheckins();
+      setCheckins(checkinsRes.data || []);
+    } catch {
+      setCheckins([]);
+    }
+
+    setLoading(false);
   };
 
   const handleExportExcel = async () => {
