@@ -937,7 +937,7 @@ const UnifiedReports = () => {
           {/* Métricas de cabeçalho */}
           {(() => {
             const concluidas = visitas.filter(v => v.status?.toUpperCase() === 'CONCLUIDA');
-            const totalKm = concluidas.reduce((s, v) => s + (v.km_rodados || 0), 0);
+            const totalKm = concluidas.reduce((s, v) => s + (v.km_ida || 0) + (v.km_volta || 0), 0);
             const totalValor = concluidas.reduce((s, v) => s + (v.valor_total || 0), 0);
             const totalInstaladores = new Set(visitas.map(v => v.installer_id || v.instalador_id)).size;
             return (
@@ -1100,7 +1100,17 @@ const UnifiedReports = () => {
                         <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">KM</th>
                         <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">R$/KM</th>
                         <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">Total (R$)</th>
-                        <th className="text-center text-xs text-muted-foreground font-medium py-2">Status</th>
+                        <th className="text-center text-xs text-muted-foreground font-medium py-2 pr-4">Status</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Vendedor</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Tipo Serviço</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">KM Ida</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">KM Volta</th>
+                        <th className="text-center text-xs text-muted-foreground font-medium py-2 pr-4">Remoção Prev.</th>
+                        <th className="text-center text-xs text-muted-foreground font-medium py-2 pr-4">Remoção Real.</th>
+                        <th className="text-right text-xs text-muted-foreground font-medium py-2 pr-4">Altura</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Ferramentas</th>
+                        <th className="text-left text-xs text-muted-foreground font-medium py-2 pr-4">Dificuldade</th>
+                        <th className="text-center text-xs text-muted-foreground font-medium py-2">Aprovação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1130,10 +1140,24 @@ const UnifiedReports = () => {
                           <td className="py-2 pr-4 text-xs text-white text-right font-medium">
                             {v.valor_total != null ? formatCurrency(v.valor_total) : '—'}
                           </td>
-                          <td className="py-2 text-center">
+                          <td className="py-2 pr-4 text-center">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${visitasStatusStyle(v.status)}`}>
                               {v.status || 'N/A'}
                             </span>
+                          </td>
+                          <td className="py-2 pr-4 text-xs text-muted-foreground">{v.vendedor_nome || '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-white max-w-[120px] truncate">{(v.tipos_servico || []).join(', ') || '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-white text-right">{v.km_ida != null ? Number(v.km_ida).toFixed(1) : '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-white text-right">{v.km_volta != null ? Number(v.km_volta).toFixed(1) : '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-center">{v.remocao_prevista_os ? 'Sim' : 'Não'}</td>
+                          <td className="py-2 pr-4 text-xs text-center">{v.remocao_a_realizar ? 'Sim' : 'Não'}</td>
+                          <td className="py-2 pr-4 text-xs text-white text-right">{v.altura_estimada_m != null ? `${v.altura_estimada_m}m` : '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-muted-foreground max-w-[120px] truncate">{(v.ferramentas || []).join(', ') || '—'}</td>
+                          <td className="py-2 pr-4 text-xs text-white">{['','🟢 N1','🟡 N2','🟠 N3','🔴 N4'][v.nivel_dificuldade] || '—'}</td>
+                          <td className="py-2 pr-4 text-xs">
+                            {v.aprovacao_status === 'APROVADO' && <span className="bg-green-500/20 text-green-400 border border-green-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold">APROVADO</span>}
+                            {v.aprovacao_status === 'NAO_APROVADO' && <span className="bg-red-500/20 text-red-400 border border-red-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold">REPROVADO</span>}
+                            {(!v.aprovacao_status || v.aprovacao_status === 'PENDENTE') && <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-1.5 py-0.5 rounded text-[10px] font-bold">PENDENTE</span>}
                           </td>
                         </tr>
                       ))}

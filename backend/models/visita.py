@@ -56,11 +56,28 @@ class VisitaCreate(BaseModel):
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: Optional[float] = 1.50
     observacoes_admin: Optional[str] = None
+    # Novos campos — expansão VT
+    job_id: Optional[str] = None
+    vendedor_nome: Optional[str] = None
+    tipos_servico: Optional[List[str]] = []
+    ferramentas: Optional[List[str]] = []
+    remocao_prevista_os: Optional[bool] = False
+    remocao_a_realizar: Optional[bool] = False
+    altura_estimada_m: Optional[float] = None
+    nivel_dificuldade: Optional[int] = None
+    aprovacao_status: Optional[str] = "PENDENTE"
 
     @field_validator("scheduled_date", "scheduled_time_end", mode="before")
     @classmethod
     def parse_dt(cls, v):
         return _coerce_datetime(v)
+
+    @field_validator("nivel_dificuldade")
+    @classmethod
+    def validate_nivel(cls, v):
+        if v is not None and v not in (1, 2, 3, 4):
+            raise ValueError("nivel_dificuldade deve ser entre 1 e 4")
+        return v
 
 
 class VisitaUpdate(BaseModel):
@@ -75,7 +92,7 @@ class VisitaUpdate(BaseModel):
     scheduled_date: Optional[datetime] = None
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: Optional[float] = None
-    km_rodados: Optional[float] = None
+    # km_rodados removido — coluna dropada. Use km_ida/km_volta.
     status: Optional[VisitaStatus] = None
     observacoes_admin: Optional[str] = None
     relatorio_descricao: Optional[str] = None
@@ -85,6 +102,18 @@ class VisitaUpdate(BaseModel):
     relatorio_chegada: Optional[datetime] = None
     relatorio_saida: Optional[datetime] = None
     relatorio_enviado_em: Optional[datetime] = None
+    # Novos campos — expansão VT
+    job_id: Optional[str] = None
+    vendedor_nome: Optional[str] = None
+    tipos_servico: Optional[List[str]] = None
+    ferramentas: Optional[List[str]] = None
+    remocao_prevista_os: Optional[bool] = None
+    remocao_a_realizar: Optional[bool] = None
+    altura_estimada_m: Optional[float] = None
+    nivel_dificuldade: Optional[int] = None
+    aprovacao_status: Optional[str] = None
+    km_ida: Optional[float] = None
+    km_volta: Optional[float] = None
 
     @field_validator(
         "scheduled_date", "scheduled_time_end",
@@ -94,6 +123,13 @@ class VisitaUpdate(BaseModel):
     @classmethod
     def parse_dt(cls, v):
         return _coerce_datetime(v)
+
+    @field_validator("nivel_dificuldade")
+    @classmethod
+    def validate_nivel(cls, v):
+        if v is not None and v not in (1, 2, 3, 4):
+            raise ValueError("nivel_dificuldade deve ser entre 1 e 4")
+        return v
 
 
 class VisitaRelatorio(BaseModel):
@@ -142,7 +178,8 @@ class VisitaOut(BaseModel):
     scheduled_date: Optional[datetime] = None
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: float = 1.50
-    km_rodados: Optional[float] = None
+    km_ida: Optional[float] = None
+    km_volta: Optional[float] = None
     valor_total: Optional[float] = None
     status: str = "AGUARDANDO"
     observacoes_admin: Optional[str] = None
@@ -156,3 +193,13 @@ class VisitaOut(BaseModel):
     created_by: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: Optional[datetime] = None
+    # Novos campos — expansão VT
+    job_id: Optional[str] = None
+    vendedor_nome: Optional[str] = None
+    tipos_servico: Optional[List[str]] = []
+    ferramentas: Optional[List[str]] = []
+    remocao_prevista_os: Optional[bool] = False
+    remocao_a_realizar: Optional[bool] = False
+    altura_estimada_m: Optional[float] = None
+    nivel_dificuldade: Optional[int] = None
+    aprovacao_status: Optional[str] = "PENDENTE"

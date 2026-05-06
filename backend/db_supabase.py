@@ -148,6 +148,15 @@ TABLE_COLUMNS = {
         "id", "sync_type", "last_sync_at", "total_imported", "total_skipped",
         "total_errors", "updated_at"
     ]),
+    "vendedores": frozenset([
+        "id", "nome", "is_active", "created_at", "created_by"
+    ]),
+    "tipos_servico": frozenset([
+        "id", "nome", "is_active", "created_at", "created_by"
+    ]),
+    "ferramentas_vt": frozenset([
+        "id", "nome", "is_active", "created_at", "created_by"
+    ]),
 }
 
 # Keep backward-compatible name for any external references
@@ -495,7 +504,8 @@ class SupabaseDB:
 
 # Create singleton instance
 db = SupabaseDB()
-client = get_client()
+# client is resolved lazily via get_client() — do NOT call at module level
+# (would raise RuntimeError if SUPABASE_URL env var is absent at import time)
 
 
 def upload_photo_to_storage(

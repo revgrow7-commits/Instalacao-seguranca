@@ -42,6 +42,7 @@ from routes.notifications import router as notifications_router
 from routes.gamification import router as gamification_router
 from routes.installers import router as installers_router
 from routes.visitas import router as visitas_router
+from routes.catalogos import router as catalogos_router
 
 api_router.include_router(auth_router, tags=["Authentication"])
 api_router.include_router(users_router, tags=["Users"])
@@ -55,6 +56,7 @@ api_router.include_router(notifications_router, tags=["Notifications"])
 api_router.include_router(gamification_router, tags=["Gamification"])
 api_router.include_router(installers_router, tags=["Installers"])
 api_router.include_router(visitas_router, tags=["Visitas Técnicas"])
+api_router.include_router(catalogos_router, tags=["Catálogos VT"])
 
 # ============ ADMIN ROUTES (kept in server.py - small, unique) ============
 
