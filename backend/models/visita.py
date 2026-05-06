@@ -1,9 +1,9 @@
 """
 Visita Técnica models.
 """
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, date, timezone
 from enum import Enum
 import uuid
 
@@ -13,6 +13,34 @@ class VisitaStatus(str, Enum):
     EM_VISITA = "EM_VISITA"
     CONCLUIDA = "CONCLUIDA"
     CANCELADA = "CANCELADA"
+
+
+def _coerce_datetime(v) -> Optional[datetime]:
+    """Aceita datetime, ISO string, date-only (YYYY-MM-DD), time-only (HH:MM) ou vazio."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, date):
+        return datetime(v.year, v.month, v.day, tzinfo=timezone.utc)
+    if isinstance(v, str):
+        try:
+            return datetime.fromisoformat(v.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        try:
+            d = date.fromisoformat(v)
+            return datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+        except ValueError:
+            pass
+        if ":" in v and len(v) <= 8:
+            today = datetime.now(timezone.utc)
+            parts = v.split(":")
+            try:
+                return today.replace(hour=int(parts[0]), minute=int(parts[1]), second=0, microsecond=0)
+            except (ValueError, IndexError):
+                pass
+    return None
 
 
 class VisitaCreate(BaseModel):
@@ -28,6 +56,11 @@ class VisitaCreate(BaseModel):
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: Optional[float] = 1.50
     observacoes_admin: Optional[str] = None
+
+    @field_validator("scheduled_date", "scheduled_time_end", mode="before")
+    @classmethod
+    def parse_dt(cls, v):
+        return _coerce_datetime(v)
 
 
 class VisitaUpdate(BaseModel):
@@ -53,6 +86,15 @@ class VisitaUpdate(BaseModel):
     relatorio_saida: Optional[datetime] = None
     relatorio_enviado_em: Optional[datetime] = None
 
+    @field_validator(
+        "scheduled_date", "scheduled_time_end",
+        "relatorio_chegada", "relatorio_saida", "relatorio_enviado_em",
+        mode="before",
+    )
+    @classmethod
+    def parse_dt(cls, v):
+        return _coerce_datetime(v)
+
 
 class VisitaRelatorio(BaseModel):
     """Campos do relatório de visita técnica (enviado pelo instalador via multipart)."""
@@ -65,6 +107,11 @@ class VisitaRelatorio(BaseModel):
     chegada: Optional[datetime] = None
     saida: Optional[datetime] = None
 
+    @field_validator("chegada", "saida", mode="before")
+    @classmethod
+    def parse_dt(cls, v):
+        return _coerce_datetime(v)
+
 
 class AgendarVisitaRequest(BaseModel):
     """Request para agendar visita técnica (atribuir instalador e data)."""
@@ -74,6 +121,11 @@ class AgendarVisitaRequest(BaseModel):
     scheduled_date: datetime
     scheduled_time_end: Optional[datetime] = None
     observacoes_admin: Optional[str] = None
+
+    @field_validator("scheduled_date", "scheduled_time_end", mode="before")
+    @classmethod
+    def parse_dt(cls, v):
+        return _coerce_datetime(v)
 
 
 class VisitaOut(BaseModel):
