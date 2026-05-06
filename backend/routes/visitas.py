@@ -45,6 +45,21 @@ def _parse_datetimes(doc: dict) -> dict:
     return doc
 
 
+# Cache simples em memória: installer_id → full_name
+_installer_name_cache: dict = {}
+
+def _enrich_installer_name(doc: dict) -> dict:
+    """Adiciona installer_name ao doc buscando na tabela installers pelo installer_id."""
+    installer_id = doc.get("installer_id")
+    if not installer_id:
+        return doc
+    if installer_id not in _installer_name_cache:
+        rec = db.installers.find_one({"id": installer_id})
+        _installer_name_cache[installer_id] = rec.get("full_name", "") if rec else ""
+    doc["installer_name"] = _installer_name_cache[installer_id]
+    return doc
+
+
 # ============ ROUTES ============
 
 @router.post("/visitas", response_model=VisitaOut)
@@ -100,7 +115,7 @@ async def create_visita(
     if not saved:
         raise HTTPException(status_code=500, detail="Erro ao salvar visita técnica")
 
-    return VisitaOut(**_parse_datetimes(saved))
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(saved)))
 
 
 @router.get("/visitas", response_model=List[VisitaOut])
@@ -159,7 +174,7 @@ async def list_visitas(
         skip=offset,
     )
 
-    return [VisitaOut(**_parse_datetimes(d)) for d in (docs or [])]
+    return [VisitaOut(**_parse_datetimes(_enrich_installer_name(d))) for d in (docs or [])]
 
 
 @router.get("/visitas/reports/excel")
@@ -317,7 +332,7 @@ async def get_visita(
         if not installer_rec or doc.get("installer_id") != installer_rec["id"]:
             raise HTTPException(status_code=403, detail="Você não tem acesso a esta visita técnica")
 
-    return VisitaOut(**_parse_datetimes(doc))
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(doc)))
 
 
 @router.patch("/visitas/{visita_id}", response_model=VisitaOut)
@@ -357,7 +372,7 @@ async def update_visita(
     if not updated:
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após atualização")
 
-    return VisitaOut(**_parse_datetimes(updated))
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
 
 
 @router.post("/visitas/{visita_id}/agendar", response_model=VisitaOut)
@@ -394,7 +409,9 @@ async def agendar_visita(
     if not updated:
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após agendamento")
 
-    return VisitaOut(**_parse_datetimes(updated))
+    # Invalida cache do nome para este instalador (pode ter mudado)
+    _installer_name_cache.pop(data.installer_id, None)
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
 
 
 @router.post("/visitas/{visita_id}/cancelar", response_model=VisitaOut)
@@ -424,7 +441,7 @@ async def cancelar_visita(
     if not updated:
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após cancelamento")
 
-    return VisitaOut(**_parse_datetimes(updated))
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
 
 
 @router.post("/visitas/{visita_id}/relatorio", response_model=VisitaOut)
@@ -523,4 +540,4 @@ async def enviar_relatorio(
     if not saved:
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após atualização")
 
-    return VisitaOut(**_parse_datetimes(saved))
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(saved)))

@@ -179,7 +179,7 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
         {visita.installer_id && (
           <p className="text-xs text-muted-foreground flex items-center gap-1 mb-1">
             <User className="h-3 w-3 flex-shrink-0" />
-            {`Instalador: ${visita.installer_id.slice(0, 8)}…`}
+            {visita.installer_name || visita.installer_id.slice(0, 8) + '…'}
           </p>
         )}
         {formattedDate && (

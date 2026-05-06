@@ -13,9 +13,8 @@ export function useVisitas(filters = {}) {
   const fetchVisitas = useCallback(async () => {
     try {
       const params = { ...filters };
-      if (user?.role === 'installer') {
-        params.installer_id = user.id;
-      }
+      // Para INSTALLER: o backend já filtra automaticamente pelo user logado (via JWT).
+      // Para ADMIN/MANAGER: installer_id virá via filters se necessário.
       const res = await api.listVisitas(params);
       setVisitas(res.data || []);
       setError(null);
@@ -24,7 +23,7 @@ export function useVisitas(filters = {}) {
     } finally {
       setLoading(false);
     }
-  }, [user?.role, user?.id]);
+  }, [user?.role]);
 
   useEffect(() => {
     setLoading(true);
