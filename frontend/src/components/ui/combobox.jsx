@@ -5,12 +5,29 @@ import { Popover, PopoverContent, PopoverTrigger } from './popover';
 import { Button } from './button';
 import { cn } from '../../lib/utils';
 
-export function Combobox({ options = [], value, onChange, placeholder = 'Selecionar...', searchPlaceholder = 'Buscar...', emptyText = 'Nenhum resultado', creatable = false, onCreateOption, className }) {
+export function Combobox({ options = [], value, onChange, placeholder = 'Selecionar...', searchPlaceholder = 'Buscar...', emptyText = 'Nenhum resultado', creatable = false, onCreate, onCreateOption, className }) {
   const [open, setOpen] = React.useState(false);
+  const [search, setSearch] = React.useState('');
   const selected = options.find(o => o.value === value);
+  const filtered = options.filter(o => (o.label ?? '').toLowerCase().includes(search.toLowerCase()));
+
+  const handleCreate = async () => {
+    const term = search.trim();
+    if (!term) return;
+    if (onCreate) {
+      await onCreate(term);
+    } else if (onCreateOption) {
+      onCreateOption();
+    }
+    setOpen(false);
+    setSearch('');
+  };
+
+  const showCreateOption = creatable && search.trim() &&
+    !filtered.some(o => (o.label ?? '').toLowerCase() === search.trim().toLowerCase());
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={(v) => { setOpen(v); if (!v) setSearch(''); }}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -23,32 +40,33 @@ export function Combobox({ options = [], value, onChange, placeholder = 'Selecio
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0 bg-card border-white/10">
-        <Command className="bg-transparent">
-          <CommandInput placeholder={searchPlaceholder} className="text-white" />
+        <Command className="bg-transparent" shouldFilter={false}>
+          <CommandInput placeholder={searchPlaceholder} className="text-white" value={search} onValueChange={setSearch} />
           <CommandList>
-            <CommandEmpty>
-              {creatable && onCreateOption ? (
-                <button
-                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-primary hover:bg-white/5"
-                  onClick={() => { onCreateOption(); setOpen(false); }}
-                >
-                  <Plus className="h-4 w-4" /> Adicionar novo
-                </button>
-              ) : emptyText}
-            </CommandEmpty>
             <CommandGroup>
-              {options.map(opt => (
+              {filtered.map(opt => (
                 <CommandItem
                   key={opt.value}
-                  value={opt.value}
-                  onSelect={() => { onChange(opt.value === value ? '' : opt.value); setOpen(false); }}
+                  onSelect={() => { onChange(opt.value === value ? '' : opt.value); setOpen(false); setSearch(''); }}
                   className="text-white hover:bg-white/5 cursor-pointer"
                 >
                   <Check className={cn("mr-2 h-4 w-4", value === opt.value ? "opacity-100" : "opacity-0")} />
                   {opt.label}
                 </CommandItem>
               ))}
+              {showCreateOption && (
+                <CommandItem
+                  onSelect={handleCreate}
+                  className="text-primary hover:bg-white/5 cursor-pointer"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar "{search.trim()}"
+                </CommandItem>
+              )}
             </CommandGroup>
+            {filtered.length === 0 && !showCreateOption && (
+              <CommandEmpty>{emptyText}</CommandEmpty>
+            )}
           </CommandList>
         </Command>
       </PopoverContent>
