@@ -52,6 +52,7 @@ const GamificationReport = lazy(() => import('./pages/GamificationReport'));
 const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
 const VisitasTecnicas = lazy(() => import('./pages/VisitasTecnicas'));
 const VisitaDetail = lazy(() => import('./pages/VisitaDetail'));
+const VisitasRelatorios = lazy(() => import('./pages/VisitasRelatorios'));
 
 // Non-lazy imports for layout components (always needed)
 import Sidebar from './components/layout/Sidebar';
@@ -384,6 +385,16 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={['admin', 'manager', 'installer']}>
             <MainLayout>
               <VisitasTecnicas />
+            </MainLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/visitas-tecnicas/relatorios"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'manager']}>
+            <MainLayout>
+              <VisitasRelatorios />
             </MainLayout>
           </ProtectedRoute>
         }

@@ -18,9 +18,10 @@ import { Badge } from '../components/ui/badge';
 import { JobAutocomplete } from '../components/visitas/JobAutocomplete';
 import { Combobox } from '../components/ui/combobox';
 import { MultiCombobox } from '../components/ui/multi-combobox';
+import { useCatalogos } from '../hooks/useCatalogos';
 import {
   MapPin, Plus, Calendar, User, Building2, ChevronDown,
-  Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon
+  Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon, BarChart2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -30,6 +31,7 @@ import { z } from 'zod';
 
 const STATUS_STYLES = {
   AGUARDANDO: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+  AGUARDANDO_CONFIRMACAO: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
   EM_VISITA: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
   CONCLUIDA: 'bg-green-500/20 text-green-400 border border-green-500/30',
   CANCELADA: 'bg-red-500/20 text-red-400 border border-red-500/30',
@@ -37,6 +39,7 @@ const STATUS_STYLES = {
 
 const STATUS_LABELS = {
   AGUARDANDO: 'AGUARDANDO',
+  AGUARDANDO_CONFIRMACAO: 'A CONFIRMAR',
   EM_VISITA: 'EM VISITA',
   CONCLUIDA: 'CONCLUÍDA',
   CANCELADA: 'CANCELADA',
@@ -71,47 +74,6 @@ const agendarSchema = z.object({
   scheduled_time_end: z.string().optional().nullable(),
   observacoes_admin: z.string().optional().nullable(),
 });
-
-function useCatalogos() {
-  const [vendedores, setVendedores] = React.useState([]);
-  const [tiposServico, setTiposServico] = React.useState([]);
-  const [ferramentas, setFerramentas] = React.useState([]);
-
-  React.useEffect(() => {
-    api.listVendedores().then(r => setVendedores((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
-    api.listTiposServico().then(r => setTiposServico((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
-    api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
-  }, []);
-
-  const addVendedor = async (nome) => {
-    try {
-      const res = await api.createVendedor(nome);
-      const item = { value: res.data.nome, label: res.data.nome };
-      setVendedores(prev => [...prev, item]);
-      return res.data.nome;
-    } catch { return null; }
-  };
-
-  const addTipoServico = async (nome) => {
-    try {
-      const res = await api.createTipoServico(nome);
-      const item = { value: res.data.nome, label: res.data.nome };
-      setTiposServico(prev => [...prev, item]);
-      return res.data.nome;
-    } catch { return null; }
-  };
-
-  const addFerramenta = async (nome) => {
-    try {
-      const res = await api.createFerramenta(nome);
-      const item = { value: res.data.nome, label: res.data.nome };
-      setFerramentas(prev => [...prev, item]);
-      return res.data.nome;
-    } catch { return null; }
-  };
-
-  return { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta };
-}
 
 const NIVEL_DIFICULDADE_OPTIONS = [
   { value: '1', label: '🟢 Nível 1 — Simples' },
@@ -337,7 +299,13 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
                 creatable
-                onCreateOption={() => {}}
+                onCreateOption={async () => {
+                  // Combobox.onCreateOption não passa o nome — pedimos via prompt.
+                  const nome = window.prompt('Nome do novo vendedor:')?.trim();
+                  if (!nome) return;
+                  const novo = await addVendedor(nome);
+                  if (novo) setValue('vendedor_nome', novo);
+                }}
               />
             </div>
           </div>
@@ -739,7 +707,13 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
                 creatable
-                onCreateOption={() => {}}
+                onCreateOption={async () => {
+                  // Combobox.onCreateOption não passa o nome — pedimos via prompt.
+                  const nome = window.prompt('Nome do novo vendedor:')?.trim();
+                  if (!nome) return;
+                  const novo = await addVendedor(nome);
+                  if (novo) setValue('vendedor_nome', novo);
+                }}
               />
             </div>
           </div>
@@ -976,6 +950,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
 
 const VisitasTecnicas = () => {
   const { user, isAdmin, isManager } = useAuth();
+  const navigate = useNavigate();
 
   // Filtros usam 'all' como sentinela — Radix UI Select proíbe SelectItem
   // com value="" (lança Error em runtime e quebra a página).
@@ -1055,6 +1030,17 @@ const VisitasTecnicas = () => {
           </Button>
           {(isAdmin || isManager) && (
             <Button
+              variant="outline"
+              size="sm"
+              className="border-white/10 text-gray-300"
+              onClick={() => navigate('/visitas-tecnicas/relatorios')}
+            >
+              <BarChart2 className="h-4 w-4 mr-2" />
+              Relatórios
+            </Button>
+          )}
+          {(isAdmin || isManager) && (
+            <Button
               className="bg-primary hover:bg-primary/90 neon-glow text-white"
               onClick={() => setNovaVisitaOpen(true)}
             >
@@ -1085,6 +1071,11 @@ const VisitasTecnicas = () => {
             <div>
               <p className="text-xl font-bold text-white">{loading ? '—' : counters.aguardando}</p>
               <p className="text-[10px] text-muted-foreground">Aguardando</p>
+              {!loading && counters.aConfirmar > 0 && (
+                <p className="text-[10px] text-amber-400 font-medium">
+                  {counters.aConfirmar} a confirmar
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1122,6 +1113,7 @@ const VisitasTecnicas = () => {
               <SelectContent className="bg-card border-white/10">
                 <SelectItem value="all">Todos os status</SelectItem>
                 <SelectItem value="AGUARDANDO">Aguardando</SelectItem>
+                <SelectItem value="AGUARDANDO_CONFIRMACAO">A Confirmar</SelectItem>
                 <SelectItem value="EM_VISITA">Em Visita</SelectItem>
                 <SelectItem value="CONCLUIDA">Concluída</SelectItem>
                 <SelectItem value="CANCELADA">Cancelada</SelectItem>

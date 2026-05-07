@@ -84,6 +84,39 @@ async def send_push_notification(user_id: str, title: str, body: str, url: str =
         return False
 
 
+async def notify_visita_scheduled(
+    visita_id: str,
+    installer_id: str,
+    visita_title: str,
+    client_name: str,
+) -> bool:
+    """
+    Notifica o instalador atribuído de que uma nova visita técnica foi agendada.
+    Resolve installer_id → user_id via tabela installers e envia push silenciosamente
+    (não levanta exceção caso instalador não tenha subscription ativa).
+    """
+    try:
+        installer_rec = db.installers.find_one({"id": installer_id}, {"_id": 0, "user_id": 1})
+        if not installer_rec or not installer_rec.get("user_id"):
+            logger.info(f"Instalador {installer_id} sem user_id mapeado — push de VT ignorado")
+            return False
+
+        body = visita_title
+        if client_name:
+            body = f"{visita_title} — {client_name}"
+
+        return await send_push_notification(
+            user_id=installer_rec["user_id"],
+            title="📅 Nova Visita Técnica",
+            body=body,
+            url=f"/visitas-tecnicas/{visita_id}",
+            data={"type": "visita_scheduled", "visita_id": visita_id},
+        )
+    except Exception as e:
+        logger.warning(f"Falha em notify_visita_scheduled (visita={visita_id}): {e}")
+        return False
+
+
 # ============ VAPID & SUBSCRIPTION ROUTES ============
 
 @router.get("/notifications/vapid-public-key")

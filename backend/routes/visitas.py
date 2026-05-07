@@ -19,9 +19,12 @@ from models.visita import (
     VisitaUpdate,
     AgendarVisitaRequest,
     VisitaRelatorio,
+    VisitaConfirmar,
+    VisitaRejeitar,
     VisitaOut,
     VisitaStatus,
 )
+from routes.notifications import notify_visita_scheduled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,6 +37,7 @@ def _parse_datetimes(doc: dict) -> dict:
     dt_fields = [
         "scheduled_date", "scheduled_time_end", "created_at", "updated_at",
         "relatorio_chegada", "relatorio_saida", "relatorio_enviado_em",
+        "confirmado_em", "rejeitado_em",
     ]
     for field in dt_fields:
         val = doc.get(field)
@@ -83,8 +87,8 @@ async def create_visita(
         "scheduled_date": data.scheduled_date.isoformat() if data.scheduled_date else None,
         "scheduled_time_end": data.scheduled_time_end.isoformat() if data.scheduled_time_end else None,
         "valor_por_km": data.valor_por_km if data.valor_por_km is not None else 1.50,
-        "km_ida": None,
-        "km_volta": None,
+        "km_ida": data.km_ida,
+        "km_volta": data.km_volta,
         "status": VisitaStatus.AGUARDANDO.value,
         "observacoes_admin": data.observacoes_admin,
         "relatorio_descricao": None,
@@ -398,6 +402,7 @@ async def agendar_visita(
         "installer_id": data.installer_id,
         "scheduled_date": data.scheduled_date.isoformat(),
         "scheduled_time_end": data.scheduled_time_end.isoformat() if data.scheduled_time_end else None,
+        "status": VisitaStatus.AGUARDANDO_CONFIRMACAO.value,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if data.observacoes_admin is not None:
@@ -411,6 +416,122 @@ async def agendar_visita(
 
     # Invalida cache do nome para este instalador (pode ter mudado)
     _installer_name_cache.pop(data.installer_id, None)
+
+    # Push notification para o instalador atribuído (silencioso em caso de falha)
+    try:
+        await notify_visita_scheduled(
+            visita_id=visita_id,
+            installer_id=data.installer_id,
+            visita_title=updated.get("titulo") or "Visita Técnica",
+            client_name=updated.get("client_name") or "",
+        )
+    except Exception as e:
+        logger.warning(f"Falha ao notificar instalador {data.installer_id} sobre VT {visita_id}: {e}")
+
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
+
+
+# Campos que podem ser editados pelo instalador na confirmação e que entram no snapshot do plano admin.
+_CONFIRMAR_FIELDS = (
+    "km_ida",
+    "km_volta",
+    "altura_estimada_m",
+    "nivel_dificuldade",
+    "ferramentas",
+    "remocao_a_realizar",
+    "tipos_servico",
+)
+
+
+def _check_installer_owns_visita(doc: dict, current_user: User) -> None:
+    """Garante que o usuário atual é o instalador atribuído à visita. Levanta 403 caso contrário."""
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Somente instaladores podem executar esta ação")
+    installer_rec = db.installers.find_one({"user_id": current_user.id})
+    if not installer_rec or doc.get("installer_id") != installer_rec["id"]:
+        raise HTTPException(status_code=403, detail="Você não está atribuído a esta visita técnica")
+
+
+@router.post("/visitas/{visita_id}/confirmar", response_model=VisitaOut)
+async def confirmar_visita(
+    visita_id: str,
+    data: VisitaConfirmar,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Instalador confirma a visita técnica, opcionalmente ajustando campos planejados.
+    Snapshot do plano admin é gravado em planejado_snapshot e status passa para EM_VISITA.
+    """
+    doc = db.visitas_tecnicas.find_one({"id": visita_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Visita técnica não encontrada")
+
+    _check_installer_owns_visita(doc, current_user)
+
+    if doc.get("status") != VisitaStatus.AGUARDANDO_CONFIRMACAO.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Visita técnica não está aguardando confirmação",
+        )
+
+    # Snapshot dos valores planejados (somente para os campos editáveis pelo instalador)
+    snapshot = {field: doc.get(field) for field in _CONFIRMAR_FIELDS}
+
+    edits = data.model_dump(exclude_unset=True)
+    update_fields: dict = {
+        "planejado_snapshot": snapshot,
+        "confirmado_em": datetime.now(timezone.utc).isoformat(),
+        "confirmado_por": current_user.id,
+        "status": VisitaStatus.EM_VISITA.value,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    update_fields.update(edits)
+
+    db.visitas_tecnicas.update_one({"id": visita_id}, {"$set": update_fields})
+
+    updated = db.visitas_tecnicas.find_one({"id": visita_id}, {"_id": 0})
+    if not updated:
+        raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após confirmação")
+
+    return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
+
+
+@router.post("/visitas/{visita_id}/rejeitar", response_model=VisitaOut)
+async def rejeitar_visita(
+    visita_id: str,
+    data: VisitaRejeitar,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Instalador rejeita a visita técnica com motivo (>= 10 chars).
+    Status volta para AGUARDANDO e installer_id é limpo para reagendamento pelo admin.
+    """
+    doc = db.visitas_tecnicas.find_one({"id": visita_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Visita técnica não encontrada")
+
+    _check_installer_owns_visita(doc, current_user)
+
+    if doc.get("status") != VisitaStatus.AGUARDANDO_CONFIRMACAO.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Visita técnica não está aguardando confirmação",
+        )
+
+    update_fields = {
+        "rejeitado_em": datetime.now(timezone.utc).isoformat(),
+        "rejeitado_motivo": data.motivo,
+        "status": VisitaStatus.AGUARDANDO.value,
+        "installer_id": None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    db.visitas_tecnicas.update_one({"id": visita_id}, {"$set": update_fields})
+
+    updated = db.visitas_tecnicas.find_one({"id": visita_id}, {"_id": 0})
+    if not updated:
+        raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após rejeição")
+
     return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
 
 
@@ -476,11 +597,17 @@ async def enviar_relatorio(
     if not installer_rec or doc.get("installer_id") != installer_rec["id"]:
         raise HTTPException(status_code=403, detail="Você não está atribuído a esta visita técnica")
 
-    # 3. Verificar status
-    if doc.get("status") == VisitaStatus.CONCLUIDA.value:
+    # 3. Verificar status — só aceita relatório quando a visita está EM_VISITA
+    current_status = doc.get("status")
+    if current_status == VisitaStatus.CONCLUIDA.value:
         raise HTTPException(status_code=400, detail="Relatório já enviado")
-    if doc.get("status") == VisitaStatus.CANCELADA.value:
+    if current_status == VisitaStatus.CANCELADA.value:
         raise HTTPException(status_code=400, detail="Visita cancelada")
+    if current_status != VisitaStatus.EM_VISITA.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Confirme a visita antes de enviar o relatório (status precisa ser EM_VISITA)",
+        )
 
     # 4. Validar km_rodados (campo retrocompatível — salvo como km_ida internamente)
     if km_rodados <= 0:

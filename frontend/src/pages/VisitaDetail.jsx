@@ -5,13 +5,15 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
   ArrowLeft, MapPin, User, Building2, Calendar, Clock,
-  CheckCircle2, AlertCircle, Image as ImageIcon
+  CheckCircle2, AlertCircle, Image as ImageIcon, XCircle, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import RelatorioVisitaForm from '../components/visitas/RelatorioVisitaForm';
+import ConfirmarVisitaForm from '../components/visitas/ConfirmarVisitaForm';
 
 const STATUS_STYLES = {
   AGUARDANDO: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+  AGUARDANDO_CONFIRMACAO: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',
   EM_VISITA: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
   CONCLUIDA: 'bg-green-500/20 text-green-400 border border-green-500/30',
   CANCELADA: 'bg-red-500/20 text-red-400 border border-red-500/30',
@@ -19,6 +21,7 @@ const STATUS_STYLES = {
 
 const STATUS_LABELS = {
   AGUARDANDO: 'AGUARDANDO',
+  AGUARDANDO_CONFIRMACAO: 'A CONFIRMAR',
   EM_VISITA: 'EM VISITA',
   CONCLUIDA: 'CONCLUÍDA',
   CANCELADA: 'CANCELADA',
@@ -36,6 +39,95 @@ const SITUACAO_LABELS = {
   pendencia: 'Pendência Identificada',
   retrabalho: 'Retrabalho Necessário',
   aprovado: 'Aprovado para Instalação',
+};
+
+const NIVEL_LABELS = {
+  1: 'Fácil', 2: 'Moderado', 3: 'Difícil', 4: 'Extremo',
+};
+
+const SNAPSHOT_FIELDS = [
+  { key: 'km_ida', label: 'KM Ida', format: (v) => (v != null ? `${v} km` : '—') },
+  { key: 'km_volta', label: 'KM Volta', format: (v) => (v != null ? `${v} km` : '—') },
+  { key: 'altura_estimada_m', label: 'Altura estimada', format: (v) => (v != null ? `${v} m` : '—') },
+  { key: 'nivel_dificuldade', label: 'Nível de dificuldade', format: (v) => (v != null ? `${v} — ${NIVEL_LABELS[v] || ''}` : '—') },
+  { key: 'ferramentas', label: 'Ferramentas', format: (v) => (Array.isArray(v) && v.length ? v.join(', ') : '—') },
+  { key: 'remocao_a_realizar', label: 'Remoção a realizar', format: (v) => (v ? 'Sim' : 'Não') },
+  { key: 'tipos_servico', label: 'Tipos de serviço', format: (v) => (Array.isArray(v) && v.length ? v.join(', ') : '—') },
+];
+
+const valuesEqual = (a, b) => {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) return false;
+    const sa = [...a].sort();
+    const sb = [...b].sort();
+    return sa.every((v, i) => v === sb[i]);
+  }
+  if (a == null && b == null) return true;
+  return a === b;
+};
+
+const SnapshotDiffCard = ({ visita, formatDatetime }) => {
+  const snap = visita.planejado_snapshot || {};
+  const rows = SNAPSHOT_FIELDS
+    .filter(f => Object.prototype.hasOwnProperty.call(snap, f.key))
+    .map(f => {
+      const planejado = snap[f.key];
+      const confirmado = visita[f.key];
+      return { ...f, planejado, confirmado, changed: !valuesEqual(planejado, confirmado) };
+    });
+
+  if (rows.length === 0) return null;
+
+  return (
+    <Card className="bg-card border-amber-500/20">
+      <CardHeader className="pb-2 pt-4 px-4">
+        <CardTitle className="text-sm text-amber-300 uppercase tracking-wide flex items-center gap-2">
+          <AlertCircle className="h-4 w-4" />
+          Alterações do instalador na confirmação
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-4 pb-4 space-y-3">
+        <p className="text-[10px] text-muted-foreground">
+          Confirmado em {formatDatetime(visita.confirmado_em)}
+        </p>
+        <div className="space-y-2">
+          {rows.map(row => (
+            <div
+              key={row.key}
+              className={`grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 items-center p-2 rounded-lg ${row.changed ? 'bg-amber-500/5 border border-amber-500/20' : 'bg-white/5'}`}
+            >
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  {row.label}
+                  {row.changed && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 normal-case tracking-normal">
+                      alterado
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">Planejado</p>
+                <p className="text-sm text-white">{row.format(row.planejado)}</p>
+              </div>
+              <span className="hidden sm:block text-muted-foreground text-xs">→</span>
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-wide opacity-0 sm:invisible">spacer</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Confirmado</p>
+                <p className={`text-sm ${row.changed ? 'text-amber-300 font-semibold' : 'text-white'}`}>
+                  {row.format(row.confirmado)}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+        {visita.observacoes_instalador && (
+          <div className="pt-2 border-t border-white/5">
+            <p className="text-xs text-muted-foreground mb-1">Observações do instalador</p>
+            <p className="text-sm text-white whitespace-pre-line">{visita.observacoes_instalador}</p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 };
 
 const InfoRow = ({ label, value, icon: Icon }) => (
@@ -98,11 +190,10 @@ const VisitaDetail = () => {
 
   const statusStyle = STATUS_STYLES[visita.status] || STATUS_STYLES.AGUARDANDO;
   const statusLabel = STATUS_LABELS[visita.status] || visita.status;
-  const canSendRelatorio =
-    isInstaller &&
-    String(visita.installer_id) === String(user?.installer_id) &&
-    visita.status !== 'CONCLUIDA' &&
-    visita.status !== 'CANCELADA';
+  const isOwnerInstaller =
+    isInstaller && String(visita.installer_id) === String(user?.installer_id);
+  const canConfirmar = isOwnerInstaller && visita.status === 'AGUARDANDO_CONFIRMACAO';
+  const canSendRelatorio = isOwnerInstaller && visita.status === 'EM_VISITA';
   const hasRelatorio = !!visita.relatorio_enviado_em;
 
   const formattedDate = visita.scheduled_date
@@ -259,7 +350,60 @@ const VisitaDetail = () => {
           </Card>
         )}
 
-        {/* Formulário de relatório para o instalador */}
+        {/* Bloco A: Formulário de confirmação para o instalador (AGUARDANDO_CONFIRMACAO) */}
+        {canConfirmar && (
+          <ConfirmarVisitaForm
+            visita={visita}
+            onConfirmado={loadVisita}
+            onRejeitado={loadVisita}
+            onCancel={() => {}}
+          />
+        )}
+
+        {/* Aviso ao instalador quando ainda não confirmou (status AGUARDANDO antigo) */}
+        {isOwnerInstaller && visita.status === 'AGUARDANDO' && (
+          <Card className="bg-card border-yellow-500/20">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-white font-medium">Aguardando agendamento</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Esta visita ainda não foi agendada. Aguarde a administração definir data e horário.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Visita rejeitada — mostra motivo */}
+        {visita.rejeitado_em && (
+          <Card className="bg-card border-red-500/20">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm text-red-400 uppercase tracking-wide flex items-center gap-2">
+                <XCircle className="h-4 w-4" />
+                Agendamento Rejeitado
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Rejeitado em {formatDatetime(visita.rejeitado_em)}
+              </p>
+              {visita.rejeitado_motivo && (
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Motivo</p>
+                  <p className="text-sm text-white whitespace-pre-line">{visita.rejeitado_motivo}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Bloco B: Snapshot diff para admin/manager — alterações do instalador na confirmação */}
+        {(isAdmin || isManager) && visita.planejado_snapshot && visita.confirmado_em && (
+          <SnapshotDiffCard visita={visita} formatDatetime={formatDatetime} />
+        )}
+
+        {/* Formulário de relatório para o instalador (apenas EM_VISITA) */}
         {canSendRelatorio && !hasRelatorio && (
           <Card className="bg-card border-purple-500/20">
             <CardHeader className="pb-2 pt-4 px-4">
@@ -270,6 +414,21 @@ const VisitaDetail = () => {
             </CardHeader>
             <CardContent className="px-4 pb-4">
               <RelatorioVisitaForm visita={visita} onSuccess={loadVisita} />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Observações do instalador (visível para todos quando preenchidas) */}
+        {visita.observacoes_instalador && !canConfirmar && (
+          <Card className="bg-card border-white/5">
+            <CardHeader className="pb-2 pt-4 px-4">
+              <CardTitle className="text-sm text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Observações do instalador
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="px-4 pb-4">
+              <p className="text-sm text-white whitespace-pre-line">{visita.observacoes_instalador}</p>
             </CardContent>
           </Card>
         )}
