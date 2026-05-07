@@ -32,6 +32,32 @@ const toDatetimeLocal = (d) => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
+const compressImage = (file, maxPx = 1280, quality = 0.78) =>
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = ({ target }) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          if (width > height) { height = Math.round((height * maxPx) / width); width = maxPx; }
+          else { width = Math.round((width * maxPx) / height); height = maxPx; }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
+          'image/jpeg',
+          quality,
+        );
+      };
+      img.src = target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
 const RelatorioVisitaForm = ({ visita, onSuccess }) => {
   const [fotos, setFotos] = useState([]);
   const [fotoPreviews, setFotoPreviews] = useState([]);
@@ -63,11 +89,12 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
   const valorPorKm = visita?.valor_por_km ?? 1.5;
   const estimativa = kmRodados > 0 ? (Number(kmRodados) * valorPorKm).toFixed(2) : null;
 
-  const handleFotoChange = (e) => {
+  const handleFotoChange = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
-    setFotos((prev) => [...prev, ...files]);
-    const previews = files.map((f) => URL.createObjectURL(f));
+    const compressed = await Promise.all(files.map((f) => compressImage(f)));
+    setFotos((prev) => [...prev, ...compressed]);
+    const previews = compressed.map((f) => URL.createObjectURL(f));
     setFotoPreviews((prev) => [...prev, ...previews]);
   };
 
@@ -98,7 +125,14 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
       toast.success('Relatório enviado com sucesso!');
       onSuccess();
     } catch (err) {
-      toast.error(err?.response?.data?.detail || 'Erro ao enviar relatório');
+      console.error('[RelatorioVT] submit failed', err?.response?.status, err?.response?.data);
+      const detail = err?.response?.data?.detail;
+      const msg = typeof detail === 'string' ? detail
+        : Array.isArray(detail) ? detail.map((d) => d?.msg || d).join(', ')
+        : err?.message === 'Network Error' ? 'Sem conexão — verifique sua internet'
+        : err?.response?.status === 413 ? 'Foto muito grande — tente uma imagem menor'
+        : 'Erro ao enviar relatório';
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
