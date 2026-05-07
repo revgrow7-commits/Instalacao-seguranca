@@ -426,7 +426,7 @@ export const api = {
   getVisita: (id) => axios.get(`${API_URL}/visitas/${id}`, { headers: getAuthHeader() }),
   submitRelatorioVisita: (id, formData) =>
     axios.post(`${API_URL}/visitas/${id}/relatorio`, formData, {
-      headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' },
+      headers: getAuthHeader(),
     }),
   exportVisitasTecnicas: (params = {}) =>
     axios.get(`${API_URL}/visitas/reports/excel`, { params, headers: getAuthHeader(), responseType: 'blob' }),

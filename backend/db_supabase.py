@@ -167,6 +167,15 @@ TABLE_COLUMNS = {
         "job_id", "vendedor_nome", "tipos_servico", "ferramentas",
         "remocao_prevista_os", "remocao_a_realizar", "altura_estimada_m",
         "nivel_dificuldade", "aprovacao_status",
+        # Migration 016 — confirmação pelo instalador
+        "confirmado_em", "confirmado_por", "planejado_snapshot",
+        "rejeitado_em", "rejeitado_motivo", "observacoes_instalador",
+        # Migration 018 — checklist de vistoria
+        "tem_estacionamento", "restricao_horario_inicio", "restricao_horario_fim",
+        "tipo_superficie", "tipo_superficie_outro", "condicao_superficie",
+        "material_remocao", "tem_ponto_energia", "medida_largura_m",
+        "medida_altura_m", "forma_instalacao", "epi_altura",
+        "escada_tamanho", "andaime_torres",
     ]),
 }
 
