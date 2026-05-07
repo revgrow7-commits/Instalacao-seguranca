@@ -708,8 +708,8 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
       // Novos campos
       job_id: visita.job_id || null,
       vendedor_nome: visita.vendedor_nome || null,
-      tipos_servico: visita.tipos_servico || [],
-      ferramentas: visita.ferramentas || [],
+      tipos_servico: (visita.tipos_servico || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
+      ferramentas: (visita.ferramentas || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
       remocao_prevista_os: visita.remocao_prevista_os || false,
       remocao_a_realizar: visita.remocao_a_realizar || false,
       altura_estimada_m: visita.altura_estimada_m ?? null,

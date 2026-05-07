@@ -14,6 +14,7 @@ export function useVisitas(filters = {}) {
   // dependências do fetch. Para INSTALLER, o backend filtra automaticamente via JWT.
   // Use refetch() manualmente quando precisar reconsultar.
   const fetchVisitas = useCallback(async () => {
+    setLoading(true);
     try {
       const params = { ...filters };
       const res = await api.listVisitas(params);
