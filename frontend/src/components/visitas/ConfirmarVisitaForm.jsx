@@ -203,6 +203,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
       toast.success('Visita confirmada — você já pode iniciar o relatório');
       onConfirmado?.();
     } catch (err) {
+      console.error('[ConfirmarVT] confirm failed', err);
       toast.error(err?.response?.data?.detail || 'Erro ao confirmar visita');
     }
   };
@@ -220,6 +221,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
       setMotivoRejeicao('');
       onRejeitado?.();
     } catch (err) {
+      console.error('[ConfirmarVT] reject failed', err);
       toast.error(err?.response?.data?.detail || 'Erro ao rejeitar agendamento');
     } finally {
       setRejeitando(false);

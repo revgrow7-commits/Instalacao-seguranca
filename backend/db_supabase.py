@@ -55,7 +55,8 @@ JSONB_FIELDS = frozenset([
     'items', 'holdprint_data', 'products_with_area', 'item_assignments',
     'archived_items', 'products_installed', 'breakdown', 'keys',
     'assigned_installers', 'checklists', 'scopes', 'token', 'google_token',
-    'justification', 'installation_config', 'subscription', 'keywords'
+    'justification', 'installation_config', 'subscription', 'keywords',
+    'planejado_snapshot'
 ])
 
 # Registry of actual Supabase table columns (from 001_schema_completo.sql)
@@ -158,15 +159,32 @@ TABLE_COLUMNS = {
         "id", "nome", "is_active", "created_at", "created_by"
     ]),
     "visitas_tecnicas": frozenset([
+        # ── Identificação e dados básicos ──────────────────────────────────
         "id", "numero_vt", "titulo", "client_name", "client_address", "branch",
-        "installer_id", "scheduled_date", "scheduled_time_end", "valor_por_km",
-        "km_ida", "km_volta", "valor_total", "status", "observacoes_admin",
+        "installer_id", "scheduled_date", "scheduled_time_end",
+        # ── Cobrança (valor_total é GENERATED ALWAYS — omitir de writes) ──
+        "valor_por_km", "km_ida", "km_volta",
+        # ── Estado operacional ─────────────────────────────────────────────
+        "status", "observacoes_admin",
+        # ── Relatório final ────────────────────────────────────────────────
         "relatorio_descricao", "relatorio_situacao", "relatorio_fotos",
         "relatorio_assinatura_confirmada", "relatorio_chegada", "relatorio_saida",
-        "relatorio_enviado_em", "created_by", "created_at", "updated_at",
+        "relatorio_enviado_em",
+        # ── Auditoria ──────────────────────────────────────────────────────
+        "created_by", "created_at", "updated_at",
+        # ── Expansão (migration 013) ────────────────────────────────────────
         "job_id", "vendedor_nome", "tipos_servico", "ferramentas",
         "remocao_prevista_os", "remocao_a_realizar", "altura_estimada_m",
         "nivel_dificuldade", "aprovacao_status",
+        # ── Confirmação pelo instalador (migration 016) ─────────────────────
+        "confirmado_em", "confirmado_por", "planejado_snapshot",
+        "rejeitado_em", "rejeitado_motivo", "observacoes_instalador",
+        # ── Checklist de vistoria ──────────────────────────────────────────
+        "tem_estacionamento", "restricao_horario_inicio", "restricao_horario_fim",
+        "tipo_superficie", "tipo_superficie_outro", "condicao_superficie",
+        "material_remocao", "tem_ponto_energia", "medida_largura_m",
+        "medida_altura_m", "forma_instalacao", "epi_altura",
+        "escada_tamanho", "andaime_torres",
     ]),
 }
 
@@ -181,7 +199,7 @@ def _filter_columns(table_name: str, data: dict) -> dict:
         return data
     rejected = set(data.keys()) - allowed
     if rejected:
-        logger.warning(f"_filter_columns: dropping unknown fields from '{table_name}': {rejected}")
+        logger.error(f"_filter_columns: dropping unknown fields from '{table_name}': {sorted(rejected)}")
     return {k: v for k, v in data.items() if k in allowed}
 
 
