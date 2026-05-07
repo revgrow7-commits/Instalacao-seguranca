@@ -106,7 +106,12 @@ const ToggleRow = ({ label, hint, checked, onChange }) => (
       <p className="text-sm text-white font-medium leading-snug">{label}</p>
       {hint && <p className="text-xs text-muted-foreground mt-0.5">{hint}</p>}
     </div>
-    <Switch checked={!!checked} onCheckedChange={onChange} className="flex-shrink-0" />
+    <Switch
+      checked={!!checked}
+      onCheckedChange={onChange}
+      className="flex-shrink-0"
+      onClick={(e) => e.stopPropagation()}
+    />
   </div>
 );
 

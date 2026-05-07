@@ -3,10 +3,10 @@ import React, { Suspense, lazy, Component } from 'react';
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
   componentDidCatch(error, info) {
     console.error('ErrorBoundary caught:', error, info);
@@ -16,6 +16,11 @@ class ErrorBoundary extends Component {
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace' }}>
           <p>Erro no app, recarregue a página (Ctrl+Shift+R) para limpar cache.</p>
+          {process.env.NODE_ENV === 'development' && this.state.error && (
+            <pre style={{ textAlign: 'left', fontSize: 11, marginTop: '1rem', background: '#111', padding: '1rem', borderRadius: 6, overflow: 'auto', maxHeight: 300 }}>
+              {this.state.error.stack}
+            </pre>
+          )}
         </div>
       );
     }
