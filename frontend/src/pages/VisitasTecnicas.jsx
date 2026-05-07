@@ -21,7 +21,8 @@ import { MultiCombobox } from '../components/ui/multi-combobox';
 import { useCatalogos } from '../hooks/useCatalogos';
 import {
   MapPin, Plus, Calendar, User, Building2, ChevronDown,
-  Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon, BarChart2
+  Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon, BarChart2,
+  Car, Layers, Ruler, Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -45,6 +46,29 @@ const STATUS_LABELS = {
   CANCELADA: 'CANCELADA',
 };
 
+const TIPO_SUPERFICIE_OPTIONS = ['Alvenaria/Pintura', 'Drywall/Gesso', 'Vidro', 'ACM/Metal', 'Outro'];
+const FORMA_INSTALACAO_OPTIONS = ['Adesivação/Envelopamento', 'Fixação Mecânica', 'Fixação Química', 'Estrutura soldada'];
+
+const ChipGroupInline = ({ options, value = [], onChange }) => (
+  <div className="flex flex-wrap gap-1.5">
+    {options.map(opt => {
+      const sel = value.includes(opt);
+      return (
+        <button
+          key={opt}
+          type="button"
+          onClick={() => onChange(sel ? value.filter(v => v !== opt) : [...value, opt])}
+          className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+            sel ? 'bg-primary/20 text-primary border-primary/50' : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/30'
+          }`}
+        >
+          {opt}
+        </button>
+      );
+    })}
+  </div>
+);
+
 const novaVisitaSchema = z.object({
   client_name: z.string().min(1, 'Nome do cliente obrigatório'),
   client_address: z.string().min(1, 'Endereço obrigatório'),
@@ -54,7 +78,7 @@ const novaVisitaSchema = z.object({
   scheduled_time_end: z.string().optional().nullable(),
   valor_por_km: z.coerce.number().min(0).default(1.50),
   observacoes_admin: z.string().optional().nullable(),
-  // Novos campos
+  // campos existentes
   job_id: z.string().optional().nullable(),
   vendedor_nome: z.string().optional().nullable(),
   tipos_servico: z.array(z.string()).optional().default([]),
@@ -66,6 +90,21 @@ const novaVisitaSchema = z.object({
   aprovacao_status: z.string().optional().default('PENDENTE'),
   km_ida: z.coerce.number().min(0).optional().nullable(),
   km_volta: z.coerce.number().min(0).optional().nullable(),
+  // checklist de vistoria
+  tem_estacionamento: z.boolean().optional().nullable(),
+  restricao_horario_inicio: z.string().optional().nullable(),
+  restricao_horario_fim: z.string().optional().nullable(),
+  tipo_superficie: z.array(z.string()).optional().default([]),
+  tipo_superficie_outro: z.string().optional().nullable(),
+  condicao_superficie: z.boolean().optional().nullable(),
+  material_remocao: z.string().optional().nullable(),
+  tem_ponto_energia: z.boolean().optional().nullable(),
+  medida_largura_m: z.coerce.number().min(0).optional().nullable(),
+  medida_altura_m: z.coerce.number().min(0).optional().nullable(),
+  forma_instalacao: z.array(z.string()).optional().default([]),
+  epi_altura: z.boolean().optional().nullable(),
+  escada_tamanho: z.string().optional().nullable(),
+  andaime_torres: z.coerce.number().int().min(1).optional().nullable(),
 });
 
 const agendarSchema = z.object({
@@ -220,6 +259,8 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
       remocao_prevista_os: false,
       remocao_a_realizar: false,
       aprovacao_status: 'PENDENTE',
+      tipo_superficie: [],
+      forma_instalacao: [],
     },
   });
 
@@ -442,54 +483,75 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <Label className="text-xs text-white cursor-pointer">Remoção prevista na OS?</Label>
-              <Switch
-                checked={!!watch('remocao_prevista_os')}
-                onCheckedChange={(v) => setValue('remocao_prevista_os', v)}
-              />
+              <Switch checked={!!watch('remocao_prevista_os')} onCheckedChange={(v) => setValue('remocao_prevista_os', v)} />
             </div>
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <Label className="text-xs text-white cursor-pointer">Remoção a realizar no local?</Label>
-              <Switch
-                checked={!!watch('remocao_a_realizar')}
-                onCheckedChange={(v) => setValue('remocao_a_realizar', v)}
-              />
+              <Switch checked={!!watch('remocao_a_realizar')} onCheckedChange={(v) => setValue('remocao_a_realizar', v)} />
+            </div>
+          </div>
+
+          {watch('remocao_a_realizar') && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Material a remover</Label>
+              <Input {...register('material_remocao')} placeholder="Ex: adesivo antigo, faixa, placa..." className="bg-background border-white/10 text-white" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
+              <Input type="number" step="0.1" min="0" {...register('altura_estimada_m')} placeholder="0.0" className="bg-background border-white/10 text-white" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
+              <Combobox options={NIVEL_DIFICULDADE_OPTIONS} value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''} onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)} placeholder="Selecionar nível..." />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                {...register('altura_estimada_m')}
-                placeholder="0.0"
-                className="bg-background border-white/10 text-white"
-              />
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Ruler className="h-3 w-3" />Largura do local (m)</Label>
+              <Input type="number" step="0.01" min="0" {...register('medida_largura_m')} placeholder="0.00" className="bg-background border-white/10 text-white" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
-              <Combobox
-                options={NIVEL_DIFICULDADE_OPTIONS}
-                value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''}
-                onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)}
-                placeholder="Selecionar nível..."
-              />
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Ruler className="h-3 w-3" />Altura do local (m)</Label>
+              <Input type="number" step="0.01" min="0" {...register('medida_altura_m')} placeholder="0.00" className="bg-background border-white/10 text-white" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" />Tipo de superfície</Label>
+            <ChipGroupInline options={TIPO_SUPERFICIE_OPTIONS} value={watch('tipo_superficie') || []} onChange={(v) => setValue('tipo_superficie', v)} />
+            {(watch('tipo_superficie') || []).includes('Outro') && (
+              <Input {...register('tipo_superficie_outro')} placeholder="Descreva..." className="bg-background border-white/10 text-white mt-1" />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Wrench className="h-3 w-3" />Forma de instalação</Label>
+            <ChipGroupInline options={FORMA_INSTALACAO_OPTIONS} value={watch('forma_instalacao') || []} onChange={(v) => setValue('forma_instalacao', v)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer flex items-center gap-1"><Car className="h-3 w-3" />Estacionamento?</Label>
+              <Switch checked={!!watch('tem_estacionamento')} onCheckedChange={(v) => setValue('tem_estacionamento', v)} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer flex items-center gap-1"><Zap className="h-3 w-3" />Ponto de energia?</Label>
+              <Switch checked={!!watch('tem_ponto_energia')} onCheckedChange={(v) => setValue('tem_ponto_energia', v)} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <Label className="text-xs text-white cursor-pointer">EPIs para trabalho em altura?</Label>
+            <Switch checked={!!watch('epi_altura')} onCheckedChange={(v) => setValue('epi_altura', v)} />
           </div>
 
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Ferramentas necessárias</Label>
-            <MultiCombobox
-              options={ferramentas}
-              value={watch('ferramentas') || []}
-              onChange={(v) => setValue('ferramentas', v)}
-              placeholder="Selecionar ferramentas..."
-              searchPlaceholder="Buscar ferramenta..."
-              creatable
-              onCreate={addFerramenta}
-            />
+            <MultiCombobox options={ferramentas} value={watch('ferramentas') || []} onChange={(v) => setValue('ferramentas', v)} placeholder="Selecionar ferramentas..." searchPlaceholder="Buscar ferramenta..." creatable onCreate={addFerramenta} />
           </div>
 
           {/* SEÇÃO 5 — RESULTADO */}
@@ -655,6 +717,21 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
       aprovacao_status: visita.aprovacao_status || 'PENDENTE',
       km_ida: visita.km_ida ?? null,
       km_volta: visita.km_volta ?? null,
+      // checklist
+      tem_estacionamento: visita.tem_estacionamento ?? null,
+      restricao_horario_inicio: visita.restricao_horario_inicio || '',
+      restricao_horario_fim: visita.restricao_horario_fim || '',
+      tipo_superficie: visita.tipo_superficie || [],
+      tipo_superficie_outro: visita.tipo_superficie_outro || '',
+      condicao_superficie: visita.condicao_superficie ?? null,
+      material_remocao: visita.material_remocao || '',
+      tem_ponto_energia: visita.tem_ponto_energia ?? null,
+      medida_largura_m: visita.medida_largura_m ?? null,
+      medida_altura_m: visita.medida_altura_m ?? null,
+      forma_instalacao: visita.forma_instalacao || [],
+      epi_altura: visita.epi_altura ?? null,
+      escada_tamanho: visita.escada_tamanho || '',
+      andaime_torres: visita.andaime_torres ?? null,
     } : {},
   });
 
@@ -852,54 +929,75 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
           <div className="grid grid-cols-2 gap-3">
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <Label className="text-xs text-white cursor-pointer">Remoção prevista na OS?</Label>
-              <Switch
-                checked={!!watch('remocao_prevista_os')}
-                onCheckedChange={(v) => setValue('remocao_prevista_os', v)}
-              />
+              <Switch checked={!!watch('remocao_prevista_os')} onCheckedChange={(v) => setValue('remocao_prevista_os', v)} />
             </div>
             <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
               <Label className="text-xs text-white cursor-pointer">Remoção a realizar no local?</Label>
-              <Switch
-                checked={!!watch('remocao_a_realizar')}
-                onCheckedChange={(v) => setValue('remocao_a_realizar', v)}
-              />
+              <Switch checked={!!watch('remocao_a_realizar')} onCheckedChange={(v) => setValue('remocao_a_realizar', v)} />
+            </div>
+          </div>
+
+          {watch('remocao_a_realizar') && (
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Material a remover</Label>
+              <Input {...register('material_remocao')} placeholder="Ex: adesivo antigo, faixa, placa..." className="bg-background border-white/10 text-white" />
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
+              <Input type="number" step="0.1" min="0" {...register('altura_estimada_m')} placeholder="0.0" className="bg-background border-white/10 text-white" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
+              <Combobox options={NIVEL_DIFICULDADE_OPTIONS} value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''} onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)} placeholder="Selecionar nível..." />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Altura estimada (m)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                {...register('altura_estimada_m')}
-                placeholder="0.0"
-                className="bg-background border-white/10 text-white"
-              />
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Ruler className="h-3 w-3" />Largura do local (m)</Label>
+              <Input type="number" step="0.01" min="0" {...register('medida_largura_m')} placeholder="0.00" className="bg-background border-white/10 text-white" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Nível de dificuldade</Label>
-              <Combobox
-                options={NIVEL_DIFICULDADE_OPTIONS}
-                value={watch('nivel_dificuldade') ? String(watch('nivel_dificuldade')) : ''}
-                onChange={(v) => setValue('nivel_dificuldade', v ? Number(v) : null)}
-                placeholder="Selecionar nível..."
-              />
+              <Label className="text-xs text-muted-foreground flex items-center gap-1"><Ruler className="h-3 w-3" />Altura do local (m)</Label>
+              <Input type="number" step="0.01" min="0" {...register('medida_altura_m')} placeholder="0.00" className="bg-background border-white/10 text-white" />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Layers className="h-3 w-3" />Tipo de superfície</Label>
+            <ChipGroupInline options={TIPO_SUPERFICIE_OPTIONS} value={watch('tipo_superficie') || []} onChange={(v) => setValue('tipo_superficie', v)} />
+            {(watch('tipo_superficie') || []).includes('Outro') && (
+              <Input {...register('tipo_superficie_outro')} placeholder="Descreva..." className="bg-background border-white/10 text-white mt-1" />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs text-muted-foreground flex items-center gap-1"><Wrench className="h-3 w-3" />Forma de instalação</Label>
+            <ChipGroupInline options={FORMA_INSTALACAO_OPTIONS} value={watch('forma_instalacao') || []} onChange={(v) => setValue('forma_instalacao', v)} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer flex items-center gap-1"><Car className="h-3 w-3" />Estacionamento?</Label>
+              <Switch checked={!!watch('tem_estacionamento')} onCheckedChange={(v) => setValue('tem_estacionamento', v)} />
+            </div>
+            <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+              <Label className="text-xs text-white cursor-pointer flex items-center gap-1"><Zap className="h-3 w-3" />Ponto de energia?</Label>
+              <Switch checked={!!watch('tem_ponto_energia')} onCheckedChange={(v) => setValue('tem_ponto_energia', v)} />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg">
+            <Label className="text-xs text-white cursor-pointer">EPIs para trabalho em altura?</Label>
+            <Switch checked={!!watch('epi_altura')} onCheckedChange={(v) => setValue('epi_altura', v)} />
           </div>
 
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Ferramentas necessárias</Label>
-            <MultiCombobox
-              options={ferramentas}
-              value={watch('ferramentas') || []}
-              onChange={(v) => setValue('ferramentas', v)}
-              placeholder="Selecionar ferramentas..."
-              searchPlaceholder="Buscar ferramenta..."
-              creatable
-              onCreate={addFerramenta}
-            />
+            <MultiCombobox options={ferramentas} value={watch('ferramentas') || []} onChange={(v) => setValue('ferramentas', v)} placeholder="Selecionar ferramentas..." searchPlaceholder="Buscar ferramenta..." creatable onCreate={addFerramenta} />
           </div>
 
           {/* SEÇÃO 5 — RESULTADO */}
