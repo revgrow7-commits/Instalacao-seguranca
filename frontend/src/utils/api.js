@@ -421,6 +421,8 @@ export const api = {
   updateVisita: (id, data) => axios.patch(`${API_URL}/visitas/${id}`, data, { headers: getAuthHeader() }),
   agendarVisita: (id, data) => axios.post(`${API_URL}/visitas/${id}/agendar`, data, { headers: getAuthHeader() }),
   cancelarVisita: (id) => axios.post(`${API_URL}/visitas/${id}/cancelar`, {}, { headers: getAuthHeader() }),
+  confirmarVisita: (id, data) => axios.post(`${API_URL}/visitas/${id}/confirmar`, data, { headers: getAuthHeader() }),
+  rejeitarVisita: (id, motivo) => axios.post(`${API_URL}/visitas/${id}/rejeitar`, { motivo }, { headers: getAuthHeader() }),
   getVisita: (id) => axios.get(`${API_URL}/visitas/${id}`, { headers: getAuthHeader() }),
   submitRelatorioVisita: (id, formData) =>
     axios.post(`${API_URL}/visitas/${id}/relatorio`, formData, {
@@ -428,6 +430,24 @@ export const api = {
     }),
   exportVisitasTecnicas: (params = {}) =>
     axios.get(`${API_URL}/visitas/reports/excel`, { params, headers: getAuthHeader(), responseType: 'blob' }),
+
+  // Visitas Técnicas — Relatórios analíticos
+  getVisitasReportByVendedor: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-vendedor`, { params, headers: getAuthHeader() }),
+  getVisitasReportByFilial: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-filial`, { params, headers: getAuthHeader() }),
+  getVisitasReportByAprovacao: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-aprovacao`, { params, headers: getAuthHeader() }),
+  getVisitasReportByDificuldade: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-dificuldade`, { params, headers: getAuthHeader() }),
+  getVisitasReportByTipoServico: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-tipo-servico`, { params, headers: getAuthHeader() }),
+  getVisitasReportByAltura: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-altura`, { params, headers: getAuthHeader() }),
+  getVisitasReportDivergenciaRemocao: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/divergencia-remocao`, { params, headers: getAuthHeader() }),
+  getVisitasReportCustoDeslocamento: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/custo-deslocamento`, { params, headers: getAuthHeader() }),
 
   // Pesquisa de Jobs para autocomplete
   searchJobs: (q) => axios.get(`${API_URL}/jobs/search`, { params: { q, limit: 10 }, headers: getAuthHeader() }),

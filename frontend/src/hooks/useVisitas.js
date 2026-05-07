@@ -10,11 +10,12 @@ export function useVisitas(filters = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // filtros aplicados client-side em VisitasTecnicas (status/branch/data) — não entram nas
+  // dependências do fetch. Para INSTALLER, o backend filtra automaticamente via JWT.
+  // Use refetch() manualmente quando precisar reconsultar.
   const fetchVisitas = useCallback(async () => {
     try {
       const params = { ...filters };
-      // Para INSTALLER: o backend já filtra automaticamente pelo user logado (via JWT).
-      // Para ADMIN/MANAGER: installer_id virá via filters se necessário.
       const res = await api.listVisitas(params);
       setVisitas(res.data || []);
       setError(null);
@@ -34,7 +35,9 @@ export function useVisitas(filters = {}) {
 
   const counters = useMemo(() => ({
     total: visitas.length,
-    aguardando: visitas.filter(v => v.status === 'AGUARDANDO').length,
+    // "Aguardando" agrega AGUARDANDO + AGUARDANDO_CONFIRMACAO para manter o card único
+    aguardando: visitas.filter(v => v.status === 'AGUARDANDO' || v.status === 'AGUARDANDO_CONFIRMACAO').length,
+    aConfirmar: visitas.filter(v => v.status === 'AGUARDANDO_CONFIRMACAO').length,
     emVisita: visitas.filter(v => v.status === 'EM_VISITA').length,
     concluidas: visitas.filter(v => v.status === 'CONCLUIDA').length,
     canceladas: visitas.filter(v => v.status === 'CANCELADA').length,

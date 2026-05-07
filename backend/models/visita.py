@@ -10,6 +10,7 @@ import uuid
 
 class VisitaStatus(str, Enum):
     AGUARDANDO = "AGUARDANDO"
+    AGUARDANDO_CONFIRMACAO = "AGUARDANDO_CONFIRMACAO"
     EM_VISITA = "EM_VISITA"
     CONCLUIDA = "CONCLUIDA"
     CANCELADA = "CANCELADA"
@@ -66,6 +67,8 @@ class VisitaCreate(BaseModel):
     altura_estimada_m: Optional[float] = None
     nivel_dificuldade: Optional[int] = None
     aprovacao_status: Optional[str] = "PENDENTE"
+    km_ida: Optional[float] = Field(None, ge=0)
+    km_volta: Optional[float] = Field(None, ge=0)
 
     @field_validator("scheduled_date", "scheduled_time_end", mode="before")
     @classmethod
@@ -149,6 +152,34 @@ class VisitaRelatorio(BaseModel):
         return _coerce_datetime(v)
 
 
+class VisitaConfirmar(BaseModel):
+    """Campos editáveis pelo instalador ao confirmar a visita técnica."""
+    model_config = ConfigDict(extra="ignore")
+
+    km_ida: Optional[float] = Field(None, ge=0)
+    km_volta: Optional[float] = Field(None, ge=0)
+    altura_estimada_m: Optional[float] = Field(None, ge=0)
+    nivel_dificuldade: Optional[int] = Field(None, ge=1, le=4)
+    ferramentas: Optional[List[str]] = None
+    remocao_a_realizar: Optional[bool] = None
+    tipos_servico: Optional[List[str]] = None
+    observacoes_instalador: Optional[str] = None
+
+    @field_validator("nivel_dificuldade")
+    @classmethod
+    def validate_nivel(cls, v):
+        if v is not None and v not in (1, 2, 3, 4):
+            raise ValueError("nivel_dificuldade deve ser entre 1 e 4")
+        return v
+
+
+class VisitaRejeitar(BaseModel):
+    """Motivo de rejeição da visita técnica pelo instalador."""
+    model_config = ConfigDict(extra="ignore")
+
+    motivo: str = Field(..., min_length=10)
+
+
 class AgendarVisitaRequest(BaseModel):
     """Request para agendar visita técnica (atribuir instalador e data)."""
     model_config = ConfigDict(extra="ignore")
@@ -204,3 +235,10 @@ class VisitaOut(BaseModel):
     altura_estimada_m: Optional[float] = None
     nivel_dificuldade: Optional[int] = None
     aprovacao_status: Optional[str] = "PENDENTE"
+    # Confirmação pelo instalador
+    confirmado_em: Optional[datetime] = None
+    confirmado_por: Optional[str] = None
+    planejado_snapshot: Optional[dict] = None
+    rejeitado_em: Optional[datetime] = None
+    rejeitado_motivo: Optional[str] = None
+    observacoes_instalador: Optional[str] = None
