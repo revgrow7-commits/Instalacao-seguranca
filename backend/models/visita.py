@@ -117,6 +117,21 @@ class VisitaUpdate(BaseModel):
     aprovacao_status: Optional[str] = None
     km_ida: Optional[float] = None
     km_volta: Optional[float] = None
+    # Checklist de vistoria (campos do PDF)
+    tem_estacionamento: Optional[bool] = None
+    restricao_horario_inicio: Optional[str] = None
+    restricao_horario_fim: Optional[str] = None
+    tipo_superficie: Optional[List[str]] = None
+    tipo_superficie_outro: Optional[str] = None
+    condicao_superficie: Optional[bool] = None
+    material_remocao: Optional[str] = None
+    tem_ponto_energia: Optional[bool] = None
+    medida_largura_m: Optional[float] = None
+    medida_altura_m: Optional[float] = None
+    forma_instalacao: Optional[List[str]] = None
+    epi_altura: Optional[bool] = None
+    escada_tamanho: Optional[str] = None
+    andaime_torres: Optional[int] = None
 
     @field_validator(
         "scheduled_date", "scheduled_time_end",
@@ -164,6 +179,21 @@ class VisitaConfirmar(BaseModel):
     remocao_a_realizar: Optional[bool] = None
     tipos_servico: Optional[List[str]] = None
     observacoes_instalador: Optional[str] = None
+    # Checklist de vistoria (campos do PDF)
+    tem_estacionamento: Optional[bool] = None
+    restricao_horario_inicio: Optional[str] = None
+    restricao_horario_fim: Optional[str] = None
+    tipo_superficie: Optional[List[str]] = None
+    tipo_superficie_outro: Optional[str] = None
+    condicao_superficie: Optional[bool] = None
+    material_remocao: Optional[str] = None
+    tem_ponto_energia: Optional[bool] = None
+    medida_largura_m: Optional[float] = Field(None, ge=0)
+    medida_altura_m: Optional[float] = Field(None, ge=0)
+    forma_instalacao: Optional[List[str]] = None
+    epi_altura: Optional[bool] = None
+    escada_tamanho: Optional[str] = None
+    andaime_torres: Optional[int] = Field(None, ge=1)
 
     @field_validator("nivel_dificuldade")
     @classmethod
@@ -242,3 +272,18 @@ class VisitaOut(BaseModel):
     rejeitado_em: Optional[datetime] = None
     rejeitado_motivo: Optional[str] = None
     observacoes_instalador: Optional[str] = None
+    # Checklist de vistoria (campos do PDF)
+    tem_estacionamento: Optional[bool] = None
+    restricao_horario_inicio: Optional[str] = None
+    restricao_horario_fim: Optional[str] = None
+    tipo_superficie: Optional[List[str]] = []
+    tipo_superficie_outro: Optional[str] = None
+    condicao_superficie: Optional[bool] = None
+    material_remocao: Optional[str] = None
+    tem_ponto_energia: Optional[bool] = None
+    medida_largura_m: Optional[float] = None
+    medida_altura_m: Optional[float] = None
+    forma_instalacao: Optional[List[str]] = []
+    epi_altura: Optional[bool] = None
+    escada_tamanho: Optional[str] = None
+    andaime_torres: Optional[int] = None

@@ -440,6 +440,21 @@ _CONFIRMAR_FIELDS = (
     "ferramentas",
     "remocao_a_realizar",
     "tipos_servico",
+    # checklist de vistoria
+    "tem_estacionamento",
+    "restricao_horario_inicio",
+    "restricao_horario_fim",
+    "tipo_superficie",
+    "tipo_superficie_outro",
+    "condicao_superficie",
+    "material_remocao",
+    "tem_ponto_energia",
+    "medida_largura_m",
+    "medida_altura_m",
+    "forma_instalacao",
+    "epi_altura",
+    "escada_tamanho",
+    "andaime_torres",
 )
 
 
