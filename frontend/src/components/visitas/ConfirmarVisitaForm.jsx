@@ -28,23 +28,23 @@ const confirmarSchema = z.object({
   km_volta:                 z.coerce.number().min(0).optional().nullable(),
   altura_estimada_m:        z.coerce.number().min(0).optional().nullable(),
   nivel_dificuldade:        z.coerce.number().min(1).max(4).optional().nullable(),
-  ferramentas:              z.array(z.string()).optional().default([]),
-  remocao_a_realizar:       z.boolean().optional().default(false),
-  tipos_servico:            z.array(z.string()).optional().default([]),
+  ferramentas:              z.array(z.string()).optional(),
+  remocao_a_realizar:       z.boolean().optional(),
+  tipos_servico:            z.array(z.string()).optional(),
   observacoes_instalador:   z.string().optional().nullable(),
   // campos do checklist PDF
   tem_estacionamento:       z.boolean().optional().nullable(),
-  tem_restricao_horario:    z.boolean().optional().default(false),
+  tem_restricao_horario:    z.boolean().optional(),
   restricao_horario_inicio: z.string().optional().nullable(),
   restricao_horario_fim:    z.string().optional().nullable(),
-  tipo_superficie:          z.array(z.string()).optional().default([]),
+  tipo_superficie:          z.array(z.string()).optional(),
   tipo_superficie_outro:    z.string().optional().nullable(),
   condicao_superficie:      z.boolean().optional().nullable(),
   material_remocao:         z.string().optional().nullable(),
   tem_ponto_energia:        z.boolean().optional().nullable(),
   medida_largura_m:         z.coerce.number().min(0).optional().nullable(),
   medida_altura_m:          z.coerce.number().min(0).optional().nullable(),
-  forma_instalacao:         z.array(z.string()).optional().default([]),
+  forma_instalacao:         z.array(z.string()).optional(),
   epi_altura:               z.boolean().optional().nullable(),
   escada_tamanho:           z.string().optional().nullable(),
   andaime_torres:           z.coerce.number().int().min(1).optional().nullable(),
@@ -142,6 +142,10 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
   const [rejeitando, setRejeitando]   = useState(false);
   const TOTAL = STEPS.length;
 
+  // Sanitise array fields: DB may store {value,label} objects instead of plain strings
+  const toStringArr = (arr) =>
+    (arr || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v)));
+
   const { register, handleSubmit, watch, setValue, formState: { isSubmitting } } = useForm({
     resolver: zodResolver(confirmarSchema),
     defaultValues: {
@@ -149,9 +153,9 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
       km_volta:                 visita?.km_volta                 ?? null,
       altura_estimada_m:        visita?.altura_estimada_m        ?? null,
       nivel_dificuldade:        visita?.nivel_dificuldade        ?? null,
-      ferramentas:              visita?.ferramentas              || [],
+      ferramentas:              toStringArr(visita?.ferramentas),
       remocao_a_realizar:       !!visita?.remocao_a_realizar,
-      tipos_servico:            visita?.tipos_servico            || [],
+      tipos_servico:            toStringArr(visita?.tipos_servico),
       observacoes_instalador:   visita?.observacoes_instalador   || '',
       tem_estacionamento:       visita?.tem_estacionamento       ?? null,
       tem_restricao_horario:    !!(visita?.restricao_horario_inicio),
@@ -171,14 +175,24 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
     },
   });
 
-  const w = watch();
-  const temEscada  = (w.ferramentas || []).some(f => typeof f === 'string' && f.toLowerCase().includes('escada'));
-  const temAndaime = (w.ferramentas || []).some(f => typeof f === 'string' && f.toLowerCase().includes('andaime'));
+  // Observar apenas os campos usados no render — evita loop infinito
+  const [
+    tem_estacionamento, tem_restricao_horario, tipo_superficie, condicao_superficie,
+    remocao_a_realizar, tem_ponto_energia, forma_instalacao, nivel_dificuldade,
+    ferramentasVal, epi_altura, tipos_servico,
+  ] = watch([
+    'tem_estacionamento', 'tem_restricao_horario', 'tipo_superficie', 'condicao_superficie',
+    'remocao_a_realizar', 'tem_ponto_energia', 'forma_instalacao', 'nivel_dificuldade',
+    'ferramentas', 'epi_altura', 'tipos_servico',
+  ]);
+
+  const temEscada  = (ferramentasVal || []).some(f => typeof f === 'string' && f.toLowerCase().includes('escada'));
+  const temAndaime = (ferramentasVal || []).some(f => typeof f === 'string' && f.toLowerCase().includes('andaime'));
 
   const onSubmit = async (data) => {
     try {
-      const { tem_restricao_horario, ...payload } = data;
-      if (!tem_restricao_horario) {
+      const { tem_restricao_horario: temRestr, ...payload } = data;
+      if (!temRestr) {
         payload.restricao_horario_inicio = null;
         payload.restricao_horario_fim    = null;
       }
@@ -271,18 +285,18 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
               <ToggleRow
                 label="Tem estacionamento ou área de carga/descarga?"
                 hint="Facilita o desembarque de materiais e equipamentos"
-                checked={w.tem_estacionamento}
+                checked={tem_estacionamento}
                 onChange={(v) => setValue('tem_estacionamento', v)}
               />
 
               <ToggleRow
                 label="Tem restrição de horário para barulho/instalação?"
                 hint="Condomínios, shoppings, centros comerciais..."
-                checked={w.tem_restricao_horario}
+                checked={tem_restricao_horario}
                 onChange={(v) => setValue('tem_restricao_horario', v)}
               />
 
-              {w.tem_restricao_horario && (
+              {tem_restricao_horario && (
                 <div className="space-y-2 pl-3 border-l-2 border-primary/40 ml-1">
                   <Label className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <Clock className="h-3.5 w-3.5" />
@@ -320,10 +334,10 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
                 <Label className="text-xs text-muted-foreground">Tipo de superfície</Label>
                 <ChipGroup
                   options={TIPO_SUPERFICIE}
-                  value={w.tipo_superficie || []}
+                  value={tipo_superficie || []}
                   onChange={(v) => setValue('tipo_superficie', v)}
                 />
-                {(w.tipo_superficie || []).includes('Outro') && (
+                {(tipo_superficie || []).includes('Outro') && (
                   <Input
                     {...register('tipo_superficie_outro')}
                     placeholder="Descreva o tipo de superfície..."
@@ -334,17 +348,17 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
 
               <ToggleRow
                 label="Superfície precisa de limpeza, remoção ou reparo antes de instalar?"
-                checked={w.condicao_superficie}
+                checked={condicao_superficie}
                 onChange={(v) => setValue('condicao_superficie', v)}
               />
 
               <ToggleRow
                 label="Há remoção de material a realizar no local?"
-                checked={w.remocao_a_realizar}
+                checked={remocao_a_realizar}
                 onChange={(v) => setValue('remocao_a_realizar', v)}
               />
 
-              {w.remocao_a_realizar && (
+              {remocao_a_realizar && (
                 <div className="space-y-1 pl-3 border-l-2 border-orange-500/40 ml-1">
                   <Label className="text-xs text-muted-foreground">Qual material será removido?</Label>
                   <Input
@@ -358,7 +372,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
               <ToggleRow
                 label="Há ponto de energia (tomada 110V/220V) próximo?"
                 hint="Para ligar ferramentas elétricas e luminosos"
-                checked={w.tem_ponto_energia}
+                checked={tem_ponto_energia}
                 onChange={(v) => setValue('tem_ponto_energia', v)}
               />
             </div>
@@ -397,7 +411,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
                 <Label className="text-xs text-muted-foreground">Forma de instalação prevista</Label>
                 <ChipGroup
                   options={FORMA_INSTALACAO}
-                  value={w.forma_instalacao || []}
+                  value={forma_instalacao || []}
                   onChange={(v) => setValue('forma_instalacao', v)}
                 />
               </div>
@@ -419,9 +433,9 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setValue('nivel_dificuldade', w.nivel_dificuldade === opt.value ? null : opt.value)}
+                      onClick={() => setValue('nivel_dificuldade', nivel_dificuldade === opt.value ? null : opt.value)}
                       className={`h-12 rounded-xl border font-semibold text-sm transition-all touch-manipulation ${
-                        w.nivel_dificuldade === opt.value
+                        nivel_dificuldade === opt.value
                           ? opt.active
                           : 'bg-white/5 text-gray-400 border-white/10 active:bg-white/10'
                       }`}
@@ -443,7 +457,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
                 <Label className="text-xs text-muted-foreground">Ferramentas necessárias</Label>
                 <MultiCombobox
                   options={ferramentas}
-                  value={w.ferramentas || []}
+                  value={ferramentasVal || []}
                   onChange={(v) => setValue('ferramentas', v)}
                   placeholder="Selecionar ferramentas..."
                   searchPlaceholder="Buscar ferramenta..."
@@ -478,7 +492,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
               <ToggleRow
                 label="Necessidade de EPIs para trabalho em altura?"
                 hint="Cinto de segurança, linha de vida, capacete..."
-                checked={w.epi_altura}
+                checked={epi_altura}
                 onChange={(v) => setValue('epi_altura', v)}
               />
 
@@ -512,7 +526,7 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
                 <Label className="text-xs text-muted-foreground">Tipos de serviço</Label>
                 <MultiCombobox
                   options={tiposServico}
-                  value={w.tipos_servico || []}
+                  value={tipos_servico || []}
                   onChange={(v) => setValue('tipos_servico', v)}
                   placeholder="Selecionar tipos..."
                   searchPlaceholder="Buscar tipo..."
