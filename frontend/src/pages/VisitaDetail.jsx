@@ -200,6 +200,10 @@ const VisitaDetail = () => {
     ? new Date(visita.scheduled_date).toLocaleDateString('pt-BR')
     : null;
 
+  const formattedTimeEnd = visita.scheduled_time_end
+    ? new Date(visita.scheduled_time_end).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    : null;
+
   const formatDatetime = (dt) => {
     if (!dt) return '—';
     return new Date(dt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
@@ -249,7 +253,7 @@ const VisitaDetail = () => {
             <InfoRow label="Instalador" value={visita.installer_name || (visita.installer_id ? visita.installer_id.slice(0, 8) + '…' : '—')} icon={User} />
             <InfoRow
               label="Data Agendada"
-              value={formattedDate ? `${formattedDate}${visita.scheduled_time_end ? ' até ' + visita.scheduled_time_end : ''}` : '—'}
+              value={formattedDate ? `${formattedDate}${formattedTimeEnd ? ' até ' + formattedTimeEnd : ''}` : '—'}
               icon={Calendar}
             />
             <InfoRow

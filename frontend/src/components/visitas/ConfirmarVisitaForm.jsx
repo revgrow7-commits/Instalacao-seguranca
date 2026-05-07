@@ -172,8 +172,8 @@ const ConfirmarVisitaForm = ({ visita, onConfirmado, onRejeitado }) => {
   });
 
   const w = watch();
-  const temEscada  = (w.ferramentas || []).some(f => f.toLowerCase().includes('escada'));
-  const temAndaime = (w.ferramentas || []).some(f => f.toLowerCase().includes('andaime'));
+  const temEscada  = (w.ferramentas || []).some(f => typeof f === 'string' && f.toLowerCase().includes('escada'));
+  const temAndaime = (w.ferramentas || []).some(f => typeof f === 'string' && f.toLowerCase().includes('andaime'));
 
   const onSubmit = async (data) => {
     try {
