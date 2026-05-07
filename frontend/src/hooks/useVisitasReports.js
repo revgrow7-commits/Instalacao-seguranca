@@ -35,7 +35,6 @@ const useReport = (apiFn, filters, defaultData) => {
         setLoading(false);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterKey]);
 
   useEffect(() => {
