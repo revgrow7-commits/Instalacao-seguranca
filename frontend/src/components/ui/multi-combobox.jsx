@@ -27,14 +27,14 @@ export function MultiCombobox({ options = [], value = [], onChange, placeholder 
   // Safely extract a display string from a value (handles plain strings or {value,label} objects)
   const toStr = (v) => typeof v === 'string' ? v : (v?.label ?? v?.value ?? String(v));
 
-  const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()));
+  const filtered = options.filter(o => (o.label ?? '').toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className={cn("space-y-2", className)}>
       {value.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {value.map((v, idx) => (
-            <Badge key={typeof v === 'string' ? v : idx} variant="secondary" className="bg-primary/20 text-primary border-primary/30 gap-1">
+            <Badge key={idx} variant="secondary" className="bg-primary/20 text-primary border-primary/30 gap-1">
               {toStr(v)}
               <button onClick={() => toggle(v)} className="hover:text-red-400 transition-colors">
                 <X className="h-3 w-3" />
@@ -74,7 +74,7 @@ export function MultiCombobox({ options = [], value = [], onChange, placeholder 
                     {opt.label}
                   </CommandItem>
                 ))}
-                {creatable && search.trim() && !filtered.some(o => o.label.toLowerCase() === search.toLowerCase()) && (
+                {creatable && search.trim() && !filtered.some(o => (o.label ?? '').toLowerCase() === search.toLowerCase()) && (
                   <CommandItem
                     onSelect={handleCreate}
                     className="text-primary hover:bg-white/5 cursor-pointer"
