@@ -197,7 +197,7 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
 
       {estimativa && (
         <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg px-3 py-2 text-sm text-purple-300">
-          Estimativa: {Number(kmRodados).toFixed(1)} km × R$ {valorPorKm.toFixed(2)}/km = <span className="font-semibold">R$ {estimativa}</span>
+          Estimativa: {kmTotal.toFixed(1)} km × R$ {valorPorKm.toFixed(2)}/km = <span className="font-semibold">R$ {estimativa}</span>
         </div>
       )}
 
