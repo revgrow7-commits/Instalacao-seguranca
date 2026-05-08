@@ -12,7 +12,8 @@ import { toast } from 'sonner';
 import api from '../../utils/api';
 
 const schema = z.object({
-  km_rodados: z.coerce.number({ invalid_type_error: 'Informe os km rodados' }).min(0.1, 'Mínimo 0,1 km'),
+  km_ida: z.coerce.number({ invalid_type_error: 'Informe os km de ida' }).min(0.1, 'Mínimo 0,1 km'),
+  km_volta: z.coerce.number({ invalid_type_error: 'Informe os km de volta' }).min(0, 'Deve ser ≥ 0'),
   descricao: z.string().min(10, 'Mínimo 10 caracteres'),
   situacao: z.enum(['normal', 'pendencia', 'retrabalho', 'aprovado'], { required_error: 'Selecione a situação' }),
   assinatura_confirmada: z.boolean().default(false),
@@ -72,7 +73,8 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
   } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
-      km_rodados: '',
+      km_ida: '',
+      km_volta: '',
       descricao: '',
       situacao: undefined,
       assinatura_confirmada: false,
@@ -85,9 +87,11 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
     setValue('chegada', toDatetimeLocal(new Date()));
   }, [setValue]);
 
-  const kmRodados = watch('km_rodados');
+  const kmIda = watch('km_ida');
+  const kmVolta = watch('km_volta');
   const valorPorKm = visita?.valor_por_km ?? 1.5;
-  const estimativa = kmRodados > 0 ? (Number(kmRodados) * valorPorKm).toFixed(2) : null;
+  const kmTotal = (Number(kmIda) || 0) + (Number(kmVolta) || 0);
+  const estimativa = kmTotal > 0 ? (kmTotal * valorPorKm).toFixed(2) : null;
 
   const handleFotoChange = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -121,7 +125,8 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('km_rodados', data.km_rodados);
+      formData.append('km_ida', data.km_ida);
+      formData.append('km_volta', data.km_volta);
       formData.append('descricao', data.descricao);
       formData.append('situacao', data.situacao);
       formData.append('assinatura_confirmada', data.assinatura_confirmada);
@@ -149,16 +154,29 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Km Rodados *</Label>
+          <Label className="text-xs text-muted-foreground">KM Ida *</Label>
           <Input
             type="number"
             step="0.1"
             min="0.1"
-            {...register('km_rodados')}
+            {...register('km_ida')}
             placeholder="0,0"
             className="bg-background border-white/10 text-white"
           />
-          {errors.km_rodados && <p className="text-xs text-red-400">{errors.km_rodados.message}</p>}
+          {errors.km_ida && <p className="text-xs text-red-400">{errors.km_ida.message}</p>}
+        </div>
+
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">KM Volta *</Label>
+          <Input
+            type="number"
+            step="0.1"
+            min="0"
+            {...register('km_volta')}
+            placeholder="0,0"
+            className="bg-background border-white/10 text-white"
+          />
+          {errors.km_volta && <p className="text-xs text-red-400">{errors.km_volta.message}</p>}
         </div>
 
         <div className="space-y-1">

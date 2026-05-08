@@ -193,3 +193,17 @@ async def report_custo_deslocamento(
         "report_visitas_custo_deslocamento",
         _build_rpc_params(branch, date_from, date_to),
     )
+
+
+@router.get("/by-instalador")
+async def report_by_instalador(
+    branch: Optional[str] = Query(None),
+    date_from: Optional[str] = Query(None),
+    date_to: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+):
+    _require_admin_or_manager(current_user)
+    return _call_report(
+        "report_visitas_by_instalador",
+        _build_rpc_params(branch, date_from, date_to),
+    )

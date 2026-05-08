@@ -20,6 +20,7 @@ import {
   useVisitasReportByAltura,
   useVisitasReportDivergenciaRemocao,
   useVisitasReportCustoDeslocamento,
+  useVisitasReportByInstalador,
 } from '../hooks/useVisitasReports';
 
 const fmtBRL = (v) =>
@@ -626,6 +627,72 @@ const CustoDeslocamentoCard = ({ filters }) => {
   );
 };
 
+const InstaladorCard = ({ filters }) => {
+  const { data, loading, error } = useVisitasReportByInstalador(filters);
+  const top10 = useMemo(() => (data || []).slice(0, 10), [data]);
+  const max = useMemo(
+    () => top10.reduce((m, r) => Math.max(m, Number(r.total) || 0), 0),
+    [top10]
+  );
+
+  return (
+    <SectionCard title="Por Instalador (Top 10)" icon={Users} fullWidth>
+      {loading ? (
+        <CardSkeleton rows={6} />
+      ) : error ? (
+        <p className="text-xs text-red-400">{error}</p>
+      ) : top10.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="grid md:grid-cols-2 gap-6">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-white/5">
+                  <th className="py-2 font-medium">Instalador</th>
+                  <th className="py-2 font-medium text-right">Total</th>
+                  <th className="py-2 font-medium text-right">Concl.</th>
+                  <th className="py-2 font-medium text-right">T. Médio</th>
+                  <th className="py-2 font-medium text-right">Custo Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {top10.map((r, i) => (
+                  <tr key={i} className="border-b border-white/5 last:border-0">
+                    <td className="py-2 text-gray-200 truncate max-w-[140px]">
+                      {r.installer_name || '—'}
+                    </td>
+                    <td className="py-2 text-right text-white tabular-nums">{fmtNum(r.total)}</td>
+                    <td className="py-2 text-right text-gray-300 tabular-nums">{fmtNum(r.concluidas)}</td>
+                    <td className="py-2 text-right text-gray-300 tabular-nums">
+                      {r.tempo_medio_minutos ? `${fmtNum(Math.round(r.tempo_medio_minutos))} min` : '—'}
+                    </td>
+                    <td className="py-2 text-right text-gray-300 tabular-nums">
+                      {fmtBRL(r.custo_total)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="space-y-3">
+            {top10.map((r, i) => (
+              <BarRow
+                key={i}
+                label={r.installer_name || '—'}
+                value={Number(r.total) || 0}
+                max={max}
+                sub={`Custo total ${fmtBRL(r.custo_total)}`}
+                color="bg-orange-500"
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </SectionCard>
+  );
+};
+
 // =============== Página principal ===============
 
 const VisitasRelatorios = () => {
@@ -742,6 +809,7 @@ const VisitasRelatorios = () => {
       {/* Grid de cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         <VendedoresCard filters={filters} />
+        <InstaladorCard filters={filters} />
         <FiliaisCard filters={filters} />
         <AprovacaoCard filters={filters} />
         <DificuldadeCard filters={filters} />

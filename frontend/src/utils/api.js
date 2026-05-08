@@ -448,6 +448,8 @@ export const api = {
     axios.get(`${API_URL}/visitas/reports/divergencia-remocao`, { params, headers: getAuthHeader() }),
   getVisitasReportCustoDeslocamento: (params = {}) =>
     axios.get(`${API_URL}/visitas/reports/custo-deslocamento`, { params, headers: getAuthHeader() }),
+  getVisitasReportByInstalador: (params = {}) =>
+    axios.get(`${API_URL}/visitas/reports/by-instalador`, { params, headers: getAuthHeader() }),
 
   // Pesquisa de Jobs para autocomplete
   searchJobs: (q) => axios.get(`${API_URL}/jobs/search`, { params: { q, limit: 10 }, headers: getAuthHeader() }),

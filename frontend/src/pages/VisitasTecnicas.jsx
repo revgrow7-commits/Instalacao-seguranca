@@ -1063,7 +1063,10 @@ const VisitasTecnicas = () => {
   React.useEffect(() => {
     api.getInstallers()
       .then(res => setInstallers(res.data || []))
-      .catch(() => {});
+      .catch(err => {
+        console.error('[VisitasTecnicas] falha ao carregar instaladores:', err?.message);
+        toast.error('Não foi possível carregar a lista de instaladores');
+      });
   }, []);
 
   const handleCancelar = useCallback(async (visita) => {

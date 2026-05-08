@@ -76,3 +76,6 @@ export const useVisitasReportDivergenciaRemocao = (filters) =>
 
 export const useVisitasReportCustoDeslocamento = (filters) =>
   useReport(api.getVisitasReportCustoDeslocamento, filters, []);
+
+export const useVisitasReportByInstalador = (filters) =>
+  useReport(api.getVisitasReportByInstalador, filters, []);

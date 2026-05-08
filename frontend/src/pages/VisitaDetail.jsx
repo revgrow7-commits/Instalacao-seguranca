@@ -289,8 +289,12 @@ const VisitaDetail = () => {
             <CardContent className="px-4 pb-4 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Km Rodados</p>
-                  <p className="text-sm font-semibold text-white">{visita.km_rodados ?? '—'} km</p>
+                  <p className="text-xs text-muted-foreground">KM Ida / Volta</p>
+                  <p className="text-sm font-semibold text-white">
+                    {(visita.km_ida != null || visita.km_volta != null)
+                      ? `${(visita.km_ida ?? 0) + (visita.km_volta ?? 0)} km (${visita.km_ida ?? 0} + ${visita.km_volta ?? 0})`
+                      : '—'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Valor Total</p>

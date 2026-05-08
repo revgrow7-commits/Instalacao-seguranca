@@ -193,7 +193,7 @@ async def export_visitas_excel(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Gera planilha Excel com visitas técnicas filtradas (19 colunas).
+    Gera planilha Excel com visitas técnicas filtradas (28 colunas).
     Aceita date_from/date_to ou start_date/end_date (aliases).
     """
     from openpyxl import Workbook
@@ -217,7 +217,8 @@ async def export_visitas_excel(
             date_filter["$lte"] = _date_to
         query["scheduled_date"] = date_filter
 
-    docs = db.visitas_tecnicas.find(query, {"_id": 0}, sort=[("created_at", -1)]) or []
+    docs_raw = db.visitas_tecnicas.find(query, {"_id": 0}, sort=[("created_at", -1)]) or []
+    docs = [_enrich_installer_name(dict(d)) for d in docs_raw]
 
     wb = Workbook()
     ws = wb.active
@@ -234,10 +235,13 @@ async def export_visitas_excel(
     )
 
     headers = [
-        "Nº VT", "Cliente", "Endereço", "Filial", "Instalador ID",
+        "Nº VT", "Cliente", "Endereço", "Filial", "Instalador",
         "Data Agendada", "KM Ida", "KM Volta", "Valor/KM", "Total (R$)",
         "Vendedor", "Tipo de Serviço", "Remoção Prevista", "Remoção Realizada",
         "Altura (m)", "Ferramentas", "Nível Dificuldade", "Status Aprovação", "Status",
+        # novas
+        "Rel. Situação", "Rel. Enviado Em", "Estacionamento", "Ponto Energia",
+        "Tipo Superfície", "Forma Instalação", "EPI Altura", "Escada", "Andaime Torres",
     ]
 
     for col_num, header in enumerate(headers, 1):
@@ -259,6 +263,16 @@ async def export_visitas_excel(
         "NAO_APROVADO": "Não aprovado",
     }
 
+    def _fmt_dt(val):
+        if not val:
+            return ""
+        if isinstance(val, str):
+            try:
+                val = datetime.fromisoformat(val.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                return val
+        return val.strftime("%d/%m/%Y %H:%M") if isinstance(val, datetime) else str(val)
+
     for row_num, doc in enumerate(docs, start=2):
         scheduled_raw = doc.get("scheduled_date")
         if isinstance(scheduled_raw, str):
@@ -278,7 +292,7 @@ async def export_visitas_excel(
             doc.get("client_name", ""),
             doc.get("client_address", ""),
             doc.get("branch", ""),
-            doc.get("installer_id") or "",
+            doc.get("installer_name") or doc.get("installer_id") or "",
             scheduled_raw or "",
             doc.get("km_ida") or "",
             doc.get("km_volta") or "",
@@ -293,16 +307,28 @@ async def export_visitas_excel(
             _nivel_labels.get(nivel, "") if nivel is not None else "",
             _aprovacao_labels.get(aprovacao, aprovacao),
             doc.get("status", ""),
+            # novas
+            doc.get("relatorio_situacao") or "",
+            _fmt_dt(doc.get("relatorio_enviado_em")),
+            "Sim" if doc.get("tem_estacionamento") else ("Não" if doc.get("tem_estacionamento") is False else ""),
+            "Sim" if doc.get("tem_ponto_energia") else ("Não" if doc.get("tem_ponto_energia") is False else ""),
+            ", ".join(doc.get("tipo_superficie") or []),
+            ", ".join(doc.get("forma_instalacao") or []),
+            "Sim" if doc.get("epi_altura") else ("Não" if doc.get("epi_altura") is False else ""),
+            doc.get("escada_tamanho") or "",
+            doc.get("andaime_torres") or "",
         ]
 
         for col_num, value in enumerate(row, 1):
             ws.cell(row=row_num, column=col_num, value=value).border = border
 
     column_widths = {
-        "A": 14, "B": 30, "C": 35, "D": 12, "E": 36,
+        "A": 14, "B": 30, "C": 35, "D": 12, "E": 30,
         "F": 18, "G": 12, "H": 12, "I": 12, "J": 14,
         "K": 16, "L": 28, "M": 18, "N": 18,
         "O": 12, "P": 30, "Q": 22, "R": 18, "S": 14,
+        # novas
+        "T": 18, "U": 20, "V": 14, "W": 14, "X": 28, "Y": 28, "Z": 12, "AA": 18, "AB": 14,
     }
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
@@ -583,7 +609,9 @@ async def cancelar_visita(
 @router.post("/visitas/{visita_id}/relatorio", response_model=VisitaOut)
 async def enviar_relatorio(
     visita_id: str,
-    km_rodados: float = Form(...),
+    km_ida: Optional[float] = Form(None),
+    km_volta: float = Form(0.0, ge=0),
+    km_rodados: Optional[float] = Form(None),
     descricao: str = Form(...),
     situacao: str = Form(...),
     assinatura_confirmada: bool = Form(False),
@@ -624,9 +652,10 @@ async def enviar_relatorio(
             detail="Confirme a visita antes de enviar o relatório (status precisa ser EM_VISITA)",
         )
 
-    # 4. Validar km_rodados (campo retrocompatível — salvo como km_ida internamente)
-    if km_rodados <= 0:
-        raise HTTPException(status_code=422, detail="km_rodados deve ser maior que zero")
+    # 4. Resolver km — campo principal: km_ida; retrocompat: km_rodados (antigos clientes)
+    effective_km_ida = km_ida if km_ida is not None else km_rodados
+    if not effective_km_ida or effective_km_ida <= 0:
+        raise HTTPException(status_code=422, detail="km_ida deve ser maior que zero")
 
     # 5. Validar fotos
     if not fotos or len(fotos) < 1:
@@ -660,9 +689,9 @@ async def enviar_relatorio(
             saida_iso = saida
 
     # 8. Montar campos de atualização (valor_total é GENERATED ALWAYS — não gravar)
-    # km_rodados é o campo enviado pelo app mobile (retrocompatível); salvo como km_ida.
     update_fields = {
-        "km_ida": km_rodados,
+        "km_ida": effective_km_ida,
+        "km_volta": km_volta,
         "status": VisitaStatus.CONCLUIDA.value,
         "relatorio_descricao": descricao,
         "relatorio_situacao": situacao,
