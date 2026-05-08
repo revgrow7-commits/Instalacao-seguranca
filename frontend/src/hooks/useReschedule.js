@@ -11,15 +11,12 @@ export function useReschedule(onSuccess) {
       return false;
     }
 
-    // Converte horário local (BRT) para UTC subtraindo 3h
-    const localIso = `${date}T${time}:00`;
-    const localDate = new Date(localIso);
-    const utcIso = new Date(localDate.getTime() + 3 * 60 * 60 * 1000).toISOString();
+    // Brasil sem DST desde 2019 — offset BRT fixo em -03:00
+    const utcIso = new Date(`${date}T${time}:00-03:00`).toISOString();
 
     let timeEndUtc = null;
     if (timeEnd) {
-      const localEnd = new Date(`${date}T${timeEnd}:00`);
-      timeEndUtc = new Date(localEnd.getTime() + 3 * 60 * 60 * 1000).toISOString();
+      timeEndUtc = new Date(`${date}T${timeEnd}:00-03:00`).toISOString();
     }
 
     setLoading(true);

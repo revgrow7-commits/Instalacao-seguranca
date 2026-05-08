@@ -98,22 +98,43 @@ const Calendar = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [jobsRes, installersRes] = await Promise.all([
+      const [jobsRes, installersRes, visitasRes] = await Promise.all([
         api.getJobs(),
-        isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] })
+        isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] }),
+        api.listVisitas().catch(() => ({ data: [] })),
       ]);
-      
-      // For installers, filter only their assigned jobs or all scheduled jobs
-      let filteredJobs = jobsRes.data;
+
+      const visitasAsEvents = (visitasRes.data || [])
+        .filter(v => v.scheduled_date && v.status !== 'CANCELADA')
+        .map(v => ({
+          id: v.id,
+          title: v.titulo || `VT ${v.numero_vt || ''}`,
+          client_name: v.client_name,
+          client_address: v.client_address,
+          branch: v.branch,
+          scheduled_date: v.scheduled_date,
+          scheduled_time_end: v.scheduled_time_end,
+          assigned_installers: v.installer_id ? [v.installer_id] : [],
+          status: v.status,
+          code: v.numero_vt,
+          kind: 'visita_tecnica',
+        }));
+
+      let scheduledJobs = (jobsRes.data || []).filter(j => j.scheduled_date);
       if (isInstaller) {
-        filteredJobs = jobsRes.data.filter(job => 
-          job.scheduled_date && 
-          (job.assigned_installers?.includes(user?.id) || !job.assigned_installers?.length)
+        scheduledJobs = scheduledJobs.filter(job =>
+          job.assigned_installers?.includes(user?.id) || !job.assigned_installers?.length
         );
       }
-      
-      setJobs(filteredJobs.filter(job => job.scheduled_date));
-      setAllJobs(jobsRes.data.filter(job => !job.scheduled_date && job.status !== 'finalizado' && job.status !== 'completed'));
+
+      const visibleVisitas = isInstaller
+        ? visitasAsEvents.filter(v => v.assigned_installers.includes(user?.id))
+        : visitasAsEvents;
+
+      setJobs([...scheduledJobs, ...visibleVisitas]);
+      setAllJobs((jobsRes.data || []).filter(j =>
+        !j.scheduled_date && j.status !== 'finalizado' && j.status !== 'completed'
+      ));
       setInstallers(installersRes.data);
     } catch (error) {
       toast.error('Erro ao carregar dados');
@@ -282,7 +303,7 @@ const Calendar = () => {
         try {
           await api.notifyJobScheduled(jobToSchedule.id);
         } catch (e) {
-          console.log('Could not send push notification:', e);
+          console.warn('Could not send push notification:', e);
         }
       }
 

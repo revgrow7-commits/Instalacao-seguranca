@@ -33,14 +33,14 @@ export default function InstallerCalendar() {
       const [statusRes, jobsRes, visitasRes] = await Promise.all([
         api.getInstallerCalendarStatus(),
         api.getJobs(),
-        api.listVisitas({ status: 'AGUARDANDO' }).catch(() => ({ data: [] })),
+        api.listVisitas().catch(() => ({ data: [] })),
       ]);
       setIsConnected(statusRes.data?.connected || false);
       // Filter jobs with scheduled_date
       const scheduledJobs = (jobsRes.data || []).filter(j => j.scheduled_date);
       setJobs(scheduledJobs);
       // Filter visitas with scheduled_date
-      setVisitas((visitasRes.data || []).filter(v => v.scheduled_date));
+      setVisitas((visitasRes.data || []).filter(v => v.scheduled_date && v.status !== 'CANCELADA'));
     } catch (e) {
       console.error('Error loading data:', e);
       toast.error('Erro ao carregar dados');
