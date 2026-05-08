@@ -249,7 +249,7 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
   );
 });
 
-const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
+const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) => {
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(novaVisitaSchema),
     defaultValues: {
@@ -265,7 +265,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
   });
 
   const [selectedJob, setSelectedJob] = React.useState(null);
-  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = useCatalogos();
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -340,10 +340,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers }) => {
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
                 creatable
-                onCreateOption={async () => {
-                  // Combobox.onCreateOption não passa o nome — pedimos via prompt.
-                  const nome = window.prompt('Nome do novo vendedor:')?.trim();
-                  if (!nome) return;
+                onCreate={async (nome) => {
                   const novo = await addVendedor(nome);
                   if (novo) setValue('vendedor_nome', novo);
                 }}
@@ -692,7 +689,7 @@ const AgendarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) =>
   );
 };
 
-const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => {
+const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catalogos }) => {
   const { register, handleSubmit, setValue, watch, reset, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(novaVisitaSchema),
     values: visita ? {
@@ -708,8 +705,8 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
       // Novos campos
       job_id: visita.job_id || null,
       vendedor_nome: visita.vendedor_nome || null,
-      tipos_servico: visita.tipos_servico || [],
-      ferramentas: visita.ferramentas || [],
+      tipos_servico: (visita.tipos_servico || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
+      ferramentas: (visita.ferramentas || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
       remocao_prevista_os: visita.remocao_prevista_os || false,
       remocao_a_realizar: visita.remocao_a_realizar || false,
       altura_estimada_m: visita.altura_estimada_m ?? null,
@@ -735,7 +732,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
     } : {},
   });
 
-  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = useCatalogos();
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -784,10 +781,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers }) => 
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
                 creatable
-                onCreateOption={async () => {
-                  // Combobox.onCreateOption não passa o nome — pedimos via prompt.
-                  const nome = window.prompt('Nome do novo vendedor:')?.trim();
-                  if (!nome) return;
+                onCreate={async (nome) => {
                   const novo = await addVendedor(nome);
                   if (novo) setValue('vendedor_nome', novo);
                 }}
@@ -1064,6 +1058,7 @@ const VisitasTecnicas = () => {
   const [editarVisita, setEditarVisita] = useState(null);
 
   const { visitas, loading, error, counters, refetch } = useVisitas();
+  const catalogos = useCatalogos();
 
   React.useEffect(() => {
     api.getInstallers()
@@ -1337,6 +1332,7 @@ const VisitasTecnicas = () => {
         onClose={() => setNovaVisitaOpen(false)}
         onSuccess={refetch}
         installers={installers}
+        catalogos={catalogos}
       />
 
       <AgendarVisitaModal
@@ -1353,6 +1349,7 @@ const VisitasTecnicas = () => {
         onClose={() => setEditarVisita(null)}
         onSuccess={refetch}
         installers={installers}
+        catalogos={catalogos}
       />
     </div>
   );

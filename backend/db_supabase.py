@@ -179,7 +179,7 @@ TABLE_COLUMNS = {
         # ── Confirmação pelo instalador (migration 016) ─────────────────────
         "confirmado_em", "confirmado_por", "planejado_snapshot",
         "rejeitado_em", "rejeitado_motivo", "observacoes_instalador",
-        # ── Checklist de vistoria ──────────────────────────────────────────
+        # ── Checklist de vistoria (migration 018) ─────────────────────────
         "tem_estacionamento", "restricao_horario_inicio", "restricao_horario_fim",
         "tipo_superficie", "tipo_superficie_outro", "condicao_superficie",
         "material_remocao", "tem_ponto_energia", "medida_largura_m",

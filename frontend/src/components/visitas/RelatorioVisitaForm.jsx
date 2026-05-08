@@ -106,9 +106,16 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
     });
   };
 
+  const MAX_TOTAL_MB = 10;
+
   const onSubmit = async (data) => {
     if (fotos.length === 0) {
       toast.error('Adicione pelo menos 1 foto');
+      return;
+    }
+    const totalBytes = fotos.reduce((acc, f) => acc + f.size, 0);
+    if (totalBytes > MAX_TOTAL_MB * 1024 * 1024) {
+      toast.error(`Total de fotos excede ${MAX_TOTAL_MB}MB. Reduza o tamanho ou quantidade.`);
       return;
     }
     setSubmitting(true);
@@ -125,13 +132,13 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
       toast.success('Relatório enviado com sucesso!');
       onSuccess();
     } catch (err) {
-      console.error('[RelatorioVT] submit failed', err?.response?.status, err?.response?.data);
+      console.error('[RelatorioVT] submit failed', err?.response?.status, err?.response?.data, err?.message);
       const detail = err?.response?.data?.detail;
       const msg = typeof detail === 'string' ? detail
-        : Array.isArray(detail) ? detail.map((d) => d?.msg || d).join(', ')
+        : Array.isArray(detail) ? detail.map((d) => d?.msg || d?.message || JSON.stringify(d)).join('; ')
         : err?.message === 'Network Error' ? 'Sem conexão — verifique sua internet'
         : err?.response?.status === 413 ? 'Foto muito grande — tente uma imagem menor'
-        : 'Erro ao enviar relatório';
+        : err?.message || 'Erro ao enviar relatório';
       toast.error(msg);
     } finally {
       setSubmitting(false);

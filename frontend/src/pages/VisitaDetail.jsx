@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -147,13 +147,16 @@ const VisitaDetail = () => {
   const [visita, setVisita] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lightboxSrc, setLightboxSrc] = useState(null);
+  const cancelledRef = useRef(false);
 
   const loadVisita = async () => {
+    cancelledRef.current = false;
+    setLoading(true);
     try {
-      setLoading(true);
       const res = await api.getVisita(id);
-      setVisita(res.data);
+      if (!cancelledRef.current) setVisita(res.data);
     } catch (err) {
+      if (cancelledRef.current) return;
       if (err.response?.status === 403) {
         toast.error('Você não tem acesso a esta visita');
         navigate('/visitas-tecnicas');
@@ -161,12 +164,13 @@ const VisitaDetail = () => {
       }
       toast.error('Erro ao carregar visita técnica');
     } finally {
-      setLoading(false);
+      if (!cancelledRef.current) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadVisita();
+    return () => { cancelledRef.current = true; };
   }, [id]);
 
   if (loading) {
