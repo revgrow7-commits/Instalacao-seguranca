@@ -574,7 +574,7 @@ const Jobs = () => {
       archivedLoadedRef.current = includeArchived;
       // Stale-while-revalidate: atualiza o estado quando o fetch fresco chegar
       if (response._stale && response._fresh) {
-        response._fresh.then(fresh => setJobs(fresh.data)).catch(() => {});
+        response._fresh.then(fresh => setJobs(fresh.data)).catch(err => console.warn('jobs stale refresh failed:', err?.message));
       }
     } catch (error) {
       toast.error('Erro ao carregar jobs');
@@ -715,9 +715,6 @@ const Jobs = () => {
     setShowJustifyDialog(true);
   };
 
-  const CS_INTEGRATION_URL = 'https://otyrrvkixegiqsthmaaj.supabase.co/functions/v1/cs-integration';
-  const CS_INTEGRATION_TOKEN = '30c98c758c9a29e9a5e1b3235028bd11fcc2cfb822778cc8e5c7c5449704c7c8';
-
   const handleOpenTicketDialog = (job) => {
     setTicketJob(job);
     setTicketCategoria('Instalação');
@@ -728,11 +725,8 @@ const Jobs = () => {
     setShowTicketDialog(true);
     if (responsaveis.length === 0) {
       setLoadingResponsaveis(true);
-      fetch(`${CS_INTEGRATION_URL}/responsaveis`, {
-        headers: { 'Authorization': `Bearer ${CS_INTEGRATION_TOKEN}` },
-      })
-        .then(r => r.json())
-        .then(data => Array.isArray(data) && setResponsaveis(data))
+      api.getCsResponsaveis()
+        .then(r => Array.isArray(r.data) && setResponsaveis(r.data))
         .catch(err => console.error('Erro ao buscar responsáveis:', err))
         .finally(() => setLoadingResponsaveis(false));
     }
@@ -758,28 +752,15 @@ const Jobs = () => {
         unidade:     ticketJob.branch ?? null,
       };
 
-      const response = await fetch(CS_INTEGRATION_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${CS_INTEGRATION_TOKEN}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const err = await response.text();
-        throw new Error(`${response.status} — ${err}`);
-      }
-
-      const ticket = await response.json();
+      const response = await api.createCsTicket(payload);
+      const ticket = response.data;
       toast.success(`Ticket ${ticket.code} criado no CS! 🎫`);
       setShowTicketDialog(false);
       setTicketJob(null);
     } catch (error) {
       console.error('Erro ao criar ticket CS:', error);
-      toast.error(`Erro ao criar ticket: ${error.message}`);
+      const msg = error.response?.data?.detail || error.message || 'Erro desconhecido';
+      toast.error(`Erro ao criar ticket: ${msg}`);
     } finally {
       setSendingTicket(false);
     }
@@ -1056,13 +1037,11 @@ const Jobs = () => {
       if (startDateFilter || endDateFilter) {
         if (jobDate && !isNaN(jobDate.getTime())) {
           if (startDateFilter) {
-            const startDate = new Date(startDateFilter);
-            startDate.setHours(0, 0, 0, 0);
+            const startDate = new Date(startDateFilter + "T00:00:00");
             if (jobDate < startDate) matchesDateRange = false;
           }
           if (endDateFilter) {
-            const endDate = new Date(endDateFilter);
-            endDate.setHours(23, 59, 59, 999);
+            const endDate = new Date(endDateFilter + "T23:59:59");
             if (jobDate > endDate) matchesDateRange = false;
           }
         } else {
@@ -1490,13 +1469,13 @@ const Jobs = () => {
                     className="w-36 justify-start text-left font-normal bg-white/5 border-white/10 text-white h-9 hover:bg-white/10"
                   >
                     <Calendar className="mr-2 h-4 w-4" />
-                    {startDateFilter ? format(new Date(startDateFilter), "dd/MM/yyyy") : "Selecionar"}
+                    {startDateFilter ? format(new Date(startDateFilter + "T00:00:00"), "dd/MM/yyyy") : "Selecionar"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
                   <CalendarComponent
                     mode="single"
-                    selected={startDateFilter ? new Date(startDateFilter) : undefined}
+                    selected={startDateFilter ? new Date(startDateFilter + "T00:00:00") : undefined}
                     onSelect={(date) => {
                       if (date) {
                         setStartDateFilter(format(date, "yyyy-MM-dd"));
@@ -1519,13 +1498,13 @@ const Jobs = () => {
                     className="w-36 justify-start text-left font-normal bg-white/5 border-white/10 text-white h-9 hover:bg-white/10"
                   >
                     <Calendar className="mr-2 h-4 w-4" />
-                    {endDateFilter ? format(new Date(endDateFilter), "dd/MM/yyyy") : "Selecionar"}
+                    {endDateFilter ? format(new Date(endDateFilter + "T00:00:00"), "dd/MM/yyyy") : "Selecionar"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0 bg-card border-white/10" align="start">
                   <CalendarComponent
                     mode="single"
-                    selected={endDateFilter ? new Date(endDateFilter) : undefined}
+                    selected={endDateFilter ? new Date(endDateFilter + "T00:00:00") : undefined}
                     onSelect={(date) => {
                       if (date) {
                         setEndDateFilter(format(date, "yyyy-MM-dd"));

@@ -749,18 +749,18 @@ async def search_jobs(
     """Autocomplete de Jobs/OS para formulário de Visita Técnica."""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    all_jobs = db.jobs.find({"archived": {"$ne": True}}, {"_id": 0}) or []
     q_lower = q.strip().lower()
+    select_cols = "id,holdprint_job_id,title,client_name,client_address,branch"
+    base = get_client().table("jobs").select(select_cols).eq("archived", False)
 
-    if not q_lower:
-        results = list(all_jobs)[:limit]
+    if q_lower:
+        # Strip PostgREST filter chars to avoid injection in or_ string
+        safe_q = q_lower.replace("(", "").replace(")", "").replace(",", "").replace(".", "")
+        results = base.or_(
+            f"holdprint_job_id.ilike.%{safe_q}%,title.ilike.%{safe_q}%,client_name.ilike.%{safe_q}%"
+        ).limit(limit).execute().data or []
     else:
-        results = [
-            j for j in all_jobs
-            if q_lower in (j.get("holdprint_job_id") or "").lower()
-            or q_lower in (j.get("title") or "").lower()
-            or q_lower in (j.get("client_name") or "").lower()
-        ][:limit]
+        results = base.limit(limit).execute().data or []
 
     return [
         {

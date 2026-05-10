@@ -241,7 +241,15 @@ def _apply_filter(builder, key: str, value: Any):
             elif op == '$lte':
                 builder = builder.lte(key, op_val)
             elif op == '$ne':
-                builder = builder.neq(key, op_val)
+                if op_val is None:
+                    builder = builder.not_.is_(key, 'null')
+                else:
+                    builder = builder.neq(key, op_val)
+            elif op == '$exists':
+                if op_val:
+                    builder = builder.not_.is_(key, 'null')
+                else:
+                    builder = builder.is_(key, 'null')
             elif op == '$regex':
                 builder = builder.ilike(key, f'%{op_val}%')
             elif op == '$contains':

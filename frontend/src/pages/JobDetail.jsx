@@ -168,7 +168,7 @@ const JobDetail = () => {
           jobData = updatedJobRes.data;
         } catch (e) {
           // Se falhar o reprocessamento, continua com os dados originais
-          console.log('Auto-reprocess skipped:', e.message);
+          console.warn('Auto-reprocess skipped:', e.message);
         }
       }
       
@@ -1047,9 +1047,10 @@ const JobDetail = () => {
             onClick={() => {
               if (job.scheduled_date) {
                 const d = new Date(job.scheduled_date);
-                const brt = new Date(d.getTime() - 3 * 60 * 60 * 1000);
-                setRescheduleDate(brt.toISOString().split('T')[0]);
-                setRescheduleTime(brt.toISOString().split('T')[1].substring(0, 5));
+                const brtStr = d.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+                const [brtDate, brtTimeFull] = brtStr.split(' ');
+                setRescheduleDate(brtDate);
+                setRescheduleTime(brtTimeFull.substring(0, 5));
               }
               setRescheduleStatus(job.status || 'agendado');
               setRescheduleInstallerIds(job.assigned_installers || []);
@@ -1958,9 +1959,11 @@ const JobDetail = () => {
                           <p className="text-xs text-muted-foreground font-medium">📷 Foto Check-in</p>
                           {checkin.checkin_photo ? (
                             <div className="relative group">
-                              <img 
+                              <img
                                 src={`data:image/jpeg;base64,${checkin.checkin_photo}`}
                                 alt="Check-in"
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-32 object-cover rounded-lg border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => window.open(`data:image/jpeg;base64,${checkin.checkin_photo}`, '_blank')}
                               />
@@ -1980,9 +1983,11 @@ const JobDetail = () => {
                           <p className="text-xs text-muted-foreground font-medium">📷 Foto Checkout</p>
                           {checkin.checkout_photo ? (
                             <div className="relative group">
-                              <img 
+                              <img
                                 src={`data:image/jpeg;base64,${checkin.checkout_photo}`}
                                 alt="Checkout"
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-32 object-cover rounded-lg border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
                                 onClick={() => window.open(`data:image/jpeg;base64,${checkin.checkout_photo}`, '_blank')}
                               />

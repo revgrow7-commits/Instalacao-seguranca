@@ -5,6 +5,7 @@ Handles push notifications, VAPID keys, and schedule conflict checks.
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, List
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from pydantic import BaseModel
 import logging
 import json
@@ -222,10 +223,16 @@ async def check_schedule_conflicts(
 ):
     """Check if installer has schedule conflicts on a specific date/time."""
     try:
-        # Parse date and compute UTC day boundaries for range filter
-        target_date = datetime.fromisoformat(date.replace('Z', '+00:00'))
-        day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
+        # Parse date and compute BRT day boundaries (then convert to UTC for DB)
+        raw = date.replace('Z', '+00:00')
+        target_date = datetime.fromisoformat(raw)
+        if target_date.tzinfo is None:
+            target_date = target_date.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        target_brt = target_date.astimezone(ZoneInfo("America/Sao_Paulo"))
+        day_start_brt = target_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end_brt = day_start_brt + timedelta(days=1)
+        day_start = day_start_brt.astimezone(timezone.utc)
+        day_end = day_end_brt.astimezone(timezone.utc)
 
         # Find jobs assigned to this installer on the same date
         query = {
@@ -258,8 +265,11 @@ async def get_pending_checkins(current_user: User = Depends(get_current_user)):
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     now = datetime.now(timezone.utc)
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
+    now_brt = now.astimezone(ZoneInfo("America/Sao_Paulo"))
+    day_start_brt = now_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end_brt = day_start_brt + timedelta(days=1)
+    day_start = day_start_brt.astimezone(timezone.utc)
+    day_end = day_end_brt.astimezone(timezone.utc)
 
     # Find jobs scheduled for today that are past their scheduled time
     jobs = db.jobs.find({
