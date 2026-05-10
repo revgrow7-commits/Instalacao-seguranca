@@ -266,8 +266,7 @@ async def installer_google_auth(current_user: User = Depends(get_current_user)):
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth não configurado")
 
-    # Store user_id with installer prefix to associate tokens later
-    state = f"installer:{current_user.id}"
+    state = _make_oauth_state(current_user.id)
 
     auth_url = (
         f"https://accounts.google.com/o/oauth2/v2/auth?"
@@ -287,13 +286,13 @@ async def installer_google_auth(current_user: User = Depends(get_current_user)):
 async def installer_google_callback(code: str, state: str = None):
     """Handles Google OAuth callback for installers."""
     try:
-        # Parse state to get installer user_id
-        if not state or not state.startswith("installer:"):
+        # Valida state HMAC — previne CSRF
+        try:
+            user_id = _verify_oauth_state(state or "")
+        except HTTPException:
             return RedirectResponse(
                 url=f"{FRONTEND_URL}/installer/calendar?google_error=invalid_state"
             )
-
-        user_id = state.replace("installer:", "")
 
         # Exchange code for tokens
         token_response = requests.post(

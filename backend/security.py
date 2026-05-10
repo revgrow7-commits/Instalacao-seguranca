@@ -62,6 +62,9 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     if user_doc is None:
         raise credentials_exception
 
+    if not user_doc.get('is_active', True):
+        raise credentials_exception
+
     # Convert datetime if needed
     if isinstance(user_doc.get('created_at'), str):
         user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])

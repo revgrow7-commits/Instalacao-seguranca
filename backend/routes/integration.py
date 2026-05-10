@@ -2,9 +2,11 @@
 Integration routes — API cross-system para Visual Connect → Instal-Visual.
 Autenticação via header X-Integration-Key (não JWT).
 """
+import hmac
 import os
 import logging
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional
@@ -21,7 +23,7 @@ def _verify_key(request: Request) -> None:
     if not INTEGRATION_API_KEY:
         raise HTTPException(status_code=503, detail="Integration key not configured")
     key = request.headers.get("X-Integration-Key", "")
-    if key != INTEGRATION_API_KEY:
+    if not hmac.compare_digest(key, INTEGRATION_API_KEY):
         raise HTTPException(status_code=401, detail="Invalid integration key")
 
 
@@ -54,7 +56,8 @@ async def integration_schedule(request: Request, payload: SchedulePayload):
             raw += ":00+00:00"
         sched_dt = datetime.fromisoformat(raw)
         if sched_dt.tzinfo is None:
-            sched_dt = sched_dt.replace(tzinfo=timezone.utc)
+            logger.warning(f"integration_schedule: naive datetime recebido, interpretando como BRT: {payload.scheduled_date}")
+            sched_dt = sched_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
         scheduled_iso = sched_dt.isoformat()
     except ValueError:
         raise HTTPException(status_code=422, detail=f"Formato de data inválido: {payload.scheduled_date}")

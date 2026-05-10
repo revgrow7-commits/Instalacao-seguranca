@@ -342,7 +342,7 @@ def forgot_password(request: ForgotPasswordRequest):
     
     # Generate reset link - ALWAYS use production URL
     reset_link = f"{FRONTEND_URL}/reset-password?token={reset_token}"
-    logger.info(f"Password reset link generated for {request.email}: {reset_link}")
+    logger.info(f"Password reset link generated for {request.email}")
     
     # Send email via Resend
     if RESEND_API_KEY:
