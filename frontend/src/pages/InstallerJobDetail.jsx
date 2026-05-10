@@ -661,9 +661,11 @@ const InstallerJobDetail = () => {
                           {checkin.checkin_photo && (
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Foto Check-in</p>
-                              <img 
+                              <img
                                 src={checkin.checkin_photo.startsWith('data:') ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
                                 alt="Check-in"
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-24 object-cover rounded-lg"
                               />
                             </div>
@@ -671,9 +673,11 @@ const InstallerJobDetail = () => {
                           {checkin.checkout_photo && (
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Foto Check-out</p>
-                              <img 
+                              <img
                                 src={checkin.checkout_photo.startsWith('data:') ? checkin.checkout_photo : `data:image/jpeg;base64,${checkin.checkout_photo}`}
                                 alt="Check-out"
+                                loading="lazy"
+                                decoding="async"
                                 className="w-full h-24 object-cover rounded-lg"
                               />
                             </div>

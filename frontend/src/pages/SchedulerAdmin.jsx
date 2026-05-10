@@ -59,6 +59,7 @@ const SchedulerAdmin = () => {
       toast.success('Tarefa pausada com sucesso');
       fetchData();
     } catch (error) {
+      console.error('[SchedulerAdmin] pause:', error);
       toast.error('Erro ao pausar tarefa');
     } finally {
       setActionLoading(prev => ({ ...prev, [jobId]: null }));
@@ -72,6 +73,7 @@ const SchedulerAdmin = () => {
       toast.success('Tarefa retomada com sucesso');
       fetchData();
     } catch (error) {
+      console.error('[SchedulerAdmin] resume:', error);
       toast.error('Erro ao retomar tarefa');
     } finally {
       setActionLoading(prev => ({ ...prev, [jobId]: null }));
@@ -89,6 +91,7 @@ const SchedulerAdmin = () => {
       toast.success(`${syncType}: ${imported} importados, ${skipped} já existentes`);
       fetchData();
     } catch (error) {
+      console.error('[SchedulerAdmin] runNow:', error);
       toast.error('Erro ao executar tarefa');
     } finally {
       setActionLoading(prev => ({ ...prev, [jobId]: null }));
@@ -105,6 +108,7 @@ const SchedulerAdmin = () => {
       );
       fetchData();
     } catch (error) {
+      console.error('[SchedulerAdmin] manualSync:', error);
       toast.error('Erro na sincronização manual');
     } finally {
       setActionLoading(prev => ({ ...prev, 'manual': false }));

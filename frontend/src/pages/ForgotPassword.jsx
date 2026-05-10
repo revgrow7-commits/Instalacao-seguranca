@@ -28,6 +28,7 @@ const ForgotPassword = () => {
         toast.success('Solicitação enviada com sucesso!');
       }
     } catch (error) {
+      console.error('[ForgotPassword] sendReset:', error);
       toast.error('Erro ao enviar solicitação. Tente novamente.');
     } finally {
       setLoading(false);

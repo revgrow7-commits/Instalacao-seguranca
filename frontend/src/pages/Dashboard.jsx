@@ -109,10 +109,10 @@ const Dashboard = () => {
           await Promise.all([
             api.getJobs({ days: 7 }),
             api.getMetrics(),
-            api.getInstallers().catch((e) => { console.log('Could not load installers:', e); return { data: [] }; }),
+            api.getInstallers().catch((e) => { console.warn('Could not load installers:', e); return { data: [] }; }),
             api.getAllItemCheckins(),
-            api.getPendingCheckins().catch((e) => { console.log('Could not load pending checkins:', e); return { data: { pending_checkins: [] } }; }),
-            api.getLocationAlerts().catch((e) => { console.log('Could not load location alerts:', e); return { data: [] }; }),
+            api.getPendingCheckins().catch((e) => { console.warn('Could not load pending checkins:', e); return { data: { pending_checkins: [] } }; }),
+            api.getLocationAlerts().catch((e) => { console.warn('Could not load location alerts:', e); return { data: [] }; }),
           ]);
 
         setJobs(jobsRes.data);
@@ -120,13 +120,13 @@ const Dashboard = () => {
         setInstallers(installersRes.data);
 
         // Filter paused check-ins (status = 'paused')
-        const paused = checkinsRes.data.filter(c => c.status === 'paused');
+        const paused = (checkinsRes || []).filter(c => c.status === 'paused');
         setPausedCheckins(paused);
 
         // Filter late check-ins (in_progress for more than 4 hours)
         const now = new Date();
         const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-        const late = checkinsRes.data.filter(c => {
+        const late = (checkinsRes || []).filter(c => {
           if (c.status !== 'in_progress') return false;
           const checkinTime = new Date(c.checkin_at);
           return checkinTime < fourHoursAgo;
@@ -141,6 +141,7 @@ const Dashboard = () => {
         setJobs(jobsRes.data);
       }
     } catch (error) {
+      console.error('[Dashboard] loadDashboardData:', error);
       toast.error('Erro ao carregar dados do dashboard');
     } finally {
       setLoading(false);
@@ -153,6 +154,7 @@ const Dashboard = () => {
       const response = await api.sendLateAlerts();
       toast.success(response.data.message);
     } catch (error) {
+      console.error('[Dashboard] sendLateAlerts:', error);
       toast.error('Erro ao enviar alertas');
     } finally {
       setSendingAlerts(false);
@@ -171,6 +173,7 @@ const Dashboard = () => {
       // Reload data
       loadDashboardData();
     } catch (error) {
+      console.error('[Dashboard] deleteCheckin:', error);
       toast.error('Erro ao excluir check-in');
     } finally {
       setDeletingId(null);

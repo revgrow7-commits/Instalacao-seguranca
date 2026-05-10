@@ -62,6 +62,18 @@ const getJobsWithCache = async (includeArchived = false) => {
   return freshPromise;
 };
 
+// Interceptor global: redireciona para /login em qualquer 401
+axios.interceptors.response.use(
+  res => res,
+  err => {
+    if (err.response?.status === 401) {
+      tokenManager.clear();
+      window.location.href = '/login';
+    }
+    return Promise.reject(err);
+  }
+);
+
 export const api = {
   // Cache control
   clearCache,
@@ -461,6 +473,10 @@ export const api = {
   createTipoServico: (nome) => { clearCache('catalogos_tipos_servico'); return axios.post(`${API_URL}/catalogos/tipos-servico`, { nome }, { headers: getAuthHeader() }); },
   listFerramentas: () => getCachedOrFetch('catalogos_ferramentas', () => axios.get(`${API_URL}/catalogos/ferramentas`, { headers: getAuthHeader() }), 60000),
   createFerramenta: (nome) => { clearCache('catalogos_ferramentas'); return axios.post(`${API_URL}/catalogos/ferramentas`, { nome }, { headers: getAuthHeader() }); },
+
+  // CS Integration (proxy via backend — token nunca vai ao bundle)
+  getCsResponsaveis: () => axios.get(`${API_URL}/cs/responsaveis`, { headers: getAuthHeader() }),
+  createCsTicket: (payload) => axios.post(`${API_URL}/cs/ticket`, payload, { headers: getAuthHeader() }),
 
   // Installer Google Calendar
   getInstallerCalendarStatus: () => getCachedOrFetch(

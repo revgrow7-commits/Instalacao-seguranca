@@ -261,7 +261,7 @@ const RelatorioVisitaForm = ({ visita, onSuccess }) => {
           <div className="grid grid-cols-3 gap-2">
             {fotoPreviews.map((src, i) => (
               <div key={i} className="relative group">
-                <img src={src} alt={`Foto ${i + 1}`} className="w-full h-24 object-cover rounded-lg" />
+                <img src={src} alt={`Foto ${i + 1}`} loading="lazy" decoding="async" className="w-full h-24 object-cover rounded-lg" />
                 <button
                   type="button"
                   onClick={() => removeFoto(i)}

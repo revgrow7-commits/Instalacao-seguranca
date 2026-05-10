@@ -47,6 +47,7 @@ const Users = () => {
       setUsers(usersRes.data);
       setInstallers(installersRes.data);
     } catch (error) {
+      console.error('[Users] loadData:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -95,6 +96,7 @@ const Users = () => {
       setSelectedUser(null);
       loadData();
     } catch (error) {
+      console.error('[Users] deleteUser:', error);
       toast.error('Erro ao deletar usuário');
     }
   };
@@ -124,6 +126,7 @@ const Users = () => {
       toast.success(user.is_active ? 'Usuário desativado!' : 'Usuário ativado!');
       loadData();
     } catch (error) {
+      console.error('[Users] toggleActive:', error);
       toast.error('Erro ao alterar status do usuário');
     }
   };
