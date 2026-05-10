@@ -46,6 +46,9 @@ const Calendar = () => {
   const [selectedInstaller, setSelectedInstaller] = useState('');
   const [sendEmailNotification, setSendEmailNotification] = useState(true);
   const [scheduling, setScheduling] = useState(false);
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [showJobDetail, setShowJobDetail] = useState(false);
+  const [selectedJobDetail, setSelectedJobDetail] = useState(null);
 
   // Week/Day view date tracking
   const [weekStartDate, setWeekStartDate] = useState(new Date());
@@ -240,13 +243,21 @@ const Calendar = () => {
     e.preventDefault();
     if (!draggedJob || !date || (!isAdmin && !isManager)) return;
     if (draggedJob.kind === 'visita_tecnica') return;
-    
+
     setDragOverDate(null);
-    
-    // Open schedule dialog with pre-filled date
+
+    const existingTime = draggedJob.scheduled_date
+      ? (() => {
+          const d = new Date(draggedJob.scheduled_date);
+          return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+        })()
+      : '08:00';
+
     setSelectedJob(draggedJob);
     setScheduleDate(date.toISOString().split('T')[0]);
-    setScheduleTime('08:00');
+    setScheduleTime(existingTime);
+    setSelectedInstaller(draggedJob.assigned_installers?.[0] || '');
+    setIsRescheduling(!!draggedJob.scheduled_date);
     setShowScheduleDialog(true);
     setDraggedJob(null);
   };
@@ -280,37 +291,27 @@ const Calendar = () => {
     setScheduling(true);
     try {
       const dateTime = new Date(`${scheduleDate}T${scheduleTime}`);
-      
-      const updateData = {
-        scheduled_date: dateTime.toISOString(),
-        assigned_installers: selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : [],
-        status: 'agendado',
-      };
-      
-      await api.updateJob(jobToSchedule.id, updateData);
+      const installerIds = selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : [];
 
-      // Sync to Google Calendar if connected and email notification is enabled
-      if (googleConnected && sendEmailNotification) {
+      await api.scheduleJob(jobToSchedule.id, {
+        scheduledDate: dateTime.toISOString(),
+        installerIds,
+        status: 'agendado',
+      });
+
+      if (googleConnected && sendEmailNotification && installerIds.length > 0) {
         await syncJobToGoogleCalendar({
           ...jobToSchedule,
           scheduled_date: dateTime.toISOString(),
-          assigned_installers: updateData.assigned_installers
+          assigned_installers: installerIds
         }, true);
       }
 
-      // Send push notification to assigned installers
-      if (updateData.assigned_installers.length > 0) {
-        try {
-          await api.notifyJobScheduled(jobToSchedule.id);
-        } catch (e) {
-          console.warn('Could not send push notification:', e);
-        }
-      }
-
-      toast.success('Job agendado com sucesso!');
+      toast.success(isRescheduling ? 'Job reagendado! Email enviado ao instalador.' : 'Job agendado com sucesso!');
       setShowScheduleDialog(false);
       setSelectedJob(null);
       setPickedJob(null);
+      setIsRescheduling(false);
       loadData();
     } catch (error) {
       console.error('Error scheduling job:', error);
@@ -381,6 +382,11 @@ const Calendar = () => {
     if (!date) return;
     setDayModalDate(date);
     setShowDayModal(true);
+  };
+
+  const openJobDetail = (job) => {
+    setSelectedJobDetail(job);
+    setShowJobDetail(true);
   };
 
   const DayDetailModal = () => {
@@ -498,7 +504,7 @@ const Calendar = () => {
                     <div key={job.id}
                          className={`absolute left-1 right-1 rounded px-2 py-1 cursor-pointer hover:brightness-110 ${getColor(job)}`}
                          style={{ top: `${i * 38}px`, minHeight: '32px' }}
-                         onClick={() => { setShowDayModal(false); navigate(`/jobs/${job.id}`); }}>
+                         onClick={() => { setShowDayModal(false); openJobDetail(job); }}>
                       <p className="text-white text-xs font-semibold truncate">#{job.holdprint_data?.code || job.code} {job.title || job.client_name}</p>
                       {inst && <p className="text-white/80 text-[10px] truncate">{inst.full_name || inst.name}</p>}
                     </div>
@@ -521,7 +527,7 @@ const Calendar = () => {
                     <div key={job.id}
                          className={`absolute left-1 right-1 rounded px-2 py-1 cursor-pointer hover:brightness-110 ${getColor(job)}`}
                          style={{ top: `${top}px`, height: `${height}px`, overflow: 'hidden' }}
-                         onClick={() => { setShowDayModal(false); navigate(`/jobs/${job.id}`); }}>
+                         onClick={() => { setShowDayModal(false); openJobDetail(job); }}>
                       <p className="text-white text-[10px] font-bold">
                         {startTime}{endTime ? ` – ${endTime}` : ''}
                       </p>
@@ -760,7 +766,7 @@ const Calendar = () => {
               setCurrentDate={setWeekStartDate}
               installers={installers}
               selectedBranch={selectedBranch}
-              onJobClick={(job) => navigate(`/jobs/${job.id}`)}
+              onJobClick={(job) => openJobDetail(job)}
               onScheduleSlot={(date, time, installerName) => {
                 setSelectedJob(null);
                 setScheduleDate(date.toISOString().split('T')[0]);
@@ -777,7 +783,7 @@ const Calendar = () => {
               setCurrentDate={setDayViewDate}
               installers={installers}
               selectedBranch={selectedBranch}
-              onJobClick={(job) => navigate(`/jobs/${job.id}`)}
+              onJobClick={(job) => openJobDetail(job)}
               onScheduleSlot={(date, time, installerId) => {
                 setSelectedJob(null);
                 setScheduleDate(date.toISOString().split('T')[0]);
@@ -829,12 +835,15 @@ const Calendar = () => {
                               {dayJobs.slice(0, 3).map(job => (
                                 <div
                                   key={job.id}
-                                  onClick={(e) => { e.stopPropagation(); navigate(job.kind === 'visita_tecnica' ? `/visitas/${job.id}` : `/jobs/${job.id}`); }}
+                                  draggable={!!(isAdmin || isManager) && job.kind !== 'visita_tecnica'}
+                                  onDragStart={(e) => { e.stopPropagation(); handleDragStart(e, job); }}
+                                  onClick={(e) => { e.stopPropagation(); openJobDetail(job); }}
                                   className={`
-                                    text-[10px] p-1 rounded truncate cursor-pointer flex items-center gap-1
+                                    text-[10px] p-1 rounded truncate flex items-center gap-1
                                     ${getStatusColor(job.status, job.kind)} text-white
                                     ${job.kind === 'visita_tecnica' ? 'border-l-2 border-l-purple-300' : ''}
                                     hover:opacity-80 transition-opacity
+                                    ${(isAdmin || isManager) && job.kind !== 'visita_tecnica' ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'}
                                   `}
                                   title={`${job.kind === 'visita_tecnica' ? '[VT]' : ''} #${job.holdprint_data?.code || job.id?.slice(0,4)} - ${job.title} - ${job.client_name || ''}`}
                                 >
@@ -975,10 +984,10 @@ const Calendar = () => {
       </Card>
 
       {/* Schedule Dialog */}
-      <Dialog open={showScheduleDialog} onOpenChange={(open) => { setShowScheduleDialog(open); if (!open) setPickedJob(null); }}>
+      <Dialog open={showScheduleDialog} onOpenChange={(open) => { setShowScheduleDialog(open); if (!open) { setPickedJob(null); setIsRescheduling(false); } }}>
         <DialogContent className="bg-card border-white/10">
           <DialogHeader>
-            <DialogTitle className="text-white">Agendar Job</DialogTitle>
+            <DialogTitle className="text-white">{isRescheduling ? 'Reagendar Job' : 'Agendar Job'}</DialogTitle>
             <DialogDescription>
               {(selectedJob || pickedJob)?.title || 'Selecione um job abaixo'}
             </DialogDescription>
@@ -1048,6 +1057,12 @@ const Calendar = () => {
               </Select>
             </div>
             
+            {isRescheduling && (
+              <div className="flex items-center gap-2 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                <Mail className="h-4 w-4 text-amber-400 shrink-0" />
+                <p className="text-xs text-amber-300">Email de reagendamento será enviado automaticamente ao instalador</p>
+              </div>
+            )}
             {googleConnected && (
               <div className="flex items-center gap-2 p-3 bg-blue-500/10 rounded-lg">
                 <input
@@ -1075,7 +1090,7 @@ const Calendar = () => {
                 ) : (
                   <>
                     <CalendarCheck className="h-4 w-4 mr-2" />
-                    Agendar
+                    {isRescheduling ? 'Reagendar' : 'Agendar'}
                   </>
                 )}
               </Button>
@@ -1093,6 +1108,110 @@ const Calendar = () => {
 
       {/* Day Detail Modal */}
       <DayDetailModal />
+
+      {/* Job Detail Modal */}
+      {selectedJobDetail && (() => {
+        const job = selectedJobDetail;
+        const installerObj = installers.find(i =>
+          job.assigned_installers?.includes(i.id) ||
+          job.assigned_installers?.includes(i.user_id)
+        );
+        const scheduledDateStr = job.scheduled_date
+          ? new Date(job.scheduled_date).toLocaleDateString('pt-BR', {
+              weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
+            })
+          : 'Não agendado';
+        const scheduledTimeStr = job.scheduled_date
+          ? new Date(job.scheduled_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          : '';
+        const statusLabels = {
+          aguardando: 'Aguardando', pending: 'Aguardando',
+          agendado: 'Agendado',
+          instalando: 'Instalando', in_progress: 'Instalando',
+          finalizado: 'Finalizado', completed: 'Finalizado',
+          pausado: 'Pausado', atrasado: 'Atrasado',
+        };
+        const handleOpenReschedule = () => {
+          setShowJobDetail(false);
+          const d = job.scheduled_date ? new Date(job.scheduled_date) : null;
+          setSelectedJob(job);
+          setScheduleDate(d ? d.toISOString().split('T')[0] : '');
+          setScheduleTime(d
+            ? `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
+            : '08:00'
+          );
+          setSelectedInstaller(job.assigned_installers?.[0] || '');
+          setIsRescheduling(!!job.scheduled_date);
+          setShowScheduleDialog(true);
+        };
+        return (
+          <Dialog open={showJobDetail} onOpenChange={setShowJobDetail}>
+            <DialogContent className="max-w-md bg-card border-white/10">
+              <DialogHeader>
+                <DialogTitle className="text-white flex items-center gap-2 flex-wrap">
+                  <span className="text-primary font-mono text-sm shrink-0">
+                    #{job.holdprint_data?.code || job.code || job.id?.slice(0,6)}
+                  </span>
+                  <span className="truncate">{job.title}</span>
+                </DialogTitle>
+                <DialogDescription>{job.client_name || ''}</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-3 py-2">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs mb-1">Data</p>
+                    <p className="text-white capitalize text-xs">{scheduledDateStr}</p>
+                    {scheduledTimeStr && <p className="text-primary text-xs mt-0.5">{scheduledTimeStr}</p>}
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs mb-1">Status</p>
+                    <p className="text-white text-xs">{statusLabels[job.status?.toLowerCase()] || job.status}</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">{job.branch}</p>
+                  </div>
+                </div>
+
+                {installerObj && (
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-muted-foreground text-xs mb-1">Instalador</p>
+                    <p className="text-white text-sm">{installerObj.full_name}</p>
+                  </div>
+                )}
+
+                {job.client_address && (
+                  <div className="bg-white/5 rounded-lg p-3 flex items-start gap-2">
+                    <MapPin className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />
+                    <p className="text-muted-foreground text-xs">{job.client_address}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                {(isAdmin || isManager) && job.kind !== 'visita_tecnica' && (
+                  <Button
+                    onClick={handleOpenReschedule}
+                    className="flex-1 bg-primary hover:bg-primary/90 text-white"
+                  >
+                    <CalendarIcon className="h-4 w-4 mr-2" />
+                    {job.scheduled_date ? 'Reagendar' : 'Agendar'}
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowJobDetail(false);
+                    navigate(job.kind === 'visita_tecnica' ? `/visitas/${job.id}` : `/jobs/${job.id}`);
+                  }}
+                  className="flex-1 border-white/20 text-white hover:bg-white/5"
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Ver Completo
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 };
