@@ -93,3 +93,10 @@ VERCEL_ENV_*.txt
 
 .vercel
 .gstack/
+
+# Claude Code + VS Code local history — never commit
+.claude/
+.history/
+
+# Git bundles (backups)
+*.bundle

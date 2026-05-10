@@ -173,7 +173,6 @@ def migrate_jobs(mongo_db, supabase: Client):
                 'branch': job.get('branch'),
                 'area_m2': float(job.get('area_m2', 0) or 0),
                 'scheduled_date': job.get('scheduled_date'),
-                'scheduled_time': job.get('scheduled_time'),
                 'assigned_installers': job.get('assigned_installers', []),
                 'item_assignments': json.dumps(job.get('item_assignments', [])),
                 'archived_items': json.dumps(job.get('archived_items', [])),

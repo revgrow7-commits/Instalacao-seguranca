@@ -7,9 +7,9 @@ export function useCatalogos() {
   const [ferramentas, setFerramentas] = useState([]);
 
   useEffect(() => {
-    api.listVendedores().then(r => setVendedores((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
-    api.listTiposServico().then(r => setTiposServico((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
-    api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(() => {});
+    api.listVendedores().then(r => setVendedores((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar vendedores', err));
+    api.listTiposServico().then(r => setTiposServico((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar tipos de serviço', err));
+    api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar ferramentas', err));
   }, []);
 
   const addVendedor = async (nome) => {
@@ -18,7 +18,7 @@ export function useCatalogos() {
       const item = { value: res.data.nome, label: res.data.nome };
       setVendedores(prev => [...prev, item]);
       return res.data.nome;
-    } catch { return null; }
+    } catch (err) { console.error('useCatalogos: falha ao criar vendedor', err); return null; }
   };
 
   const addTipoServico = async (nome) => {
@@ -27,7 +27,7 @@ export function useCatalogos() {
       const item = { value: res.data.nome, label: res.data.nome };
       setTiposServico(prev => [...prev, item]);
       return res.data.nome;
-    } catch { return null; }
+    } catch (err) { console.error('useCatalogos: falha ao criar tipo de serviço', err); return null; }
   };
 
   const addFerramenta = async (nome) => {
@@ -36,7 +36,7 @@ export function useCatalogos() {
       const item = { value: res.data.nome, label: res.data.nome };
       setFerramentas(prev => [...prev, item]);
       return res.data.nome;
-    } catch { return null; }
+    } catch (err) { console.error('useCatalogos: falha ao criar ferramenta', err); return null; }
   };
 
   return { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta };

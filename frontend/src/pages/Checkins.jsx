@@ -300,7 +300,7 @@ const Checkins = () => {
       ]);
       
       // Filter out archived checkins and sort by most recent
-      const activeCheckins = checkinsRes.data
+      const activeCheckins = (checkinsRes || [])
         .filter(c => !c.archived)
         .sort((a, b) => new Date(b.checkin_at || 0) - new Date(a.checkin_at || 0));
       

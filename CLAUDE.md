@@ -1,90 +1,349 @@
-Indústria Visual
+# Indústria Visual — instal-visual.com.br
 
-## Visão Geral do Projeto
+Sistema full-stack de gestão operacional de instalações de comunicação visual. Controla o ciclo completo: importação de jobs do Holdprint → agendamento → check-in em campo pelo instalador (com GPS e foto) → gamificação → relatórios.
 
-**Indústria Visual** é uma plataforma web de gestão operacional para empresas de **comunicação visual e instalação**. O sistema centraliza o ciclo completo de trabalho: desde a importação de jobs até o controle de check-ins em campo por instaladores, geração de relatórios e bonificação por desempenho.
-
-- **URL base:** `https://instal-visual.com.br`
+- **URL prod:** `https://instal-visual.com.br`
+- **Projeto Supabase:** `qfsxtwkltfraounsjjah` (instal-visual.com.br) — **NÃO confundir** com `otyrrvkixegiqsthmaaj` (somos-industriavisual.com.br)
+- **Plataforma:** Vercel (frontend CRA + backend FastAPI Python serverless)
 - **Idioma:** Português do Brasil
-- **Tema:** Dark mode com cor de destaque rosa/pink
-- **Tipo:** SPA (Single Page Application) com carregamento assíncrono
+- **Tema:** Dark mode, cor de destaque rosa `#e94560`
 
 ---
 
-## Módulos e Funcionalidades
+## Stack Técnica
 
-### 1. Dashboard (`/dashboard`)
-Painel central de visão geral. Exibe métricas consolidadas de jobs, check-ins e desempenho operacional.
-
-### 2. Jobs (`/jobs`)
-Gerenciamento de ordens de serviço de instalação.
-- Contadores: Total, Aguardando, Instalando, Agendados
-- Filtros por: status, filial, instalador, período
-- Importação via integração com **Holdprint**
-- Ações por job: Agendar, Justificar atraso, Sem Instalação, Arquivar
-- Status: `AGUARDANDO`, `INSTALANDO`, `AGENDADO`
-- Atributos: código (#), filial, cliente, data prevista, instalador atribuído
-
-### 3. Check-ins (`/checkins`)
-Registro de presença e execução em campo pelos instaladores.
-- Contadores: Total, Em Andamento, Completos, Pausados
-- Cada registro contém: foto de entrada, foto de saída, GPS (lat/long/precisão), horário, duração e m² instalados
-- Alerta de `ATRASO` quando checkout não é realizado em mais de 4h
-- Filtros por status e instalador
-- Abas: Todos, Check-ins (entradas), Check-outs (saídas)
-- Visualização individual em `/checkin-viewer/{uuid}`
-
-### 4. Relatórios (`/reports`)
-Relatórios gerenciais de produção e performance por período.
-
-### 5. KPIs Família (`/reports/kpis`)
-Indicadores-chave de desempenho agrupados por família de produtos/serviços.
-
-### 6. Bonificação (`/gamification-report`)
-Sistema de gamificação para bonificação de instaladores com base em performance e metas.
-
-### 7. Calendário (`/calendar`)
-Calendário de instalações com visualização mensal.
-- Painel lateral com jobs não agendados (arrastáveis para datas)
-- Integração opcional com Google Calendar
-- Filtro por filial
-
-### 8. Usuários (`/users`)
-Gestão de usuários e permissões do sistema.
-- Perfis: `ADMINISTRADOR`, `GERENTE`, `INSTALADOR`
-- Atributos: nome, e-mail, telefone, filial, status (ativo/inativo)
-
-### 9. Agendamentos (`/admin/scheduler`)
-Painel de tarefas automáticas do sistema.
-- Sincronização com Holdprint diariamente às 06:00 (horário de Brasília)
-- Permite pausar ou executar manualmente
-- Exibe data/hora e quantidade de jobs importados na última sincronização
-
----
-
-## Integrações Externas
-
-- **Holdprint**: Sistema de origem dos jobs. Sincronização automática via scheduler ou manual.
-- **Google Calendar**: Integração opcional para espelhar o calendário de instalações.
-- **GPS/Geolocalização**: Captura de coordenadas nos check-ins via dispositivo móvel.
-
----
-
-## Perfis de Usuário
-
-| Perfil | Descrição |
+| Camada | Tecnologia |
 |---|---|
-| Administrador | Acesso total, incluindo usuários e agendamentos |
-| Gerente | Acesso gerencial a relatórios e jobs |
-| Instalador | Realiza check-ins em campo via app mobile |
+| Frontend | React 18 (CRA), JavaScript, Axios |
+| Backend | Python 3.x + FastAPI (síncrono, serverless) |
+| Banco | Supabase PostgreSQL (via wrapper `db_supabase.py`) |
+| Auth | JWT (HS256), bcrypt, Resend (email reset) |
+| Storage | Supabase Storage — bucket `checkin-photos` |
+| Deploy | Vercel: frontend em `/`, backend em `/_/backend` |
+| Push | VAPID Web Push via `py-vapid` |
+| Cron | Vercel Cron — `GET /api/cron/sync-holdprint` (09:00 UTC / 06:00 BRT) |
+| Integrações | Holdprint API, Google Calendar OAuth, Resend |
 
 ---
 
-## Terminologia do Domínio
+## Estrutura de Diretórios
 
-- **Job**: Ordem de serviço de instalação de comunicação visual
-- **Check-in / Check-out**: Registro de entrada e saída do instalador no local do job
-- **Holdprint**: Plataforma de origem dos pedidos, integrada via API
-- **Filial**: Unidade regional (ex: `POA` = Porto Alegre, `SP` = São Paulo)
-- **m² Instalado**: Métrica de área instalada registrada no checkout
-- **Hold**: Job com previsão de entrega pendente de definição
+```
+/
+├── frontend/
+│   └── src/
+│       ├── App.js               — rotas + AuthProvider
+│       ├── context/
+│       │   └── AuthContext.jsx  — único contexto de auth
+│       ├── hooks/               — hooks customizados com Axios (NÃO React Query)
+│       │   ├── useJobs.js
+│       │   ├── useVisitas.js    — visitas técnicas
+│       │   ├── useCatalogos.js  — vendedores, tipos de serviço, ferramentas
+│       │   └── usePushNotifications.js
+│       ├── components/
+│       │   ├── layout/          — shell da aplicação
+│       │   ├── ui/              — componentes base reutilizáveis
+│       │   └── visitas/         — componentes de visitas técnicas
+│       ├── pages/               — uma page por rota
+│       ├── lib/                 — utilitários compartilhados
+│       └── utils/
+│           ├── api.js           — wrapper Axios com cache e interceptors
+│           └── tokenManager.js  — JWT no localStorage com controle de expiração
+│
+├── backend/
+│   ├── server.py        — app FastAPI, include de todos os routers + cron
+│   ├── config.py        — todas as constantes e variáveis de ambiente
+│   ├── security.py      — JWT decode, bcrypt, get_current_user, require_role
+│   ├── db_supabase.py   — wrapper MongoDB-like sobre Supabase (SupabaseDB, SupabaseTable)
+│   ├── routes/          — 15 módulos de rota (um por domínio)
+│   ├── services/        — lógica de negócio: gamification, gps, holdprint, image, email
+│   ├── models/          — Pydantic models: user, job, checkin, visita, gamification
+│   └── migrations/      — SQL executado manualmente no Supabase
+│
+├── vercel.json          — roteamento Vercel: frontend em /, backend em /_/backend
+└── CLAUDE.md            — este arquivo
+```
+
+---
+
+## Módulos e Rotas
+
+### Frontend (páginas)
+
+| Página | Rota | Acesso |
+|---|---|---|
+| `Dashboard.jsx` | `/dashboard` | todos |
+| `Jobs.jsx` | `/jobs` | admin, manager |
+| `Checkins.jsx` | `/checkins` | admin, manager |
+| `CheckinViewer.jsx` | `/checkin-viewer/:id` | todos |
+| `Calendar.jsx` | `/calendar` | admin, manager |
+| `InstallerCalendar.jsx` | `/installer-calendar` | installer |
+| `InstallerDashboard.jsx` | `/installer` | installer |
+| `InstallerJobDetail.jsx` | `/installer/job/:id` | installer |
+| `VisitasTecnicas.jsx` | `/visitas` | admin, manager |
+| `VisitaDetail.jsx` | `/visita/:id` | todos |
+| `UnifiedReports.jsx` | `/reports` | admin, manager |
+| `FamilyKPIsReport.jsx` | `/reports/kpis` | admin, manager |
+| `GamificationReport.jsx` | `/gamification-report` | admin, manager |
+| `SchedulerAdmin.jsx` | `/admin/scheduler` | admin |
+| `Users.jsx` | `/users` | admin |
+| `LojaFaixaPreta.jsx` | `/loja` | todos |
+
+### Backend (rotas `/api/...`)
+
+| Módulo | Prefixo | Responsabilidade |
+|---|---|---|
+| `auth_new.py` | `/auth` | login, register, forgot/reset/change password |
+| `users.py` | `/users` | CRUD usuários |
+| `jobs.py` | `/jobs` | CRUD + status + sync Holdprint |
+| `checkins.py` | `/checkins` | check-ins gerais |
+| `item_checkins.py` | `/item-checkins` | check-ins por item de job |
+| `installers.py` | `/installers` | CRUD instaladores + GPS alerts |
+| `visitas.py` | `/visitas` | ciclo completo de visitas técnicas |
+| `visitas_reports.py` | `/visitas/reports` | relatórios de VTs |
+| `catalogos.py` | `/catalogos` | vendedores, tipos de serviço, ferramentas VT |
+| `gamification.py` | `/gamification` | moedas, níveis, recompensas |
+| `reports.py` | `/reports` | relatórios gerenciais |
+| `products.py` | `/products` | catálogo de produtos e famílias |
+| `calendar.py` | `/calendar` | calendário + Google Calendar OAuth |
+| `notifications.py` | `/notifications` | push notifications VAPID |
+| `integration.py` | `/integration` | sync manual Holdprint |
+| `cs_integration.py` | `/cs` | integração CS (visitas) |
+| `server.py` (inline) | `/admin`, `/scheduler`, `/cron`, `/location-alerts` | rotas administrativas |
+
+---
+
+## Autenticação
+
+### Frontend — tokenManager + AuthContext
+- JWT armazenado em `localStorage` via `tokenManager.js`
+- Snapshot de usuário em `sessionStorage` com TTL de 5 minutos (evita flash de loading no reload)
+- Expiração frontend: **7 dias** por padrão em `tokenManager.setToken(token, expiresInDays=7)`
+- `AuthContext` expõe: `user`, `loading`, `login()`, `logout()`, `isAdmin`, `isManager`, `isInstaller`, `token`, `getToken`
+
+### Backend — security.py
+- Expiração backend: **1 dia** (`ACCESS_TOKEN_EXPIRE_DAYS = 1` em `config.py`)
+- Algoritmo: HS256, secret via env `JWT_SECRET`
+- `get_current_user()` decodifica JWT e busca o usuário em `db.users`
+- `require_role(user, [UserRole.ADMIN])` lança HTTP 403 se role insuficiente
+
+> ⚠️ **ATENÇÃO — JWT_EXPIRY_MISMATCH:** Backend expira em 1 dia, frontend armazena por 7 dias. Após o 2º dia, o token frontend ainda existe mas o backend rejeita. O `AuthContext` trata isso fazendo logout no 401 de `/auth/me`.
+
+### Roles
+```python
+class UserRole(str, Enum):
+    ADMIN = "admin"
+    MANAGER = "manager"
+    INSTALLER = "installer"
+```
+
+---
+
+## Camada de Banco (`db_supabase.py`)
+
+O backend usa uma **abstração MongoDB-like** sobre o Supabase PostgreSQL. Isso permite usar sintaxe familiar sem reescrever toda a lógica:
+
+```python
+# Estilo MongoDB — o que o código usa
+db.jobs.find({"status": "AGUARDANDO"})
+db.users.find_one({"email": email})
+db.checkins.insert_one({"job_id": job_id, ...})
+db.jobs.update_one({"id": job_id}, {"$set": {"status": "INSTALANDO"}})
+db.jobs.update_one({"id": job_id}, {"$inc": {"total_jobs": 1}})
+
+# O que acontece internamente — Supabase PostgREST
+supabase.table("jobs").select("*").eq("status", "AGUARDANDO").execute()
+```
+
+### Operadores suportados
+| MongoDB | Supabase equivalente |
+|---|---|
+| `$set` | `update(data)` |
+| `$inc` | read-then-write (NÃO atômico — ver ARCH-003) |
+| `$push` | read-then-write com append |
+| `$or` | `.or_("field.eq.val1,field.eq.val2")` |
+| `$in` | `.in_(field, list)` |
+| `$gte/$lte/$gt/$lt` | `.gte/.lte/.gt/.lt` |
+| `$regex` | `.ilike(field, "%val%")` |
+
+### `_filter_columns()`
+Antes de qualquer insert/update, campos desconhecidos são removidos via `TABLE_COLUMNS` registry. Evita erros 400 do PostgREST por colunas inexistentes. **Se adicionar uma coluna no banco, adicionar no registry também.**
+
+### JSONB
+Campos JSONB (`items`, `holdprint_data`, `products_with_area`, etc.) são tratados nativamente — não usar `json.dumps` ao escrever nem `json.loads` ao ler.
+
+---
+
+## Gamificação
+
+### Backend (`services/gamification.py`)
+- `add_coins(user_id, amount, ...)` — soma moedas em `gamification_balances` (read-then-write, NÃO atômico)
+- `calculate_level(total_earned)` — retorna int 1–10 baseado em moedas acumuladas
+- Tabelas: `gamification_balances`, `coin_transactions`, `rewards`, `reward_requests`
+
+### Inconsistência de schema de níveis
+`gamification_balances` tem dois campos de nível:
+- `current_level`: string legada ("bronze", "silver", "gold"...)
+- `level`: string numérica ("1", "2", ... "10") — schema atual
+
+Ao ler nível, sempre usar `level` (numérico). `current_level` existe por compatibilidade retroativa.
+
+---
+
+## GPS e Check-in de Campo
+
+- **Distância máxima para checkout:** `MAX_CHECKOUT_DISTANCE_METERS = 500` metros (configurável em `config.py`)
+- Alertas de localização são gravados em `location_alerts` quando instalador faz checkout fora do raio
+- Campos GPS nos checkins: `gps_lat`, `gps_long` (entrada), `checkout_gps_lat`, `checkout_gps_long` (saída)
+- Upload de fotos: base64 → Supabase Storage bucket `checkin-photos` → URL pública gravada no banco; se falhar, base64 fica no banco como fallback
+
+---
+
+## Variáveis de Ambiente Obrigatórias
+
+```bash
+# Supabase (obrigatório)
+SUPABASE_URL=https://qfsxtwkltfraounsjjah.supabase.co
+SUPABASE_SERVICE_KEY=...
+
+# JWT (obrigatório — gerar com: openssl rand -hex 32)
+JWT_SECRET=...
+
+# Holdprint
+HOLDPRINT_API_KEY_POA=...
+HOLDPRINT_API_KEY_SP=...
+
+# Email (reset de senha)
+RESEND_API_KEY=...
+SENDER_EMAIL=noreply@instal-visual.com.br
+
+# Google Calendar
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=...
+
+# Web Push
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+
+# Cron (segurança do endpoint de sync)
+CRON_SECRET=...
+
+# Frontend
+REACT_APP_BACKEND_URL=https://instal-visual.com.br
+```
+
+---
+
+## Padrões Obrigatórios
+
+### Toda rota protegida precisa de `Depends(get_current_user)`
+```python
+# ✅ CORRETO
+@router.get("/jobs")
+def list_jobs(current_user: User = Depends(get_current_user)):
+    ...
+
+# ❌ ERRADO — rota pública sem querer
+@router.get("/jobs")
+def list_jobs():
+    ...
+```
+
+### `require_role` antes de qualquer ação destrutiva
+```python
+require_role(current_user, [UserRole.ADMIN])
+```
+
+### Inserir no `TABLE_COLUMNS` ao criar coluna nova
+Ao executar migration que adiciona coluna, adicionar o campo em `db_supabase.py` → `TABLE_COLUMNS[tabela]`, senão `_filter_columns()` vai silenciosamente descartar o campo.
+
+### Verificar erros do `insert_one` / `update_one`
+`SupabaseTable.insert_one()` lança exceção em caso de erro. Capturar no caller se necessário para retornar erro HTTP correto.
+
+### Cron protegido pelo header Vercel
+```python
+is_vercel_cron = request.headers.get('x-vercel-cron') == '1'
+```
+Não remover essa verificação.
+
+---
+
+## Decisões Arquiteturais Registradas
+
+### ARCH-001: Wrapper MongoDB-like sobre Supabase
+O backend usa sintaxe MongoDB (`find`, `insert_one`, `$set`, `$inc`) implementada como wrapper sobre o Supabase PostgREST. Isso facilita a leitura do código legado mas esconde funcionalidades SQL (joins, transações, RPC atômico). Ver `docs/adr/0001-db-wrapper-mongodb.md`.
+
+### ARCH-002: JWT expira em 1 dia no backend, 7 dias no frontend
+Assimetria intencional: o frontend usa 7 dias para não forçar login diário em dispositivos móveis dos instaladores. O `AuthContext` captura o 401 de `/auth/me` e faz logout automático, então o usuário só percebe a expiração na próxima abertura do app. Ver `docs/adr/0002-jwt-expiry-assimetria.md`.
+
+### ARCH-003: `$inc` e `add_coins` não são atômicos (dívida técnica)
+`db.update_one({...}, {"$inc": {"field": 1}})` faz read-then-write. Em `add_coins()` também. Race condition possível sob carga. Correção: RPC Supabase atômica. Ver TASKS.md BUG-001.
+
+### ARCH-004: CORS wildcard em produção (risco de segurança)
+`allow_origins = CORS_ORIGINS` env, default `"*"`. Configurar a env `CORS_ORIGINS` com domínios específicos em produção. Ver `docs/adr/0004-cors-wildcard.md`.
+
+### ARCH-005: `_filter_columns()` como proteção de schema
+Evita erros 400 do Supabase por campos desconhecidos. Custo: campos novos adicionados ao banco mas não ao `TABLE_COLUMNS` são descartados silenciosamente. Sempre atualizar o registry ao criar migrations.
+
+---
+
+## Bugs Conhecidos / Pendentes
+
+### PENDING-001: `$inc` não atômico — race condition em contadores
+**Arquivo:** `backend/db_supabase.py` linha ~415 (`$inc` handler em `update_one`)
+**Impacto:** Dois updates concorrentes do mesmo campo numérico (ex: `total_jobs` do instalador) podem perder um incremento.
+**Fix:** Substituir `$inc` por RPC Supabase: `supabase.rpc("increment_field", {table, id, field, delta})`.
+
+### PENDING-002: `add_coins()` assíncrona mas chamada de forma síncrona
+**Arquivo:** `backend/services/gamification.py` linha 45 — `async def add_coins()`
+**Impacto:** Chamadores que não fazem `await` recebem uma coroutine em vez do resultado. Verificar todos os callers com `grep -r "add_coins" backend/routes/`.
+**Fix:** Converter para `def add_coins()` síncrono (o DB é síncrono), ou garantir `await` em todos os callers async.
+
+### PENDING-003: Inconsistência no schema de nível de gamificação
+**Arquivo:** `backend/services/gamification.py` — `level` (numérico "1"-"10") vs `current_level` (string "bronze"/"silver")
+**Impacto:** Frontend pode exibir nível errado dependendo de qual campo usa.
+**Fix:** Migrar todos os registros para usar apenas `level` numérico; deprecar `current_level`.
+
+### PENDING-004: `update_many` delega para `update_one`
+**Arquivo:** `backend/db_supabase.py` linha ~456
+**Impacto:** `db.table.update_many({...}, {...})` só atualiza o primeiro registro que o PostgREST retornar, não todos.
+**Fix:** Implementar `update_many` como loop ou usar `.update()` sem filtro único.
+
+### PENDING-005: Senha mínima de 6 caracteres em auto-registro
+**Arquivo:** `backend/routes/auth_new.py` linha ~152
+**Impacto:** Força bruta facilitada em contas de instaladores.
+**Fix:** Aumentar para mínimo 8 caracteres com validação de complexidade.
+
+---
+
+## Histórico de Correções Relevantes (sessão 2026-05-08)
+
+| Arquivo | Correção |
+|---|---|
+| `frontend/src/hooks/useCatalogos.js` | 6 erros silenciosos (`.catch(() => {})` → `.catch(e => console.error(...))`) |
+| `frontend/src/hooks/usePushNotifications.js` | Uso correto de `navigator.serviceWorker.ready` (global, não da instância) |
+
+---
+
+## Comandos Úteis
+
+```bash
+# Dev frontend
+cd frontend && npm start
+
+# Dev backend
+cd backend && uvicorn server:app --reload
+
+# Type check (JS — sem TypeScript, verificar erros de importação)
+cd frontend && npm run build 2>&1 | grep -i error
+
+# Buscar rotas sem proteção de auth
+grep -r "def " backend/routes/ --include="*.py" -A 2 | grep -v "Depends\|#\|\"\"\"" | grep "def [a-z]"
+
+# Buscar callers de add_coins (verificar await)
+grep -r "add_coins" backend/routes/ --include="*.py"
+
+# Verificar campos em TABLE_COLUMNS vs migrations recentes
+grep -r "ALTER TABLE\|ADD COLUMN" backend/migrations/ --include="*.sql" | tail -20
+```

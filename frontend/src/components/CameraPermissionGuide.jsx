@@ -42,14 +42,14 @@ const CameraPermissionGuide = ({ onPermissionGranted, onSkip }) => {
           };
         } catch (permError) {
           // Firefox doesn't support camera permission query
-          console.log('Camera permission query not supported:', permError);
+          console.warn('Camera permission query not supported:', permError);
           setPermissionStatus('unknown');
         }
       } else {
         setPermissionStatus('unknown');
       }
     } catch (error) {
-      console.log('Permission API error:', error);
+      console.warn('Permission API error:', error);
       setPermissionStatus('unknown');
     }
   };

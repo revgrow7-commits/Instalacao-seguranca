@@ -45,6 +45,7 @@ from routes.visitas import router as visitas_router
 from routes.visitas_reports import router as visitas_reports_router
 from routes.catalogos import router as catalogos_router
 from routes.integration import router as integration_router
+from routes.cs_integration import router as cs_integration_router
 
 api_router.include_router(auth_router, tags=["Authentication"])
 api_router.include_router(users_router, tags=["Users"])
@@ -61,6 +62,7 @@ api_router.include_router(visitas_router, tags=["Visitas Técnicas"])
 api_router.include_router(visitas_reports_router)
 api_router.include_router(catalogos_router, tags=["Catálogos VT"])
 api_router.include_router(integration_router, tags=["Integration"])
+api_router.include_router(cs_integration_router, tags=["CS Integration"])
 
 # ============ ADMIN ROUTES (kept in server.py - small, unique) ============
 

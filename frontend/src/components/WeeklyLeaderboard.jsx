@@ -23,7 +23,7 @@ const WeeklyLeaderboard = ({ compact = false }) => {
       const myRank = response.data.leaderboard?.find(r => r.user_id === user?.id);
       setUserRank(myRank);
     } catch (error) {
-      console.log('Could not load leaderboard');
+      console.warn('Could not load leaderboard');
     } finally {
       setLoading(false);
     }

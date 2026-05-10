@@ -791,19 +791,19 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
     
     # Queries simples para checkins
     checkins = db.checkins.find({}, {"_id": 0, "status": 1})
-    item_checkins = db.item_checkins.find({}, {"_id": 0, "status": 1, "time_worked_minutes": 1})
-    
+    item_checkins = db.item_checkins.find({}, {"_id": 0, "status": 1, "net_duration_minutes": 1})
+
     total_checkins = len(checkins) + len(item_checkins)
     completed_checkins = (
         len([c for c in checkins if c.get("status") == "completed"]) +
         len([c for c in item_checkins if c.get("status") == "completed"])
     )
-    
+
     # Calcular duração média dos item_checkins completados
-    completed_with_time = [c for c in item_checkins if c.get("status") == "completed" and c.get("time_worked_minutes")]
+    completed_with_time = [c for c in item_checkins if c.get("status") == "completed" and c.get("net_duration_minutes")]
     avg_duration = 0
     if completed_with_time:
-        avg_duration = sum(c.get("time_worked_minutes", 0) for c in completed_with_time) / len(completed_with_time)
+        avg_duration = sum(c.get("net_duration_minutes", 0) for c in completed_with_time) / len(completed_with_time)
     
     total_installers = db.installers.count_documents({})
     

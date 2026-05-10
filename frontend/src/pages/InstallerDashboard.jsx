@@ -151,7 +151,7 @@ const InstallerDashboard = () => {
       setGamificationBalance(balanceRes.data);
       setRecentTransactions(transactionsRes.data);
     } catch (error) {
-      console.log('Gamification data not available yet');
+      console.warn('Gamification data not available yet');
     }
   };
 
@@ -169,7 +169,7 @@ const InstallerDashboard = () => {
         }
       }
     } catch (error) {
-      console.log('Daily engagement already claimed or error');
+      console.warn('Daily engagement already claimed or error');
     }
   };
 
