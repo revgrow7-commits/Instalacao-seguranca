@@ -78,13 +78,27 @@ async def create_visita(
     now = datetime.now(timezone.utc).isoformat()
     visita_id = str(uuid.uuid4())
 
+    # ── Resolver installer_id por email quando instalador externo sem id local ──
+    effective_installer_id = data.installer_id
+    if data.installer_email and not effective_installer_id:
+        local_installer = db.installers.find_one({"email": data.installer_email.lower()})
+        if not local_installer:
+            # Tentar via tabela users (instaladores cujo user_id aponta para users.email)
+            user_rec = db.users.find_one({"email": data.installer_email.lower()})
+            if user_rec:
+                local_installer = db.installers.find_one({"user_id": user_rec["id"]})
+        if local_installer:
+            effective_installer_id = local_installer["id"]
+
     doc = {
         "id": visita_id,
         "titulo": data.titulo or "VISITA TÉCNICA",
         "client_name": data.client_name,
         "client_address": data.client_address,
         "branch": data.branch,
-        "installer_id": data.installer_id,
+        "installer_id": effective_installer_id,
+        "installer_nome": data.installer_nome,
+        "installer_email": data.installer_email,
         "scheduled_date": data.scheduled_date.isoformat() if data.scheduled_date else None,
         "scheduled_time_end": data.scheduled_time_end.isoformat() if data.scheduled_time_end else None,
         "valor_por_km": data.valor_por_km if data.valor_por_km is not None else 1.50,
@@ -125,13 +139,20 @@ async def create_visita(
     if data.vendedor_email and data.vendedor_nome:
         send_vendedor_report_email(data.vendedor_email, data.vendedor_nome, saved)
 
-    if data.installer_id:
-        installer_rec = db.installers.find_one({"id": data.installer_id})
+    # ── Email convite ao instalador ───────────────────────────────────────────
+    # Prioridade: conta local (via installer_id) → instalador externo (via installer_email)
+    installer_email_sent = False
+    if effective_installer_id:
+        installer_rec = db.installers.find_one({"id": effective_installer_id})
         if installer_rec and installer_rec.get("user_id"):
             user_rec = db.users.find_one({"id": installer_rec["user_id"]})
             if user_rec and user_rec.get("email"):
                 installer_name = installer_rec.get("full_name") or user_rec.get("name") or user_rec["email"]
                 send_installer_invite_email(user_rec["email"], installer_name, saved)
+                installer_email_sent = True
+    if not installer_email_sent and data.installer_email:
+        installer_name = data.installer_nome or data.installer_email
+        send_installer_invite_email(data.installer_email, installer_name, saved)
 
     return VisitaOut(**_parse_datetimes(_enrich_installer_name(saved)))
 
@@ -146,6 +167,7 @@ async def list_visitas(
     # Aliases para compatibilidade com clientes que enviam start_date/end_date
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
+    vendedor_email: Optional[str] = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     current_user: User = Depends(get_current_user),
@@ -183,6 +205,9 @@ async def list_visitas(
         if _date_to:
             date_filter["$lte"] = _date_to
         query["scheduled_date"] = date_filter
+
+    if vendedor_email:
+        query["vendedor_email"] = {"$regex": vendedor_email}
 
     docs = db.visitas_tecnicas.find(
         query,

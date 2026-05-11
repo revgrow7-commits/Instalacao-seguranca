@@ -185,6 +185,8 @@ TABLE_COLUMNS = {
         "material_remocao", "tem_ponto_energia", "medida_largura_m",
         "medida_altura_m", "forma_instalacao", "epi_altura",
         "escada_tamanho", "andaime_torres",
+        # ── Instalador externo / Visual Connect (migration 029) ───────────
+        "installer_nome", "installer_email",
     ]),
 }
 

@@ -70,6 +70,9 @@ class VisitaCreate(BaseModel):
     aprovacao_status: Optional[str] = "PENDENTE"
     km_ida: Optional[float] = Field(None, ge=0)
     km_volta: Optional[float] = Field(None, ge=0)
+    # Instalador externo (Visual Connect) — usado quando o instalador não tem conta local
+    installer_nome: Optional[str] = None
+    installer_email: Optional[str] = None
 
     @field_validator("scheduled_date", "scheduled_time_end", mode="before")
     @classmethod
@@ -239,6 +242,9 @@ class VisitaOut(BaseModel):
     branch: str
     installer_id: Optional[str] = None
     installer_name: Optional[str] = None
+    # Instalador externo (Visual Connect)
+    installer_nome: Optional[str] = None
+    installer_email: Optional[str] = None
     scheduled_date: Optional[datetime] = None
     scheduled_time_end: Optional[datetime] = None
     valor_por_km: float = 1.50

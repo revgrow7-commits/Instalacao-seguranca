@@ -74,6 +74,8 @@ const novaVisitaSchema = z.object({
   client_address: z.string().min(1, 'Endereço obrigatório'),
   branch: z.enum(['POA', 'SP'], { required_error: 'Filial obrigatória' }),
   installer_id: z.string().optional().nullable(),
+  installer_nome: z.string().optional().nullable(),
+  installer_email: z.string().optional().nullable(),
   scheduled_date: z.string().optional().nullable(),
   scheduled_time_end: z.string().optional().nullable(),
   valor_por_km: z.coerce.number().min(0).default(1.50),
@@ -266,7 +268,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
   });
 
   const [selectedJob, setSelectedJob] = React.useState(null);
-  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, vendedoresVC, vendedoresVCMap, instaladoresVC, instaladoresVCMap, csLoading, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -335,15 +337,16 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
-                value={watch('vendedor_nome') || ''}
+                options={vendedoresVC.length > 0 ? vendedoresVC : (colaboradoresVC.length > 0 ? colaboradoresVC : vendedores)}
+                value={watch('vendedor_email') || ''}
                 onChange={(v) => {
-                  setValue('vendedor_nome', v || null);
-                  setValue('vendedor_email', colaboradoresVCMap.get(v) || null);
+                  const opt = vendedoresVCMap.get(v);
+                  setValue('vendedor_email', v || null);
+                  setValue('vendedor_nome', opt?._nome || colaboradoresVCMap.get(v) || v || null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                emptyText={colaboradoresVC.length === 0 ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
               />
             </div>
           </div>
@@ -386,20 +389,20 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
               {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Instalador</Label>
-              <Select onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}>
-                <SelectTrigger className="bg-background border-white/10 text-white">
-                  <SelectValue placeholder="Sem instalador" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-white/10">
-                  <SelectItem value="none">Sem instalador</SelectItem>
-                  {installers.map(inst => (
-                    <SelectItem key={inst.id} value={String(inst.id)}>
-                      {inst.name || inst.full_name || inst.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
+              <Combobox
+                options={instaladoresVC}
+                value={watch('installer_email') || ''}
+                onChange={(v) => {
+                  const opt = instaladoresVCMap.get(v);
+                  setValue('installer_email', v || null);
+                  setValue('installer_nome', opt?._nome || v || null);
+                  setValue('installer_id', null);
+                }}
+                placeholder={csLoading ? 'Carregando...' : 'Selecionar instalador...'}
+                searchPlaceholder="Buscar instalador..."
+                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+              />
             </div>
           </div>
 
@@ -697,6 +700,8 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
       client_address: visita.client_address || '',
       branch: visita.branch || '',
       installer_id: visita.installer_id ? String(visita.installer_id) : null,
+      installer_nome: visita.installer_nome || null,
+      installer_email: visita.installer_email || null,
       // API retorna ISO datetime completo; inputs nativos precisam de "YYYY-MM-DD" e "HH:MM"
       scheduled_date: visita.scheduled_date ? visita.scheduled_date.slice(0, 10) : '',
       scheduled_time_end: visita.scheduled_time_end ? visita.scheduled_time_end.slice(11, 16) : '',
@@ -705,6 +710,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
       // Novos campos
       job_id: visita.job_id || null,
       vendedor_nome: visita.vendedor_nome || null,
+      vendedor_email: visita.vendedor_email || null,
       tipos_servico: (visita.tipos_servico || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
       ferramentas: (visita.ferramentas || []).map(v => typeof v === 'string' ? v : (v?.value ?? v?.label ?? String(v))),
       remocao_prevista_os: visita.remocao_prevista_os || false,
@@ -732,7 +738,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
     } : {},
   });
 
-  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, vendedoresVC, vendedoresVCMap, instaladoresVC, instaladoresVCMap, csLoading, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -775,15 +781,16 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
-                value={watch('vendedor_nome') || ''}
+                options={vendedoresVC.length > 0 ? vendedoresVC : (colaboradoresVC.length > 0 ? colaboradoresVC : vendedores)}
+                value={watch('vendedor_email') || ''}
                 onChange={(v) => {
-                  setValue('vendedor_nome', v || null);
-                  setValue('vendedor_email', colaboradoresVCMap.get(v) || null);
+                  const opt = vendedoresVCMap.get(v);
+                  setValue('vendedor_email', v || null);
+                  setValue('vendedor_nome', opt?._nome || colaboradoresVCMap.get(v) || v || null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                emptyText={colaboradoresVC.length === 0 ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
               />
             </div>
           </div>
@@ -825,23 +832,20 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
               {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Instalador</Label>
-              <Select
-                defaultValue={visita?.installer_id ? String(visita.installer_id) : 'none'}
-                onValueChange={(v) => setValue('installer_id', v === 'none' ? null : v)}
-              >
-                <SelectTrigger className="bg-background border-white/10 text-white">
-                  <SelectValue placeholder="Sem instalador" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-white/10">
-                  <SelectItem value="none">Sem instalador</SelectItem>
-                  {installers.map(inst => (
-                    <SelectItem key={inst.id} value={String(inst.id)}>
-                      {inst.name || inst.full_name || inst.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
+              <Combobox
+                options={instaladoresVC}
+                value={watch('installer_email') || ''}
+                onChange={(v) => {
+                  const opt = instaladoresVCMap.get(v);
+                  setValue('installer_email', v || null);
+                  setValue('installer_nome', opt?._nome || v || null);
+                  setValue('installer_id', null);
+                }}
+                placeholder={csLoading ? 'Carregando...' : 'Selecionar instalador...'}
+                searchPlaceholder="Buscar instalador..."
+                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+              />
             </div>
           </div>
 
@@ -1047,6 +1051,7 @@ const VisitasTecnicas = () => {
   // com value="" (lança Error em runtime e quebra a página).
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterBranch, setFilterBranch] = useState('all');
+  const [filterVendedor, setFilterVendedor] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState(null);
   const [filterDateTo, setFilterDateTo] = useState(null);
   const [datePopoverOpen, setDatePopoverOpen] = useState(false);
@@ -1083,17 +1088,20 @@ const VisitasTecnicas = () => {
     return visitas.filter(v => {
       if (filterStatus !== 'all' && v.status !== filterStatus) return false;
       if (filterBranch !== 'all' && v.branch !== filterBranch) return false;
+      if (filterVendedor && !(v.vendedor_email || '').toLowerCase().includes(filterVendedor.toLowerCase()) &&
+          !(v.vendedor_nome || '').toLowerCase().includes(filterVendedor.toLowerCase())) return false;
       if (filterDateFrom && v.scheduled_date && new Date(v.scheduled_date) < filterDateFrom) return false;
       if (filterDateTo && v.scheduled_date && new Date(v.scheduled_date) > filterDateTo) return false;
       return true;
     });
-  }, [visitas, filterStatus, filterBranch, filterDateFrom, filterDateTo]);
+  }, [visitas, filterStatus, filterBranch, filterVendedor, filterDateFrom, filterDateTo]);
 
-  const hasFilters = filterStatus !== 'all' || filterBranch !== 'all' || filterDateFrom || filterDateTo;
+  const hasFilters = filterStatus !== 'all' || filterBranch !== 'all' || !!filterVendedor || filterDateFrom || filterDateTo;
 
   const clearFilters = () => {
     setFilterStatus('all');
     setFilterBranch('all');
+    setFilterVendedor('');
     setFilterDateFrom(null);
     setFilterDateTo(null);
   };
@@ -1225,6 +1233,17 @@ const VisitasTecnicas = () => {
                 <SelectItem value="SP">SP</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="w-56">
+              <Combobox
+                options={catalogos.vendedoresVC.length > 0 ? catalogos.vendedoresVC : catalogos.colaboradoresVC}
+                value={filterVendedor}
+                onChange={(v) => setFilterVendedor(v || '')}
+                placeholder="Filtrar por vendedor"
+                searchPlaceholder="Buscar vendedor..."
+                emptyText={catalogos.csLoading ? 'Carregando...' : 'Nenhum resultado'}
+              />
+            </div>
 
             <Popover open={datePopoverOpen} onOpenChange={setDatePopoverOpen}>
               <PopoverTrigger asChild>
