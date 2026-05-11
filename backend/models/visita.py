@@ -60,6 +60,7 @@ class VisitaCreate(BaseModel):
     # Novos campos — expansão VT
     job_id: Optional[str] = None
     vendedor_nome: Optional[str] = None
+    vendedor_email: Optional[str] = None
     tipos_servico: Optional[List[str]] = []
     ferramentas: Optional[List[str]] = []
     remocao_prevista_os: Optional[bool] = False
@@ -108,6 +109,7 @@ class VisitaUpdate(BaseModel):
     # Novos campos — expansão VT
     job_id: Optional[str] = None
     vendedor_nome: Optional[str] = None
+    vendedor_email: Optional[str] = None
     tipos_servico: Optional[List[str]] = None
     ferramentas: Optional[List[str]] = None
     remocao_prevista_os: Optional[bool] = None
@@ -258,6 +260,7 @@ class VisitaOut(BaseModel):
     # Novos campos — expansão VT
     job_id: Optional[str] = None
     vendedor_nome: Optional[str] = None
+    vendedor_email: Optional[str] = None
     tipos_servico: Optional[List[str]] = []
     ferramentas: Optional[List[str]] = []
     remocao_prevista_os: Optional[bool] = False

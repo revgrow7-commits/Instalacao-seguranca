@@ -13,6 +13,7 @@ import base64
 
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
+from services.email import send_vendedor_report_email, send_installer_invite_email
 from models.user import User, UserRole
 from models.visita import (
     VisitaCreate,
@@ -104,6 +105,7 @@ async def create_visita(
         # Novos campos — expansão VT
         "job_id": data.job_id,
         "vendedor_nome": data.vendedor_nome,
+        "vendedor_email": data.vendedor_email,
         "tipos_servico": data.tipos_servico or [],
         "ferramentas": data.ferramentas or [],
         "remocao_prevista_os": data.remocao_prevista_os or False,
@@ -118,6 +120,18 @@ async def create_visita(
     saved = db.visitas_tecnicas.find_one({"id": visita_id})
     if not saved:
         raise HTTPException(status_code=500, detail="Erro ao salvar visita técnica")
+
+    # ── Disparo de emails (não bloqueia a resposta em caso de falha) ──────────
+    if data.vendedor_email and data.vendedor_nome:
+        send_vendedor_report_email(data.vendedor_email, data.vendedor_nome, saved)
+
+    if data.installer_id:
+        installer_rec = db.installers.find_one({"id": data.installer_id})
+        if installer_rec and installer_rec.get("user_id"):
+            user_rec = db.users.find_one({"id": installer_rec["user_id"]})
+            if user_rec and user_rec.get("email"):
+                installer_name = installer_rec.get("full_name") or user_rec.get("name") or user_rec["email"]
+                send_installer_invite_email(user_rec["email"], installer_name, saved)
 
     return VisitaOut(**_parse_datetimes(_enrich_installer_name(saved)))
 

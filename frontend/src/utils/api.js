@@ -476,6 +476,7 @@ export const api = {
 
   // CS Integration (proxy via backend — token nunca vai ao bundle)
   getCsResponsaveis: () => axios.get(`${API_URL}/cs/responsaveis`, { headers: getAuthHeader() }),
+  getCsColaboradores: () => getCachedOrFetch('cs_colaboradores', () => axios.get(`${API_URL}/cs/colaboradores`, { headers: getAuthHeader() }), 5 * 60 * 1000),
   createCsTicket: (payload) => axios.post(`${API_URL}/cs/ticket`, payload, { headers: getAuthHeader() }),
 
   // Installer Google Calendar

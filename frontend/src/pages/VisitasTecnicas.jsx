@@ -81,6 +81,7 @@ const novaVisitaSchema = z.object({
   // campos existentes
   job_id: z.string().optional().nullable(),
   vendedor_nome: z.string().optional().nullable(),
+  vendedor_email: z.string().optional().nullable(),
   tipos_servico: z.array(z.string()).optional().default([]),
   ferramentas: z.array(z.string()).optional().default([]),
   remocao_prevista_os: z.boolean().optional().default(false),
@@ -265,7 +266,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
   });
 
   const [selectedJob, setSelectedJob] = React.useState(null);
-  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -334,16 +335,15 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={vendedores}
+                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
                 value={watch('vendedor_nome') || ''}
-                onChange={(v) => setValue('vendedor_nome', v || null)}
+                onChange={(v) => {
+                  setValue('vendedor_nome', v || null);
+                  setValue('vendedor_email', colaboradoresVCMap.get(v) || null);
+                }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                creatable
-                onCreate={async (nome) => {
-                  const novo = await addVendedor(nome);
-                  if (novo) setValue('vendedor_nome', novo);
-                }}
+                emptyText={colaboradoresVC.length === 0 ? 'Carregando colaboradores...' : 'Nenhum resultado'}
               />
             </div>
           </div>
@@ -732,7 +732,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
     } : {},
   });
 
-  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -775,16 +775,15 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={vendedores}
+                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
                 value={watch('vendedor_nome') || ''}
-                onChange={(v) => setValue('vendedor_nome', v || null)}
+                onChange={(v) => {
+                  setValue('vendedor_nome', v || null);
+                  setValue('vendedor_email', colaboradoresVCMap.get(v) || null);
+                }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                creatable
-                onCreate={async (nome) => {
-                  const novo = await addVendedor(nome);
-                  if (novo) setValue('vendedor_nome', novo);
-                }}
+                emptyText={colaboradoresVC.length === 0 ? 'Carregando colaboradores...' : 'Nenhum resultado'}
               />
             </div>
           </div>

@@ -172,8 +172,8 @@ TABLE_COLUMNS = {
         "relatorio_enviado_em",
         # ── Auditoria ──────────────────────────────────────────────────────
         "created_by", "created_at", "updated_at",
-        # ── Expansão (migration 013) ────────────────────────────────────────
-        "job_id", "vendedor_nome", "tipos_servico", "ferramentas",
+        # ── Expansão (migration 013 + 028) ─────────────────────────────────
+        "job_id", "vendedor_nome", "vendedor_email", "tipos_servico", "ferramentas",
         "remocao_prevista_os", "remocao_a_realizar", "altura_estimada_m",
         "nivel_dificuldade", "aprovacao_status",
         # ── Confirmação pelo instalador (migration 016) ─────────────────────
