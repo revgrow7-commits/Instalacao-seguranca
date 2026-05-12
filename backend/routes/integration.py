@@ -92,14 +92,30 @@ async def integration_schedule(request: Request, payload: SchedulePayload):
         update["notes"] = payload.notes
 
     # Fase 2: resolver emails → IDs de usuários do Instal-Visual
+    # Fallback por nome (primeiro token) quando email não bate entre sistemas
     if payload.installer_emails:
         installer_ids: List[str] = []
+        all_users = db.users.find({"role": "installer"}) or []
         for email in payload.installer_emails:
             user = db.users.find_one({"email": email.lower()})
+            if not user:
+                # Fallback: match pelo primeiro nome extraído do email local-part
+                first = email.split("@")[0].replace(".", " ").split()[0].lower()
+                user = next(
+                    (u for u in all_users if first in (u.get("name") or "").lower()),
+                    None,
+                )
+                if user:
+                    logger.info(
+                        f"integration_schedule: instalador matched por nome '{first}' "
+                        f"(email={email} → id={user['id']})"
+                    )
+                else:
+                    logger.warning(
+                        f"integration_schedule: instalador não encontrado email={email}"
+                    )
             if user:
                 installer_ids.append(user["id"])
-            else:
-                logger.warning(f"integration_schedule: instalador não encontrado por email={email}")
         if installer_ids:
             update["assigned_installers"] = installer_ids
 
