@@ -36,9 +36,10 @@ export function useCatalogos() {
     api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar ferramentas', err));
 
     // Todos os colaboradores do Visual Connect — usado pelos seletores de Vendedor e Instalador
+    // Edge Function retorna { colaboradores: [...] }, Axios envolve em { data: { colaboradores: [...] } }
     api.getCsColaboradores()
       .then(r => {
-        const data = r.data || [];
+        const data = r.data?.colaboradores || r.data || [];
         const opts = data.map(toComboOption);
         setColaboradoresVC(opts);
         setColaboradoresVCMap(new Map(opts.map(o => [o.value, o])));
@@ -51,8 +52,8 @@ export function useCatalogos() {
       api.getCsColaboradores('vendedor').catch(err => { console.error('useCatalogos: falha ao carregar vendedores VC', err); return { data: [] }; }),
       api.getCsColaboradores('instalador').catch(err => { console.error('useCatalogos: falha ao carregar instaladores VC', err); return { data: [] }; }),
     ]).then(([resV, resI]) => {
-      const vData = resV.data || [];
-      const iData = resI.data || [];
+      const vData = resV.data?.colaboradores || resV.data || [];
+      const iData = resI.data?.colaboradores || resI.data || [];
       const vOpts = vData.map(toComboOption);
       const iOpts = iData.map(toComboOption);
       setVendedoresVC(vOpts);
