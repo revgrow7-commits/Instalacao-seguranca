@@ -354,12 +354,13 @@ async def list_jobs(
     if not jobs:
         return []
     
-    # Busca checkins apenas para jobs retornados
-    job_ids = [j.get('id') for j in jobs if j.get('id')]
-    active_checkins = db.item_checkins.find(
-        {"status": "in_progress", "job_id": {"$in": job_ids}},
+    # Busca todos os checkins in_progress sem filtrar por job_id (evita URL longa com $in)
+    job_ids = set(j.get('id') for j in jobs if j.get('id'))
+    all_active_checkins = db.item_checkins.find(
+        {"status": "in_progress"},
         {"_id": 0, "job_id": 1, "checkin_at": 1}
     )
+    active_checkins = [c for c in all_active_checkins if c.get("job_id") in job_ids]
     
     job_start_times = {}
     for checkin in active_checkins:
@@ -1086,10 +1087,13 @@ async def update_job(job_id: str, job_update: dict, current_user: User = Depends
 
     from db_supabase import _deserialize
     job_doc = _deserialize(result.data[0])
-    if isinstance(job_doc.get('created_at'), str):
-        job_doc['created_at'] = datetime.fromisoformat(job_doc['created_at'])
-    if job_doc.get('scheduled_date') and isinstance(job_doc['scheduled_date'], str):
-        job_doc['scheduled_date'] = datetime.fromisoformat(job_doc['scheduled_date'])
+    for _dt_field in ("created_at", "scheduled_date", "scheduled_time_end"):
+        _val = job_doc.get(_dt_field)
+        if _val and isinstance(_val, str):
+            try:
+                job_doc[_dt_field] = datetime.fromisoformat(_val.replace("Z", "+00:00"))
+            except ValueError:
+                pass
     return Job(**job_doc)
 
 
