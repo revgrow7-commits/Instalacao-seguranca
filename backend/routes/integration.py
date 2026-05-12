@@ -6,10 +6,11 @@ import hmac
 import os
 import logging
 from datetime import datetime, timezone
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
-from typing import Optional
+from typing import List, Optional
 
 from db_supabase import db, get_client
 
@@ -31,32 +32,53 @@ class SchedulePayload(BaseModel):
     holdprint_job_id: str
     scheduled_date: str  # ISO 8601 — datetime-local format "YYYY-MM-DDTHH:mm"
     notes: Optional[str] = None
+    # Fase 2: emails dos instaladores selecionados no Visual Connect
+    installer_emails: Optional[List[str]] = None
+    # Fase 3: dados mínimos para criar o job caso ainda não exista
+    job_title: Optional[str] = None
+    client_name: Optional[str] = None
+    branch: Optional[str] = None
 
 
 @router.post("/schedule")
 async def integration_schedule(request: Request, payload: SchedulePayload):
     """
     Recebido do Visual Connect ao agendar uma instalação.
-    Atualiza scheduled_date e status no Instal-Visual via holdprint_job_id.
+    Atualiza scheduled_date, status e assigned_installers no Instal-Visual via holdprint_job_id.
+    Se o job ainda não foi importado pelo cron, cria um registro mínimo (Fase 3).
     """
     _verify_key(request)
 
     job = db.jobs.find_one({"holdprint_job_id": payload.holdprint_job_id})
+
+    # Fase 3: fallback — criar job mínimo para não perder o agendamento
     if not job:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Job não encontrado no Instal-Visual: {payload.holdprint_job_id}"
+        new_id = str(uuid4())
+        db.jobs.insert_one({
+            "id": new_id,
+            "holdprint_job_id": payload.holdprint_job_id,
+            "title": payload.job_title or f"Job #{payload.holdprint_job_id}",
+            "client_name": payload.client_name or "",
+            "status": "aguardando",
+            "branch": payload.branch or "POA",
+        })
+        job = {"id": new_id, "holdprint_job_id": payload.holdprint_job_id}
+        logger.info(
+            f"integration_schedule: job criado automaticamente "
+            f"holdprint_id={payload.holdprint_job_id}"
         )
 
-    # Normalizar data para ISO com timezone UTC
+    # Normalizar data para ISO com timezone
     try:
-        # Aceita "2026-05-20T10:00" ou "2026-05-20T10:00:00" ou "2026-05-20T10:00:00Z"
         raw = payload.scheduled_date.replace("Z", "+00:00")
         if len(raw) == 16:  # "YYYY-MM-DDTHH:mm"
             raw += ":00+00:00"
         sched_dt = datetime.fromisoformat(raw)
         if sched_dt.tzinfo is None:
-            logger.warning(f"integration_schedule: naive datetime recebido, interpretando como BRT: {payload.scheduled_date}")
+            logger.warning(
+                f"integration_schedule: naive datetime recebido, interpretando como BRT: "
+                f"{payload.scheduled_date}"
+            )
             sched_dt = sched_dt.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
         scheduled_iso = sched_dt.isoformat()
     except ValueError:
@@ -69,13 +91,26 @@ async def integration_schedule(request: Request, payload: SchedulePayload):
     if payload.notes is not None:
         update["notes"] = payload.notes
 
+    # Fase 2: resolver emails → IDs de usuários do Instal-Visual
+    if payload.installer_emails:
+        installer_ids: List[str] = []
+        for email in payload.installer_emails:
+            user = db.users.find_one({"email": email.lower()})
+            if user:
+                installer_ids.append(user["id"])
+            else:
+                logger.warning(f"integration_schedule: instalador não encontrado por email={email}")
+        if installer_ids:
+            update["assigned_installers"] = installer_ids
+
     result = get_client().table("jobs").update(update).eq("id", job["id"]).execute()
     if not result.data:
         raise HTTPException(status_code=500, detail="Falha ao atualizar job")
 
     logger.info(
         f"integration_schedule: job {job['id']} agendado via Visual Connect "
-        f"(holdprint_job_id={payload.holdprint_job_id}, date={scheduled_iso})"
+        f"(holdprint_job_id={payload.holdprint_job_id}, date={scheduled_iso}, "
+        f"installers={update.get('assigned_installers', [])})"
     )
 
     return {
