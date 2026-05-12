@@ -96,7 +96,8 @@ TABLE_COLUMNS = {
         "products_installed", "is_late", "created_at"
     ]),
     "item_pause_logs": frozenset([
-        "id", "checkin_id", "reason", "paused_at", "resumed_at", "duration_minutes",
+        "id", "checkin_id", "job_id", "item_index", "installer_id",
+        "reason", "paused_at", "resumed_at", "duration_minutes",
         "auto_generated", "created_at"
     ]),
     "installed_products": frozenset([

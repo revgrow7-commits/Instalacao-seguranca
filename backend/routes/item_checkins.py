@@ -202,6 +202,9 @@ class ItemPauseLog(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     checkin_id: str
+    job_id: str
+    item_index: int
+    installer_id: str
     reason: str
     paused_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     resumed_at: Optional[datetime] = None
@@ -461,6 +464,9 @@ async def complete_item_checkout(
                 pause_log = {
                     "id": str(uuid.uuid4()),
                     "checkin_id": checkin_id,
+                    "job_id": checkin["job_id"],
+                    "item_index": checkin["item_index"],
+                    "installer_id": checkin["installer_id"],
                     "reason": pause_reason,
                     "paused_at": datetime.now(timezone.utc).isoformat(),
                     "resumed_at": datetime.now(timezone.utc).isoformat(),
@@ -686,6 +692,9 @@ async def pause_item_checkin(
     
     pause_log = ItemPauseLog(
         checkin_id=checkin_id,
+        job_id=checkin["job_id"],
+        item_index=checkin["item_index"],
+        installer_id=checkin["installer_id"],
         reason=reason
     )
 

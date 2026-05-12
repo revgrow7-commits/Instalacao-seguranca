@@ -85,11 +85,12 @@ class ItemPauseLog(BaseModel):
     """Item pause log model."""
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    item_checkin_id: str
+    checkin_id: str
     job_id: str
     item_index: int
     installer_id: str
-    start_time: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    end_time: Optional[datetime] = None
     reason: str
-    duration_minutes: Optional[int] = None
+    paused_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    resumed_at: Optional[datetime] = None
+    duration_minutes: Optional[float] = None
+    auto_generated: bool = False
