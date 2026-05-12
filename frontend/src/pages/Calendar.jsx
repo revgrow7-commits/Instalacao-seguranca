@@ -49,6 +49,7 @@ const Calendar = () => {
   const [isRescheduling, setIsRescheduling] = useState(false);
   const [showJobDetail, setShowJobDetail] = useState(false);
   const [selectedJobDetail, setSelectedJobDetail] = useState(null);
+  const [visibleJobsCount, setVisibleJobsCount] = useState(10);
 
   // Week/Day view date tracking
   const [weekStartDate, setWeekStartDate] = useState(new Date());
@@ -726,9 +727,9 @@ const Calendar = () => {
                 Jobs Não Agendados ({allJobs.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-2 max-h-[400px] overflow-y-auto">
+            <CardContent className="p-2 max-h-[600px] overflow-y-auto">
               <div className="space-y-2">
-                {allJobs.slice(0, 10).map(job => (
+                {allJobs.slice(0, visibleJobsCount).map(job => (
                   <div
                     key={job.id}
                     draggable
@@ -747,10 +748,13 @@ const Calendar = () => {
                     </div>
                   </div>
                 ))}
-                {allJobs.length > 10 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    +{allJobs.length - 10} jobs
-                  </p>
+                {visibleJobsCount < allJobs.length && (
+                  <button
+                    onClick={() => setVisibleJobsCount(c => c + 10)}
+                    className="w-full text-xs text-primary hover:text-primary/80 text-center py-2 border border-dashed border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                  >
+                    + {allJobs.length - visibleJobsCount} jobs — Carregar mais
+                  </button>
                 )}
               </div>
             </CardContent>
