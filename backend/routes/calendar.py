@@ -556,7 +556,14 @@ async def sync_job_to_installer_calendar(job_id: str, current_user = None):
 
         # Get job details for calendar event
         job_title = job.get("title", "Job")
-        job_code = job.get("holdprint_data", {}).get("code", job_id[:8])
+        _hd_raw = job.get("holdprint_data") or "{}"
+        if isinstance(_hd_raw, str):
+            import json as _json
+            try:
+                _hd_raw = _json.loads(_hd_raw)
+            except Exception:
+                _hd_raw = {}
+        job_code = (_hd_raw or {}).get("code", job_id[:8]) if isinstance(_hd_raw, dict) else job_id[:8]
         client_name = job.get("client_name", "Cliente")
         branch = job.get("branch", "")
         scheduled_date = job.get("scheduled_date")

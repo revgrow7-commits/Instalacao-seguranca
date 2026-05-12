@@ -389,19 +389,21 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
               {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
+              <Label className="text-xs text-muted-foreground">Instalador</Label>
               <Combobox
-                options={colaboradoresVC}
-                value={watch('installer_email') || ''}
+                options={[...installers]
+                  .map(inst => ({ value: String(inst.id), label: inst.name || inst.full_name || inst.email }))
+                  .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))}
+                value={watch('installer_id') || ''}
                 onChange={(v) => {
-                  const opt = colaboradoresVCMap.get(v);
-                  setValue('installer_email', v || null);
-                  setValue('installer_nome', opt?._nome || v || null);
-                  setValue('installer_id', null);
+                  const inst = installers.find(i => String(i.id) === v);
+                  setValue('installer_id', v || null);
+                  setValue('installer_nome', inst?.name || inst?.full_name || v || null);
+                  setValue('installer_email', inst?.email || null);
                 }}
-                placeholder={csLoading ? 'Carregando...' : 'Selecionar instalador...'}
+                placeholder="Selecionar instalador..."
                 searchPlaceholder="Buscar instalador..."
-                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText="Nenhum resultado"
               />
             </div>
           </div>
@@ -832,19 +834,21 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
               {errors.branch && <p className="text-xs text-red-400">{errors.branch.message}</p>}
             </div>
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
+              <Label className="text-xs text-muted-foreground">Instalador</Label>
               <Combobox
-                options={colaboradoresVC}
-                value={watch('installer_email') || ''}
+                options={[...installers]
+                  .map(inst => ({ value: String(inst.id), label: inst.name || inst.full_name || inst.email }))
+                  .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))}
+                value={watch('installer_id') || ''}
                 onChange={(v) => {
-                  const opt = colaboradoresVCMap.get(v);
-                  setValue('installer_email', v || null);
-                  setValue('installer_nome', opt?._nome || v || null);
-                  setValue('installer_id', null);
+                  const inst = installers.find(i => String(i.id) === v);
+                  setValue('installer_id', v || null);
+                  setValue('installer_nome', inst?.name || inst?.full_name || v || null);
+                  setValue('installer_email', inst?.email || null);
                 }}
-                placeholder={csLoading ? 'Carregando...' : 'Selecionar instalador...'}
+                placeholder="Selecionar instalador..."
                 searchPlaceholder="Buscar instalador..."
-                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText="Nenhum resultado"
               />
             </div>
           </div>
@@ -1065,10 +1069,10 @@ const VisitasTecnicas = () => {
   const catalogos = useCatalogos();
 
   React.useEffect(() => {
-    api.getInstallers()
-      .then(res => setInstallers(res.data || []))
+    api.getUsers({ role: 'installer', is_active: true })
+      .then(res => setInstallers(Array.isArray(res.data) ? res.data : []))
       .catch(err => {
-        console.error('[VisitasTecnicas] falha ao carregar instaladores:', err?.message);
+        console.error('[VisitasTecnicas] falha ao carregar instaladores:', err?.response?.data || err?.message);
         toast.error('Não foi possível carregar a lista de instaladores');
       });
   }, []);

@@ -40,48 +40,61 @@ class PushNotificationRequest(BaseModel):
 # ============ HELPER FUNCTIONS ============
 
 async def send_push_notification(user_id: str, title: str, body: str, url: str = "/", data: dict = None):
-    """Send push notification to a specific user."""
-    from pywebpush import webpush, WebPushException
+    """Send push notification via Supabase Edge Function (RFC 8291, Web Crypto no Deno)."""
+    import os
+    import httpx
 
-    subscription = db.push_subscriptions.find_one(
-        {"user_id": user_id, "is_active": True}
-    )
-
+    subscription = db.push_subscriptions.find_one({"user_id": user_id, "is_active": True})
     if not subscription:
         logger.info(f"No active push subscription for user {user_id}")
         return False
 
-    try:
-        payload = json.dumps({
-            "title": title,
-            "body": body,
-            "icon": "/logo192.png",
-            "badge": "/logo192.png",
-            "url": url,
-            "data": data or {}
-        })
+    supabase_url = os.environ.get("SUPABASE_URL", "https://qfsxtwkltfraounsjjah.supabase.co").rstrip("/")
+    supabase_key = os.environ.get("SUPABASE_SERVICE_KEY", "")
+    edge_url = f"{supabase_url}/functions/v1/send-push"
 
-        webpush(
-            subscription_info={
-                "endpoint": subscription["endpoint"],
-                "keys": subscription["keys"]
-            },
-            data=payload,
-            vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_claims={
-                "sub": f"mailto:{VAPID_CLAIMS_EMAIL}"
-            }
-        )
-        logger.info(f"Push notification sent to user {user_id}")
-        return True
-    except WebPushException as e:
-        logger.error(f"Push notification failed for user {user_id}: {str(e)}")
-        # If subscription is invalid, mark it as inactive
-        if e.response and e.response.status_code in [404, 410]:
+    payload = json.dumps({
+        "title": title,
+        "body": body,
+        "icon": "/logo192.png",
+        "badge": "/logo192.png",
+        "url": url,
+        "data": data or {},
+    })
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                edge_url,
+                json={
+                    "endpoint": subscription["endpoint"],
+                    "keys": subscription["keys"],
+                    "payload": payload,
+                    "subject": f"mailto:{VAPID_CLAIMS_EMAIL}",
+                    "vapid_private": VAPID_PRIVATE_KEY,
+                    "vapid_public": VAPID_PUBLIC_KEY,
+                },
+                headers={"Authorization": f"Bearer {supabase_key}"},
+            )
+
+        result = resp.json() if resp.headers.get("content-type", "").startswith("application/json") else {}
+        if result.get("expired") or resp.status_code in (404, 410):
             db.push_subscriptions.update_one(
                 {"user_id": user_id},
-                {"$set": {"is_active": False}}
+                {"$set": {"is_active": False}},
             )
+            logger.info(f"Push subscription expirada para user {user_id}, desativada")
+            return False
+
+        if not resp.is_success:
+            logger.error(f"Push notification falhou para user {user_id}: HTTP {resp.status_code} — {result}")
+            return False
+
+        logger.info(f"Push notification enviada para user {user_id}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Push notification erro para user {user_id}: {e}")
         return False
 
 

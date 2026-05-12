@@ -13,7 +13,11 @@ import base64
 
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
-from services.email import send_vendedor_report_email, send_installer_invite_email
+from services.email import (
+    send_vendedor_report_email,
+    send_installer_invite_email,
+    send_visita_notificacao_geral,
+)
 from models.user import User, UserRole
 from models.visita import (
     VisitaCreate,
@@ -135,24 +139,11 @@ async def create_visita(
     if not saved:
         raise HTTPException(status_code=500, detail="Erro ao salvar visita técnica")
 
-    # ── Disparo de emails (não bloqueia a resposta em caso de falha) ──────────
-    if data.vendedor_email and data.vendedor_nome:
-        send_vendedor_report_email(data.vendedor_email, data.vendedor_nome, saved)
-
-    # ── Email convite ao instalador ───────────────────────────────────────────
-    # Prioridade: conta local (via installer_id) → instalador externo (via installer_email)
-    installer_email_sent = False
-    if effective_installer_id:
-        installer_rec = db.installers.find_one({"id": effective_installer_id})
-        if installer_rec and installer_rec.get("user_id"):
-            user_rec = db.users.find_one({"id": installer_rec["user_id"]})
-            if user_rec and user_rec.get("email"):
-                installer_name = installer_rec.get("full_name") or user_rec.get("name") or user_rec["email"]
-                send_installer_invite_email(user_rec["email"], installer_name, saved)
-                installer_email_sent = True
-    if not installer_email_sent and data.installer_email:
-        installer_name = data.installer_nome or data.installer_email
-        send_installer_invite_email(data.installer_email, installer_name, saved)
+    # ── Notifica todos os managers (vendedores) e instaladores ───────────────
+    try:
+        send_visita_notificacao_geral(saved)
+    except Exception as exc:
+        logger.error("Erro ao enviar notificações de nova VT: %s", exc)
 
     return VisitaOut(**_parse_datetimes(_enrich_installer_name(saved)))
 

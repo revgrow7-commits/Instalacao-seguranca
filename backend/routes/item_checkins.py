@@ -152,6 +152,17 @@ async def update_productivity_history(product_data: dict):
     await _update(product_data)
 
 
+def _resolve_job_id_for_checkin(checkin: dict) -> str:
+    """Garante job_id não-nulo. Lança 400 com mensagem descritiva se impossível."""
+    job_id = checkin.get("job_id")
+    if job_id:
+        return job_id
+    raise HTTPException(
+        status_code=400,
+        detail=f"item_checkin {checkin.get('id')} sem job_id — não é possível registrar pausa",
+    )
+
+
 # Import gamification functions from server (these will be available when router is included)
 async def calculate_checkout_coins(checkin, job):
     """Calculate coins for checkout - placeholder, actual implementation in server.py"""
@@ -461,10 +472,11 @@ async def complete_item_checkout(
             
             if checkin["status"] != "paused":
                 pause_reason = f"Saiu do local sem justificar (distância: {round(distance_meters)}m)"
+                job_id = _resolve_job_id_for_checkin(checkin)
                 pause_log = {
                     "id": str(uuid.uuid4()),
                     "checkin_id": checkin_id,
-                    "job_id": checkin["job_id"],
+                    "job_id": job_id,
                     "item_index": checkin["item_index"],
                     "installer_id": checkin["installer_id"],
                     "reason": pause_reason,
@@ -690,12 +702,13 @@ async def pause_item_checkin(
         logger.error(f"Checkin {checkin_id} is already paused")
         raise HTTPException(status_code=400, detail="Item is already paused")
     
+    job_id = _resolve_job_id_for_checkin(checkin)
     pause_log = ItemPauseLog(
         checkin_id=checkin_id,
-        job_id=checkin["job_id"],
+        job_id=job_id,
         item_index=checkin["item_index"],
         installer_id=checkin["installer_id"],
-        reason=reason
+        reason=reason,
     )
 
     pause_dict = pause_log.model_dump()

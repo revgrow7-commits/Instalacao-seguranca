@@ -91,7 +91,13 @@ export const api = {
   adminResetPassword: (userId, newPassword) => axios.put(`${API_URL}/users/${userId}/reset-password`, { new_password: newPassword }, { headers: getAuthHeader() }),
 
   // Users
-  getUsers: () => axios.get(`${API_URL}/users`, { headers: getAuthHeader() }),
+  getUsers: (params = {}) => {
+    const qs = new URLSearchParams();
+    if (params.role) qs.set('role', params.role);
+    if (typeof params.is_active === 'boolean') qs.set('is_active', String(params.is_active));
+    const url = qs.toString() ? `${API_URL}/users?${qs.toString()}` : `${API_URL}/users`;
+    return axios.get(url, { headers: getAuthHeader() });
+  },
   createUser: (data) => {
     clearCache('users');
     return axios.post(`${API_URL}/auth/register`, data, { headers: getAuthHeader() });

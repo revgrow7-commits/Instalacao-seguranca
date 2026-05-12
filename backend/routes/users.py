@@ -2,7 +2,7 @@
 User management routes.
 """
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends
 
 from db_supabase import db
@@ -13,14 +13,27 @@ router = APIRouter()
 
 
 @router.get("/users", response_model=List[User])
-async def list_users(current_user: User = Depends(get_current_user)):
-    require_role(current_user, [UserRole.ADMIN])
-    users = db.users.find({}, {"_id": 0, "password_hash": 0})
-    
+async def list_users(
+    role: Optional[str] = None,
+    is_active: Optional[bool] = None,
+    current_user: User = Depends(get_current_user),
+):
+    # Sem filtros: só admin pode listar todos os usuários
+    if role is None and is_active is None:
+        require_role(current_user, [UserRole.ADMIN])
+
+    query: dict = {}
+    if role is not None:
+        query["role"] = role
+    if is_active is not None:
+        query["is_active"] = is_active
+
+    users = db.users.find(query, {"_id": 0, "password_hash": 0})
+
     for user in users:
-        if isinstance(user['created_at'], str):
-            user['created_at'] = datetime.fromisoformat(user['created_at'])
-    
+        if isinstance(user.get("created_at"), str):
+            user["created_at"] = datetime.fromisoformat(user["created_at"])
+
     return users
 
 
