@@ -337,12 +337,12 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={vendedoresVC.length > 0 ? vendedoresVC : (colaboradoresVC.length > 0 ? colaboradoresVC : vendedores)}
+                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
                 value={watch('vendedor_email') || ''}
                 onChange={(v) => {
-                  const opt = vendedoresVCMap.get(v);
+                  const opt = colaboradoresVCMap.get(v);
                   setValue('vendedor_email', v || null);
-                  setValue('vendedor_nome', opt?._nome || colaboradoresVCMap.get(v) || v || null);
+                  setValue('vendedor_nome', opt?._nome || v || null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
@@ -391,10 +391,10 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
               <Combobox
-                options={instaladoresVC}
+                options={colaboradoresVC}
                 value={watch('installer_email') || ''}
                 onChange={(v) => {
-                  const opt = instaladoresVCMap.get(v);
+                  const opt = colaboradoresVCMap.get(v);
                   setValue('installer_email', v || null);
                   setValue('installer_nome', opt?._nome || v || null);
                   setValue('installer_id', null);
@@ -781,12 +781,12 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={vendedoresVC.length > 0 ? vendedoresVC : (colaboradoresVC.length > 0 ? colaboradoresVC : vendedores)}
+                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
                 value={watch('vendedor_email') || ''}
                 onChange={(v) => {
-                  const opt = vendedoresVCMap.get(v);
+                  const opt = colaboradoresVCMap.get(v);
                   setValue('vendedor_email', v || null);
-                  setValue('vendedor_nome', opt?._nome || colaboradoresVCMap.get(v) || v || null);
+                  setValue('vendedor_nome', opt?._nome || v || null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
@@ -834,10 +834,10 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Instalador (Visual Connect)</Label>
               <Combobox
-                options={instaladoresVC}
+                options={colaboradoresVC}
                 value={watch('installer_email') || ''}
                 onChange={(v) => {
-                  const opt = instaladoresVCMap.get(v);
+                  const opt = colaboradoresVCMap.get(v);
                   setValue('installer_email', v || null);
                   setValue('installer_nome', opt?._nome || v || null);
                   setValue('installer_id', null);
@@ -1236,7 +1236,7 @@ const VisitasTecnicas = () => {
 
             <div className="w-56">
               <Combobox
-                options={catalogos.vendedoresVC.length > 0 ? catalogos.vendedoresVC : catalogos.colaboradoresVC}
+                options={catalogos.colaboradoresVC}
                 value={filterVendedor}
                 onChange={(v) => setFilterVendedor(v || '')}
                 placeholder="Filtrar por vendedor"

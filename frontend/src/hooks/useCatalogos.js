@@ -35,12 +35,13 @@ export function useCatalogos() {
     api.listTiposServico().then(r => setTiposServico((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar tipos de serviço', err));
     api.listFerramentas().then(r => setFerramentas((r.data || []).map(v => ({ value: v.nome, label: v.nome })))).catch(err => console.error('useCatalogos: falha ao carregar ferramentas', err));
 
-    // Todos os colaboradores (compatibilidade legada para seletor de Vendedor sem filtro de role)
+    // Todos os colaboradores do Visual Connect — usado pelos seletores de Vendedor e Instalador
     api.getCsColaboradores()
       .then(r => {
         const data = r.data || [];
-        setColaboradoresVC(data.map(c => ({ value: c.nome, label: c.cargo ? `${c.nome} (${c.cargo})` : c.nome })));
-        setColaboradoresVCMap(new Map(data.map(c => [c.nome, c.email || ''])));
+        const opts = data.map(toComboOption);
+        setColaboradoresVC(opts);
+        setColaboradoresVCMap(new Map(opts.map(o => [o.value, o])));
       })
       .catch(err => console.error('useCatalogos: falha ao carregar colaboradores do Visual Connect', err));
 
