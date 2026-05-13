@@ -1,6 +1,8 @@
 import axios from 'axios';
 import tokenManager from './tokenManager';
 
+// cache-bust 2026-05-13 — força bundle hash novo para invalidar CDN edge cache
+// Path correto é /api (não /_/backend/api). Backend está em api.instal-visual.com.br via header REACT_APP_BACKEND_URL.
 const API_URL = (process.env.REACT_APP_BACKEND_URL?.trim() || window.location.origin) + '/api';
 
 // Simple in-memory cache
