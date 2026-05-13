@@ -442,6 +442,8 @@ export const api = {
   confirmarVisita: (id, data) => axios.post(`${API_URL}/visitas/${id}/confirmar`, data, { headers: getAuthHeader() }),
   rejeitarVisita: (id, motivo) => axios.post(`${API_URL}/visitas/${id}/rejeitar`, { motivo }, { headers: getAuthHeader() }),
   getVisita: (id) => axios.get(`${API_URL}/visitas/${id}`, { headers: getAuthHeader() }),
+  enviarEmailVisita: (id) =>
+    axios.post(`${API_URL}/visitas/${id}/enviar-email`, {}, { headers: getAuthHeader() }),
   submitRelatorioVisita: (id, formData) =>
     axios.post(`${API_URL}/visitas/${id}/relatorio`, formData, {
       headers: getAuthHeader(),

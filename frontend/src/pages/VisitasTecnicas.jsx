@@ -22,7 +22,7 @@ import { useCatalogos } from '../hooks/useCatalogos';
 import {
   MapPin, Plus, Calendar, User, Building2, ChevronDown,
   Clock, X, RefreshCw, Eye, Wrench, AlertTriangle, CheckCircle2, XCircle, Clock as ClockIcon, BarChart2,
-  Car, Layers, Ruler, Zap
+  Car, Layers, Ruler, Zap, Mail, MessageCircle, Loader2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -143,7 +143,7 @@ function buildDatetimePayload(data) {
   return payload;
 }
 
-const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmin, isManager }) => {
+const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, onEnviarEmail, loadingEmailId, isAdmin, isManager }) => {
   const navigate = useNavigate();
   const statusStyle = STATUS_STYLES[visita.status] || STATUS_STYLES.AGUARDANDO;
   const statusLabel = STATUS_LABELS[visita.status] || visita.status;
@@ -151,6 +151,30 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
   const formattedDate = visita.scheduled_date
     ? new Date(visita.scheduled_date).toLocaleDateString('pt-BR')
     : null;
+
+  const handleWhatsApp = () => {
+    const STATUS_LABELS_WA = {
+      AGUARDANDO: 'Aguardando',
+      AGUARDANDO_CONFIRMACAO: 'A Confirmar',
+      EM_VISITA: 'Em Visita',
+      CONCLUIDA: 'Concluída',
+      CANCELADA: 'Cancelada',
+    };
+    const dataStr = formattedDate || 'A definir';
+    const msg = [
+      `*Visita Técnica — ${visita.numero_vt || visita.id?.slice(0, 8)?.toUpperCase()}*`,
+      `Cliente: ${visita.client_name}`,
+      visita.client_address ? `Endereço: ${visita.client_address}` : null,
+      visita.branch ? `Filial: ${visita.branch}` : null,
+      `Data: ${dataStr}`,
+      `Status: ${STATUS_LABELS_WA[visita.status] || visita.status}`,
+      visita.installer_name ? `Instalador: ${visita.installer_name}` : null,
+      visita.aprovacao_status ? `Aprovação: ${visita.aprovacao_status}` : null,
+      ``,
+      `🔗 https://instal-visual.com.br/visitas-tecnicas/${visita.id}`,
+    ].filter(Boolean).join('\n');
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
 
   return (
     <Card className="bg-card border-white/5 hover:border-primary/30 transition-all duration-200">
@@ -200,7 +224,7 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
         )}
         {!formattedDate && <div className="mb-3" />}
 
-        <div className="pt-2 border-t border-white/5 mb-2">
+        <div className="pt-2 border-t border-white/5 mb-2 space-y-2">
           <Button
             size="sm"
             variant="outline"
@@ -210,6 +234,34 @@ const VisitaCard = React.memo(({ visita, onAgendar, onEditar, onCancelar, isAdmi
             <Eye className="h-3 w-3 mr-1" />
             Ver Detalhes
           </Button>
+
+          {(isAdmin || isManager) && (
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs border-green-500/30 text-green-400 hover:bg-green-500/10 disabled:opacity-50"
+                disabled={loadingEmailId === visita.id}
+                onClick={() => onEnviarEmail(visita)}
+                title="Enviar relatório por email ao vendedor e instalador"
+              >
+                {loadingEmailId === visita.id
+                  ? <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  : <Mail className="h-3 w-3 mr-1" />}
+                Enviar Email
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
+                onClick={handleWhatsApp}
+                title="Enviar resumo da visita via WhatsApp"
+              >
+                <MessageCircle className="h-3 w-3 mr-1" />
+                WhatsApp
+              </Button>
+            </div>
+          )}
         </div>
 
         {(isAdmin || isManager) && (
@@ -1064,6 +1116,7 @@ const VisitasTecnicas = () => {
   const [novaVisitaOpen, setNovaVisitaOpen] = useState(false);
   const [agendarVisita, setAgendarVisita] = useState(null);
   const [editarVisita, setEditarVisita] = useState(null);
+  const [loadingEmailId, setLoadingEmailId] = useState(null);
 
   const { visitas, loading, error, counters, refetch } = useVisitas();
   const catalogos = useCatalogos();
@@ -1075,6 +1128,19 @@ const VisitasTecnicas = () => {
         console.error('[VisitasTecnicas] falha ao carregar instaladores:', err?.response?.data || err?.message);
         toast.error('Não foi possível carregar a lista de instaladores');
       });
+  }, []);
+
+  const handleEnviarEmail = useCallback(async (visita) => {
+    setLoadingEmailId(visita.id);
+    try {
+      const res = await api.enviarEmailVisita(visita.id);
+      const sentTo = res?.data?.sent_to || [];
+      toast.success(`Email enviado para: ${sentTo.join(', ')}`);
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Erro ao enviar email');
+    } finally {
+      setLoadingEmailId(null);
+    }
   }, []);
 
   const handleCancelar = useCallback(async (visita) => {
@@ -1345,6 +1411,8 @@ const VisitasTecnicas = () => {
               onAgendar={setAgendarVisita}
               onEditar={setEditarVisita}
               onCancelar={handleCancelar}
+              onEnviarEmail={handleEnviarEmail}
+              loadingEmailId={loadingEmailId}
               isAdmin={isAdmin}
               isManager={isManager}
             />

@@ -17,6 +17,7 @@ from services.email import (
     send_vendedor_report_email,
     send_installer_invite_email,
     send_visita_notificacao_geral,
+    send_relatorio_visita_concluida,
 )
 from models.user import User, UserRole
 from models.visita import (
@@ -634,6 +635,29 @@ async def cancelar_visita(
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após cancelamento")
 
     return VisitaOut(**_parse_datetimes(_enrich_installer_name(updated)))
+
+
+@router.post("/visitas/{visita_id}/enviar-email")
+async def enviar_email_relatorio(
+    visita_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Envia o relatório completo da visita por email ao vendedor e/ou instalador. Somente admin/manager."""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    doc = db.visitas_tecnicas.find_one({"id": visita_id}, {"_id": 0})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Visita técnica não encontrada")
+
+    sent_to = send_relatorio_visita_concluida(doc)
+
+    if not sent_to:
+        raise HTTPException(
+            status_code=400,
+            detail="Nenhum email de destinatário configurado na visita (vendedor_email / installer_email).",
+        )
+
+    return {"success": True, "sent_to": sent_to}
 
 
 @router.post("/visitas/{visita_id}/relatorio", response_model=VisitaOut)
