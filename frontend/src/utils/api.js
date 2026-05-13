@@ -63,12 +63,10 @@ const getJobsWithCache = async (includeArchived = false) => {
 };
 
 // Interceptor global: redireciona para /login em qualquer 401
-// Exceção: rota de login — não redireciona, deixa o catch do AuthContext tratar
 axios.interceptors.response.use(
   res => res,
   err => {
-    const isLoginEndpoint = err.config?.url?.includes('/auth/login');
-    if (err.response?.status === 401 && !isLoginEndpoint) {
+    if (err.response?.status === 401) {
       tokenManager.clear();
       window.location.href = '/login';
     }
