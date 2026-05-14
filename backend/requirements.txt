@@ -33,4 +33,17 @@ resend==2.19.0
 
 # Image processing (compressão de fotos de check-in/out)
 # CRÍTICO (auditoria 2026-05-14): sem Pillow, compress_base64_image cai no
-# except silen
+# except silencioso e devolve a foto SEM compressão — base64 grande pode
+# estourar body limit do Vercel (4.5MB) e RAM da serverless function.
+Pillow>=10.0.0,<11.0.0
+
+# Excel handling
+openpyxl==3.1.5
+
+# Date handling
+python-dateutil==2.9.0.post0
+pytz==2025.2
+
+# Utilities
+certifi==2025.11.12
+urllib3==2.5.0

@@ -324,6 +324,36 @@ Evita erros 400 do Supabase por campos desconhecidos. Custo: campos novos adicio
 | `frontend/src/hooks/useCatalogos.js` | 6 erros silenciosos (`.catch(() => {})` → `.catch(e => console.error(...))`) |
 | `frontend/src/hooks/usePushNotifications.js` | Uso correto de `navigator.serviceWorker.ready` (global, não da instância) |
 
+## Incidente 2026-05-13 — `FUNCTION_INVOCATION_FAILED` em produção
+
+**Sintoma:** `api.instal-visual.com.br/*` retornava `FUNCTION_INVOCATION_FAILED` no commit `12bf1206` (Revert do `55ac9657`).
+
+**Diagnóstico:**
+- Build do Python passa limpo, falha é runtime (ImportError ao carregar `server.py`).
+- Suspeita principal: commit `990e03be` ("feat: WhatsApp + push via Edge Function + email VT geral") removeu `PyJWT` e `Pillow` do `requirements.txt`. A remoção do PyJWT é correta (`python-jose` cobre), mas há 3 `from PIL import Image` em `services/image.py`, `routes/checkins.py`, `routes/item_checkins.py` — todas dentro de funções, então não disparam ImportError no module-load. A causa raiz exata só pode ser confirmada com `git pull` + `python -c "from server import app"` no working tree no SHA `12bf1206`.
+
+**Resolução temporária:**
+- Promovido `dpl_AzWWn7FPrxEbebxSzPN5t3Z9V8j5` (commit `82029d06`, SHA antes dos commits problemáticos) no projeto Vercel `backend` via `POST /v10/projects/.../promote/...`. Backend voltou a responder JSON.
+- Frontend `instalacao-seguranca` já estava em `dc6e9de0` (promote anterior). Frontend e backend agora em commits diferentes — features pós-`82029d06` (WhatsApp button, paginação calendar, edge function push) podem retornar 404 quando o frontend chama endpoints que o backend `82029d06` não tem.
+
+**Banco (Supabase `qfsxtwkltfraounsjjah`):**
+- Aplicada migration `028_rls_initplan_job_item_assignments` (otimização de RLS que faltou em 027).
+- Confirmadas as 5/5 policies RLS de `public` com `(SELECT auth.uid())`.
+- Confirmadas as migrations 023, 024, 025, 027, 029 (e a 028 informalmente). Schema 100% sincronizado.
+- Zero ERROR-level findings nos advisors de segurança.
+
+**Próxima ação pendente (requer working tree local):**
+1. `cd C:\Users\andre\Downloads\claude\Instal-supa\supabase && git pull origin main`
+2. `cd backend && python -c "from server import app; print('OK')"` para reproduzir o ImportError
+3. Achar o `from X import Y` órfão (provavelmente em arquivo modificado por `990e03be`), corrigir ou re-adicionar dep
+4. `git commit -am "fix: import órfão pós-cleanup de requirements"` e `git push origin main` para auto-deploy
+
+**MCPs locais adicionados:**
+- `vercel-write` em `vercel-mcp-write/server.mjs` — expõe `promote_deployment`, `redeploy_deployment`, `create/update/delete/list_env_vars`, `delete_deployment` via REST API direta da Vercel. Configurado em `claude_desktop_config.json`.
+
+**Dívida de segurança:**
+- Token Vercel `vcp_...` e n8n JWT estão em texto-claro no `claude_desktop_config.json` E no histórico de uma conversa Cowork (esposição de print do usuário). Rotacionar ambos em até 24h.
+
 ---
 
 ## Comandos Úteis

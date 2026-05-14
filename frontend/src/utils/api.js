@@ -1,8 +1,8 @@
 import axios from 'axios';
 import tokenManager from './tokenManager';
 
-// cache-bust 2026-05-13 — força bundle hash novo para invalidar CDN edge cache
-// Path correto é /api (não /_/backend/api). Backend está em api.instal-visual.com.br via header REACT_APP_BACKEND_URL.
+// REACT_APP_BACKEND_URL deve incluir /_/backend (monorepo Vercel: backend em /_/backend, frontend em /)
+// Ex: https://backend-henna-one-82.vercel.app/_/backend → API_URL = .../api
 const API_URL = (process.env.REACT_APP_BACKEND_URL?.trim() || window.location.origin) + '/api';
 
 // Simple in-memory cache
@@ -64,12 +64,13 @@ const getJobsWithCache = async (includeArchived = false) => {
   return freshPromise;
 };
 
-// Interceptor global: redireciona para /login em qualquer 401
+// Interceptor global: redireciona para /login em 401, exceto no próprio login
 axios.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
-      tokenManager.clear();
+    const isLoginEndpoint = err.config?.url?.includes('/auth/login');
+    if (err.response?.status === 401 && !isLoginEndpoint) {
+      tokenManager.clearToken();
       window.location.href = '/login';
     }
     return Promise.reject(err);
