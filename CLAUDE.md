@@ -342,11 +342,13 @@ Evita erros 400 do Supabase por campos desconhecidos. Custo: campos novos adicio
 - Confirmadas as migrations 023, 024, 025, 027, 029 (e a 028 informalmente). Schema 100% sincronizado.
 - Zero ERROR-level findings nos advisors de segurança.
 
-**Próxima ação pendente (requer working tree local):**
-1. `cd C:\Users\andre\Downloads\claude\Instal-supa\supabase && git pull origin main`
-2. `cd backend && python -c "from server import app; print('OK')"` para reproduzir o ImportError
-3. Achar o `from X import Y` órfão (provavelmente em arquivo modificado por `990e03be`), corrigir ou re-adicionar dep
-4. `git commit -am "fix: import órfão pós-cleanup de requirements"` e `git push origin main` para auto-deploy
+**Resolução definitiva (2026-05-14 — commit `2f53ede`):**
+- Raiz do bug de login: frontend chamava `REACT_APP_BACKEND_URL + /api` = `/api/...` que serveia o SPA CRA, não o FastAPI
+- Backend (projeto Vercel monorepo `redeploy`) usa `experimentalServices`, expõe FastAPI em `/_/backend/api/*`
+- `REACT_APP_BACKEND_URL` atualizado de `https://backend-henna-one-82.vercel.app` para `https://backend-henna-one-82.vercel.app/_/backend`
+- Interceptor 401 em `api.js` corrigido: exceção para `/auth/login` + `clear()` → `clearToken()`
+- Pillow restaurado em `requirements.txt` (commit `40a9393` + `2f53ede`)
+- Frontend promovido a produção: `dpl_GeJ55JfbpbT85YqaFkm8kZDqiPRH` serve `instal-visual.com.br`
 
 **MCPs locais adicionados:**
 - `vercel-write` em `vercel-mcp-write/server.mjs` — expõe `promote_deployment`, `redeploy_deployment`, `create/update/delete/list_env_vars`, `delete_deployment` via REST API direta da Vercel. Configurado em `claude_desktop_config.json`.
