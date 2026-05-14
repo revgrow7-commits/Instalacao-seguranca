@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -149,7 +149,14 @@ const VisitaDetail = () => {
   const [lightboxSrc, setLightboxSrc] = useState(null);
   const cancelledRef = useRef(false);
 
-  const loadVisita = async () => {
+  // Wrapped in useCallback so useEffect can list it as a dependency without
+  // re-firing on every render. Closes over `id` and `navigate`; both setters
+  // (setVisita/setLoading) are stable.
+  //
+  // The cancellation flag is set inside the function (not in useEffect cleanup
+  // alone) so that consecutive calls — e.g. user navigates from /visitas/A to
+  // /visitas/B before A's request resolves — correctly invalidate A.
+  const loadVisita = useCallback(async () => {
     cancelledRef.current = false;
     setLoading(true);
     try {
@@ -166,12 +173,12 @@ const VisitaDetail = () => {
     } finally {
       if (!cancelledRef.current) setLoading(false);
     }
-  };
+  }, [id, navigate]);
 
   useEffect(() => {
     loadVisita();
     return () => { cancelledRef.current = true; };
-  }, [id]);
+  }, [loadVisita]);
 
   if (loading) {
     return (
@@ -347,6 +354,8 @@ const VisitaDetail = () => {
                         key={i}
                         src={typeof src === 'string' ? src : src?.url}
                         alt={`Foto ${i + 1}`}
+                        loading="lazy"
+                        decoding="async"
                         className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
                         onClick={() => setLightboxSrc(typeof src === 'string' ? src : src?.url)}
                       />

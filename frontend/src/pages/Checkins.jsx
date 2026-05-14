@@ -13,6 +13,7 @@ import {
   ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight, MessageCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getPhotoSrc } from '../lib/photo';
 
 // Skeleton loader component
 const CheckinSkeleton = () => (
@@ -109,7 +110,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
             <div className="w-full h-full rounded-lg overflow-hidden bg-white/5">
               {photo ? (
                 <img
-                  src={photo.startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`}
+                  src={getPhotoSrc(photo, isCheckout ? checkin.checkout_photo_url : checkin.checkin_photo_url)}
                   alt={type}
                   className="w-full h-full object-cover"
                   loading="lazy"

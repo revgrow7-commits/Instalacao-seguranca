@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CoinAnimation from '../components/CoinAnimation';
+import { getPhotoSrc } from '../lib/photo';
 
 // FIX C3 (auditoria 2026-05-14): relaxado de 100m para 200m. Em zonas urbanas
 // densas e locais semi-fechados, smartphones costumam reportar 80-200m no
@@ -413,7 +414,8 @@ const InstallerJobDetail = () => {
       
       // Usar valores definidos pelo gerente na atribuição
       const complexityLevel = assignment?.manager_difficulty_level || 3;
-      const heightCategory = 'terreo'; // Valor padrão (altura será definida pelo cenário)
+      // TODO: usar altura real da atribuicao quando disponivel (campo ausente no objeto assignment)
+      const heightCategory = 'terreo';
       const scenarioCategory = assignment?.manager_scenario_category || 'loja_rua';
       const installedM2 = item?.total_area_m2 || 0; // Usar o m² calculado do item
       
@@ -811,11 +813,11 @@ const InstallerJobDetail = () => {
                       {/* Check-in/Check-out Photos */}
                       {checkin && (
                         <div className="grid grid-cols-2 gap-3">
-                          {checkin.checkin_photo && (
+                          {(checkin.checkin_photo || checkin.checkin_photo_url) && (
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Foto Check-in</p>
                               <img
-                                src={checkin.checkin_photo.startsWith('data:') ? checkin.checkin_photo : `data:image/jpeg;base64,${checkin.checkin_photo}`}
+                                src={getPhotoSrc(checkin.checkin_photo, checkin.checkin_photo_url)}
                                 alt="Check-in"
                                 loading="lazy"
                                 decoding="async"
@@ -823,11 +825,11 @@ const InstallerJobDetail = () => {
                               />
                             </div>
                           )}
-                          {checkin.checkout_photo && (
+                          {(checkin.checkout_photo || checkin.checkout_photo_url) && (
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Foto Check-out</p>
                               <img
-                                src={checkin.checkout_photo.startsWith('data:') ? checkin.checkout_photo : `data:image/jpeg;base64,${checkin.checkout_photo}`}
+                                src={getPhotoSrc(checkin.checkout_photo, checkin.checkout_photo_url)}
                                 alt="Check-out"
                                 loading="lazy"
                                 decoding="async"
@@ -997,13 +999,13 @@ const InstallerJobDetail = () => {
                                   Motivo: <span className="text-orange-300">{PAUSE_REASON_LABELS[pauseLogs[itemIndex].active_pause.reason] || pauseLogs[itemIndex].active_pause.reason}</span>
                                 </p>
                                 <p className="text-muted-foreground">
-                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.start_time)) / 60000))}</span>
+                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.paused_at)) / 60000))}</span>
                                 </p>
                               </div>
                             )}
                             {pauseLogs[itemIndex]?.total_pause_minutes > 0 && (
                               <p className="text-xs text-muted-foreground mt-2">
-                                Tempo total em pausa: {formatDuration(pauseLogs[itemIndex].total_pause_minutes + (pauseLogs[itemIndex].active_pause ? Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.start_time)) / 60000) : 0))}
+                                Tempo total em pausa: {formatDuration(pauseLogs[itemIndex].total_pause_minutes + (pauseLogs[itemIndex].active_pause ? Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.paused_at)) / 60000) : 0))}
                               </p>
                             )}
                           </div>
