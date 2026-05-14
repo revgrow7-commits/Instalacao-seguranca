@@ -383,9 +383,11 @@ async def create_item_checkin(
     db.item_checkins.insert_one(checkin_dict)
     
     checkin_dict.pop('_id', None)
-    
+    checkin_dict.pop('checkin_photo', None)
+    checkin_dict.pop('checkout_photo', None)
+
     db.jobs.update_one({"id": job_id}, {"$set": {"status": "instalando"}})
-    
+
     return checkin_dict
 
 
@@ -531,7 +533,7 @@ async def complete_item_checkout(
     checkin_lat = checkin.get("gps_lat")
     checkin_long = checkin.get("gps_long")
     
-    if checkin_lat and checkin_long and gps_lat and gps_long:
+    if all(v is not None for v in [checkin_lat, checkin_long, gps_lat, gps_long]):
         distance_meters = calculate_gps_distance(checkin_lat, checkin_long, gps_lat, gps_long)
         
         if distance_meters > MAX_CHECKOUT_DISTANCE_METERS:
@@ -553,21 +555,6 @@ async def complete_item_checkout(
             db.location_alerts.insert_one(location_log)
             
             if checkin["status"] != "paused":
-                pause_reason = f"Saiu do local sem justificar (distância: {round(distance_meters)}m)"
-                job_id = _resolve_job_id_for_checkin(checkin)
-                pause_log = {
-                    "id": str(uuid.uuid4()),
-                    "checkin_id": checkin_id,
-                    "job_id": job_id,
-                    "item_index": checkin["item_index"],
-                    "installer_id": checkin["installer_id"],
-                    "reason": pause_reason,
-                    "paused_at": datetime.now(timezone.utc).isoformat(),
-                    "resumed_at": datetime.now(timezone.utc).isoformat(),
-                    "duration_minutes": 0,
-                    "auto_generated": True
-                }
-                db.item_pause_logs.insert_one(pause_log)
                 auto_paused = True
             
             location_alert = {
@@ -707,7 +694,7 @@ async def complete_item_checkout(
         db.jobs.update_one({"id": checkin["job_id"]}, {"$set": {"status": "finalizado"}})
     
     # Return result
-    result = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+    result = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
     
     if location_alert:
         result["location_alert"] = location_alert
@@ -784,17 +771,16 @@ async def pause_item_checkin(
         logger.error(f"Checkin {checkin_id} is already paused")
         raise HTTPException(status_code=400, detail="Item is already paused")
 
-    # FIX B2 (relaxado para produção): aceita motivos atuais OU legados.
-    # Rejeitar legados quebraria instaladores com PWA em cache antigo —
-    # eles ficariam impossibilitados de pausar em campo até atualizar o app.
-    # Para qualquer outro valor totalmente desconhecido, logamos warning e
-    # gravamos como "outro" (preserva o histórico operacional).
+    # FIX B2 (auditoria 2026-05-14): aceita motivos atuais (PAUSE_REASONS) OU
+    # legados (LEGACY_PAUSE_REASON_LABELS) para retro-compatibilidade com PWA
+    # em cache antigo. Valores totalmente desconhecidos retornam 422 — evita
+    # gravar lixo no banco silenciosamente.
     _all_valid = set(PAUSE_REASONS) | set(LEGACY_PAUSE_REASON_LABELS.keys())
     if reason not in _all_valid:
-        logger.warning(
-            f"Motivo de pausa desconhecido '{reason}' de {current_user.email}; gravando como 'outro'"
+        raise HTTPException(
+            status_code=422,
+            detail=f"Motivo de pausa inválido: {reason}",
         )
-        reason = "outro"
 
     job_id = _resolve_job_id_for_checkin(checkin)
     pause_log = ItemPauseLog(

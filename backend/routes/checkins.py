@@ -392,7 +392,7 @@ async def _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy
     update_data = {k: v for k, v in update_data.items() if v is not None}
 
     db.checkins.update_one({"id": checkin_id}, {"$set": update_data})
-    result = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
+    result = db.checkins.find_one({"id": checkin_id}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
     if not result:
         raise HTTPException(status_code=404, detail="Check-in not found after update")
     
@@ -467,10 +467,11 @@ async def get_checkin_details(
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    checkin = db.checkins.find_one({"id": checkin_id}, {"_id": 0})
-    
+    photo_projection = {"_id": 0, "checkin_photo": 0, "checkout_photo": 0}
+    checkin = db.checkins.find_one({"id": checkin_id}, photo_projection)
+
     if not checkin:
-        checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
+        checkin = db.item_checkins.find_one({"id": checkin_id}, photo_projection)
     
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
