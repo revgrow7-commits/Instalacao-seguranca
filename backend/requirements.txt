@@ -31,13 +31,6 @@ google-api-python-client>=2.0.0
 # Email
 resend==2.19.0
 
-# Excel handling
-openpyxl==3.1.5
-
-# Date handling
-python-dateutil==2.9.0.post0
-pytz==2025.2
-
-# Utilities
-certifi==2025.11.12
-urllib3==2.5.0
+# Image processing (compressão de fotos de check-in/out)
+# CRÍTICO (auditoria 2026-05-14): sem Pillow, compress_base64_image cai no
+# except silen

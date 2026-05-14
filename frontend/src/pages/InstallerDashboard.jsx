@@ -108,9 +108,14 @@ const InstallerDashboard = () => {
       if (res._stale && res._fresh) {
         res._fresh.then(fresh => {
           setJobs(fresh.data ?? []);
-        }).catch(() => { /* falha silenciosa — cache já está exibido */ });
+        }).catch(e => {
+          // FIX M3: logar mesmo em fallback silencioso para investigar incidentes
+          console.warn('[InstallerDashboard] revalidação stale-while-revalidate falhou:', e);
+        });
       }
-    } catch {
+    } catch (e) {
+      // FIX M3 (auditoria 2026-05-14): capturar o erro para logar antes de exibir toast genérico.
+      console.error('[InstallerDashboard] loadJobs falhou:', e);
       toast.error('Erro ao carregar jobs');
       setJobs([]);
       setLoading(false);
@@ -121,8 +126,10 @@ const InstallerDashboard = () => {
     try {
       const res = await api.getCheckins();
       setCheckins(res.data ?? []);
-    } catch {
-      // silencioso — checkin ausente apenas remove badge "Em Andamento"
+    } catch (e) {
+      // FIX M3: silencioso na UI (checkin ausente apenas remove badge),
+      // mas registrado no console para diagnóstico de incidentes de suporte.
+      console.warn('[InstallerDashboard] loadCheckins falhou:', e);
     } finally {
       setCheckinsLoading(false);
     }
@@ -137,8 +144,9 @@ const InstallerDashboard = () => {
         .sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
         .slice(0, 5);
       setUpcomingVisitas(upcoming);
-    } catch {
-      // silencioso — visitas não bloqueiam dashboard
+    } catch (e) {
+      // FIX M3: visitas não bloqueiam o dashboard, mas o erro fica registrado.
+      console.warn('[InstallerDashboard] loadVisitas falhou:', e);
     }
   };
 
@@ -148,10 +156,12 @@ const InstallerDashboard = () => {
         api.getGamificationBalance(),
         api.getGamificationTransactions(5)
       ]);
-      setGamificationBalance(balanceRes.data);
-      setRecentTransactions(transactionsRes.data);
+      // FIX B4 (auditoria 2026-05-14): fallback para listas — se a chamada
+      // falhar parcialmente ou voltar sem `data`, evita undefined no estado.
+      setGamificationBalance(balanceRes.data || null);
+      setRecentTransactions(transactionsRes.data || []);
     } catch (error) {
-      console.warn('Gamification data not available yet');
+      console.warn('[InstallerDashboard] gamification fetch falhou:', error);
     }
   };
 

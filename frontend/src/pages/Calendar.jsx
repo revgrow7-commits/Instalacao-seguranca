@@ -139,8 +139,12 @@ const Calendar = () => {
       setAllJobs((jobsRes.data || []).filter(j =>
         !j.scheduled_date && j.status !== 'finalizado' && j.status !== 'completed'
       ));
-      setInstallers(installersRes.data);
+      // FIX B4 (auditoria 2026-05-14): fallback obrigatório — se a resposta
+      // vier sem `data` (instalador, erro de rede), `undefined.map/find` quebra
+      // o componente inteiro com tela em branco.
+      setInstallers(installersRes.data || []);
     } catch (error) {
+      console.error('[Calendar] loadData:', error);
       toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
@@ -157,12 +161,18 @@ const Calendar = () => {
   };
 
   const disconnectGoogleCalendar = async () => {
+    // FIX M4 (auditoria 2026-05-14): exige confirmação — o botão "X"
+    // tinha clique fácil em mobile e desconectar força reautorização OAuth completa.
+    if (!window.confirm('Desconectar o Google Calendar?\n\nVocê precisará autorizar a integração novamente para sincronizar jobs.')) {
+      return;
+    }
     try {
       await api.disconnectGoogle();
       setGoogleConnected(false);
       setGoogleEmail(null);
       toast.success('Google Calendar desconectado');
     } catch (error) {
+      console.error('[Calendar] disconnectGoogleCalendar:', error);
       toast.error('Erro ao desconectar Google Calendar');
     }
   };
@@ -176,7 +186,11 @@ const Calendar = () => {
     setSyncingJob(job.id);
     try {
       const scheduledDate = new Date(job.scheduled_date);
-      const endDate = new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000);
+      // FIX M5 (auditoria 2026-05-14): respeita scheduled_time_end quando o gerente
+      // o definiu. O fallback de 4h só vale para jobs sem horário de término.
+      const endDate = job.scheduled_time_end
+        ? new Date(job.scheduled_time_end)
+        : new Date(scheduledDate.getTime() + 4 * 60 * 60 * 1000);
 
       // Get assigned installer emails for notifications
       const assignedInstallerEmails = [];

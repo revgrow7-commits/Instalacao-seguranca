@@ -21,25 +21,46 @@ logger = logging.getLogger(__name__)
 MAX_CHECKOUT_DISTANCE_METERS = 500
 
 # Pause reason labels
+# FIX B2 (auditoria 2026-05-14): sincronizado com frontend (InstallerJobDetail.jsx).
+# Os valores legados (almoço/banheiro/etc) foram migrados para o conjunto operacional
+# atual usado em campo. Para retro-compatibilidade com pause_logs antigos,
+# o map LEGACY_PAUSE_REASON_LABELS mantém os labels históricos.
 PAUSE_REASONS = [
-    "almoço",
-    "banheiro", 
-    "esperando_material",
-    "problema_tecnico",
-    "atendimento_cliente",
-    "deslocamento",
-    "outro"
+    "aguardando_cliente",
+    "chuva",
+    "falta_material",
+    "almoco_intervalo",
+    "problema_acesso",
+    "problema_equipamento",
+    "aguardando_aprovacao",
+    "outro",
 ]
 
 PAUSE_REASON_LABELS = {
+    "aguardando_cliente": "Aguardando Cliente",
+    "chuva": "Chuva/Intempérie",
+    "falta_material": "Falta de Material",
+    "almoco_intervalo": "Almoço/Intervalo",
+    "problema_acesso": "Problema de Acesso",
+    "problema_equipamento": "Problema com Equipamento",
+    "aguardando_aprovacao": "Aguardando Aprovação",
+    "outro": "Outro Motivo",
+}
+
+# Mantém labels históricos para registros antigos no banco — relatórios
+# de pausas anteriores à migração continuam legíveis.
+LEGACY_PAUSE_REASON_LABELS = {
     "almoço": "Almoço/Refeição",
     "banheiro": "Banheiro",
     "esperando_material": "Esperando Material",
     "problema_tecnico": "Problema Técnico",
     "atendimento_cliente": "Atendimento ao Cliente",
     "deslocamento": "Deslocamento entre pontos",
-    "outro": "Outro motivo"
 }
+
+# União usada apenas para resolver labels de leitura (relatórios). Não use
+# este map para validação de entrada — novos motivos devem usar PAUSE_REASONS.
+_ALL_PAUSE_REASON_LABELS = {**LEGACY_PAUSE_REASON_LABELS, **PAUSE_REASON_LABELS}
 
 
 # ============ HELPER FUNCTIONS ============
@@ -270,12 +291,28 @@ async def create_item_checkin(
     products = job.get("products_with_area", [])
     if not products:
         products = job.get("items", [])
-    
-    if not products or item_index >= len(products):
+
+    if not products or item_index >= len(products) or item_index < 0:
         raise HTTPException(status_code=400, detail=f"Item inválido. O job tem {len(products)} itens.")
-    
+
+    # FIX M9 / B1 (auditoria 2026-05-14): bloqueia check-in em item arquivado.
+    # Defesa em profundidade — o frontend já filtra arquivados, mas evita que
+    # uma regressão (ou cliente alterado) grave dados no item errado.
+    archived_indices = {a.get("item_index") for a in job.get("archived_items", []) if a.get("item_index") is not None}
+    if item_index in archived_indices:
+        raise HTTPException(
+            status_code=400,
+            detail="Este item foi arquivado e não aceita novos check-ins. Contate o gerente para desarquivar.",
+        )
+
     product = products[item_index]
     
+    # FIX C4 (auditoria 2026-05-14): idempotência — se já existe checkin
+    # in_progress para este item+instalador, retornamos o existente em vez
+    # de 400. Cenário comum em campo: instalador faz check-in, perde sinal
+    # antes da resposta voltar, e tenta de novo. Antes: erro confuso "Item
+    # already has an active check-in" e o instalador acha que falhou.
+    # Agora: o segundo POST confirma o checkin já gravado.
     existing = db.item_checkins.find_one({
         "job_id": job_id,
         "item_index": item_index,
@@ -283,7 +320,37 @@ async def create_item_checkin(
         "status": "in_progress"
     })
     if existing:
-        raise HTTPException(status_code=400, detail="Item already has an active check-in")
+        # Verifica se o check-in é recente (últimos 5 min) — se for, trata
+        # como retry idempotente. Se for antigo, sinaliza que está pendente.
+        try:
+            existing_at_raw = existing.get("checkin_at")
+            if isinstance(existing_at_raw, str):
+                existing_at = datetime.fromisoformat(existing_at_raw.replace('Z', '+00:00'))
+            elif isinstance(existing_at_raw, datetime):
+                existing_at = existing_at_raw
+            else:
+                existing_at = None
+
+            if existing_at:
+                if existing_at.tzinfo is None:
+                    existing_at = existing_at.replace(tzinfo=timezone.utc)
+                age_seconds = (datetime.now(timezone.utc) - existing_at).total_seconds()
+                if age_seconds < 300:  # 5 minutos
+                    logger.info(
+                        f"Checkin idempotente: retornando existing {existing['id']} "
+                        f"(criado há {int(age_seconds)}s) para item {item_index}"
+                    )
+                    return existing
+        except Exception as _e:
+            logger.warning(f"Falha ao parsear checkin_at de existing checkin: {_e}")
+
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Já existe um check-in em andamento para este item. "
+                "Faça o checkout antes de iniciar um novo check-in."
+            ),
+        )
     
     family_id, family_name = await detect_product_family([product.get("name", "")])
     
@@ -440,7 +507,22 @@ async def complete_item_checkout(
     if checkin["status"] == "completed":
         logger.error(f"Checkin {checkin_id} already completed")
         raise HTTPException(status_code=400, detail="Item already checked out")
-    
+
+    # FIX M9 (relaxado para produção): se o item foi arquivado APÓS o check-in,
+    # NÃO bloqueia o checkout — apenas loga warning. Bloquear deixaria o
+    # instalador em campo sem poder concluir o trabalho que já executou.
+    # O bloqueio só vale para NOVOS check-ins (create_item_checkin acima).
+    _job_for_archive_check = db.jobs.find_one({"id": checkin.get("job_id")}, {"_id": 0})
+    if _job_for_archive_check:
+        _archived = {a.get("item_index") for a in _job_for_archive_check.get("archived_items", []) if a.get("item_index") is not None}
+        if checkin.get("item_index") in _archived:
+            logger.warning(
+                f"Checkout permitido em item arquivado (item foi arquivado durante o check-in): "
+                f"checkin={checkin_id} item_index={checkin.get('item_index')} "
+                f"installer={checkin.get('installer_id')}"
+            )
+            # Continua normalmente — não bloqueia o instalador.
+
     # GPS Distance Validation
     location_alert = None
     auto_paused = False
@@ -701,7 +783,19 @@ async def pause_item_checkin(
     if checkin["status"] == "paused":
         logger.error(f"Checkin {checkin_id} is already paused")
         raise HTTPException(status_code=400, detail="Item is already paused")
-    
+
+    # FIX B2 (relaxado para produção): aceita motivos atuais OU legados.
+    # Rejeitar legados quebraria instaladores com PWA em cache antigo —
+    # eles ficariam impossibilitados de pausar em campo até atualizar o app.
+    # Para qualquer outro valor totalmente desconhecido, logamos warning e
+    # gravamos como "outro" (preserva o histórico operacional).
+    _all_valid = set(PAUSE_REASONS) | set(LEGACY_PAUSE_REASON_LABELS.keys())
+    if reason not in _all_valid:
+        logger.warning(
+            f"Motivo de pausa desconhecido '{reason}' de {current_user.email}; gravando como 'outro'"
+        )
+        reason = "outro"
+
     job_id = _resolve_job_id_for_checkin(checkin)
     pause_log = ItemPauseLog(
         checkin_id=checkin_id,
@@ -765,12 +859,12 @@ async def resume_item_checkin(
         {"id": active_pause["id"]},
         {"$set": {"resumed_at": end_time.isoformat(), "duration_minutes": pause_duration}}
     )
-    
+
     db.item_checkins.update_one(
         {"id": checkin_id},
         {"$set": {"status": "in_progress"}}
     )
-    
+
     return {
         "message": "Item resumed successfully",
         "pause_duration_minutes": pause_duration,
@@ -789,17 +883,22 @@ async def get_item_pause_logs(
         {"_id": 0}
     )
 
+    # FIX B2 (auditoria 2026-05-14): usa o map union para resolver labels -
+    # cobre tanto motivos atuais quanto legados gravados antes da unificacao.
     for log in pause_logs:
-        log["reason_label"] = PAUSE_REASON_LABELS.get(log.get("reason"), log.get("reason"))
+        reason = log.get("reason")
+        log["reason_label"] = _ALL_PAUSE_REASON_LABELS.get(reason, reason)
 
-    total_pause_minutes = sum(p.get("duration_minutes", 0) or 0 for p in pause_logs if p.get("duration_minutes"))
+    total_pause_minutes = sum(
+        p.get("duration_minutes", 0) or 0 for p in pause_logs if p.get("duration_minutes")
+    )
     active_pause = next((p for p in pause_logs if p.get("resumed_at") is None), None)
-    
+
     return {
         "pauses": pause_logs,
         "total_pause_minutes": total_pause_minutes,
         "has_active_pause": active_pause is not None,
-        "active_pause": active_pause
+        "active_pause": active_pause,
     }
 
 
@@ -808,5 +907,5 @@ async def get_pause_reasons():
     """Get list of valid pause reasons"""
     return {
         "reasons": PAUSE_REASONS,
-        "labels": PAUSE_REASON_LABELS
+        "labels": PAUSE_REASON_LABELS,
     }

@@ -17,7 +17,13 @@ import {
 import { toast } from 'sonner';
 import CoinAnimation from '../components/CoinAnimation';
 
-const GPS_ACCURACY_LIMIT = 100; // metros — rejeita leitura com precisão pior que isso
+// FIX C3 (auditoria 2026-05-14): relaxado de 100m para 200m. Em zonas urbanas
+// densas e locais semi-fechados, smartphones costumam reportar 80-200m no
+// primeiro fix — o limite anterior travava o instalador em loop sem que ele
+// pudesse fazer nada além de sair para a rua. Backend ainda valida a 500m
+// no checkout (item_checkins.py:21), então a margem operacional é segura.
+const GPS_ACCURACY_LIMIT = 200; // metros — rejeita leitura com precisão pior que isso
+const GPS_TIMEOUT_MS = 30000;   // 30s — em redes 3G mobile, 15s era curto demais
 
 const PAUSE_REASON_LABELS = {
   "aguardando_cliente": "Aguardando Cliente",
@@ -59,9 +65,14 @@ const InstallerJobDetail = () => {
   });
 
   useEffect(() => {
-    loadJobData();
+    // FIX M2 (auditoria 2026-05-14): flag de cancelamento — se o usuário
+    // navega entre jobs rapidamente, evita setState em componente desmontado
+    // (warning React + risco de exibir dados de outro job por race condition).
+    let cancelled = false;
+    loadJobData(() => cancelled);
     // GPS will be requested only when user clicks check-in/checkout button
     // This prevents the Android overlay permission error
+    return () => { cancelled = true; };
   }, [jobId]);
 
   // Buscar os valores de atribuição definidos pelo gerente para um item
@@ -81,11 +92,24 @@ const InstallerJobDetail = () => {
       }
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          // FIX C3 (auditoria 2026-05-14): em vez de rejeitar absolutamente
+          // quando a precisão está pior que GPS_ACCURACY_LIMIT, pergunta ao
+          // usuário se quer continuar. Em campo, isso é a diferença entre
+          // "consigo trabalhar" e "fico travado para sempre".
           if (position.coords.accuracy > GPS_ACCURACY_LIMIT) {
-            const msg = `Sinal GPS muito fraco (precisão ${Math.round(position.coords.accuracy)} m). Vá para um local aberto e tente novamente.`;
-            setGpsError(msg);
-            reject(new Error(msg));
-            return;
+            const accuracyM = Math.round(position.coords.accuracy);
+            const proceed = window.confirm(
+              `⚠️ Sinal GPS impreciso (${accuracyM}m).\n\n` +
+              `Local ideal seria abaixo de ${GPS_ACCURACY_LIMIT}m, mas vamos registrar mesmo assim.\n\n` +
+              `Continuar com check-in?`
+            );
+            if (!proceed) {
+              const msg = `Check-in cancelado — GPS impreciso (${accuracyM}m).`;
+              setGpsError(msg);
+              reject(new Error(msg));
+              return;
+            }
+            // Usuário confirmou — segue mesmo com baixa precisão.
           }
           const location = {
             lat: position.coords.latitude,
@@ -106,39 +130,58 @@ const InstallerJobDetail = () => {
           setGpsError(msg);
           reject(new Error(msg));
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        // FIX C3: timeout 30s (era 15s) — em 3G mobile, 15s é curto demais.
+        { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 0 }
       );
     });
   };
 
-  const loadJobData = async () => {
+  // FIX M2: aceita um callback opcional `isCancelled` para evitar setState
+  // após desmontagem (default: sempre false = mantém comportamento antigo).
+  const loadJobData = async (isCancelled = () => false) => {
     try {
       setLoading(true);
       const jobRes = await api.getJobById(jobId);
+      if (isCancelled()) return;
       setJob(jobRes.data);
-      
+
       // Load item checkins
       const checkinsRes = await api.getItemCheckins(jobId);
+      if (isCancelled()) return;
+      const checkinsList = Array.isArray(checkinsRes.data) ? checkinsRes.data : [];
       const checkinsMap = {};
       const pauseLogsMap = {};
-      
-      for (const c of checkinsRes.data) {
-        checkinsMap[c.item_index] = c;
-        
-        // Load pause logs for each checkin
-        if (c.status === 'in_progress' || c.status === 'paused') {
-          try {
-            const pauseRes = await api.getItemPauseLogs(c.id);
-            pauseLogsMap[c.item_index] = pauseRes.data;
-          } catch (e) {
+
+      // FIX M1 (auditoria 2026-05-14): pause logs em paralelo (Promise.allSettled)
+      // em vez do loop sequencial original. Antes: N+1 round-trips bloqueando
+      // a tela em 3G ruim — agora 1 ida única e fallback silencioso por checkin.
+      checkinsList.forEach(c => { checkinsMap[c.item_index] = c; });
+
+      const activeCheckins = checkinsList.filter(c =>
+        c.status === 'in_progress' || c.status === 'paused'
+      );
+
+      if (activeCheckins.length > 0) {
+        const pauseResults = await Promise.allSettled(
+          activeCheckins.map(c => api.getItemPauseLogs(c.id))
+        );
+        if (isCancelled()) return;
+        activeCheckins.forEach((c, idx) => {
+          const r = pauseResults[idx];
+          if (r.status === 'fulfilled') {
+            pauseLogsMap[c.item_index] = r.value.data;
+          } else {
+            console.warn('[InstallerJobDetail] getItemPauseLogs falhou:', r.reason);
             pauseLogsMap[c.item_index] = { pauses: [], total_pause_minutes: 0 };
           }
-        }
+        });
       }
-      
+
+      if (isCancelled()) return;
       setItemCheckins(checkinsMap);
       setPauseLogs(pauseLogsMap);
     } catch (error) {
+      if (isCancelled()) return;
       // Check if it's an access denied error
       if (error.response?.status === 403) {
         toast.error('Você não tem acesso a este job');
@@ -146,53 +189,97 @@ const InstallerJobDetail = () => {
         return;
       }
       toast.error('Erro ao carregar job');
-      console.error(error);
+      console.error('[InstallerJobDetail] loadJobData:', error);
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
   };
 
   const handleFileSelect = async (itemIndex, type) => {
+    // FIX C6 (auditoria 2026-05-14): bloqueia múltiplos cliques no botão.
+    // Antes, o usuário podia clicar várias vezes antes do GPS responder e
+    // abria múltiplos seletores de câmera. Agora o botão fica desabilitado
+    // do click até o final do fluxo.
+    if (processingItem !== null) {
+      console.warn('[InstallerJobDetail] handleFileSelect ignorado — processamento em andamento');
+      return;
+    }
+    setProcessingItem(itemIndex);
+
+    // FIX C6-safety: timeout absoluto de 60s para garantir que o botão NUNCA
+    // fique trancado permanentemente caso algum browser exótico não dispare
+    // nem onChange nem focus (cenário improvável mas que deixaria o instalador
+    // bloqueado até reiniciar o app).
+    const lockTimeoutId = setTimeout(() => {
+      console.warn('[InstallerJobDetail] lock timeout — liberando processingItem após 60s');
+      setProcessingItem(null);
+    }, 60000);
+
     // For mobile devices, use native file input with camera capture
     // This bypasses getUserMedia permission issues
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
-    
+
     // Detect if mobile
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
+
     if (isMobile) {
       // On mobile, use capture attribute to open camera directly
       // 'environment' opens rear camera, 'user' opens front camera
       input.setAttribute('capture', 'environment');
     }
-    
-    input.onchange = async (e) => {
-      const file = e.target.files?.[0];
-      if (file) {
-        try {
-          // Compress image before converting to base64
-          const compressedBase64 = await compressImage(file);
-          
-          if (type === 'checkin') {
-            await handleItemCheckin(itemIndex, compressedBase64);
-          } else {
-            await handleItemCheckout(itemIndex, compressedBase64);
-          }
-        } catch (error) {
-          console.error('Error processing image:', error);
-          toast.error('Erro ao processar imagem. Tente novamente.');
+
+    // Garante que se o usuário cancelar o picker (sem onchange), o lock seja
+    // liberado. `window.focus` dispara quando o picker fecha.
+    let onChangeRan = false;
+    const releaseIfCancelled = () => {
+      setTimeout(() => {
+        if (!onChangeRan) {
+          clearTimeout(lockTimeoutId);
+          setProcessingItem(null);
+          window.removeEventListener('focus', releaseIfCancelled);
         }
+      }, 500);
+    };
+
+    input.onchange = async (e) => {
+      onChangeRan = true;
+      clearTimeout(lockTimeoutId);
+      window.removeEventListener('focus', releaseIfCancelled);
+      const file = e.target.files?.[0];
+      if (!file) {
+        setProcessingItem(null);
+        return;
+      }
+      try {
+        // Compress image before converting to base64
+        const compressedBase64 = await compressImage(file);
+
+        if (type === 'checkin') {
+          await handleItemCheckin(itemIndex, compressedBase64);
+        } else {
+          await handleItemCheckout(itemIndex, compressedBase64);
+        }
+      } catch (error) {
+        console.error('[InstallerJobDetail] handleFileSelect compress/checkin error:', error);
+        toast.error('Erro ao processar imagem. Tente novamente.');
+        setProcessingItem(null);
       }
     };
-    
+
     // Reset input to allow selecting same file again
     input.value = '';
+    window.addEventListener('focus', releaseIfCancelled, { once: true });
     input.click();
   };
 
   // Helper function to compress images
+  // FIX C2 (auditoria 2026-05-14): compressão iterativa — se ainda passar de
+  // ~1MB base64 (que vira ~750KB de bytes JPEG + overhead multipart), reduz
+  // a qualidade até caber. Evita estourar o limite de 4.5MB do Vercel para
+  // payloads de função serverless. Sem este loop, fotos de smartphones de
+  // 48MP+ derrubavam o checkin com timeout/413 silencioso.
   const compressImage = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -200,13 +287,12 @@ const InstallerJobDetail = () => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1024;
-          const MAX_HEIGHT = 1024;
-          
+          let MAX_WIDTH = 1024;
+          let MAX_HEIGHT = 1024;
+
           let width = img.width;
           let height = img.height;
-          
-          // Calculate new dimensions
+
           if (width > height) {
             if (width > MAX_WIDTH) {
               height = Math.round((height * MAX_WIDTH) / width);
@@ -218,15 +304,33 @@ const InstallerJobDetail = () => {
               height = MAX_HEIGHT;
             }
           }
-          
+
           canvas.width = width;
           canvas.height = height;
-          
+
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          
-          // Convert to base64 with compression
-          const base64 = canvas.toDataURL('image/jpeg', 0.7);
+
+          // Compressão iterativa — alvo: ≤ 1MB de base64 (~750KB binário).
+          const MAX_BASE64_BYTES = 1024 * 1024; // 1MB
+          let quality = 0.7;
+          let base64 = canvas.toDataURL('image/jpeg', quality);
+
+          // Se ainda muito grande, reduz qualidade progressivamente.
+          while (base64.length > MAX_BASE64_BYTES && quality > 0.2) {
+            quality -= 0.1;
+            base64 = canvas.toDataURL('image/jpeg', quality);
+          }
+
+          // Se mesmo a 0.2 ainda está acima, encolhe dimensão e tenta de novo.
+          if (base64.length > MAX_BASE64_BYTES) {
+            canvas.width = Math.round(canvas.width * 0.7);
+            canvas.height = Math.round(canvas.height * 0.7);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            base64 = canvas.toDataURL('image/jpeg', 0.5);
+          }
+
+          console.log(`[compressImage] saída: ${(base64.length / 1024).toFixed(0)}KB (quality=${quality.toFixed(2)})`);
           resolve(base64);
         };
         img.onerror = reject;
@@ -260,8 +364,26 @@ const InstallerJobDetail = () => {
       toast.success('Check-in do item realizado!');
       await loadJobData();
     } catch (error) {
-      toast.error('Erro ao fazer check-in do item');
-      console.error(error);
+      // FIX C5 (auditoria 2026-05-14): expõe o motivo real do erro em vez
+      // do toast genérico. Quando o backend responde 400/409/422, o detail
+      // explica o que precisa ser feito (ex: "Item já está em check-in",
+      // "Item arquivado", "Você não está atribuído", etc.).
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      let userMessage;
+      if (detail) {
+        userMessage = detail;
+      } else if (status === 413) {
+        userMessage = 'Foto muito grande. Tire uma nova com menor resolução.';
+      } else if (status >= 500) {
+        userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
+      } else if (!error.response) {
+        userMessage = 'Sem conexão. Verifique sua internet e tente novamente.';
+      } else {
+        userMessage = 'Erro ao fazer check-in do item. Tente novamente.';
+      }
+      toast.error(userMessage, { duration: 6000 });
+      console.error('[InstallerJobDetail] handleItemCheckin:', error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
@@ -307,7 +429,7 @@ const InstallerJobDetail = () => {
       formData.append('notes', checkoutForm.notes);
 
       const response = await api.completeItemCheckout(checkin.id, formData);
-      
+
       // Check for location alert
       if (response.data?.location_alert) {
         const alert = response.data.location_alert;
@@ -316,10 +438,22 @@ const InstallerJobDetail = () => {
           { duration: 8000 }
         );
       }
-      
-      // Check for gamification coins earned
-      if (response.data?.gamification?.coins_awarded > 0) {
-        const coinsAwarded = response.data.gamification.coins_awarded;
+
+      // FIX B3 (auditoria 2026-05-14): completeItemCheckout não dispara mais
+      // a gamificação automaticamente — chamamos /gamification/process-checkout
+      // explicitamente. Falha aqui é não-bloqueante para o checkout (que já
+      // foi gravado). O usuário verá apenas o toast de sucesso normal.
+      let coinsAwarded = response.data?.gamification?.coins_awarded || 0;
+      if (!coinsAwarded) {
+        try {
+          const gamiRes = await api.processCheckoutGamification(checkin.id);
+          coinsAwarded = gamiRes.data?.coins_awarded || 0;
+        } catch (gamiErr) {
+          console.warn('[InstallerJobDetail] processCheckoutGamification falhou (não-bloqueante):', gamiErr);
+        }
+      }
+
+      if (coinsAwarded > 0) {
         setEarnedCoins(coinsAwarded);
         setShowCoinAnimation(true);
       } else {
@@ -331,9 +465,24 @@ const InstallerJobDetail = () => {
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Erro ao fazer check-out do item';
-      toast.error(errorMessage);
-      console.error('Checkout error:', error.response?.data || error);
+      // FIX C5: mensagens detalhadas + diagnóstico de problemas de rede
+      // e payload (mesma lógica do handleItemCheckin).
+      const status = error.response?.status;
+      const detail = error.response?.data?.detail;
+      let userMessage;
+      if (detail) {
+        userMessage = detail;
+      } else if (status === 413) {
+        userMessage = 'Foto muito grande. Tire uma nova com menor resolução.';
+      } else if (status >= 500) {
+        userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
+      } else if (!error.response) {
+        userMessage = 'Sem conexão. Verifique sua internet e tente novamente.';
+      } else {
+        userMessage = 'Erro ao fazer check-out do item. Tente novamente.';
+      }
+      toast.error(userMessage, { duration: 6000 });
+      console.error('[InstallerJobDetail] handleItemCheckout:', error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
@@ -582,24 +731,28 @@ const InstallerJobDetail = () => {
           </Card>
         ) : (
           products.map((item, index) => {
-            const status = getItemStatus(index);
-            const checkin = itemCheckins[index];
-            const isExpanded = expandedItem === index;
-            const isProcessing = processingItem === index;
+            // FIX B1: usar originalIndex para alinhar com backend quando há itens arquivados.
+            // O array `products` vem filtrado por `getProducts()`, mas o backend grava
+            // checkins indexados pelo índice original em `products_with_area`.
+            const itemIndex = item.originalIndex ?? index;
+            const status = getItemStatus(itemIndex);
+            const checkin = itemCheckins[itemIndex];
+            const isExpanded = expandedItem === itemIndex;
+            const isProcessing = processingItem === itemIndex;
 
             return (
-              <Card 
-                key={index} 
+              <Card
+                key={itemIndex}
                 className={`bg-card/50 border transition-all ${
-                  status === 'completed' ? 'border-green-500/30' : 
+                  status === 'completed' ? 'border-green-500/30' :
                   status === 'in_progress' ? 'border-blue-500/30' : 'border-border'
                 }`}
               >
                 <CardContent className="p-4">
                   {/* Item Header */}
-                  <div 
+                  <div
                     className="flex items-start justify-between cursor-pointer"
-                    onClick={() => setExpandedItem(isExpanded ? null : index)}
+                    onClick={() => setExpandedItem(isExpanded ? null : itemIndex)}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -724,7 +877,7 @@ const InstallerJobDetail = () => {
                       {/* Actions */}
                       {status === 'pending' && (
                         <Button
-                          onClick={() => handleFileSelect(index, 'checkin')}
+                          onClick={() => handleFileSelect(itemIndex, 'checkin')}
                           disabled={isProcessing}
                           className="w-full bg-blue-600 hover:bg-blue-700 h-12 active:scale-[0.98] transition-transform"
                         >
@@ -745,9 +898,9 @@ const InstallerJobDetail = () => {
                                 <Clock className="h-4 w-4" />
                                 Em execução: {formatDuration(getElapsedTime(checkin))}
                               </p>
-                              {pauseLogs[index]?.total_pause_minutes > 0 && (
+                              {pauseLogs[itemIndex]?.total_pause_minutes > 0 && (
                                 <span className="text-xs text-orange-400">
-                                  Pausado: {formatDuration(pauseLogs[index].total_pause_minutes)}
+                                  Pausado: {formatDuration(pauseLogs[itemIndex].total_pause_minutes)}
                                 </span>
                               )}
                             </div>
@@ -755,7 +908,7 @@ const InstallerJobDetail = () => {
 
                           {/* Info definida pelo Gerente (somente leitura) */}
                           {(() => {
-                            const assignment = getItemAssignment(index);
+                            const assignment = getItemAssignment(itemIndex);
                             const scenarioLabels = {
                               'loja_rua': 'Loja de Rua',
                               'shopping': 'Shopping',
@@ -806,7 +959,7 @@ const InstallerJobDetail = () => {
                           {/* Action Buttons */}
                           <div className="flex gap-2">
                             <Button
-                              onClick={() => handleOpenPauseModal(index)}
+                              onClick={() => handleOpenPauseModal(itemIndex)}
                               disabled={isProcessing}
                               variant="outline"
                               className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-12 active:scale-[0.98] transition-transform"
@@ -815,7 +968,7 @@ const InstallerJobDetail = () => {
                               Pausar
                             </Button>
                             <Button
-                              onClick={() => handleFileSelect(index, 'checkout')}
+                              onClick={() => handleFileSelect(itemIndex, 'checkout')}
                               disabled={isProcessing}
                               className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
                             >
@@ -838,25 +991,25 @@ const InstallerJobDetail = () => {
                               <Pause className="h-4 w-4" />
                               <span className="font-medium">Item Pausado</span>
                             </div>
-                            {pauseLogs[index]?.active_pause && (
+                            {pauseLogs[itemIndex]?.active_pause && (
                               <div className="text-sm">
                                 <p className="text-muted-foreground">
-                                  Motivo: <span className="text-orange-300">{PAUSE_REASON_LABELS[pauseLogs[index].active_pause.reason] || pauseLogs[index].active_pause.reason}</span>
+                                  Motivo: <span className="text-orange-300">{PAUSE_REASON_LABELS[pauseLogs[itemIndex].active_pause.reason] || pauseLogs[itemIndex].active_pause.reason}</span>
                                 </p>
                                 <p className="text-muted-foreground">
-                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[index].active_pause.start_time)) / 60000))}</span>
+                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.start_time)) / 60000))}</span>
                                 </p>
                               </div>
                             )}
-                            {pauseLogs[index]?.total_pause_minutes > 0 && (
+                            {pauseLogs[itemIndex]?.total_pause_minutes > 0 && (
                               <p className="text-xs text-muted-foreground mt-2">
-                                Tempo total em pausa: {formatDuration(pauseLogs[index].total_pause_minutes + (pauseLogs[index].active_pause ? Math.floor((new Date() - new Date(pauseLogs[index].active_pause.start_time)) / 60000) : 0))}
+                                Tempo total em pausa: {formatDuration(pauseLogs[itemIndex].total_pause_minutes + (pauseLogs[itemIndex].active_pause ? Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.start_time)) / 60000) : 0))}
                               </p>
                             )}
                           </div>
 
                           <Button
-                            onClick={() => handleResumeItem(index)}
+                            onClick={() => handleResumeItem(itemIndex)}
                             disabled={isProcessing}
                             className="w-full bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
                           >
@@ -909,7 +1062,7 @@ const InstallerJobDetail = () => {
               Pausar Item
             </DrawerTitle>
             <p className="text-sm text-muted-foreground mt-2">
-              Informe o motivo da pausa. O tempo pausado não será contado na sua produtividade.
+              Informe o motivo da pausa. O tempo pausado nao sera contado na sua produtividade.
             </p>
           </DrawerHeader>
 
@@ -930,8 +1083,8 @@ const InstallerJobDetail = () => {
 
             <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
               <p className="text-xs text-orange-400">
-                <strong>Importante:</strong> O tempo em pausa será registrado e excluído do cálculo de produtividade (m²/h),
-                garantindo que sua métrica seja justa e reflita apenas o tempo efetivamente trabalhado.
+                <strong>Importante:</strong> O tempo em pausa sera registrado e excluido do calculo de produtividade (m2/h),
+                garantindo que sua metrica seja justa e reflita apenas o tempo efetivamente trabalhado.
               </p>
             </div>
 
