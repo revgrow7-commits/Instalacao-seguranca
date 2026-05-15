@@ -66,6 +66,17 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, [loadUser]);
 
+  // Escuta evento disparado pelo interceptor 401 de api.js.
+  // Evita hard reload — React Router redireciona via ProtectedRoute.
+  useEffect(() => {
+    const handleExpired = () => {
+      setUser(null);
+      writeSessionSnapshot(null);
+    };
+    window.addEventListener('auth:expired', handleExpired);
+    return () => window.removeEventListener('auth:expired', handleExpired);
+  }, []);
+
   const login = async (email, password) => {
     try {
       const response = await axios.post(`${API_URL}/auth/login`, {

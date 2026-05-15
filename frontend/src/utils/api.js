@@ -64,18 +64,35 @@ const getJobsWithCache = async (includeArchived = false) => {
   return freshPromise;
 };
 
-// Interceptor global: redireciona para /login em 401, exceto no próprio login
+// Interceptor global: sinaliza expiração de token via evento (sem hard reload).
+// AuthContext escuta 'auth:expired' e faz setUser(null), React Router redireciona.
 axios.interceptors.response.use(
   res => res,
   err => {
     const isLoginEndpoint = err.config?.url?.includes('/auth/login');
     if (err.response?.status === 401 && !isLoginEndpoint) {
       tokenManager.clearToken();
-      window.location.href = '/login';
+      window.dispatchEvent(new CustomEvent('auth:expired'));
     }
     return Promise.reject(err);
   }
 );
+
+// Retry com backoff exponencial para erros de rede e 5xx.
+// Não retenta em 4xx (erros de cliente são definitivos).
+const withRetry = async (fn, { retries = 3, baseDelayMs = 1000 } = {}) => {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      const isNetworkError = !err.response || err.code === 'ERR_NETWORK' || err.code === 'ECONNABORTED';
+      const isServerError = err.response?.status >= 500;
+      const shouldRetry = (isNetworkError || isServerError) && attempt < retries;
+      if (!shouldRetry) throw err;
+      await new Promise(resolve => setTimeout(resolve, baseDelayMs * Math.pow(2, attempt)));
+    }
+  }
+};
 
 export const api = {
   // Cache control
@@ -220,11 +237,13 @@ export const api = {
   getCheckinDetails: (checkinId) => axios.get(`${API_URL}/checkins/${checkinId}/details`, { headers: getAuthHeader() }),
   deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
-  // Item Check-ins (per item)
+  // Item Check-ins (per item) — submits críticos usam withRetry (instalador em campo, 3G)
   createItemCheckin: (formData) => {
     const jobId = formData.get ? formData.get('job_id') : null;
     if (jobId) clearCache(`item_checkins_${jobId}`);
-    return axios.post(`${API_URL}/item-checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+    return withRetry(() =>
+      axios.post(`${API_URL}/item-checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } })
+    );
   },
   completeItemCheckout: (checkinId, formData) => {
     const jobId = formData.get ? formData.get('job_id') : null;
@@ -232,7 +251,9 @@ export const api = {
     clearCache(`item_pause_logs_${checkinId}`);
     clearCache('gamification_balance');
     clearCache('gamification_transactions');
-    return axios.put(`${API_URL}/item-checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
+    return withRetry(() =>
+      axios.put(`${API_URL}/item-checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } })
+    );
   },
   getItemCheckins: (jobId) => getCachedOrFetch(
     `item_checkins_${jobId}`,
