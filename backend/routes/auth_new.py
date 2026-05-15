@@ -187,19 +187,8 @@ def register(request: RegisterRequest):
     }
     
     db.installers.insert_one(installer_doc)
-    
-    # Create gamification balance
-    db.gamification_balances.insert_one({
-        "id": str(uuid.uuid4()),
-        "user_id": user_id,
-        "total_coins": 0,
-        "lifetime_coins": 0,
-        "current_level": "bronze",
-        "level": "bronze",
-        "created_at": now,
-        "updated_at": now
-    })
-    
+    # Gamificação desabilitada 2026-05-15 — INSERT removido (FK violation em users.id pré-commit).
+
     logger.info(f"New user self-registered: {request.email}")
     
     return {
@@ -284,18 +273,7 @@ def admin_register(request: AdminRegisterRequest, current_user: User = Depends(g
         }
         
         db.installers.insert_one(installer_doc)
-        
-        # Create gamification balance
-        db.gamification_balances.insert_one({
-            "id": str(uuid.uuid4()),
-            "user_id": user_id,
-            "total_coins": 0,
-            "lifetime_coins": 0,
-            "current_level": "bronze",
-            "level": "bronze",
-            "created_at": now,
-            "updated_at": now
-        })
+        # Gamificação desabilitada 2026-05-15 — INSERT removido (FK violation em users.id pré-commit).
     
     logger.info(f"Admin {current_user.email} created user: {request.email} with role {request.role}")
     

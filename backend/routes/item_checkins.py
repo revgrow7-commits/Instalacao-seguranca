@@ -167,15 +167,7 @@ def _resolve_job_id_for_checkin(checkin: dict) -> str:
     )
 
 
-# Import gamification functions from server (these will be available when router is included)
-async def calculate_checkout_coins(checkin, job):
-    """Calculate coins for checkout - placeholder, actual implementation in server.py"""
-    return {"total_coins": 0, "breakdown": [], "installed_m2": 0}
-
-
-async def award_coins(user_id, amount, transaction_type, description, reference_id, breakdown):
-    """Award coins to user - placeholder, actual implementation in server.py"""
-    return None
+# Gamificação desabilitada 2026-05-15 — placeholders removidos.
 
 
 # ============ PYDANTIC MODELS ============
@@ -647,11 +639,8 @@ async def complete_item_checkout(
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
-        try:
-            db.installed_products.insert_one(installed_product_dict)
-            await update_productivity_history(installed_product_dict)
-        except Exception as _e:
-            logger.warning(f"installed_products insert skipped (schema drift?): {_e}")
+        db.installed_products.insert_one(installed_product_dict)
+        await update_productivity_history(installed_product_dict)
     
     # Check job completion
     job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})

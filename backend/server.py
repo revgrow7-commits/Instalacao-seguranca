@@ -217,10 +217,18 @@ def health_check():
 
 # ============ MIDDLEWARE ============
 
+_cors_env = os.environ.get('CORS_ORIGINS', '').strip()
+if not _cors_env:
+    # Falhar rápido em produção se env não estiver configurada.
+    # Em dev local, definir CORS_ORIGINS=http://localhost:3000 no .env.
+    raise RuntimeError(
+        "CORS_ORIGINS env var obrigatória. "
+        "Prod: https://instal-visual.com.br — Dev: http://localhost:3000"
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_origins=[o.strip() for o in _cors_env.split(',') if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )

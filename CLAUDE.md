@@ -122,12 +122,10 @@ Sistema full-stack de gestão operacional de instalações de comunicação visu
 - `AuthContext` expõe: `user`, `loading`, `login()`, `logout()`, `isAdmin`, `isManager`, `isInstaller`, `token`, `getToken`
 
 ### Backend — security.py
-- Expiração backend: **1 dia** (`ACCESS_TOKEN_EXPIRE_DAYS = 1` em `config.py`)
+- Expiração backend: **7 dias** (`ACCESS_TOKEN_EXPIRE_DAYS = 7` em `config.py`) — alinhado com frontend (2026-05-15)
 - Algoritmo: HS256, secret via env `JWT_SECRET`
 - `get_current_user()` decodifica JWT e busca o usuário em `db.users`
 - `require_role(user, [UserRole.ADMIN])` lança HTTP 403 se role insuficiente
-
-> ⚠️ **ATENÇÃO — JWT_EXPIRY_MISMATCH:** Backend expira em 1 dia, frontend armazena por 7 dias. Após o 2º dia, o token frontend ainda existe mas o backend rejeita. O `AuthContext` trata isso fazendo logout no 401 de `/auth/me`.
 
 ### Roles
 ```python

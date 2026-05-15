@@ -17,7 +17,7 @@ SECRET_KEY = os.environ.get('JWT_SECRET')
 if not SECRET_KEY:
     raise RuntimeError("JWT_SECRET environment variable is required. Generate with: openssl rand -hex 32")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 1
+ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 # Holdprint API Keys
 HOLDPRINT_API_KEY_POA = os.environ.get('HOLDPRINT_API_KEY_POA')
