@@ -639,7 +639,13 @@ async def complete_item_checkout(
             "created_at": datetime.now(timezone.utc).isoformat()
         }
 
-        db.installed_products.insert_one(installed_product_dict)
+        try:
+            db.installed_products.insert_one(installed_product_dict)
+        except Exception as _ip_err:
+            # Items de serviço (sem products_with_area) podem violar NOT NULL em
+            # installed_products — registrar e continuar. Checkout não pode falhar
+            # por causa de um registro secundário.
+            logger.warning(f"installed_products insert skipped: {_ip_err}")
         try:
             await update_productivity_history(installed_product_dict)
         except Exception as _ph_err:
