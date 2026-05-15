@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -89,19 +89,19 @@ const Dashboard = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-  useEffect(() => {
-    // Redirect installers to their specific dashboard
-    if (isInstaller) {
-      navigate('/installer/dashboard');
-      return;
-    }
-    // Only load data when we have user info
-    if (user) {
-      loadDashboardData();
-    }
-  }, [isInstaller, navigate, user]);
-
-  const loadDashboardData = async () => {
+  // FIX B2 (hooks audit, 2026-05-14): wrapped in useCallback with explicit
+  // deps so the useEffect can list it. The function gates by `isAdmin` and
+  // `isManager`; previously the effect ran with [isInstaller, navigate, user]
+  // and re-fired on user change but called the captured (stale) version of
+  // loadDashboardData. Today benign because isAdmin/isManager don't change
+  // mid-session, but the bug would surface the moment role-switching is added.
+  //
+  // Why not useApiCall: this function does 6 parallel fetches AND non-trivial
+  // post-processing (filter paused, compute late from time delta) AND has two
+  // branches (admin/manager vs non). Splitting into 6 useApiCalls would lose
+  // the all-or-nothing behavior and complicate the role branch. See
+  // src/pages/Users.jsx for the canonical useApiCall demo.
+  const loadDashboardData = useCallback(async () => {
     try {
       if (isAdmin || isManager) {
         // All calls are independent — run in parallel
@@ -112,7 +112,7 @@ const Dashboard = () => {
             api.getInstallers().catch((e) => { console.warn('Could not load installers:', e); return { data: [] }; }),
             api.getAllItemCheckins(),
             api.getPendingCheckins().catch((e) => { console.warn('Could not load pending checkins:', e); return { data: { pending_checkins: [] } }; }),
-            api.getLocationAlerts().catch((e) => { console.warn('Could not load location alerts:', e); return { data: [] }; }),
+            api.getLocationAlerts().catch((e) => { console.error('[Dashboard] Erro ao carregar location alerts:', e); setLocationAlerts([]); return { data: [] }; }),
           ]);
 
         setJobs(jobsRes.data);
@@ -146,7 +146,19 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, isManager]);
+
+  useEffect(() => {
+    // Redirect installers to their specific dashboard
+    if (isInstaller) {
+      navigate('/installer/dashboard');
+      return;
+    }
+    // Only load data when we have user info
+    if (user) {
+      loadDashboardData();
+    }
+  }, [isInstaller, navigate, user, loadDashboardData]);
 
   const handleSendLateAlerts = async () => {
     setSendingAlerts(true);

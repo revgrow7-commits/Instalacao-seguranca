@@ -9,14 +9,15 @@ import { Label } from '../components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
-import { 
-  ArrowLeft, Package, MapPin, Camera, Check, Clock, 
-  Ruler, AlertCircle, CheckCircle2, PlayCircle, 
-  Square, ChevronDown, ChevronUp, Upload, Pause, Play
+import {
+  ArrowLeft, Package, MapPin, Camera, Check, Clock,
+  Ruler, AlertCircle, CheckCircle2, PlayCircle,
+  Square, ChevronDown, ChevronUp, Upload, Pause, Play, Wifi, WifiOff
 } from 'lucide-react';
 import { toast } from 'sonner';
 import CoinAnimation from '../components/CoinAnimation';
 import { getPhotoSrc } from '../lib/photo';
+import LocationPermissionGuide from '../components/LocationPermissionGuide';
 
 // FIX C3 (auditoria 2026-05-14): relaxado de 100m para 200m. Em zonas urbanas
 // densas e locais semi-fechados, smartphones costumam reportar 80-200m no
@@ -50,7 +51,17 @@ const InstallerJobDetail = () => {
   const [gpsLocation, setGpsLocation] = useState(null);
   const [gpsError, setGpsError] = useState(null);
   const fileInputRef = useRef({});
-  
+
+  // GPS confirmation dialog state (substituindo window.confirm — 3C)
+  const [gpsConfirmOpen, setGpsConfirmOpen] = useState(false);
+  const [gpsConfirmMessage, setGpsConfirmMessage] = useState('');
+  const [gpsConfirmResolve, setGpsConfirmResolve] = useState(null);
+
+  // GPS permission guide state (3D)
+  const [locationPermissionGuideOpen, setLocationPermissionGuideOpen] = useState(false);
+  // Pending retry: { itemIndex, type, photoBase64 } — preserva a foto quando GPS falha (3A)
+  const [pendingGpsRetry, setPendingGpsRetry] = useState(null);
+
   // Pause modal state
   const [showPauseModal, setShowPauseModal] = useState(false);
   const [pauseItemIndex, setPauseItemIndex] = useState(null);
@@ -83,58 +94,96 @@ const InstallerJobDetail = () => {
     return assignments.find(a => a.item_index === itemIndex);
   };
 
-  const requestGPS = () => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        const msg = 'Este dispositivo não suporta GPS. Use um smartphone com localização ativada.';
-        setGpsError(msg);
-        reject(new Error(msg));
-        return;
-      }
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          // FIX C3 (auditoria 2026-05-14): em vez de rejeitar absolutamente
-          // quando a precisão está pior que GPS_ACCURACY_LIMIT, pergunta ao
-          // usuário se quer continuar. Em campo, isso é a diferença entre
-          // "consigo trabalhar" e "fico travado para sempre".
-          if (position.coords.accuracy > GPS_ACCURACY_LIMIT) {
-            const accuracyM = Math.round(position.coords.accuracy);
-            const proceed = window.confirm(
-              `⚠️ Sinal GPS impreciso (${accuracyM}m).\n\n` +
-              `Local ideal seria abaixo de ${GPS_ACCURACY_LIMIT}m, mas vamos registrar mesmo assim.\n\n` +
-              `Continuar com check-in?`
-            );
-            if (!proceed) {
-              const msg = `Check-in cancelado — GPS impreciso (${accuracyM}m).`;
-              setGpsError(msg);
-              reject(new Error(msg));
-              return;
-            }
-            // Usuário confirmou — segue mesmo com baixa precisão.
-          }
-          const location = {
-            lat: position.coords.latitude,
-            long: position.coords.longitude,
-            accuracy: position.coords.accuracy
-          };
-          setGpsLocation(location);
-          setGpsError(null);
-          resolve(location);
-        },
-        (error) => {
-          const messages = {
-            1: 'Permissão de localização negada. Ative o GPS nas configurações do navegador.',
-            2: 'Posição não disponível. Verifique se o GPS está ativado.',
-            3: 'Tempo esgotado ao obter GPS. Vá para um local aberto e tente novamente.'
-          };
-          const msg = messages[error.code] || 'Não foi possível obter localização GPS.';
-          setGpsError(msg);
-          reject(new Error(msg));
-        },
-        // FIX C3: timeout 30s (era 15s) — em 3G mobile, 15s é curto demais.
-        { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: 0 }
-      );
+  // showGpsConfirm — substitui window.confirm (3C): retorna Promise<boolean>
+  const showGpsConfirm = (message) => {
+    return new Promise((resolve) => {
+      setGpsConfirmMessage(message);
+      // Armazenamos o resolve em estado para o dialog chamar depois.
+      // Usamos função wrapper para evitar que o React interprete como
+      // updater function (setX(fn) chama fn(prevState)).
+      setGpsConfirmResolve(() => resolve);
+      setGpsConfirmOpen(true);
     });
+  };
+
+  // Tenta obter posição GPS com um único conjunto de opções.
+  // Retorna Promise<GeolocationPosition>.
+  const tryGetPosition = (options) => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  };
+
+  // requestGPS — retry com fallback de precisão (3A) + dialog estilizado (3C).
+  // Estratégia:
+  //   1. Alta precisão, sem cache, 30s timeout.
+  //   2. Se falhar por timeout (3) ou indisponível (2): retry com baixa precisão,
+  //      cache de 60s, 15s timeout.
+  //   Permissão negada (1) rejeita imediatamente (retry seria inútil).
+  const requestGPS = async () => {
+    if (!navigator.geolocation) {
+      const msg = 'Este dispositivo não suporta GPS. Use um smartphone com localização ativada.';
+      setGpsError(msg);
+      throw new Error(msg);
+    }
+
+    let position;
+    try {
+      position = await tryGetPosition({
+        enableHighAccuracy: true,
+        timeout: GPS_TIMEOUT_MS,
+        maximumAge: 0,
+      });
+    } catch (firstErr) {
+      // Código 1 = permissão negada — sem retry, abrir guia de permissão.
+      if (firstErr.code === 1) {
+        const msg = 'Permissão de localização negada. Ative o GPS nas configurações do navegador.';
+        setGpsError(msg);
+        throw Object.assign(new Error(msg), { gpsCode: 1 });
+      }
+      // Código 2 (indisponível) ou 3 (timeout) — tenta fallback de baixa precisão.
+      console.warn('[requestGPS] primeira tentativa falhou (código ' + firstErr.code + '), tentando fallback…');
+      toast.info('GPS com dificuldade — tentando sinal alternativo…', { duration: 4000 });
+      try {
+        position = await tryGetPosition({
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 60000,
+        });
+      } catch (secondErr) {
+        const messages = {
+          1: 'Permissão de localização negada. Ative o GPS nas configurações do navegador.',
+          2: 'Posição não disponível. Verifique se o GPS está ativado.',
+          3: 'Tempo esgotado ao obter GPS. Vá para um local aberto e tente novamente.',
+        };
+        const msg = messages[secondErr.code] || 'Não foi possível obter localização GPS.';
+        setGpsError(msg);
+        throw Object.assign(new Error(msg), { gpsCode: secondErr.code });
+      }
+    }
+
+    // GPS obtido — verificar precisão.
+    if (position.coords.accuracy > GPS_ACCURACY_LIMIT) {
+      const accuracyM = Math.round(position.coords.accuracy);
+      // 3C: dialog estilizado em vez de window.confirm
+      const proceed = await showGpsConfirm(
+        `Sinal GPS impreciso (${accuracyM}m). O ideal é abaixo de ${GPS_ACCURACY_LIMIT}m, mas podemos registrar mesmo assim.\n\nDeseja continuar com o check-in?`
+      );
+      if (!proceed) {
+        const msg = `Check-in cancelado — GPS impreciso (${accuracyM}m).`;
+        setGpsError(msg);
+        throw new Error(msg);
+      }
+    }
+
+    const location = {
+      lat: position.coords.latitude,
+      long: position.coords.longitude,
+      accuracy: position.coords.accuracy,
+    };
+    setGpsLocation(location);
+    setGpsError(null);
+    return location;
   };
 
   // FIX M2: aceita um callback opcional `isCancelled` para evitar setState
@@ -348,7 +397,24 @@ const InstallerJobDetail = () => {
     try {
       location = await requestGPS();
     } catch (gpsErr) {
-      toast.error(gpsErr.message, { duration: 6000 });
+      // 3A: foto preservada — guardamos em pendingGpsRetry para que o instalador
+      // possa tentar o GPS novamente sem re-tirar a foto.
+      if (gpsErr.gpsCode === 1) {
+        // Permissão negada — abre o guia de permissão e preserva a foto.
+        setPendingGpsRetry({ itemIndex, type: 'checkin', photoBase64 });
+        setLocationPermissionGuideOpen(true);
+        setProcessingItem(null);
+        return;
+      }
+      // Outros erros de GPS: toast com botão de retry — foto ainda guardada.
+      setPendingGpsRetry({ itemIndex, type: 'checkin', photoBase64 });
+      toast.error(gpsErr.message, {
+        duration: 8000,
+        action: {
+          label: 'Tentar GPS',
+          onClick: () => handleRetryGps(),
+        },
+      });
       setProcessingItem(null);
       return;
     }
@@ -362,6 +428,7 @@ const InstallerJobDetail = () => {
       formData.append('gps_accuracy', location.accuracy);
 
       await api.createItemCheckin(formData);
+      setPendingGpsRetry(null);
       toast.success('Check-in do item realizado!');
       await loadJobData();
     } catch (error) {
@@ -390,6 +457,20 @@ const InstallerJobDetail = () => {
     }
   };
 
+  // handleRetryGps — chamado pelo toast "Tentar GPS" e pelo LocationPermissionGuide.
+  // Usa a foto guardada em pendingGpsRetry para finalizar o fluxo sem re-tirar foto (3A).
+  const handleRetryGps = async () => {
+    if (!pendingGpsRetry) return;
+    const { itemIndex, type, photoBase64 } = pendingGpsRetry;
+    // Limpa o retry pendente antes de chamar para evitar loop duplo.
+    setPendingGpsRetry(null);
+    if (type === 'checkin') {
+      await handleItemCheckin(itemIndex, photoBase64);
+    } else {
+      await handleItemCheckout(itemIndex, photoBase64);
+    }
+  };
+
   const handleItemCheckout = async (itemIndex, photoBase64) => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) {
@@ -402,7 +483,21 @@ const InstallerJobDetail = () => {
     try {
       location = await requestGPS();
     } catch (gpsErr) {
-      toast.error(gpsErr.message, { duration: 6000 });
+      // 3A: foto preservada no pendingGpsRetry.
+      if (gpsErr.gpsCode === 1) {
+        setPendingGpsRetry({ itemIndex, type: 'checkout', photoBase64 });
+        setLocationPermissionGuideOpen(true);
+        setProcessingItem(null);
+        return;
+      }
+      setPendingGpsRetry({ itemIndex, type: 'checkout', photoBase64 });
+      toast.error(gpsErr.message, {
+        duration: 8000,
+        action: {
+          label: 'Tentar GPS',
+          onClick: () => handleRetryGps(),
+        },
+      });
       setProcessingItem(null);
       return;
     }
@@ -463,6 +558,7 @@ const InstallerJobDetail = () => {
       }
       
       // Reset form
+      setPendingGpsRetry(null);
       setCheckoutForm({ notes: '' });
       setExpandedItem(null);
       await loadJobData();
@@ -780,6 +876,13 @@ const InstallerJobDetail = () => {
                     </div>
                     
                     <div className="flex items-center gap-2">
+                      {/* 3B: GPS status badge — visível apenas quando há erro ou processamento para este item */}
+                      {isProcessing && gpsError && (
+                        <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">
+                          <WifiOff className="h-3 w-3" />
+                          GPS indisponível
+                        </span>
+                      )}
                       {status === 'completed' && (
                         <CheckCircle2 className="h-6 w-6 text-green-500" />
                       )}
@@ -790,6 +893,20 @@ const InstallerJobDetail = () => {
                       )}
                     </div>
                   </div>
+
+                  {/* 3B: GPS error banner — aparece quando há retry pendente para este item */}
+                  {pendingGpsRetry?.itemIndex === itemIndex && gpsError && (
+                    <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-md bg-red-500/10 border border-red-500/20">
+                      <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                      <span className="text-xs text-red-400 flex-1">{gpsError}</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleRetryGps(); }}
+                        className="text-xs text-primary underline underline-offset-2 shrink-0"
+                      >
+                        Tentar novamente
+                      </button>
+                    </div>
+                  )}
 
                   {/* Expanded Content */}
                   {isExpanded && (
@@ -1052,6 +1169,69 @@ const InstallerJobDetail = () => {
             <CheckCircle2 className="h-5 w-5 mr-2" />
             Finalizar Job
           </Button>
+        </div>
+      )}
+
+      {/* GPS Precision Confirm Dialog (3C — substitui window.confirm) */}
+      <Dialog open={gpsConfirmOpen} onOpenChange={(open) => {
+        if (!open && gpsConfirmResolve) {
+          // Fechar o dialog sem escolher = cancelar
+          gpsConfirmResolve(false);
+          setGpsConfirmResolve(null);
+          setGpsConfirmOpen(false);
+        }
+      }}>
+        <DialogContent className="bg-card border-white/10 max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <WifiOff className="h-5 w-5 text-yellow-400" />
+              Sinal GPS Fraco
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground text-sm mt-2 whitespace-pre-line">
+              {gpsConfirmMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-11 border-white/20 text-white hover:bg-white/10"
+              onClick={() => {
+                if (gpsConfirmResolve) gpsConfirmResolve(false);
+                setGpsConfirmResolve(null);
+                setGpsConfirmOpen(false);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1 h-11 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-transform"
+              onClick={() => {
+                if (gpsConfirmResolve) gpsConfirmResolve(true);
+                setGpsConfirmResolve(null);
+                setGpsConfirmOpen(false);
+              }}
+            >
+              Continuar mesmo assim
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* LocationPermissionGuide (3D) */}
+      {locationPermissionGuideOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm">
+            <LocationPermissionGuide
+              onPermissionGranted={() => {
+                setLocationPermissionGuideOpen(false);
+                handleRetryGps();
+              }}
+              onSkip={() => {
+                setLocationPermissionGuideOpen(false);
+                setPendingGpsRetry(null);
+              }}
+            />
+          </div>
         </div>
       )}
 
