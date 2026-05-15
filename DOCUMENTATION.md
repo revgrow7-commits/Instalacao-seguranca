@@ -97,8 +97,8 @@ DB_NAME=industria_visual_db
 JWT_SECRET=your-secret-key
 
 # Holdprint API
-HOLDPRINT_API_KEY_SP=REDACTED_HOLDPRINT_SP
-HOLDPRINT_API_KEY_POA=REDACTED_HOLDPRINT_POA
+HOLDPRINT_API_KEY_SP=<HOLDPRINT_API_KEY_SP — contatar Holdprint/Holdworks>
+HOLDPRINT_API_KEY_POA=<HOLDPRINT_API_KEY_POA — contatar Holdprint/Holdworks>
 
 # Email (Resend)
 RESEND_API_KEY=your-resend-key
@@ -294,8 +294,8 @@ Accept: application/json
 ```
 
 ### Chaves
-- **SP:** `REDACTED_HOLDPRINT_SP`
-- **POA:** `REDACTED_HOLDPRINT_POA`
+- **SP:** `<HOLDPRINT_API_KEY_SP — ver Vercel Dashboard > Environment Variables>`
+- **POA:** `<HOLDPRINT_API_KEY_POA — ver Vercel Dashboard > Environment Variables>`
 
 ### Resposta
 ```javascript

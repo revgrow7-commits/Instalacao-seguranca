@@ -88,17 +88,17 @@ Após o deploy inicial:
 2. Adicione TODAS as variáveis (copie da lista abaixo):
 
 ```
-SUPABASE_URL = https://otyrrvkixegiqsthmaaj.supabase.co
-SUPABASE_SERVICE_KEY = REDACTED_SUPABASE_SERVICE_KEY
-SUPABASE_ANON_KEY = REDACTED_SUPABASE_ANON_KEY
-JWT_SECRET = your-secret-key-change-in-production-123456789
-HOLDPRINT_API_KEY_POA = REDACTED_HOLDPRINT_POA
-HOLDPRINT_API_KEY_SP = REDACTED_HOLDPRINT_SP
-RESEND_API_KEY = REDACTED_RESEND_API_KEY
+SUPABASE_URL = <SUPABASE_URL — ver Supabase Dashboard > Settings > API>
+SUPABASE_SERVICE_KEY = <SUPABASE_SERVICE_KEY — ver Supabase Dashboard > Settings > API>
+SUPABASE_ANON_KEY = <SUPABASE_ANON_KEY — ver Supabase Dashboard > Settings > API>
+JWT_SECRET = <gerar com: openssl rand -hex 32>
+HOLDPRINT_API_KEY_POA = <HOLDPRINT_API_KEY_POA — contatar Holdprint/Holdworks>
+HOLDPRINT_API_KEY_SP = <HOLDPRINT_API_KEY_SP — contatar Holdprint/Holdworks>
+RESEND_API_KEY = <RESEND_API_KEY — ver Resend Dashboard > API Keys>
 SENDER_EMAIL = bruno@industriavisual.com.br
 FRONTEND_URL = https://instal-visual.com.br
-VAPID_PUBLIC_KEY = REDACTED_VAPID_PUBLIC_KEY
-VAPID_PRIVATE_KEY = -----BEGIN PRIVATE KEY-----\nREDACTED_VAPID_PRIVATE_KEY_B64\n-----END PRIVATE KEY-----
+VAPID_PUBLIC_KEY = <VAPID_PUBLIC_KEY — regerar com py-vapid e atualizar service worker>
+VAPID_PRIVATE_KEY = <VAPID_PRIVATE_KEY — regerar com py-vapid>
 VAPID_CLAIMS_EMAIL = bruno@industriavisual.com.br
 VERCEL = 1
 SERVERLESS = true
