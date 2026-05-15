@@ -7,18 +7,16 @@ from typing import Optional, List
 from datetime import datetime, timezone
 import uuid
 import logging
-import math
 
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
+from config import MAX_CHECKOUT_DISTANCE_METERS
+from services.gps import calculate_gps_distance
 
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-
-# Constants
-MAX_CHECKOUT_DISTANCE_METERS = 500
 
 # Pause reason labels
 # FIX B2 (auditoria 2026-05-14): sincronizado com frontend (InstallerJobDetail.jsx).
@@ -115,21 +113,6 @@ def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimens
     except Exception as e:
         logger.error(f"Error compressing image: {e}")
         return base64_string
-
-
-def calculate_gps_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calculate distance between two GPS coordinates in meters using Haversine formula."""
-    R = 6371000  # Earth's radius in meters
-    
-    phi1 = math.radians(lat1)
-    phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
-    
-    a = math.sin(delta_phi/2)**2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda/2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    
-    return R * c
 
 
 async def detect_product_family(product_names: list) -> tuple:

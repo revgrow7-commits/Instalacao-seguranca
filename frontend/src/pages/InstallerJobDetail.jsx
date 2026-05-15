@@ -372,12 +372,16 @@ const InstallerJobDetail = () => {
             base64 = canvas.toDataURL('image/jpeg', quality);
           }
 
-          // Se mesmo a 0.2 ainda está acima, encolhe dimensão e tenta de novo.
-          if (base64.length > MAX_BASE64_BYTES) {
+          // Se mesmo a 0.2 ainda está acima, encolhe dimensão progressivamente
+          // (até 4 tentativas de 0.7x cada — garante saída ≤ 1MB para câmeras de até ~200MP).
+          let resizeAttempts = 0;
+          while (base64.length > MAX_BASE64_BYTES && resizeAttempts < 4) {
             canvas.width = Math.round(canvas.width * 0.7);
             canvas.height = Math.round(canvas.height * 0.7);
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            base64 = canvas.toDataURL('image/jpeg', 0.5);
+            const q = Math.max(0.3, 0.5 - resizeAttempts * 0.05);
+            base64 = canvas.toDataURL('image/jpeg', q);
+            resizeAttempts++;
           }
 
           console.log(`[compressImage] saída: ${(base64.length / 1024).toFixed(0)}KB (quality=${quality.toFixed(2)})`);
@@ -573,7 +577,8 @@ const InstallerJobDetail = () => {
   const handleCoinAnimationComplete = () => {
     setShowCoinAnimation(false);
     setEarnedCoins(0);
-    toast.success('Check-out do item realizado! Moedas adicionadas ao seu saldo.');
+    // [GAMIFICATION DISABLED 2026-05-15] mensagem de moedas removida
+    toast.success('Check-out do item realizado!');
   };
 
   const getItemByIndex = (index) => {
