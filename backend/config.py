@@ -49,6 +49,9 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual
 # GPS/Location Settings
 MAX_CHECKOUT_DISTANCE_METERS = 500
 
+# Feature Flags
+GAMIFICATION_ENABLED = os.environ.get('GAMIFICATION_ENABLED', 'false').lower() == 'true'
+
 # Upload directory
 _is_serverless = os.environ.get('VERCEL') == '1' or os.environ.get('SERVERLESS') == 'true'
 UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', '/tmp/uploads' if _is_serverless else str(ROOT_DIR / 'uploads')))

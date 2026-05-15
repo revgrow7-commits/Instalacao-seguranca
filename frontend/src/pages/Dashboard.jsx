@@ -11,7 +11,8 @@ import {
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-import GamificationHighlight from '../components/GamificationHighlight';
+// [GAMIFICATION DISABLED 2026-05-15] import suspenso.
+// import GamificationHighlight from '../components/GamificationHighlight';
 
 const Dashboard = () => {
   const { user, isAdmin, isManager, isInstaller } = useAuth();
@@ -819,12 +820,12 @@ const Dashboard = () => {
         )}
         </div>
 
-        {/* Gamification Highlight - 1 coluna */}
-        {(isAdmin || isManager) && (
+        {/* [GAMIFICATION DISABLED 2026-05-15] highlight suspenso. */}
+        {/* {(isAdmin || isManager) && (
           <div className="lg:col-span-1">
             <GamificationHighlight />
           </div>
-        )}
+        )} */}
       </div>
 
       {/* =============== DRILL-DOWN MODALS =============== */}

@@ -78,12 +78,13 @@ const Sidebar = () => {
       icon: TrendingUp,
       roles: ['admin', 'manager']
     },
-    {
-      name: 'Bonificação',
-      href: '/gamification-report',
-      icon: Trophy,
-      roles: ['admin', 'manager']
-    },
+    // [GAMIFICATION DISABLED 2026-05-15] item de menu suspenso.
+    // {
+    //   name: 'Bonificação',
+    //   href: '/gamification-report',
+    //   icon: Trophy,
+    //   roles: ['admin', 'manager']
+    // },
     {
       name: 'Calendário',
       href: '/calendar',

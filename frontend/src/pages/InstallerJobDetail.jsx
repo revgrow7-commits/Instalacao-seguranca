@@ -536,26 +536,10 @@ const InstallerJobDetail = () => {
         );
       }
 
-      // FIX B3 (auditoria 2026-05-14): completeItemCheckout não dispara mais
-      // a gamificação automaticamente — chamamos /gamification/process-checkout
-      // explicitamente. Falha aqui é não-bloqueante para o checkout (que já
-      // foi gravado). O usuário verá apenas o toast de sucesso normal.
-      let coinsAwarded = response.data?.gamification?.coins_awarded || 0;
-      if (!coinsAwarded) {
-        try {
-          const gamiRes = await api.processCheckoutGamification(checkin.id);
-          coinsAwarded = gamiRes.data?.coins_awarded || 0;
-        } catch (gamiErr) {
-          console.warn('[InstallerJobDetail] processCheckoutGamification falhou (não-bloqueante):', gamiErr);
-        }
-      }
-
-      if (coinsAwarded > 0) {
-        setEarnedCoins(coinsAwarded);
-        setShowCoinAnimation(true);
-      } else {
-        toast.success('Check-out do item realizado!');
-      }
+      // [GAMIFICATION DISABLED 2026-05-15] award de moedas suspenso após checkout.
+      // Toda a chamada a /gamification/process-checkout e a animação de coins foram
+      // removidas. Para reverter, ver git: git show HEAD~1 -- frontend/src/pages/InstallerJobDetail.jsx
+      toast.success('Check-out do item realizado!');
       
       // Reset form
       setPendingGpsRetry(null);
@@ -759,12 +743,7 @@ const InstallerJobDetail = () => {
 
   return (
     <div className={`min-h-screen bg-background ${completedItems === totalItems && totalItems > 0 ? 'pb-28' : 'pb-8'}`}>
-      {/* Coin Animation */}
-      <CoinAnimation 
-        show={showCoinAnimation} 
-        coins={earnedCoins} 
-        onComplete={handleCoinAnimationComplete}
-      />
+      {/* [GAMIFICATION DISABLED 2026-05-15] CoinAnimation suspenso. */}
 
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">

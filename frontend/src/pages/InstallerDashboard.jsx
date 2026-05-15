@@ -1,4 +1,4 @@
-import React, { useEffect, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -75,28 +75,11 @@ const InstallerDashboard = () => {
   const [gamificationBalance, setGamificationBalance] = useState(null);
   const [recentTransactions, setRecentTransactions] = useState([]);
 
-  useEffect(() => {
-    loadJobs();
-    loadCheckins();
-    loadVisitas();
-    loadGamificationData();
-    registerDailyEngagement();
-    // Show notification modal after a short delay
-    const timer = setTimeout(() => {
-      const hasAskedForNotifications = localStorage.getItem('notification_asked');
-      if (!hasAskedForNotifications) {
-        setShowNotificationModal(true);
-      }
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleNotificationComplete = (accepted) => {
-    localStorage.setItem('notification_asked', 'true');
-    setShowNotificationModal(false);
-  };
-
-  const loadJobs = async () => {
+  // FIX B2 (hooks audit, 2026-05-14): all 5 loaders wrapped in useCallback so
+  // the bootstrap useEffect can list them as deps. None capture component
+  // state today (purely setState + api calls), so empty deps are correct.
+  // Defining them BEFORE the useEffect keeps the call order obvious.
+  const loadJobs = useCallback(async () => {
     try {
       const res = await api.getJobs();
       if (Array.isArray(res.data) && res.data.length === 0)
@@ -120,9 +103,9 @@ const InstallerDashboard = () => {
       setJobs([]);
       setLoading(false);
     }
-  };
+  }, []);
 
-  const loadCheckins = async () => {
+  const loadCheckins = useCallback(async () => {
     try {
       const res = await api.getCheckins();
       setCheckins(res.data ?? []);
@@ -133,9 +116,9 @@ const InstallerDashboard = () => {
     } finally {
       setCheckinsLoading(false);
     }
-  };
+  }, []);
 
-  const loadVisitas = async () => {
+  const loadVisitas = useCallback(async () => {
     try {
       const res = await api.listVisitas({ status: 'AGUARDANDO' });
       const upcoming = (res.data || [])
@@ -148,39 +131,39 @@ const InstallerDashboard = () => {
       // FIX M3: visitas não bloqueiam o dashboard, mas o erro fica registrado.
       console.warn('[InstallerDashboard] loadVisitas falhou:', e);
     }
-  };
+  }, []);
 
-  const loadGamificationData = async () => {
-    try {
-      const [balanceRes, transactionsRes] = await Promise.all([
-        api.getGamificationBalance(),
-        api.getGamificationTransactions(5)
-      ]);
-      // FIX B4 (auditoria 2026-05-14): fallback para listas — se a chamada
-      // falhar parcialmente ou voltar sem `data`, evita undefined no estado.
-      setGamificationBalance(balanceRes.data || null);
-      setRecentTransactions(transactionsRes.data || []);
-    } catch (error) {
-      console.warn('[InstallerDashboard] gamification fetch falhou:', error);
-    }
-  };
+  // [GAMIFICATION DISABLED 2026-05-15] fetcher virou no-op. State fica null e a UI esconde
+  // os widgets via conditionals `{gamificationBalance && ...}`. Para reverter, restaurar
+  // o corpo do try/catch original (ver git: git show HEAD~1 -- frontend/src/pages/InstallerDashboard.jsx).
+  const loadGamificationData = useCallback(async () => {
+    // intencionalmente vazio
+  }, []);
 
-  const registerDailyEngagement = async () => {
-    try {
-      const today = new Date().toDateString();
-      const lastEngagement = localStorage.getItem('daily_engagement_date');
-      
-      if (lastEngagement !== today) {
-        const response = await api.registerDailyEngagement();
-        if (response.data.success && !response.data.already_claimed) {
-          toast.success(`🎉 ${response.data.message}`, { duration: 5000 });
-          localStorage.setItem('daily_engagement_date', today);
-          loadGamificationData(); // Refresh balance
-        }
+  // [GAMIFICATION DISABLED 2026-05-15] daily engagement virou no-op.
+  const registerDailyEngagement = useCallback(async () => {
+    // intencionalmente vazio
+  }, []);
+
+  useEffect(() => {
+    loadJobs();
+    loadCheckins();
+    loadVisitas();
+    loadGamificationData();
+    registerDailyEngagement();
+    // Show notification modal after a short delay
+    const timer = setTimeout(() => {
+      const hasAskedForNotifications = localStorage.getItem('notification_asked');
+      if (!hasAskedForNotifications) {
+        setShowNotificationModal(true);
       }
-    } catch (error) {
-      console.warn('Daily engagement already claimed or error');
-    }
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [loadJobs, loadCheckins, loadVisitas, loadGamificationData, registerDailyEngagement]);
+
+  const handleNotificationComplete = (accepted) => {
+    localStorage.setItem('notification_asked', 'true');
+    setShowNotificationModal(false);
   };
 
 
@@ -563,22 +546,7 @@ const InstallerDashboard = () => {
         </Suspense>
       )}
 
-      {/* Prêmios - Em Breve */}
-      <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-card border border-white/5">
-        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-          <Coins className="h-5 w-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-white">Prêmios</p>
-          <p className="text-xs text-muted-foreground">Em breve — resgate com suas moedas</p>
-        </div>
-        <TrendingUp className="h-4 w-4 text-muted-foreground shrink-0" />
-      </div>
-
-      {/* Weekly Leaderboard - carrega em background */}
-      <Suspense fallback={null}>
-        <WeeklyLeaderboard />
-      </Suspense>
+      {/* [GAMIFICATION DISABLED 2026-05-15] card "Prêmios" e WeeklyLeaderboard suspensos. */}
     </div>
   );
 };

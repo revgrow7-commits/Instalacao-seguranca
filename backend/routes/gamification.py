@@ -9,8 +9,12 @@ import uuid
 from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
+from config import GAMIFICATION_ENABLED
 
 router = APIRouter()
+
+def _gamification_disabled_response():
+    return {"enabled": False, "message": "Gamificação temporariamente indisponível"}
 
 # ============ COIN LEVELS & CONSTANTS ============
 BASE_COINS_PER_M2 = 10
@@ -221,6 +225,7 @@ async def award_coins(user_id: str, amount: int, transaction_type: str, descript
 @router.get("/gamification/balance")
 async def get_gamification_balance(current_user: User = Depends(get_current_user)):
     """Get current user's gamification balance and level info"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     balance = db.gamification_balances.find_one({"user_id": current_user.id}, {"_id": 0})
     
     if not balance:
@@ -243,6 +248,7 @@ async def get_gamification_balance(current_user: User = Depends(get_current_user
 @router.get("/gamification/balance/{user_id}")
 async def get_user_gamification_balance(user_id: str, current_user: User = Depends(get_current_user)):
     """Get a specific user's gamification balance (admin/manager only for other users)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     if user_id != current_user.id:
         require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
@@ -271,6 +277,7 @@ async def get_gamification_transactions(
     current_user: User = Depends(get_current_user)
 ):
     """Get current user's coin transaction history"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     transactions = db.coin_transactions.find(
         {"user_id": current_user.id}, 
         {"_id": 0},
@@ -288,6 +295,7 @@ async def get_user_transactions(
     current_user: User = Depends(get_current_user)
 ):
     """Get a specific user's transactions (admin/manager only for other users)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     if user_id != current_user.id:
         require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
@@ -305,6 +313,7 @@ async def get_user_transactions(
 @router.post("/gamification/daily-engagement")
 async def register_daily_engagement(current_user: User = Depends(get_current_user)):
     """Register daily engagement bonus (first calendar access of the day)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     
     # Check if already claimed today
@@ -342,6 +351,7 @@ async def process_checkout_gamification(
     current_user: User = Depends(get_current_user)
 ):
     """Process gamification rewards for a completed checkout"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     # Get checkin data
     checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:
@@ -392,6 +402,7 @@ async def process_checkout_gamification(
 @router.get("/gamification/rewards")
 async def get_rewards(current_user: User = Depends(get_current_user)):
     """Get all available rewards"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     rewards = db.rewards.find({"is_active": True}, {"_id": 0})
     return rewards
 
@@ -407,8 +418,9 @@ async def create_reward(
     current_user: User = Depends(get_current_user)
 ):
     """Create a new reward (admin only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN])
-    
+
     reward = Reward(
         name=name,
         description=description,
@@ -440,8 +452,9 @@ async def update_reward(
     current_user: User = Depends(get_current_user)
 ):
     """Update a reward (admin only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN])
-    
+
     update_data = {}
     if name is not None: update_data["name"] = name
     if description is not None: update_data["description"] = description
@@ -460,6 +473,7 @@ async def update_reward(
 @router.delete("/gamification/rewards/{reward_id}")
 async def delete_reward(reward_id: str, current_user: User = Depends(get_current_user)):
     """Delete a reward (admin only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN])
     db.rewards.delete_one({"id": reward_id})
     return {"message": "Prêmio excluído com sucesso"}
@@ -468,8 +482,9 @@ async def delete_reward(reward_id: str, current_user: User = Depends(get_current
 @router.post("/gamification/rewards/seed")
 async def seed_default_rewards(current_user: User = Depends(get_current_user)):
     """Seed default rewards (admin only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN])
-    
+
     default_rewards = [
         {"name": "Voucher R$50", "description": "Vale-compras de R$50 para usar em lojas parceiras", "cost_coins": 500, "category": "voucher"},
         {"name": "Kit Ferramentas Básico", "description": "Kit com ferramentas essenciais para instalação", "cost_coins": 1500, "category": "equipment"},
@@ -496,6 +511,7 @@ async def seed_default_rewards(current_user: User = Depends(get_current_user)):
 @router.post("/gamification/redeem/{reward_id}")
 async def redeem_reward(reward_id: str, current_user: User = Depends(get_current_user)):
     """Redeem a reward with coins"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     # Get reward
     reward = db.rewards.find_one({"id": reward_id, "is_active": True}, {"_id": 0})
     if not reward:
@@ -559,6 +575,7 @@ async def redeem_reward(reward_id: str, current_user: User = Depends(get_current
 @router.get("/gamification/redemptions")
 async def get_my_redemptions(current_user: User = Depends(get_current_user)):
     """Get current user's reward redemptions"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     redemptions = db.reward_requests.find(
         {"user_id": current_user.id}, 
         {"_id": 0},
@@ -570,6 +587,7 @@ async def get_my_redemptions(current_user: User = Depends(get_current_user)):
 @router.get("/gamification/redemptions/all")
 async def get_all_redemptions(current_user: User = Depends(get_current_user)):
     """Get all redemption requests (admin/manager only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
     redemptions = db.reward_requests.find({}, {"_id": 0}, sort=[("created_at", -1)])
@@ -599,8 +617,9 @@ async def update_redemption_status(
     current_user: User = Depends(get_current_user)
 ):
     """Update redemption request status (admin/manager only)"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     if status not in ["pending", "approved", "delivered", "rejected"]:
         raise HTTPException(status_code=400, detail="Status inválido")
     
@@ -644,8 +663,9 @@ async def get_gamification_report(
     current_user: User = Depends(get_current_user)
 ):
     """Get gamification report for admin/manager"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     # Default to current month
     now = datetime.now(timezone.utc)
     report_month = month or now.month
@@ -731,6 +751,7 @@ async def get_leaderboard(
     current_user: User = Depends(get_current_user)
 ):
     """Get gamification leaderboard"""
+    if not GAMIFICATION_ENABLED: return _gamification_disabled_response()
     now = datetime.now(timezone.utc)
     
     # Determine date range

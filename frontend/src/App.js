@@ -52,8 +52,9 @@ const FamilyReport = lazy(() => import('./pages/FamilyReport'));
 const InstallerReport = lazy(() => import('./pages/InstallerReport'));
 const FamilyKPIsReport = lazy(() => import('./pages/FamilyKPIsReport'));
 const Profile = lazy(() => import('./pages/Profile'));
-const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
-const GamificationReport = lazy(() => import('./pages/GamificationReport'));
+// [GAMIFICATION DISABLED 2026-05-15] páginas suspensas (rotas redirecionam para /dashboard).
+// const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
+// const GamificationReport = lazy(() => import('./pages/GamificationReport'));
 const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
 const VisitasTecnicas = lazy(() => import('./pages/VisitasTecnicas'));
 const VisitaDetail = lazy(() => import('./pages/VisitaDetail'));
@@ -354,26 +355,9 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/loja-faixa-preta"
-        element={
-          <ProtectedRoute>
-            <MainLayout>
-              <LojaFaixaPreta />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/gamification-report"
-        element={
-          <ProtectedRoute allowedRoles={['admin', 'manager']}>
-            <MainLayout>
-              <GamificationReport />
-            </MainLayout>
-          </ProtectedRoute>
-        }
-      />
+      {/* [GAMIFICATION DISABLED 2026-05-15] rotas redirecionam para /dashboard. */}
+      <Route path="/loja-faixa-preta" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/gamification-report" element={<Navigate to="/dashboard" replace />} />
       <Route
         path="/admin/scheduler"
         element={
