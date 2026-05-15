@@ -640,8 +640,12 @@ async def complete_item_checkout(
         }
 
         db.installed_products.insert_one(installed_product_dict)
-        await update_productivity_history(installed_product_dict)
-    
+        try:
+            await update_productivity_history(installed_product_dict)
+        except Exception as _ph_err:
+            # Schema divergence entre código e tabela — não bloqueia o checkout.
+            logger.warning(f"productivity_history update skipped: {_ph_err}")
+
     # Check job completion
     job = db.jobs.find_one({"id": checkin["job_id"]}, {"_id": 0})
     job_checkins = db.item_checkins.find({"job_id": checkin["job_id"]}, {"_id": 0})
