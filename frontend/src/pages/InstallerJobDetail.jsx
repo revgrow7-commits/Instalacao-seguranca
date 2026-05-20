@@ -6,18 +6,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+// Dialog/DialogContent/DialogHeader/... removidos — o confirm de GPS agora é renderizado por useConfirmDialog.
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
   ArrowLeft, Package, MapPin, Camera, Check, Clock,
   Ruler, AlertCircle, CheckCircle2, PlayCircle,
-  Square, ChevronDown, ChevronUp, Upload, Pause, Play, Wifi, WifiOff
+  ChevronDown, ChevronUp, Pause, Play, WifiOff
 } from 'lucide-react';
 import { toast } from 'sonner';
-import CoinAnimation from '../components/CoinAnimation';
 import { getPhotoSrc } from '../lib/photo';
 import LocationPermissionGuide from '../components/LocationPermissionGuide';
+import { useConfirmDialog } from '../hooks/useConfirmDialog';
+import { useGpsMachine } from '../hooks/useGpsMachine';
+// CoinAnimation removido (gamification disabled 2026-05-15).
 
 // FIX C3 (auditoria 2026-05-14): relaxado de 100m para 200m. Em zonas urbanas
 // densas e locais semi-fechados, smartphones costumam reportar 80-200m no
@@ -43,21 +45,15 @@ const InstallerJobDetail = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [job, setJob] = useState(null);
+  const [meuPapel, setMeuPapel] = useState(null); // papel do usuário nesta instalação (VC)
   const [itemCheckins, setItemCheckins] = useState({});
   const [pauseLogs, setPauseLogs] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedItem, setExpandedItem] = useState(null);
   const [processingItem, setProcessingItem] = useState(null);
-  const [gpsLocation, setGpsLocation] = useState(null);
-  const [gpsError, setGpsError] = useState(null);
   const fileInputRef = useRef({});
 
-  // GPS confirmation dialog state (substituindo window.confirm — 3C)
-  const [gpsConfirmOpen, setGpsConfirmOpen] = useState(false);
-  const [gpsConfirmMessage, setGpsConfirmMessage] = useState('');
-  const [gpsConfirmResolve, setGpsConfirmResolve] = useState(null);
-
-  // GPS permission guide state (3D)
+  // GPS permission guide state (3D) — fluxo separado da máquina de GPS.
   const [locationPermissionGuideOpen, setLocationPermissionGuideOpen] = useState(false);
   // Pending retry: { itemIndex, type, photoBase64 } — preserva a foto quando GPS falha (3A)
   const [pendingGpsRetry, setPendingGpsRetry] = useState(null);
@@ -67,13 +63,33 @@ const InstallerJobDetail = () => {
   const [pauseItemIndex, setPauseItemIndex] = useState(null);
   const [pauseReason, setPauseReason] = useState('');
 
-  // Coin animation state
-  const [showCoinAnimation, setShowCoinAnimation] = useState(false);
-  const [earnedCoins, setEarnedCoins] = useState(0);
+  // [GAMIFICATION DISABLED 2026-05-15] removidos showCoinAnimation/earnedCoins
+  // e handleCoinAnimationComplete — eram dead state desde a desativação.
 
   // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
     notes: ''
+  });
+
+  // Confirm dialog para "GPS impreciso" — antes eram 3 useStates + workaround
+  // setX(() => resolve). Agora encapsulado em hook.
+  const { confirm: confirmLowAccuracyGps, Dialog: GpsConfirmDialog } = useConfirmDialog({
+    defaultTitle: 'Sinal GPS Fraco',
+    confirmText: 'Continuar mesmo assim',
+    cancelText: 'Cancelar',
+  });
+
+  // Máquina de estados do GPS — antes eram 7 useStates espalhados (gpsLocation,
+  // gpsError, gpsConfirmOpen/Message/Resolve, locationPermissionGuide, ...) +
+  // 110 linhas de requestGPS/showGpsConfirm/tryGetPosition inline. Agora 1 hook.
+  const {
+    error: gpsError,
+    requestGPS,
+  } = useGpsMachine({
+    accuracyLimit: GPS_ACCURACY_LIMIT,
+    timeoutMs: GPS_TIMEOUT_MS,
+    confirmLowAccuracy: confirmLowAccuracyGps,
+    onFallbackAttempt: () => toast.info('GPS com dificuldade — tentando sinal alternativo…', { duration: 4000 }),
   });
 
   useEffect(() => {
@@ -94,97 +110,8 @@ const InstallerJobDetail = () => {
     return assignments.find(a => a.item_index === itemIndex);
   };
 
-  // showGpsConfirm — substitui window.confirm (3C): retorna Promise<boolean>
-  const showGpsConfirm = (message) => {
-    return new Promise((resolve) => {
-      setGpsConfirmMessage(message);
-      // Armazenamos o resolve em estado para o dialog chamar depois.
-      // Usamos função wrapper para evitar que o React interprete como
-      // updater function (setX(fn) chama fn(prevState)).
-      setGpsConfirmResolve(() => resolve);
-      setGpsConfirmOpen(true);
-    });
-  };
-
-  // Tenta obter posição GPS com um único conjunto de opções.
-  // Retorna Promise<GeolocationPosition>.
-  const tryGetPosition = (options) => {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, options);
-    });
-  };
-
-  // requestGPS — retry com fallback de precisão (3A) + dialog estilizado (3C).
-  // Estratégia:
-  //   1. Alta precisão, sem cache, 30s timeout.
-  //   2. Se falhar por timeout (3) ou indisponível (2): retry com baixa precisão,
-  //      cache de 60s, 15s timeout.
-  //   Permissão negada (1) rejeita imediatamente (retry seria inútil).
-  const requestGPS = async () => {
-    if (!navigator.geolocation) {
-      const msg = 'Este dispositivo não suporta GPS. Use um smartphone com localização ativada.';
-      setGpsError(msg);
-      throw new Error(msg);
-    }
-
-    let position;
-    try {
-      position = await tryGetPosition({
-        enableHighAccuracy: true,
-        timeout: GPS_TIMEOUT_MS,
-        maximumAge: 0,
-      });
-    } catch (firstErr) {
-      // Código 1 = permissão negada — sem retry, abrir guia de permissão.
-      if (firstErr.code === 1) {
-        const msg = 'Permissão de localização negada. Ative o GPS nas configurações do navegador.';
-        setGpsError(msg);
-        throw Object.assign(new Error(msg), { gpsCode: 1 });
-      }
-      // Código 2 (indisponível) ou 3 (timeout) — tenta fallback de baixa precisão.
-      console.warn('[requestGPS] primeira tentativa falhou (código ' + firstErr.code + '), tentando fallback…');
-      toast.info('GPS com dificuldade — tentando sinal alternativo…', { duration: 4000 });
-      try {
-        position = await tryGetPosition({
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 60000,
-        });
-      } catch (secondErr) {
-        const messages = {
-          1: 'Permissão de localização negada. Ative o GPS nas configurações do navegador.',
-          2: 'Posição não disponível. Verifique se o GPS está ativado.',
-          3: 'Tempo esgotado ao obter GPS. Vá para um local aberto e tente novamente.',
-        };
-        const msg = messages[secondErr.code] || 'Não foi possível obter localização GPS.';
-        setGpsError(msg);
-        throw Object.assign(new Error(msg), { gpsCode: secondErr.code });
-      }
-    }
-
-    // GPS obtido — verificar precisão.
-    if (position.coords.accuracy > GPS_ACCURACY_LIMIT) {
-      const accuracyM = Math.round(position.coords.accuracy);
-      // 3C: dialog estilizado em vez de window.confirm
-      const proceed = await showGpsConfirm(
-        `Sinal GPS impreciso (${accuracyM}m). O ideal é abaixo de ${GPS_ACCURACY_LIMIT}m, mas podemos registrar mesmo assim.\n\nDeseja continuar com o check-in?`
-      );
-      if (!proceed) {
-        const msg = `Check-in cancelado — GPS impreciso (${accuracyM}m).`;
-        setGpsError(msg);
-        throw new Error(msg);
-      }
-    }
-
-    const location = {
-      lat: position.coords.latitude,
-      long: position.coords.longitude,
-      accuracy: position.coords.accuracy,
-    };
-    setGpsLocation(location);
-    setGpsError(null);
-    return location;
-  };
+  // requestGPS é fornecido pelo hook useGpsMachine. A lógica de retry/fallback/
+  // confirmação de baixa precisão vive lá. Aqui o componente só consome.
 
   // FIX M2: aceita um callback opcional `isCancelled` para evitar setState
   // após desmontagem (default: sempre false = mantém comportamento antigo).
@@ -194,6 +121,31 @@ const InstallerJobDetail = () => {
       const jobRes = await api.getJobById(jobId);
       if (isCancelled()) return;
       setJob(jobRes.data);
+
+      // Busca papel do usuário no Visual Connect (fire-and-forget, não bloqueia o carregamento)
+      const hpId = jobRes.data?.holdprint_job_id;
+      if (hpId && user?.email) {
+        fetch('https://otyrrvkixegiqsthmaaj.supabase.co/functions/v1/installation-list', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'sb_publishable_EuYPYtSpr2X3-rXz1PhqUg_aU0Mj9Zv',
+            'Authorization': 'Bearer sb_publishable_EuYPYtSpr2X3-rXz1PhqUg_aU0Mj9Zv',
+          },
+          body: JSON.stringify({ holdprint_job_id: hpId }),
+        })
+          .then(r => r.ok ? r.json() : null)
+          .then(vcData => {
+            if (isCancelled()) return;
+            const vcJob = (vcData?.data ?? [])[0];
+            if (!vcJob) return;
+            const inst = (vcJob.installers ?? []).find(
+              i => i.email?.toLowerCase() === user.email?.toLowerCase()
+            );
+            if (inst?.papel) setMeuPapel(inst.papel);
+          })
+          .catch(() => {});
+      }
 
       // Load item checkins
       const checkinsRes = await api.getItemCheckins(jobId);
@@ -574,12 +526,8 @@ const InstallerJobDetail = () => {
     }
   };
 
-  const handleCoinAnimationComplete = () => {
-    setShowCoinAnimation(false);
-    setEarnedCoins(0);
-    // [GAMIFICATION DISABLED 2026-05-15] mensagem de moedas removida
-    toast.success('Check-out do item realizado!');
-  };
+  // [GAMIFICATION DISABLED 2026-05-15] handleCoinAnimationComplete removido —
+  // toast de sucesso do checkout já é emitido em handleItemCheckout.
 
   const getItemByIndex = (index) => {
     const products = job?.products_with_area || [];
@@ -761,9 +709,16 @@ const InstallerJobDetail = () => {
           </button>
           
           <h1 className="text-xl font-bold text-foreground">{job.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {job.holdprint_data?.client_name || job.client_name || 'Cliente não informado'}
-          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              {job.holdprint_data?.client_name || job.client_name || 'Cliente não informado'}
+            </p>
+            {meuPapel && meuPapel !== 'instalador' && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary capitalize shrink-0">
+                {meuPapel}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1156,50 +1111,8 @@ const InstallerJobDetail = () => {
         </div>
       )}
 
-      {/* GPS Precision Confirm Dialog (3C — substitui window.confirm) */}
-      <Dialog open={gpsConfirmOpen} onOpenChange={(open) => {
-        if (!open && gpsConfirmResolve) {
-          // Fechar o dialog sem escolher = cancelar
-          gpsConfirmResolve(false);
-          setGpsConfirmResolve(null);
-          setGpsConfirmOpen(false);
-        }
-      }}>
-        <DialogContent className="bg-card border-white/10 max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <WifiOff className="h-5 w-5 text-yellow-400" />
-              Sinal GPS Fraco
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground text-sm mt-2 whitespace-pre-line">
-              {gpsConfirmMessage}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-11 border-white/20 text-white hover:bg-white/10"
-              onClick={() => {
-                if (gpsConfirmResolve) gpsConfirmResolve(false);
-                setGpsConfirmResolve(null);
-                setGpsConfirmOpen(false);
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1 h-11 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-transform"
-              onClick={() => {
-                if (gpsConfirmResolve) gpsConfirmResolve(true);
-                setGpsConfirmResolve(null);
-                setGpsConfirmOpen(false);
-              }}
-            >
-              Continuar mesmo assim
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* GPS Precision Confirm Dialog — fornecido por useConfirmDialog */}
+      {GpsConfirmDialog}
 
       {/* LocationPermissionGuide (3D) */}
       {locationPermissionGuideOpen && (
