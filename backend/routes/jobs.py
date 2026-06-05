@@ -1451,13 +1451,22 @@ async def archive_job_items(job_id: str, request: ArchiveItemsRequest, current_u
                 "exclude_from_metrics": request.exclude_from_metrics
             })
     
+    # Remove archived indices from item_assignments to keep state consistent.
+    # Installers assigned only to archived items would otherwise still see
+    # a job with 0 workable items, causing confusion.
+    archived_index_set = {a.get("item_index") for a in archived_items}
+    item_assignments = [
+        a for a in job.get("item_assignments", [])
+        if a.get("item_index") not in archived_index_set
+    ]
+
     db.jobs.update_one(
         {"id": job_id},
-        {"$set": {"archived_items": archived_items}}
+        {"$set": {"archived_items": archived_items, "item_assignments": item_assignments}}
     )
-    
+
     logger.info(f"Job {job_id}: {len(request.item_indices)} items archived by {current_user.name}")
-    
+
     return {
         "message": f"{len(request.item_indices)} item(s) arquivado(s) com sucesso",
         "archived_items": archived_items
