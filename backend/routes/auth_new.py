@@ -175,7 +175,7 @@ def register(request: RegisterRequest):
     
     # Also create installer record
     installer_doc = {
-        "id": str(uuid.uuid4()),
+        "id": user_id,
         "user_id": user_id,
         "full_name": request.name,
         "phone": request.phone,
@@ -261,7 +261,7 @@ def admin_register(request: AdminRegisterRequest, current_user: User = Depends(g
     # If installer role, create installer record
     if request.role == "installer":
         installer_doc = {
-            "id": str(uuid.uuid4()),
+            "id": user_id,
             "user_id": user_id,
             "full_name": request.name,
             "phone": request.phone,
