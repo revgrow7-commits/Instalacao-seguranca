@@ -364,12 +364,23 @@ async def create_item_checkin(
     if photo_url:
         checkin_dict['checkin_photo_url'] = photo_url
     db.item_checkins.insert_one(checkin_dict)
-    
+
     checkin_dict.pop('_id', None)
     checkin_dict.pop('checkin_photo', None)
     checkin_dict.pop('checkout_photo', None)
 
-    db.jobs.update_one({"id": job_id}, {"$set": {"status": "instalando"}})
+    # Garante que o instalador esteja em assigned_installers para aparecer no dashboard.
+    # Cenário: rescheduling pode sobrescrever assigned_installers sem incluir instaladores
+    # já atribuídos via item_assignments, tornando o job invisível no perfil deles.
+    _current_assigned = job.get("assigned_installers") or []
+    _ids_to_add = [i for i in [installer["id"], current_user.id] if i not in _current_assigned]
+    if _ids_to_add:
+        db.jobs.update_one(
+            {"id": job_id},
+            {"$set": {"status": "instalando", "assigned_installers": _current_assigned + _ids_to_add}}
+        )
+    else:
+        db.jobs.update_one({"id": job_id}, {"$set": {"status": "instalando"}})
 
     return checkin_dict
 
@@ -530,7 +541,16 @@ async def batch_item_checkin(
         checkin_dict['exif_duration_minutes'] = exif_duration_minutes
 
     db.item_checkins.insert_one(checkin_dict)
-    db.jobs.update_one({"id": request.job_id}, {"$set": {"status": "instalando"}})
+
+    _current_assigned = job.get("assigned_installers") or []
+    _ids_to_add = [i for i in [installer_id, current_user.id] if i not in _current_assigned]
+    if _ids_to_add:
+        db.jobs.update_one(
+            {"id": request.job_id},
+            {"$set": {"status": "instalando", "assigned_installers": _current_assigned + _ids_to_add}}
+        )
+    else:
+        db.jobs.update_one({"id": request.job_id}, {"$set": {"status": "instalando"}})
 
     checkin_dict.pop('_id', None)
     checkin_dict.pop('checkin_photo', None)
