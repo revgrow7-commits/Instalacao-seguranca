@@ -70,6 +70,40 @@ def _enrich_installer_name(doc: dict) -> dict:
     return doc
 
 
+def _resolve_installer_id(installer_id: Optional[str], installer_email: Optional[str] = None) -> Optional[str]:
+    """Resolve um identificador de instalador para installers.id.
+
+    A coluna visitas_tecnicas.installer_id é FK para installers.id. O frontend
+    pode enviar:
+      • um installers.id (passa direto);
+      • um users.id (mapeado via installers.user_id) — origem do bug de FK 500;
+      • nenhum id, mas um email (resolvido via installers.email ou users.email).
+    Retorna installers.id resolvido, ou None se nada casar.
+    """
+    if installer_id:
+        rec = db.installers.find_one({"id": installer_id})
+        if rec:
+            return installer_id
+        rec = db.installers.find_one({"user_id": installer_id})
+        if rec:
+            return rec["id"]
+        logger.warning(
+            "installer_id '%s' não corresponde a installers.id nem installers.user_id; "
+            "tentando resolver por email.", installer_id,
+        )
+    if installer_email:
+        email = installer_email.lower()
+        rec = db.installers.find_one({"email": email})
+        if rec:
+            return rec["id"]
+        user_rec = db.users.find_one({"email": email})
+        if user_rec:
+            rec = db.installers.find_one({"user_id": user_rec["id"]})
+            if rec:
+                return rec["id"]
+    return None
+
+
 # ============ ROUTES ============
 
 @router.post("/visitas", response_model=VisitaOut)
@@ -83,17 +117,9 @@ async def create_visita(
     now = datetime.now(timezone.utc).isoformat()
     visita_id = str(uuid.uuid4())
 
-    # ── Resolver installer_id por email quando instalador externo sem id local ──
-    effective_installer_id = data.installer_id
-    if data.installer_email and not effective_installer_id:
-        local_installer = db.installers.find_one({"email": data.installer_email.lower()})
-        if not local_installer:
-            # Tentar via tabela users (instaladores cujo user_id aponta para users.email)
-            user_rec = db.users.find_one({"email": data.installer_email.lower()})
-            if user_rec:
-                local_installer = db.installers.find_one({"user_id": user_rec["id"]})
-        if local_installer:
-            effective_installer_id = local_installer["id"]
+    # ── Resolver installer_id para installers.id (FK). Aceita installers.id,
+    #    users.id ou email; evita violação de FK quando o frontend enviar users.id. ──
+    effective_installer_id = _resolve_installer_id(data.installer_id, data.installer_email)
 
     doc = {
         "id": visita_id,
@@ -134,7 +160,14 @@ async def create_visita(
         "aprovacao_status": data.aprovacao_status or "PENDENTE",
     }
 
-    db.visitas_tecnicas.insert_one(doc)
+    try:
+        db.visitas_tecnicas.insert_one(doc)
+    except Exception as exc:
+        logger.error("create_visita insert_one error: %s | doc keys: %s", exc, list(doc.keys()))
+        raise HTTPException(
+            status_code=422,
+            detail=f"Erro ao criar visita: {exc}",
+        )
 
     saved = db.visitas_tecnicas.find_one({"id": visita_id})
     if not saved:
@@ -425,6 +458,16 @@ async def update_visita(
     if "status" in update_fields and isinstance(update_fields["status"], VisitaStatus):
         update_fields["status"] = update_fields["status"].value
 
+    # installer_id deve ser installers.id (FK). Resolve users.id/email → installers.id.
+    if update_fields.get("installer_id"):
+        resolved = _resolve_installer_id(update_fields["installer_id"])
+        if not resolved:
+            raise HTTPException(
+                status_code=400,
+                detail="Instalador não encontrado na base local (installers). Selecione um instalador válido.",
+            )
+        update_fields["installer_id"] = resolved
+
     update_fields["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     db.visitas_tecnicas.update_one({"id": visita_id}, {"$set": update_fields})
@@ -455,8 +498,16 @@ async def agendar_visita(
     if doc.get("status") == VisitaStatus.CANCELADA.value:
         raise HTTPException(status_code=400, detail="Não é possível agendar uma visita técnica cancelada")
 
+    # installer_id deve ser installers.id (FK). Resolve users.id/email → installers.id.
+    resolved_installer_id = _resolve_installer_id(data.installer_id)
+    if not resolved_installer_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Instalador não encontrado na base local (installers). Selecione um instalador válido.",
+        )
+
     update_fields = {
-        "installer_id": data.installer_id,
+        "installer_id": resolved_installer_id,
         "scheduled_date": data.scheduled_date.isoformat(),
         "scheduled_time_end": data.scheduled_time_end.isoformat() if data.scheduled_time_end else None,
         "status": VisitaStatus.AGUARDANDO_CONFIRMACAO.value,
@@ -472,13 +523,13 @@ async def agendar_visita(
         raise HTTPException(status_code=500, detail="Erro ao recuperar visita técnica após agendamento")
 
     # Invalida cache do nome para este instalador (pode ter mudado)
-    _installer_name_cache.pop(data.installer_id, None)
+    _installer_name_cache.pop(resolved_installer_id, None)
 
     # Push notification para o instalador atribuído (silencioso em caso de falha)
     try:
         await notify_visita_scheduled(
             visita_id=visita_id,
-            installer_id=data.installer_id,
+            installer_id=resolved_installer_id,
             visita_title=updated.get("titulo") or "Visita Técnica",
             client_name=updated.get("client_name") or "",
         )
