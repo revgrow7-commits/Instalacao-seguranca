@@ -320,7 +320,7 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
   });
 
   const [selectedJob, setSelectedJob] = React.useState(null);
-  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, vendedoresVC, vendedoresVCMap, instaladoresVC, instaladoresVCMap, csLoading, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -389,16 +389,19 @@ const NovaVisitaModal = ({ open, onClose, onSuccess, installers, catalogos }) =>
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
-                value={watch('vendedor_email') || ''}
+                options={vendedores}
+                value={watch('vendedor_nome') || ''}
                 onChange={(v) => {
-                  const opt = colaboradoresVCMap.get(v);
-                  setValue('vendedor_email', v || null);
-                  setValue('vendedor_nome', opt?._nome || v || null);
+                  // Catálogo de vendedores (/catalogos/vendedores) substitui /cs/colaboradores.
+                  // Só há nome (sem email), então vendedor_email fica nulo.
+                  setValue('vendedor_nome', v || null);
+                  setValue('vendedor_email', null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText="Nenhum resultado"
+                creatable
+                onCreate={addVendedor}
               />
             </div>
           </div>
@@ -792,7 +795,7 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
     } : {},
   });
 
-  const { vendedores, tiposServico, ferramentas, colaboradoresVC, colaboradoresVCMap, vendedoresVC, vendedoresVCMap, instaladoresVC, instaladoresVCMap, csLoading, addVendedor, addTipoServico, addFerramenta } = catalogos;
+  const { vendedores, tiposServico, ferramentas, addVendedor, addTipoServico, addFerramenta } = catalogos;
 
   const [kmIda, kmVolta, valorKm] = watch(['km_ida', 'km_volta', 'valor_por_km']);
   const totalDeslocamento = ((Number(kmIda) || 0) + (Number(kmVolta) || 0)) * (Number(valorKm) || 0);
@@ -835,16 +838,19 @@ const EditarVisitaModal = ({ open, visita, onClose, onSuccess, installers, catal
             <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">Vendedor</Label>
               <Combobox
-                options={colaboradoresVC.length > 0 ? colaboradoresVC : vendedores}
-                value={watch('vendedor_email') || ''}
+                options={vendedores}
+                value={watch('vendedor_nome') || ''}
                 onChange={(v) => {
-                  const opt = colaboradoresVCMap.get(v);
-                  setValue('vendedor_email', v || null);
-                  setValue('vendedor_nome', opt?._nome || v || null);
+                  // Catálogo de vendedores (/catalogos/vendedores) substitui /cs/colaboradores.
+                  // Só há nome (sem email), então vendedor_email fica nulo.
+                  setValue('vendedor_nome', v || null);
+                  setValue('vendedor_email', null);
                 }}
                 placeholder="Selecionar vendedor..."
                 searchPlaceholder="Buscar vendedor..."
-                emptyText={csLoading ? 'Carregando colaboradores...' : 'Nenhum resultado'}
+                emptyText="Nenhum resultado"
+                creatable
+                onCreate={addVendedor}
               />
             </div>
           </div>
@@ -1122,7 +1128,11 @@ const VisitasTecnicas = () => {
   const catalogos = useCatalogos();
 
   React.useEffect(() => {
-    api.getUsers({ role: 'installer', is_active: true })
+    // IMPORTANTE: visitas_tecnicas.installer_id é FK para installers.id (NÃO users.id).
+    // Por isso a lista vem de /installers (installers.id) e não de /users.
+    // Usar /users gravava users.id em installer_id e causava violação de FK (500) ao
+    // criar/agendar/editar visita com instalador selecionado.
+    api.getInstallers()
       .then(res => setInstallers(Array.isArray(res.data) ? res.data : []))
       .catch(err => {
         console.error('[VisitasTecnicas] falha ao carregar instaladores:', err?.response?.data || err?.message);
@@ -1306,12 +1316,12 @@ const VisitasTecnicas = () => {
 
             <div className="w-56">
               <Combobox
-                options={catalogos.colaboradoresVC}
+                options={catalogos.vendedores}
                 value={filterVendedor}
                 onChange={(v) => setFilterVendedor(v || '')}
                 placeholder="Filtrar por vendedor"
                 searchPlaceholder="Buscar vendedor..."
-                emptyText={catalogos.csLoading ? 'Carregando...' : 'Nenhum resultado'}
+                emptyText="Nenhum resultado"
               />
             </div>
 
