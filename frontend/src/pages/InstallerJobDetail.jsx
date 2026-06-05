@@ -6,30 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-// Dialog/DialogContent/DialogHeader/... removidos — o confirm de GPS agora é renderizado por useConfirmDialog.
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
   ArrowLeft, Package, MapPin, Camera, Check, Clock,
   Ruler, AlertCircle, CheckCircle2, PlayCircle,
-  ChevronDown, ChevronUp, Pause, Play, WifiOff,
+  ChevronDown, ChevronUp, Pause, Play,
   Images, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
 import { extractExif } from '../lib/extractExif';
-import LocationPermissionGuide from '../components/LocationPermissionGuide';
-import { useConfirmDialog } from '../hooks/useConfirmDialog';
-import { useGpsMachine } from '../hooks/useGpsMachine';
-// CoinAnimation removido (gamification disabled 2026-05-15).
-
-// FIX C3 (auditoria 2026-05-14): relaxado de 100m para 200m. Em zonas urbanas
-// densas e locais semi-fechados, smartphones costumam reportar 80-200m no
-// primeiro fix — o limite anterior travava o instalador em loop sem que ele
-// pudesse fazer nada além de sair para a rua. Backend ainda valida a 500m
-// no checkout (item_checkins.py:21), então a margem operacional é segura.
-const GPS_ACCURACY_LIMIT = 200; // metros — rejeita leitura com precisão pior que isso
-const GPS_TIMEOUT_MS = 30000;   // 30s — em redes 3G mobile, 15s era curto demais
 
 const PAUSE_REASON_LABELS = {
   "aguardando_cliente": "Aguardando Cliente",
@@ -55,11 +42,6 @@ const InstallerJobDetail = () => {
   const [processingItem, setProcessingItem] = useState(null);
   const fileInputRef = useRef({});
   const hasAutoExpanded = useRef(false);
-
-  // GPS permission guide state (3D) — fluxo separado da máquina de GPS.
-  const [locationPermissionGuideOpen, setLocationPermissionGuideOpen] = useState(false);
-  // Pending retry: { itemIndex, type, photoBase64 } — preserva a foto quando GPS falha (3A)
-  const [pendingGpsRetry, setPendingGpsRetry] = useState(null);
 
   // Pause modal state
   const [showPauseModal, setShowPauseModal] = useState(false);
@@ -113,35 +95,9 @@ const InstallerJobDetail = () => {
     });
   };
 
-  // Confirm dialog para "GPS impreciso" — antes eram 3 useStates + workaround
-  // setX(() => resolve). Agora encapsulado em hook.
-  const { confirm: confirmLowAccuracyGps, Dialog: GpsConfirmDialog } = useConfirmDialog({
-    defaultTitle: 'Sinal GPS Fraco',
-    confirmText: 'Continuar mesmo assim',
-    cancelText: 'Cancelar',
-  });
-
-  // Máquina de estados do GPS — antes eram 7 useStates espalhados (gpsLocation,
-  // gpsError, gpsConfirmOpen/Message/Resolve, locationPermissionGuide, ...) +
-  // 110 linhas de requestGPS/showGpsConfirm/tryGetPosition inline. Agora 1 hook.
-  const {
-    error: gpsError,
-    requestGPS,
-  } = useGpsMachine({
-    accuracyLimit: GPS_ACCURACY_LIMIT,
-    timeoutMs: GPS_TIMEOUT_MS,
-    confirmLowAccuracy: confirmLowAccuracyGps,
-    onFallbackAttempt: () => toast.info('GPS com dificuldade — tentando sinal alternativo…', { duration: 4000 }),
-  });
-
   useEffect(() => {
-    // FIX M2 (auditoria 2026-05-14): flag de cancelamento — se o usuário
-    // navega entre jobs rapidamente, evita setState em componente desmontado
-    // (warning React + risco de exibir dados de outro job por race condition).
     let cancelled = false;
     loadJobData(() => cancelled);
-    // GPS will be requested only when user clicks check-in/checkout button
-    // This prevents the Android overlay permission error
     return () => { cancelled = true; };
   }, [jobId]);
 
@@ -164,9 +120,6 @@ const InstallerJobDetail = () => {
     const assignments = job.item_assignments || [];
     return assignments.find(a => a.item_index === itemIndex);
   };
-
-  // requestGPS é fornecido pelo hook useGpsMachine. A lógica de retry/fallback/
-  // confirmação de baixa precisão vive lá. Aqui o componente só consome.
 
   // FIX M2: aceita um callback opcional `isCancelled` para evitar setState
   // após desmontagem (default: sempre false = mantém comportamento antigo).
@@ -406,25 +359,11 @@ const InstallerJobDetail = () => {
 
   const handleItemCheckin = async (itemIndex, photoBase64, exifData = {}) => {
     setProcessingItem(itemIndex);
-    // GPS é opcional — tenta obter, mas prossegue com null se falhar.
-    // Localização de registro vem do EXIF da foto quando GPS não está disponível.
-    let location = null;
-    try {
-      location = await requestGPS();
-    } catch (_gpsErr) {
-      // GPS indisponível: registra sem coordenadas do navegador.
-      // O EXIF da foto (se disponível) servirá como evidência de localização.
-    }
     try {
       const formData = new FormData();
       formData.append('job_id', jobId);
       formData.append('item_index', itemIndex);
       formData.append('photo_base64', photoBase64);
-      if (location) {
-        formData.append('gps_lat', location.lat);
-        formData.append('gps_long', location.long);
-        formData.append('gps_accuracy', location.accuracy);
-      }
       // Metadados EXIF da foto (localização e dispositivo registrados pela câmera)
       if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
       if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
@@ -432,7 +371,6 @@ const InstallerJobDetail = () => {
       if (exifData?.exif_device) formData.append('exif_device', exifData.exif_device);
 
       await api.createItemCheckin(formData);
-      setPendingGpsRetry(null);
       toast.success('Check-in do item realizado!');
       await loadJobData();
     } catch (error) {
@@ -464,20 +402,6 @@ const InstallerJobDetail = () => {
     }
   };
 
-  // handleRetryGps — chamado pelo toast "Tentar GPS" e pelo LocationPermissionGuide.
-  // Usa a foto guardada em pendingGpsRetry para finalizar o fluxo sem re-tirar foto (3A).
-  const handleRetryGps = async () => {
-    if (!pendingGpsRetry) return;
-    const { itemIndex, type, photoBase64 } = pendingGpsRetry;
-    // Limpa o retry pendente antes de chamar para evitar loop duplo.
-    setPendingGpsRetry(null);
-    if (type === 'checkin') {
-      await handleItemCheckin(itemIndex, photoBase64);
-    } else {
-      await handleItemCheckout(itemIndex, photoBase64);
-    }
-  };
-
   const handleItemCheckout = async (itemIndex, photoBase64, exifData = {}) => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) {
@@ -486,13 +410,6 @@ const InstallerJobDetail = () => {
     }
 
     setProcessingItem(itemIndex);
-    // GPS é opcional — prossegue com null se indisponível.
-    let location = null;
-    try {
-      location = await requestGPS();
-    } catch (_gpsErr) {
-      // GPS indisponível: checkout registrado sem coordenadas do navegador.
-    }
 
     try {
 
@@ -508,11 +425,6 @@ const InstallerJobDetail = () => {
 
       const formData = new FormData();
       formData.append('photo_base64', photoBase64);
-      if (location) {
-        formData.append('gps_lat', location.lat);
-        formData.append('gps_long', location.long);
-        formData.append('gps_accuracy', location.accuracy);
-      }
       // Metadados EXIF da foto
       if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
       if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
@@ -527,16 +439,7 @@ const InstallerJobDetail = () => {
       // para invalidar o cache de item_checkins deste job.
       if (checkin.job_id) formData.append('job_id', checkin.job_id);
 
-      const response = await api.completeItemCheckout(checkin.id, formData);
-
-      // Check for location alert
-      if (response.data?.location_alert) {
-        const alert = response.data.location_alert;
-        toast.warning(
-          `⚠️ Alerta de Localização!\n${alert.message}\n\nUm registro foi criado automaticamente.`,
-          { duration: 8000 }
-        );
-      }
+      await api.completeItemCheckout(checkin.id, formData);
 
       // [GAMIFICATION DISABLED 2026-05-15] award de moedas suspenso após checkout.
       // Toda a chamada a /gamification/process-checkout e a animação de coins foram
@@ -544,7 +447,6 @@ const InstallerJobDetail = () => {
       toast.success('Check-out do item realizado!');
 
       // Reset form
-      setPendingGpsRetry(null);
       setCheckoutForm({ notes: '' });
       setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(null);
@@ -557,7 +459,6 @@ const InstallerJobDetail = () => {
       // gravou o checkout (status 400 + "already checked out"), trata como sucesso.
       if (status === 400 && detail === 'Item already checked out') {
         toast.success('Check-out do item realizado!');
-        setPendingGpsRetry(null);
         setCheckoutForm({ notes: '' });
         setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
         setExpandedItem(null);
@@ -908,13 +809,6 @@ const InstallerJobDetail = () => {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      {/* 3B: GPS status badge — visível apenas quando há erro ou processamento para este item */}
-                      {isProcessing && gpsError && (
-                        <span className="flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-red-500/20 text-red-400 border border-red-500/30">
-                          <WifiOff className="h-3 w-3" />
-                          GPS indisponível
-                        </span>
-                      )}
                       {status === 'completed' && (
                         <CheckCircle2 className="h-6 w-6 text-green-500" />
                       )}
@@ -925,20 +819,6 @@ const InstallerJobDetail = () => {
                       )}
                     </div>
                   </div>
-
-                  {/* 3B: GPS error banner — aparece quando há retry pendente para este item */}
-                  {pendingGpsRetry?.itemIndex === itemIndex && gpsError && (
-                    <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-md bg-red-500/10 border border-red-500/20">
-                      <AlertCircle className="h-3.5 w-3.5 text-red-400 shrink-0" />
-                      <span className="text-xs text-red-400 flex-1">{gpsError}</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleRetryGps(); }}
-                        className="text-xs text-primary underline underline-offset-2 shrink-0"
-                      >
-                        Tentar novamente
-                      </button>
-                    </div>
-                  )}
 
                   {/* Expanded Content */}
                   {isExpanded && (
@@ -1288,27 +1168,6 @@ const InstallerJobDetail = () => {
             <CheckCircle2 className="h-5 w-5 mr-2" />
             Finalizar Job
           </Button>
-        </div>
-      )}
-
-      {/* GPS Precision Confirm Dialog — fornecido por useConfirmDialog */}
-      {GpsConfirmDialog}
-
-      {/* LocationPermissionGuide (3D) */}
-      {locationPermissionGuideOpen && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm">
-            <LocationPermissionGuide
-              onPermissionGranted={() => {
-                setLocationPermissionGuideOpen(false);
-                handleRetryGps();
-              }}
-              onSkip={() => {
-                setLocationPermissionGuideOpen(false);
-                setPendingGpsRetry(null);
-              }}
-            />
-          </div>
         </div>
       )}
 

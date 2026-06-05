@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popove
 import { Calendar as CalendarComponent } from '../components/ui/calendar';
 import {
   Briefcase, Plus, Search, RefreshCw, MapPin, Calendar, Users,
-  Download, Hash, Ban, CalendarPlus, CalendarCheck, ChevronDown,
+  Download, Hash, Ban, CalendarPlus, CalendarCheck, CalendarClock, ChevronDown,
   Clock, CheckCircle, MessageSquareWarning, AlertTriangle, ChevronRight,
   Archive, ArchiveRestore, CheckSquare, Square, X, Ticket
 } from 'lucide-react';
@@ -169,7 +169,7 @@ const JobsPageSkeleton = () => (
 );
 
 // Mini Job Card Component for better performance
-const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify, onArchive, onOpenTicket, isAdmin, isManager, isLoading, selectionMode, isSelected, onToggleSelect }) => {
+const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onReschedule, onJustify, onArchive, onOpenTicket, isAdmin, isManager, isLoading, selectionMode, isSelected, onToggleSelect }) => {
   const jobNumber = job.holdprint_data?.code || job.code || job.id?.slice(0, 8);
   const isScheduled = !!job.scheduled_date;
   const isArchived = job.archived || job.status === 'arquivado';
@@ -369,32 +369,48 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onJustify
         {/* Action Buttons */}
         {(isAdmin || isManager) && (
           <div className="flex gap-2 pt-2 border-t border-white/5">
-            {/* Schedule Button */}
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                onSchedule(job);
-              }}
-              variant="outline"
-              size="sm"
-              className={`flex-1 h-8 text-xs ${
-                isScheduled 
-                  ? 'border-green-500/50 text-green-400 hover:bg-green-500/10' 
-                  : 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10'
-              }`}
-            >
-              {isScheduled ? (
-                <>
-                  <CalendarCheck className="h-3 w-3 mr-1" />
-                  Agendado
-                </>
-              ) : (
-                <>
-                  <CalendarPlus className="h-3 w-3 mr-1" />
-                  Agendar
-                </>
-              )}
-            </Button>
+            {/* Reschedule Button — only for in-progress jobs */}
+            {isInProgress ? (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReschedule(job);
+                }}
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8 text-xs border-orange-500/50 text-orange-400 hover:bg-orange-500/10"
+              >
+                <CalendarClock className="h-3 w-3 mr-1" />
+                Reagendar
+              </Button>
+            ) : (
+              /* Schedule Button — for non in-progress jobs */
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSchedule(job);
+                }}
+                variant="outline"
+                size="sm"
+                className={`flex-1 h-8 text-xs ${
+                  isScheduled
+                    ? 'border-green-500/50 text-green-400 hover:bg-green-500/10'
+                    : 'border-blue-500/50 text-blue-400 hover:bg-blue-500/10'
+                }`}
+              >
+                {isScheduled ? (
+                  <>
+                    <CalendarCheck className="h-3 w-3 mr-1" />
+                    Agendado
+                  </>
+                ) : (
+                  <>
+                    <CalendarPlus className="h-3 w-3 mr-1" />
+                    Agendar
+                  </>
+                )}
+              </Button>
+            )}
 
             {/* Justify Button - Show when scheduled and late */}
             {isScheduled && isLate && (
@@ -811,22 +827,26 @@ const Jobs = () => {
 
     try {
       setProcessingJobId(selectedJob.id);
+      const isInProgress = selectedJob.status === 'instalando' || selectedJob.status === 'in_progress';
+      const newStatus = isoDate
+        ? 'agendado'
+        : isInProgress
+          ? 'aguardando'
+          : selectedJob.status === 'agendado'
+            ? 'aguardando'
+            : selectedJob.status;
+
       await api.updateJob(selectedJob.id, {
         scheduled_date: isoDate,
         assigned_installers: installerIds,
-        status: isoDate ? 'agendado' : selectedJob.status === 'agendado' ? 'aguardando' : selectedJob.status,
+        status: newStatus,
       });
 
-      toast.success(isoDate ? 'Job agendado com sucesso!' : 'Agendamento removido');
+      toast.success(isInProgress && isoDate ? 'Job reagendado com sucesso!' : isoDate ? 'Job agendado com sucesso!' : 'Agendamento removido');
 
       setJobs(prev => prev.map(j =>
         j.id === selectedJob.id
-          ? {
-              ...j,
-              scheduled_date: isoDate,
-              assigned_installers: installerIds,
-              status: isoDate ? 'agendado' : (j.status === 'agendado' ? 'aguardando' : j.status),
-            }
+          ? { ...j, scheduled_date: isoDate, assigned_installers: installerIds, status: newStatus }
           : j
       ));
 
@@ -1594,6 +1614,7 @@ const Jobs = () => {
                   onNavigate={(id) => navigate(`/jobs/${id}`)}
                   onFinalize={handleFinalizeNoInstallation}
                   onSchedule={handleOpenScheduleDialog}
+                  onReschedule={handleOpenScheduleDialog}
                   onJustify={handleOpenJustifyDialog}
                   onArchive={handleArchiveJob}
                   onOpenTicket={handleOpenTicketDialog}
@@ -1912,8 +1933,17 @@ const Jobs = () => {
         <DialogContent className="bg-card border-white/10 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              <CalendarPlus className="h-5 w-5 text-primary" />
-              Agendar Job
+              {(selectedJob?.status === 'instalando' || selectedJob?.status === 'in_progress') ? (
+                <>
+                  <CalendarClock className="h-5 w-5 text-orange-400" />
+                  Reagendar Job
+                </>
+              ) : (
+                <>
+                  <CalendarPlus className="h-5 w-5 text-primary" />
+                  Agendar Job
+                </>
+              )}
             </DialogTitle>
             <DialogDescription className="font-mono text-primary/80 text-xs">
               #{selectedJob?.holdprint_data?.code || selectedJob?.id?.slice(0, 8)} — {selectedJob?.title}
@@ -2003,7 +2033,7 @@ const Jobs = () => {
                 ) : scheduleDate ? (
                   <>
                     <CalendarCheck className="h-4 w-4 mr-2" />
-                    Confirmar Agendamento
+                    {(selectedJob?.status === 'instalando' || selectedJob?.status === 'in_progress') ? 'Confirmar Reagendamento' : 'Confirmar Agendamento'}
                   </>
                 ) : (
                   <>
