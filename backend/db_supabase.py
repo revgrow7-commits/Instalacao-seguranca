@@ -93,7 +93,9 @@ TABLE_COLUMNS = {
         "checkout_gps_lat", "checkout_gps_long", "checkout_gps_accuracy", "product_name",
         "family_name", "installed_m2", "complexity_level", "height_category",
         "scenario_category", "notes", "productivity_m2_h", "is_archived",
-        "products_installed", "is_late", "created_at"
+        "products_installed", "is_late", "created_at",
+        "exif_lat", "exif_long", "exif_datetime", "exif_device",
+        "checkout_exif_lat", "checkout_exif_long", "checkout_exif_datetime", "checkout_exif_device"
     ]),
     "item_pause_logs": frozenset([
         "id", "checkin_id", "job_id", "item_index", "installer_id",

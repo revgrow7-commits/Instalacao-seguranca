@@ -229,6 +229,10 @@ async def create_item_checkin(
     gps_lat: Optional[float] = Form(None),
     gps_long: Optional[float] = Form(None),
     gps_accuracy: Optional[float] = Form(None),
+    exif_lat: Optional[float] = Form(None),
+    exif_long: Optional[float] = Form(None),
+    exif_datetime: Optional[str] = Form(None),
+    exif_device: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
     """Create a check-in for a specific item in a job"""
@@ -342,6 +346,10 @@ async def create_item_checkin(
         gps_lat=gps_lat,
         gps_long=gps_long,
         gps_accuracy=gps_accuracy,
+        exif_lat=exif_lat,
+        exif_long=exif_long,
+        exif_datetime=exif_datetime,
+        exif_device=exif_device,
         product_name=product.get("name", f"Item {item_index}"),
         family_name=family_name
     )
@@ -458,6 +466,10 @@ async def complete_item_checkout(
     gps_lat: Optional[float] = Form(None),
     gps_long: Optional[float] = Form(None),
     gps_accuracy: Optional[float] = Form(None),
+    exif_lat: Optional[float] = Form(None),
+    exif_long: Optional[float] = Form(None),
+    exif_datetime: Optional[str] = Form(None),
+    exif_device: Optional[str] = Form(None),
     installed_m2: Optional[float] = Form(None),
     complexity_level: Optional[int] = Form(None),
     height_category: Optional[str] = Form(None),
@@ -597,6 +609,10 @@ async def complete_item_checkout(
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,
+        "checkout_exif_lat": exif_lat,
+        "checkout_exif_long": exif_long,
+        "checkout_exif_datetime": exif_datetime,
+        "checkout_exif_device": exif_device,
         "installed_m2": installed_m2,
         "complexity_level": complexity_level,
         "height_category": height_category,

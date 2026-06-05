@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
+import { extractExif } from '../lib/extractExif';
 import LocationPermissionGuide from '../components/LocationPermissionGuide';
 import { useConfirmDialog } from '../hooks/useConfirmDialog';
 import { useGpsMachine } from '../hooks/useGpsMachine';
@@ -255,13 +256,15 @@ const InstallerJobDetail = () => {
         return;
       }
       try {
+        // Extrair EXIF do arquivo original antes da compressão (canvas apaga os metadados)
+        const exifData = await extractExif(file);
         // Compress image before converting to base64
         const compressedBase64 = await compressImage(file);
 
         if (type === 'checkin') {
-          await handleItemCheckin(itemIndex, compressedBase64);
+          await handleItemCheckin(itemIndex, compressedBase64, exifData);
         } else {
-          await handleItemCheckout(itemIndex, compressedBase64);
+          await handleItemCheckout(itemIndex, compressedBase64, exifData);
         }
       } catch (error) {
         console.error('[InstallerJobDetail] handleFileSelect compress/checkin error:', error);
@@ -347,41 +350,32 @@ const InstallerJobDetail = () => {
     });
   };
 
-  const handleItemCheckin = async (itemIndex, photoBase64) => {
+  const handleItemCheckin = async (itemIndex, photoBase64, exifData = {}) => {
     setProcessingItem(itemIndex);
-    let location;
+    // GPS é opcional — tenta obter, mas prossegue com null se falhar.
+    // Localização de registro vem do EXIF da foto quando GPS não está disponível.
+    let location = null;
     try {
       location = await requestGPS();
-    } catch (gpsErr) {
-      // 3A: foto preservada — guardamos em pendingGpsRetry para que o instalador
-      // possa tentar o GPS novamente sem re-tirar a foto.
-      if (gpsErr.gpsCode === 1) {
-        // Permissão negada — abre o guia de permissão e preserva a foto.
-        setPendingGpsRetry({ itemIndex, type: 'checkin', photoBase64 });
-        setLocationPermissionGuideOpen(true);
-        setProcessingItem(null);
-        return;
-      }
-      // Outros erros de GPS: toast com botão de retry — foto ainda guardada.
-      setPendingGpsRetry({ itemIndex, type: 'checkin', photoBase64 });
-      toast.error(gpsErr.message, {
-        duration: 8000,
-        action: {
-          label: 'Tentar GPS',
-          onClick: () => handleRetryGps(),
-        },
-      });
-      setProcessingItem(null);
-      return;
+    } catch (_gpsErr) {
+      // GPS indisponível: registra sem coordenadas do navegador.
+      // O EXIF da foto (se disponível) servirá como evidência de localização.
     }
     try {
       const formData = new FormData();
       formData.append('job_id', jobId);
       formData.append('item_index', itemIndex);
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', location.lat);
-      formData.append('gps_long', location.long);
-      formData.append('gps_accuracy', location.accuracy);
+      if (location) {
+        formData.append('gps_lat', location.lat);
+        formData.append('gps_long', location.long);
+        formData.append('gps_accuracy', location.accuracy);
+      }
+      // Metadados EXIF da foto (localização e dispositivo registrados pela câmera)
+      if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
+      if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
+      if (exifData?.exif_datetime) formData.append('exif_datetime', exifData.exif_datetime);
+      if (exifData?.exif_device) formData.append('exif_device', exifData.exif_device);
 
       await api.createItemCheckin(formData);
       setPendingGpsRetry(null);
@@ -427,7 +421,7 @@ const InstallerJobDetail = () => {
     }
   };
 
-  const handleItemCheckout = async (itemIndex, photoBase64) => {
+  const handleItemCheckout = async (itemIndex, photoBase64, exifData = {}) => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) {
       toast.error('Faça o check-in primeiro');
@@ -435,46 +429,38 @@ const InstallerJobDetail = () => {
     }
 
     setProcessingItem(itemIndex);
-    let location;
+    // GPS é opcional — prossegue com null se indisponível.
+    let location = null;
     try {
       location = await requestGPS();
-    } catch (gpsErr) {
-      // 3A: foto preservada no pendingGpsRetry.
-      if (gpsErr.gpsCode === 1) {
-        setPendingGpsRetry({ itemIndex, type: 'checkout', photoBase64 });
-        setLocationPermissionGuideOpen(true);
-        setProcessingItem(null);
-        return;
-      }
-      setPendingGpsRetry({ itemIndex, type: 'checkout', photoBase64 });
-      toast.error(gpsErr.message, {
-        duration: 8000,
-        action: {
-          label: 'Tentar GPS',
-          onClick: () => handleRetryGps(),
-        },
-      });
-      setProcessingItem(null);
-      return;
+    } catch (_gpsErr) {
+      // GPS indisponível: checkout registrado sem coordenadas do navegador.
     }
 
     try {
 
       const item = getItemByIndex(itemIndex);
       const assignment = getItemAssignment(itemIndex);
-      
+
       // Usar valores definidos pelo gerente na atribuição
       const complexityLevel = assignment?.manager_difficulty_level || 3;
       // TODO: usar altura real da atribuicao quando disponivel (campo ausente no objeto assignment)
       const heightCategory = 'terreo';
       const scenarioCategory = assignment?.manager_scenario_category || 'loja_rua';
       const installedM2 = item?.total_area_m2 || 0; // Usar o m² calculado do item
-      
+
       const formData = new FormData();
       formData.append('photo_base64', photoBase64);
-      formData.append('gps_lat', location.lat);
-      formData.append('gps_long', location.long);
-      formData.append('gps_accuracy', location.accuracy);
+      if (location) {
+        formData.append('gps_lat', location.lat);
+        formData.append('gps_long', location.long);
+        formData.append('gps_accuracy', location.accuracy);
+      }
+      // Metadados EXIF da foto
+      if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
+      if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
+      if (exifData?.exif_datetime) formData.append('exif_datetime', exifData.exif_datetime);
+      if (exifData?.exif_device) formData.append('exif_device', exifData.exif_device);
       formData.append('installed_m2', installedM2);
       formData.append('complexity_level', complexityLevel);
       formData.append('height_category', heightCategory);

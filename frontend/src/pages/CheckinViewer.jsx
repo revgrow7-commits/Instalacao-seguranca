@@ -214,6 +214,42 @@ const CheckinViewer = () => {
                 </div>
               </div>
             )}
+
+            {(checkin.exif_lat || checkin.exif_datetime || checkin.exif_device) && (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-5 w-5 text-green-400 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-400">Metadados da Foto (EXIF)</p>
+                    {checkin.exif_lat && checkin.exif_long && (
+                      <>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          GPS: {checkin.exif_lat.toFixed(6)}, {checkin.exif_long.toFixed(6)}
+                        </p>
+                        <a
+                          href={`https://www.google.com/maps?q=${checkin.exif_lat},${checkin.exif_long}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-green-400 hover:text-green-300 underline mt-0.5 inline-block"
+                        >
+                          Ver no Maps
+                        </a>
+                      </>
+                    )}
+                    {checkin.exif_datetime && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Capturado: {checkin.exif_datetime.replace('T', ' ').substring(0, 19)}
+                      </p>
+                    )}
+                    {checkin.exif_device && (
+                      <p className="text-xs text-muted-foreground">
+                        Dispositivo: {checkin.exif_device}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Check-in Photo */}
@@ -288,6 +324,42 @@ const CheckinViewer = () => {
                       >
                         Ver no Google Maps
                       </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(checkin.checkout_exif_lat || checkin.checkout_exif_datetime || checkin.checkout_exif_device) && (
+                <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-5 w-5 text-green-400 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-green-400">Metadados da Foto (EXIF)</p>
+                      {checkin.checkout_exif_lat && checkin.checkout_exif_long && (
+                        <>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            GPS: {checkin.checkout_exif_lat.toFixed(6)}, {checkin.checkout_exif_long.toFixed(6)}
+                          </p>
+                          <a
+                            href={`https://www.google.com/maps?q=${checkin.checkout_exif_lat},${checkin.checkout_exif_long}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-green-400 hover:text-green-300 underline mt-0.5 inline-block"
+                          >
+                            Ver no Maps
+                          </a>
+                        </>
+                      )}
+                      {checkin.checkout_exif_datetime && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Capturado: {checkin.checkout_exif_datetime.replace('T', ' ').substring(0, 19)}
+                        </p>
+                      )}
+                      {checkin.checkout_exif_device && (
+                        <p className="text-xs text-muted-foreground">
+                          Dispositivo: {checkin.checkout_exif_device}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

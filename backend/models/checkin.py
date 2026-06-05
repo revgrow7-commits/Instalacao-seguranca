@@ -79,6 +79,15 @@ class ItemCheckin(BaseModel):
     product_name: Optional[str] = None
     family_name: Optional[str] = None
     status: str = "in_progress"
+    # Metadados EXIF extraídos da foto (registrados pela câmera do dispositivo)
+    exif_lat: Optional[float] = None
+    exif_long: Optional[float] = None
+    exif_datetime: Optional[str] = None
+    exif_device: Optional[str] = None
+    checkout_exif_lat: Optional[float] = None
+    checkout_exif_long: Optional[float] = None
+    checkout_exif_datetime: Optional[str] = None
+    checkout_exif_device: Optional[str] = None
 
 
 class ItemPauseLog(BaseModel):
