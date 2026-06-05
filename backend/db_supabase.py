@@ -140,6 +140,12 @@ TABLE_COLUMNS = {
         "caption", "exif_lat", "exif_long", "exif_datetime", "exif_device",
         "file_name", "file_size_bytes", "created_at"
     ]),
+    "item_checkin_photos": frozenset([
+        "id", "checkin_id", "job_id", "installer_id", "tipo",
+        "photo_url", "photo_base64",
+        "exif_lat", "exif_long", "exif_datetime", "exif_device",
+        "file_name", "file_size_bytes", "ordem", "created_at",
+    ]),
     "password_resets": frozenset(["id", "user_id", "token", "expires_at", "created_at"]),
     "google_tokens": frozenset(["id", "user_id", "token", "created_at", "updated_at"]),
     "job_justifications": frozenset([

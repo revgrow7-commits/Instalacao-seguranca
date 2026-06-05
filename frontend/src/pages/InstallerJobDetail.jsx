@@ -17,6 +17,9 @@ import {
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
 import { extractExif } from '../lib/extractExif';
+import { compressImage } from '../lib/compressImage';
+import { uploadExtraPhotos } from '../lib/uploadPhotos';
+import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
 
 const PAUSE_REASON_LABELS = {
   "aguardando_cliente": "Aguardando Cliente",
@@ -56,6 +59,8 @@ const InstallerJobDetail = () => {
     notes: ''
   });
 
+  // Fotos de check-in múltiplas — { [itemIndex]: [{file, exif, preview}] }
+  const [checkinPhotos, setCheckinPhotos] = useState({});
   // Fotos de conclusão múltiplas (galeria) — { [itemIndex]: [{file, exif, preview}] }
   const [checkoutPhotos, setCheckoutPhotos] = useState({});
 
@@ -65,29 +70,17 @@ const InstallerJobDetail = () => {
     catch { return null; }
   };
 
-  const handleAddCheckoutPhotos = (itemIndex) => {
-    const current = checkoutPhotos[itemIndex] || [];
-    if (current.length >= 10) { toast.warning('Máximo de 10 fotos'); return; }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.multiple = true;
-    // Sem capture — abre galeria em vez da câmera diretamente
-    input.onchange = async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, 10 - current.length);
-      if (!files.length) return;
-      const processed = await Promise.all(files.map(async (file) => {
-        const exif = await extractExif(file).catch(() => ({}));
-        const preview = URL.createObjectURL(file);
-        return { file, exif, preview };
-      }));
-      setCheckoutPhotos(prev => ({ ...prev, [itemIndex]: [...(prev[itemIndex] || []), ...processed] }));
-    };
-    input.click();
+  const addPhotos = (setState, itemIndex, newPhotos, max = 10) => {
+    setState(prev => {
+      const current = prev[itemIndex] || [];
+      const available = max - current.length;
+      if (available <= 0) { toast.warning(`Máximo de ${max} fotos`); return prev; }
+      return { ...prev, [itemIndex]: [...current, ...newPhotos.slice(0, available)] };
+    });
   };
 
-  const removeCheckoutPhoto = (itemIndex, photoIdx) => {
-    setCheckoutPhotos(prev => {
+  const removePhoto = (setState, itemIndex, photoIdx) => {
+    setState(prev => {
       const copy = [...(prev[itemIndex] || [])];
       URL.revokeObjectURL(copy[photoIdx].preview);
       copy.splice(photoIdx, 1);
@@ -205,195 +198,44 @@ const InstallerJobDetail = () => {
     }
   };
 
-  const handleFileSelect = async (itemIndex, type) => {
-    // FIX C6 (auditoria 2026-05-14): bloqueia múltiplos cliques no botão.
-    // Antes, o usuário podia clicar várias vezes antes do GPS responder e
-    // abria múltiplos seletores de câmera. Agora o botão fica desabilitado
-    // do click até o final do fluxo.
-    if (processingItem !== null) {
-      console.warn('[InstallerJobDetail] handleFileSelect ignorado — processamento em andamento');
+  // handleItemCheckin — usa batchCheckin com fotos acumuladas em checkinPhotos[itemIndex]
+  const handleItemCheckin = async (itemIndex) => {
+    const photos = checkinPhotos[itemIndex] || [];
+    if (photos.length === 0) {
+      toast.error('Adicione pelo menos uma foto para fazer check-in');
       return;
     }
-    setProcessingItem(itemIndex);
-
-    // FIX C6-safety: timeout absoluto de 60s para garantir que o botão NUNCA
-    // fique trancado permanentemente caso algum browser exótico não dispare
-    // nem onChange nem focus (cenário improvável mas que deixaria o instalador
-    // bloqueado até reiniciar o app).
-    const lockTimeoutId = setTimeout(() => {
-      console.warn('[InstallerJobDetail] lock timeout — liberando processingItem após 60s');
-      setProcessingItem(null);
-    }, 60000);
-
-    // For mobile devices, use native file input with camera capture
-    // This bypasses getUserMedia permission issues
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-
-    // Detect if mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      // On mobile, use capture attribute to open camera directly
-      // 'environment' opens rear camera, 'user' opens front camera
-      input.setAttribute('capture', 'environment');
-    }
-
-    // Garante que se o usuário cancelar o picker (sem onchange), o lock seja
-    // liberado. `window.focus` dispara quando o picker fecha.
-    let onChangeRan = false;
-    const releaseIfCancelled = () => {
-      setTimeout(() => {
-        if (!onChangeRan) {
-          clearTimeout(lockTimeoutId);
-          setProcessingItem(null);
-          window.removeEventListener('focus', releaseIfCancelled);
-        }
-      }, 500);
-    };
-
-    input.onchange = async (e) => {
-      onChangeRan = true;
-      clearTimeout(lockTimeoutId);
-      window.removeEventListener('focus', releaseIfCancelled);
-      const file = e.target.files?.[0];
-      if (!file) {
-        setProcessingItem(null);
-        return;
-      }
-      try {
-        // Extrair EXIF do arquivo original antes da compressão (canvas apaga os metadados)
-        const exifData = await extractExif(file);
-        // Compress image before converting to base64
-        const compressedBase64 = await compressImage(file);
-
-        if (type === 'checkin') {
-          await handleItemCheckin(itemIndex, compressedBase64, exifData);
-        } else {
-          await handleItemCheckout(itemIndex, compressedBase64, exifData);
-        }
-      } catch (error) {
-        console.error('[InstallerJobDetail] handleFileSelect compress/checkin error:', error);
-        toast.error('Erro ao processar imagem. Tente novamente.');
-        setProcessingItem(null);
-      }
-    };
-
-    // Reset input to allow selecting same file again
-    input.value = '';
-    window.addEventListener('focus', releaseIfCancelled, { once: true });
-    input.click();
-  };
-
-  // Helper function to compress images
-  // FIX C2 (auditoria 2026-05-14): compressão iterativa — se ainda passar de
-  // ~1MB base64 (que vira ~750KB de bytes JPEG + overhead multipart), reduz
-  // a qualidade até caber. Evita estourar o limite de 4.5MB do Vercel para
-  // payloads de função serverless. Sem este loop, fotos de smartphones de
-  // 48MP+ derrubavam o checkin com timeout/413 silencioso.
-  const compressImage = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let MAX_WIDTH = 1024;
-          let MAX_HEIGHT = 1024;
-
-          let width = img.width;
-          let height = img.height;
-
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height = Math.round((height * MAX_WIDTH) / width);
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width = Math.round((width * MAX_HEIGHT) / height);
-              height = MAX_HEIGHT;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Compressão iterativa — alvo: ≤ 1MB de base64 (~750KB binário).
-          const MAX_BASE64_BYTES = 1024 * 1024; // 1MB
-          let quality = 0.7;
-          let base64 = canvas.toDataURL('image/jpeg', quality);
-
-          // Se ainda muito grande, reduz qualidade progressivamente.
-          while (base64.length > MAX_BASE64_BYTES && quality > 0.2) {
-            quality -= 0.1;
-            base64 = canvas.toDataURL('image/jpeg', quality);
-          }
-
-          // Se mesmo a 0.2 ainda está acima, encolhe dimensão progressivamente
-          // (até 4 tentativas de 0.7x cada — garante saída ≤ 1MB para câmeras de até ~200MP).
-          let resizeAttempts = 0;
-          while (base64.length > MAX_BASE64_BYTES && resizeAttempts < 4) {
-            canvas.width = Math.round(canvas.width * 0.7);
-            canvas.height = Math.round(canvas.height * 0.7);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            const q = Math.max(0.3, 0.5 - resizeAttempts * 0.05);
-            base64 = canvas.toDataURL('image/jpeg', q);
-            resizeAttempts++;
-          }
-
-          console.log(`[compressImage] saída: ${(base64.length / 1024).toFixed(0)}KB (quality=${quality.toFixed(2)})`);
-          resolve(base64);
-        };
-        img.onerror = reject;
-        img.src = event.target.result;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleItemCheckin = async (itemIndex, photoBase64, exifData = {}) => {
+    if (processingItem !== null) return;
     setProcessingItem(itemIndex);
     try {
-      const formData = new FormData();
-      formData.append('job_id', jobId);
-      formData.append('item_index', itemIndex);
-      formData.append('photo_base64', photoBase64);
-      // Metadados EXIF da foto (localização e dispositivo registrados pela câmera)
-      if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
-      if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
-      if (exifData?.exif_datetime) formData.append('exif_datetime', exifData.exif_datetime);
-      if (exifData?.exif_device) formData.append('exif_device', exifData.exif_device);
-
-      await api.createItemCheckin(formData);
-      toast.success('Check-in do item realizado!');
+      const photosBase64 = await Promise.all(photos.map(f => compressImage(f.file)));
+      const exifData = photos.map(f => f.exif || {});
+      await api.batchCheckin({
+        job_id: jobId,
+        item_index: itemIndex,
+        photos: photosBase64,
+        exif_data: exifData,
+      });
+      toast.success('Check-in realizado!');
+      setCheckinPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
+      setExpandedItem(itemIndex);
+      hasAutoExpanded.current = true;
       await loadJobData();
     } catch (error) {
-      // FIX C5 (auditoria 2026-05-14): expõe o motivo real do erro em vez
-      // do toast genérico. Quando o backend responde 400/409/422, o detail
-      // explica o que precisa ser feito (ex: "Item já está em check-in",
-      // "Item arquivado", "Você não está atribuído", etc.).
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
       let userMessage;
       if (detail) {
         userMessage = detail;
       } else if (status === 413) {
-        userMessage = 'Foto muito grande. Tire uma nova com menor resolução.';
+        userMessage = 'Foto muito grande. Tente novamente com menor resolução.';
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
-        userMessage = isTimeout
-          ? 'O servidor demorou para responder. Tente novamente.'
-          : 'Falha na requisição. Verifique sua conexão e tente novamente.';
+        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha na requisição. Verifique sua conexão.';
       } else {
-        userMessage = 'Erro ao fazer check-in do item. Tente novamente.';
+        userMessage = 'Erro ao fazer check-in. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
       console.error('[InstallerJobDetail] handleItemCheckin:', error.code, error.response?.data || error);
@@ -402,51 +244,53 @@ const InstallerJobDetail = () => {
     }
   };
 
-  const handleItemCheckout = async (itemIndex, photoBase64, exifData = {}) => {
+  // handleItemCheckout — foto[0] via FormData (retrocompatível), extras via uploadExtraPhotos
+  const handleItemCheckout = async (itemIndex) => {
     const checkin = itemCheckins[itemIndex];
-    if (!checkin) {
-      toast.error('Faça o check-in primeiro');
+    if (!checkin) { toast.error('Faça o check-in primeiro'); return; }
+
+    const photos = checkoutPhotos[itemIndex] || [];
+    if (photos.length === 0) {
+      toast.error('Adicione pelo menos uma foto para finalizar');
       return;
     }
-
+    if (processingItem !== null) return;
     setProcessingItem(itemIndex);
 
     try {
-
       const item = getItemByIndex(itemIndex);
       const assignment = getItemAssignment(itemIndex);
-
-      // Usar valores definidos pelo gerente na atribuição
       const complexityLevel = assignment?.manager_difficulty_level || 3;
-      // TODO: usar altura real da atribuicao quando disponivel (campo ausente no objeto assignment)
       const heightCategory = 'terreo';
       const scenarioCategory = assignment?.manager_scenario_category || 'loja_rua';
-      const installedM2 = item?.total_area_m2 || 0; // Usar o m² calculado do item
+      const installedM2 = item?.total_area_m2 || 0;
 
+      const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
+      const latestExif = photos.find(f => f.exif?.exif_datetime === exifTimes[exifTimes.length - 1])?.exif || photos[0].exif || {};
+
+      const primaryBase64 = await compressImage(photos[0].file);
       const formData = new FormData();
-      formData.append('photo_base64', photoBase64);
-      // Metadados EXIF da foto
-      if (exifData?.exif_lat != null) formData.append('exif_lat', exifData.exif_lat);
-      if (exifData?.exif_long != null) formData.append('exif_long', exifData.exif_long);
-      if (exifData?.exif_datetime) formData.append('exif_datetime', exifData.exif_datetime);
-      if (exifData?.exif_device) formData.append('exif_device', exifData.exif_device);
+      formData.append('photo_base64', primaryBase64);
+      if (latestExif?.exif_lat != null) formData.append('exif_lat', latestExif.exif_lat);
+      if (latestExif?.exif_long != null) formData.append('exif_long', latestExif.exif_long);
+      if (latestExif?.exif_datetime) formData.append('exif_datetime', latestExif.exif_datetime);
+      if (latestExif?.exif_device) formData.append('exif_device', latestExif.exif_device);
       formData.append('installed_m2', installedM2);
       formData.append('complexity_level', complexityLevel);
       formData.append('height_category', heightCategory);
       formData.append('scenario_category', scenarioCategory);
       formData.append('notes', checkoutForm.notes);
-      // job_id não é enviado ao backend, mas é lido por api.completeItemCheckout
-      // para invalidar o cache de item_checkins deste job.
       if (checkin.job_id) formData.append('job_id', checkin.job_id);
 
       await api.completeItemCheckout(checkin.id, formData);
 
-      // [GAMIFICATION DISABLED 2026-05-15] award de moedas suspenso após checkout.
-      // Toda a chamada a /gamification/process-checkout e a animação de coins foram
-      // removidas. Para reverter, ver git: git show HEAD~1 -- frontend/src/pages/InstallerJobDetail.jsx
-      toast.success('Check-out do item realizado!');
+      // Fotos extras (índices 1..N) — fire-and-forget, não bloqueia o checkout
+      if (photos.length > 1) {
+        uploadExtraPhotos(jobId, photos.slice(1), `checkout-item-${itemIndex}`)
+          .catch(e => console.warn('[checkout extra photos]', e));
+      }
 
-      // Reset form
+      toast.success('Check-out realizado!');
       setCheckoutForm({ notes: '' });
       setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(null);
@@ -455,10 +299,8 @@ const InstallerJobDetail = () => {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
 
-      // Idempotência: o withRetry pode reenviar após timeout. Se o backend já
-      // gravou o checkout (status 400 + "already checked out"), trata como sucesso.
       if (status === 400 && detail === 'Item already checked out') {
-        toast.success('Check-out do item realizado!');
+        toast.success('Check-out realizado!');
         setCheckoutForm({ notes: '' });
         setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
         setExpandedItem(null);
@@ -470,17 +312,14 @@ const InstallerJobDetail = () => {
       if (detail) {
         userMessage = detail;
       } else if (status === 413) {
-        userMessage = 'Foto muito grande. Tire uma nova com menor resolução.';
+        userMessage = 'Foto muito grande. Tente novamente.';
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
-        // ERR_NETWORK / ECONNABORTED podem ser timeout do servidor, não ausência de internet.
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
-        userMessage = isTimeout
-          ? 'O servidor demorou para responder. Tente novamente.'
-          : 'Falha na requisição. Verifique sua conexão e tente novamente.';
+        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha na requisição. Verifique sua conexão.';
       } else {
-        userMessage = 'Erro ao fazer check-out do item. Tente novamente.';
+        userMessage = 'Erro ao finalizar item. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
       console.error('[InstallerJobDetail] handleItemCheckout:', error.code, error.response?.data || error);
@@ -763,19 +602,53 @@ const InstallerJobDetail = () => {
         ) : (
           products.map((item, index) => {
             // FIX B1: usar originalIndex para alinhar com backend quando há itens arquivados.
-            // O array `products` vem filtrado por `getProducts()`, mas o backend grava
-            // checkins indexados pelo índice original em `products_with_area`.
             const itemIndex = item.originalIndex ?? index;
             const status = getItemStatus(itemIndex);
             const checkin = itemCheckins[itemIndex];
             const isExpanded = expandedItem === itemIndex;
             const isProcessing = processingItem === itemIndex;
 
+            // Item concluído: linha compacta verde em vez do Card completo
+            if (status === 'completed') {
+              return (
+                <div
+                  key={itemIndex}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/20 transition-all duration-300 ${isExpanded ? '' : ''}`}
+                >
+                  <Check className="h-4 w-4 text-green-400 shrink-0" />
+                  <span className="flex-1 text-sm text-foreground truncate">{item.name || `Item ${index + 1}`}</span>
+                  <span className="text-xs text-green-400/70 shrink-0">
+                    {(item.total_area_m2 || 0).toFixed(1)} m²
+                  </span>
+                  {checkin?.net_duration_minutes && (
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {formatDuration(checkin.net_duration_minutes)}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => setExpandedItem(isExpanded ? null : itemIndex)}
+                    className="text-muted-foreground hover:text-foreground shrink-0"
+                  >
+                    {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                  {isExpanded && (
+                    <div className="w-full mt-2 pt-2 border-t border-green-500/20">
+                      {checkin && (
+                        <div className="grid grid-cols-2 gap-1.5 text-xs">
+                          <span className="text-muted-foreground">m² instalados: <span className="text-foreground">{checkin.installed_m2 || 0}</span></span>
+                          <span className="text-muted-foreground">Produtividade: <span className="text-primary">{checkin.productivity_m2_h || 0} m²/h</span></span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+
             return (
               <Card
                 key={itemIndex}
                 className={`bg-card/50 border transition-all ${
-                  status === 'completed' ? 'border-green-500/30' :
                   status === 'in_progress' ? 'border-blue-500/30' : 'border-border'
                 }`}
               >
@@ -907,18 +780,30 @@ const InstallerJobDetail = () => {
 
                       {/* Actions */}
                       {status === 'pending' && (
-                        <Button
-                          onClick={() => handleFileSelect(itemIndex, 'checkin')}
-                          disabled={isProcessing}
-                          className="w-full bg-blue-600 hover:bg-blue-700 h-12 active:scale-[0.98] transition-transform"
-                        >
-                          {isProcessing ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                          ) : (
-                            <Camera className="h-4 w-4 mr-2" />
-                          )}
-                          Fazer Check-in (Tirar Foto)
-                        </Button>
+                        <div className="space-y-3">
+                          <PhotoGalleryPicker
+                            photos={checkinPhotos[itemIndex] || []}
+                            onPhotos={(newPhotos) => addPhotos(setCheckinPhotos, itemIndex, newPhotos)}
+                            onRemove={(pi) => removePhoto(setCheckinPhotos, itemIndex, pi)}
+                            disabled={isProcessing}
+                            maxPhotos={10}
+                            label="Fotos de início"
+                          />
+                          <Button
+                            onClick={() => handleItemCheckin(itemIndex)}
+                            disabled={isProcessing || (checkinPhotos[itemIndex] || []).length === 0}
+                            className="w-full bg-blue-600 hover:bg-blue-700 h-12 active:scale-[0.98] transition-transform disabled:opacity-40"
+                          >
+                            {isProcessing ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                            ) : (
+                              <Check className="h-4 w-4 mr-2" />
+                            )}
+                            {(checkinPhotos[itemIndex] || []).length === 0
+                              ? 'Adicione fotos para fazer check-in'
+                              : `Fazer Check-in (${(checkinPhotos[itemIndex] || []).length} foto${(checkinPhotos[itemIndex] || []).length > 1 ? 's' : ''})`}
+                          </Button>
+                        </div>
                       )}
 
                       {status === 'in_progress' && (
@@ -987,71 +872,15 @@ const InstallerJobDetail = () => {
                             />
                           </div>
 
-                          {/* Fotos de conclusão — múltiplas da galeria */}
-                          {(() => {
-                            const photos = checkoutPhotos[itemIndex] || [];
-                            const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
-                            const earliest = exifTimes[0];
-                            const latest = exifTimes[exifTimes.length - 1];
-                            return (
-                              <div className="space-y-2">
-                                <Label className="text-sm text-muted-foreground">Fotos de conclusão (galeria)</Label>
-
-                                {photos.length > 0 && (
-                                  <div className="grid grid-cols-4 gap-1.5">
-                                    {photos.map((f, pi) => (
-                                      <div key={pi} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
-                                        <img src={f.preview} alt="" className="w-full h-full object-cover" />
-                                        <button
-                                          onClick={() => removeCheckoutPhoto(itemIndex, pi)}
-                                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
-                                        >
-                                          <X className="h-3 w-3 text-white" />
-                                        </button>
-                                        {f.exif?.exif_datetime && (
-                                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                                            <p className="text-[9px] text-white/80 text-center truncate">
-                                              {formatExifTime(f.exif.exif_datetime)}
-                                            </p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-
-                                {earliest && (
-                                  <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs space-y-0.5">
-                                    <p className="text-muted-foreground font-medium">Registro EXIF da galeria</p>
-                                    <div className="flex gap-4">
-                                      <span><span className="text-muted-foreground">Início: </span><span className="text-white">{formatExifTime(earliest)}</span></span>
-                                      {latest && latest !== earliest && (
-                                        <span><span className="text-muted-foreground">Fim: </span><span className="text-green-400">{formatExifTime(latest)}</span></span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-
-                                <button
-                                  onClick={() => handleAddCheckoutPhotos(itemIndex)}
-                                  disabled={isProcessing || photos.length >= 10}
-                                  className={`w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-dashed text-sm transition-colors
-                                    ${photos.length >= 10
-                                      ? 'border-white/10 text-muted-foreground cursor-not-allowed'
-                                      : 'border-green-500/40 text-green-400 hover:border-green-500/70 hover:bg-green-500/5 active:bg-green-500/10'
-                                    }`}
-                                >
-                                  <Images className="h-4 w-4" />
-                                  {photos.length === 0
-                                    ? 'Adicionar fotos da conclusão (galeria)'
-                                    : photos.length >= 10
-                                      ? 'Limite atingido (10)'
-                                      : `+ Adicionar fotos (${photos.length}/10)`
-                                  }
-                                </button>
-                              </div>
-                            );
-                          })()}
+                          {/* Fotos de conclusão */}
+                          <PhotoGalleryPicker
+                            photos={checkoutPhotos[itemIndex] || []}
+                            onPhotos={(newPhotos) => addPhotos(setCheckoutPhotos, itemIndex, newPhotos)}
+                            onRemove={(pi) => removePhoto(setCheckoutPhotos, itemIndex, pi)}
+                            disabled={isProcessing}
+                            maxPhotos={10}
+                            label="Fotos de conclusão"
+                          />
 
                           {/* Action Buttons */}
                           <div className="flex gap-2">
@@ -1065,37 +894,16 @@ const InstallerJobDetail = () => {
                               Pausar
                             </Button>
                             <Button
-                              onClick={async () => {
-                                const photos = checkoutPhotos[itemIndex] || [];
-                                if (photos.length > 0) {
-                                  // Usa fotos pré-selecionadas da galeria
-                                  if (processingItem !== null) return;
-                                  setProcessingItem(itemIndex);
-                                  try {
-                                    const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
-                                    // EXIF do timestamp mais recente = hora de conclusão real
-                                    const latestExif = photos.find(f => f.exif?.exif_datetime === exifTimes[exifTimes.length - 1])?.exif || photos[0].exif || {};
-                                    const compressedBase64 = await compressImage(photos[0].file);
-                                    await handleItemCheckout(itemIndex, compressedBase64, latestExif);
-                                  } catch (err) {
-                                    console.error('[checkout multi-photo]', err);
-                                    toast.error('Erro ao processar fotos. Tente novamente.');
-                                    setProcessingItem(null);
-                                  }
-                                } else {
-                                  // Sem fotos pré-selecionadas: abre câmera/galeria (fluxo original)
-                                  handleFileSelect(itemIndex, 'checkout');
-                                }
-                              }}
-                              disabled={isProcessing}
-                              className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
+                              onClick={() => handleItemCheckout(itemIndex)}
+                              disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0}
+                              className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform disabled:opacity-40"
                             >
                               {isProcessing ? (
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                               ) : (
-                                <Camera className="h-4 w-4 mr-2" />
+                                <Check className="h-4 w-4 mr-2" />
                               )}
-                              Finalizar
+                              {(checkoutPhotos[itemIndex] || []).length === 0 ? 'Adicione fotos' : 'Finalizar'}
                             </Button>
                           </div>
                         </div>
