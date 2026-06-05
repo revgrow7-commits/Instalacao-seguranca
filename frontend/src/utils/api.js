@@ -37,10 +37,18 @@ const clearCache = (key = null) => {
 const JOBS_CACHE_KEY = 'cache_jobs_v1';
 const JOBS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
-// Retorna { data, _stale: true } instantaneamente se cache válido existe.
-// Sempre dispara o fetch real em background; quando resolver, atualiza localStorage.
-// Se sem cache, aguarda o fetch.
-const getJobsWithCache = async (includeArchived = false) => {
+// Boot cleanup: remove chaves corrompidas de versões anteriores que usavam
+// template string com objeto (ex: cache_jobs_v1_[object Object]).
+try {
+  Object.keys(localStorage)
+    .filter(k => k.startsWith(JOBS_CACHE_KEY) && k.includes('['))
+    .forEach(k => localStorage.removeItem(k));
+} catch { /* localStorage indisponível */ }
+
+// Aceita boolean (legado) ou options object { includeArchived }.
+// Callers que passavam { days: 7 } recebiam object Object no key — corrigido.
+const getJobsWithCache = async (options = false) => {
+  const includeArchived = typeof options === 'boolean' ? options : Boolean(options?.includeArchived);
   const key = `${JOBS_CACHE_KEY}_${includeArchived}`;
   let stale = null;
   try {
@@ -253,6 +261,12 @@ export const api = {
     clearCache('gamification_transactions');
     return withRetry(() =>
       axios.put(`${API_URL}/item-checkins/${checkinId}/checkout`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } })
+    );
+  },
+  batchCheckin: (payload) => {
+    if (payload.job_id) clearCache(`item_checkins_${payload.job_id}`);
+    return withRetry(() =>
+      axios.post(`${API_URL}/item-checkins/batch`, payload, { headers: getAuthHeader() })
     );
   },
   getItemCheckins: (jobId) => getCachedOrFetch(

@@ -108,7 +108,7 @@ const Dashboard = () => {
         // All calls are independent — run in parallel
         const [jobsRes, metricsRes, installersRes, checkinsRes, pendingRes, locationRes] =
           await Promise.all([
-            api.getJobs({ days: 7 }),
+            api.getJobs(),
             api.getMetrics(),
             api.getInstallers().catch((e) => { console.warn('Could not load installers:', e); return { data: [] }; }),
             api.getAllItemCheckins(),
