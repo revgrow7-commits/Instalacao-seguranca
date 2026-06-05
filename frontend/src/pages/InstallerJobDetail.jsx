@@ -690,6 +690,7 @@ const InstallerJobDetail = () => {
   };
 
   const products = getProducts();
+  const archivedCount = (job.archived_items || []).length;
   const totalItems = products.length;
   const completedItems = getCompletedItemsCount();
   const totalM2Job = job.area_m2 || products.reduce((sum, p) => sum + (p.total_area_m2 || 0), 0);
@@ -717,6 +718,17 @@ const InstallerJobDetail = () => {
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-primary/20 text-primary capitalize shrink-0">
                 {meuPapel}
               </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 mt-1">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            {job.client_address ? (
+              <p className="text-xs text-muted-foreground">{job.client_address}</p>
+            ) : (
+              <p className="text-xs text-yellow-500 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                Endereço não informado — confirme com o responsável
+              </p>
             )}
           </div>
         </div>
@@ -751,6 +763,21 @@ const InstallerJobDetail = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Aviso de itens arquivados */}
+      {archivedCount > 0 && (
+        <div className="px-4 pb-2">
+          <div className="flex items-start gap-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-400">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>
+              {archivedCount === 1
+                ? '1 item foi arquivado e não aparece na lista abaixo.'
+                : `${archivedCount} itens foram arquivados e não aparecem na lista abaixo.`}
+              {' '}Fale com o responsável se precisar de esclarecimentos.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Items List */}
       <div className="p-4 space-y-3">
