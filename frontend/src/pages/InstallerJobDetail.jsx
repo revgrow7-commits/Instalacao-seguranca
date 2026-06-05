@@ -483,6 +483,9 @@ const InstallerJobDetail = () => {
       formData.append('height_category', heightCategory);
       formData.append('scenario_category', scenarioCategory);
       formData.append('notes', checkoutForm.notes);
+      // job_id não é enviado ao backend, mas é lido por api.completeItemCheckout
+      // para invalidar o cache de item_checkins deste job.
+      if (checkin.job_id) formData.append('job_id', checkin.job_id);
 
       const response = await api.completeItemCheckout(checkin.id, formData);
 
@@ -508,6 +511,18 @@ const InstallerJobDetail = () => {
     } catch (error) {
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
+
+      // Idempotência: o withRetry pode reenviar após timeout. Se o backend já
+      // gravou o checkout (status 400 + "already checked out"), trata como sucesso.
+      if (status === 400 && detail === 'Item already checked out') {
+        toast.success('Check-out do item realizado!');
+        setPendingGpsRetry(null);
+        setCheckoutForm({ notes: '' });
+        setExpandedItem(null);
+        await loadJobData();
+        return;
+      }
+
       let userMessage;
       if (detail) {
         userMessage = detail;
@@ -535,7 +550,9 @@ const InstallerJobDetail = () => {
   // toast de sucesso do checkout já é emitido em handleItemCheckout.
 
   const getItemByIndex = (index) => {
-    const products = job?.products_with_area || [];
+    const products = job?.products_with_area?.length
+      ? job.products_with_area
+      : (job?.items || []);
     return products[index];
   };
 
