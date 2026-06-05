@@ -135,6 +135,11 @@ TABLE_COLUMNS = {
         "checkin_long", "checkout_lat", "checkout_long", "distance_meters",
         "max_allowed_meters", "action_taken", "created_at"
     ]),
+    "job_photos": frozenset([
+        "id", "job_id", "uploaded_by", "uploaded_by_name", "photo_url", "photo_base64",
+        "caption", "exif_lat", "exif_long", "exif_datetime", "exif_device",
+        "file_name", "file_size_bytes", "created_at"
+    ]),
     "password_resets": frozenset(["id", "user_id", "token", "expires_at", "created_at"]),
     "google_tokens": frozenset(["id", "user_id", "token", "created_at", "updated_at"]),
     "job_justifications": frozenset([
