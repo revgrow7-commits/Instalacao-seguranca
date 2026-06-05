@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import {
   ArrowLeft, Package, MapPin, Camera, Check, Clock,
   Ruler, AlertCircle, CheckCircle2, PlayCircle,
-  ChevronDown, ChevronUp, Pause, Play, WifiOff
+  ChevronDown, ChevronUp, Pause, Play, WifiOff,
+  Images, X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
@@ -72,6 +73,45 @@ const InstallerJobDetail = () => {
   const [checkoutForm, setCheckoutForm] = useState({
     notes: ''
   });
+
+  // Fotos de conclusão múltiplas (galeria) — { [itemIndex]: [{file, exif, preview}] }
+  const [checkoutPhotos, setCheckoutPhotos] = useState({});
+
+  const formatExifTime = (isoStr) => {
+    if (!isoStr) return null;
+    try { return new Date(isoStr.replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
+    catch { return null; }
+  };
+
+  const handleAddCheckoutPhotos = (itemIndex) => {
+    const current = checkoutPhotos[itemIndex] || [];
+    if (current.length >= 10) { toast.warning('Máximo de 10 fotos'); return; }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    // Sem capture — abre galeria em vez da câmera diretamente
+    input.onchange = async (e) => {
+      const files = Array.from(e.target.files || []).slice(0, 10 - current.length);
+      if (!files.length) return;
+      const processed = await Promise.all(files.map(async (file) => {
+        const exif = await extractExif(file).catch(() => ({}));
+        const preview = URL.createObjectURL(file);
+        return { file, exif, preview };
+      }));
+      setCheckoutPhotos(prev => ({ ...prev, [itemIndex]: [...(prev[itemIndex] || []), ...processed] }));
+    };
+    input.click();
+  };
+
+  const removeCheckoutPhoto = (itemIndex, photoIdx) => {
+    setCheckoutPhotos(prev => {
+      const copy = [...(prev[itemIndex] || [])];
+      URL.revokeObjectURL(copy[photoIdx].preview);
+      copy.splice(photoIdx, 1);
+      return { ...prev, [itemIndex]: copy };
+    });
+  };
 
   // Confirm dialog para "GPS impreciso" — antes eram 3 useStates + workaround
   // setX(() => resolve). Agora encapsulado em hook.
@@ -502,10 +542,11 @@ const InstallerJobDetail = () => {
       // Toda a chamada a /gamification/process-checkout e a animação de coins foram
       // removidas. Para reverter, ver git: git show HEAD~1 -- frontend/src/pages/InstallerJobDetail.jsx
       toast.success('Check-out do item realizado!');
-      
+
       // Reset form
       setPendingGpsRetry(null);
       setCheckoutForm({ notes: '' });
+      setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
@@ -518,6 +559,7 @@ const InstallerJobDetail = () => {
         toast.success('Check-out do item realizado!');
         setPendingGpsRetry(null);
         setCheckoutForm({ notes: '' });
+        setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
         setExpandedItem(null);
         await loadJobData();
         return;
@@ -1065,6 +1107,72 @@ const InstallerJobDetail = () => {
                             />
                           </div>
 
+                          {/* Fotos de conclusão — múltiplas da galeria */}
+                          {(() => {
+                            const photos = checkoutPhotos[itemIndex] || [];
+                            const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
+                            const earliest = exifTimes[0];
+                            const latest = exifTimes[exifTimes.length - 1];
+                            return (
+                              <div className="space-y-2">
+                                <Label className="text-sm text-muted-foreground">Fotos de conclusão (galeria)</Label>
+
+                                {photos.length > 0 && (
+                                  <div className="grid grid-cols-4 gap-1.5">
+                                    {photos.map((f, pi) => (
+                                      <div key={pi} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
+                                        <img src={f.preview} alt="" className="w-full h-full object-cover" />
+                                        <button
+                                          onClick={() => removeCheckoutPhoto(itemIndex, pi)}
+                                          className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
+                                        >
+                                          <X className="h-3 w-3 text-white" />
+                                        </button>
+                                        {f.exif?.exif_datetime && (
+                                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
+                                            <p className="text-[9px] text-white/80 text-center truncate">
+                                              {formatExifTime(f.exif.exif_datetime)}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {earliest && (
+                                  <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs space-y-0.5">
+                                    <p className="text-muted-foreground font-medium">Registro EXIF da galeria</p>
+                                    <div className="flex gap-4">
+                                      <span><span className="text-muted-foreground">Início: </span><span className="text-white">{formatExifTime(earliest)}</span></span>
+                                      {latest && latest !== earliest && (
+                                        <span><span className="text-muted-foreground">Fim: </span><span className="text-green-400">{formatExifTime(latest)}</span></span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                <button
+                                  onClick={() => handleAddCheckoutPhotos(itemIndex)}
+                                  disabled={isProcessing || photos.length >= 10}
+                                  className={`w-full flex items-center justify-center gap-2 h-10 rounded-lg border border-dashed text-sm transition-colors
+                                    ${photos.length >= 10
+                                      ? 'border-white/10 text-muted-foreground cursor-not-allowed'
+                                      : 'border-green-500/40 text-green-400 hover:border-green-500/70 hover:bg-green-500/5 active:bg-green-500/10'
+                                    }`}
+                                >
+                                  <Images className="h-4 w-4" />
+                                  {photos.length === 0
+                                    ? 'Adicionar fotos da conclusão (galeria)'
+                                    : photos.length >= 10
+                                      ? 'Limite atingido (10)'
+                                      : `+ Adicionar fotos (${photos.length}/10)`
+                                  }
+                                </button>
+                              </div>
+                            );
+                          })()}
+
                           {/* Action Buttons */}
                           <div className="flex gap-2">
                             <Button
@@ -1077,7 +1185,28 @@ const InstallerJobDetail = () => {
                               Pausar
                             </Button>
                             <Button
-                              onClick={() => handleFileSelect(itemIndex, 'checkout')}
+                              onClick={async () => {
+                                const photos = checkoutPhotos[itemIndex] || [];
+                                if (photos.length > 0) {
+                                  // Usa fotos pré-selecionadas da galeria
+                                  if (processingItem !== null) return;
+                                  setProcessingItem(itemIndex);
+                                  try {
+                                    const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
+                                    // EXIF do timestamp mais recente = hora de conclusão real
+                                    const latestExif = photos.find(f => f.exif?.exif_datetime === exifTimes[exifTimes.length - 1])?.exif || photos[0].exif || {};
+                                    const compressedBase64 = await compressImage(photos[0].file);
+                                    await handleItemCheckout(itemIndex, compressedBase64, latestExif);
+                                  } catch (err) {
+                                    console.error('[checkout multi-photo]', err);
+                                    toast.error('Erro ao processar fotos. Tente novamente.');
+                                    setProcessingItem(null);
+                                  }
+                                } else {
+                                  // Sem fotos pré-selecionadas: abre câmera/galeria (fluxo original)
+                                  handleFileSelect(itemIndex, 'checkout');
+                                }
+                              }}
                               disabled={isProcessing}
                               className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
                             >
