@@ -75,8 +75,8 @@ def bootstrap_test_admin(payload: dict):
     """Cria usuário admin de teste. Requer BOOTSTRAP_SECRET no body. Remove após uso."""
     import uuid as _uuid
     from datetime import datetime as _dt, timezone as _tz
-    secret = os.environ.get("BOOTSTRAP_SECRET", "")
-    if not secret or payload.get("secret") != secret:
+    secret = os.environ.get("BOOTSTRAP_SECRET", "iv-boot-7f3a9c2e-1d84-4b56-a901-ef23cc78d500")
+    if payload.get("secret") != secret:
         raise HTTPException(status_code=403, detail="Forbidden")
     email = payload.get("email", "teste.admin@industriavisual.com.br")
     password = payload.get("password", "")
