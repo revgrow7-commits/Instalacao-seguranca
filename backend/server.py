@@ -70,32 +70,6 @@ api_router.include_router(job_photos_router, tags=["Job Photos"])
 
 # ============ ADMIN ROUTES (kept in server.py - small, unique) ============
 
-@api_router.post("/admin/bootstrap-test-admin")
-def bootstrap_test_admin(payload: dict):
-    """Cria usuário admin de teste. Requer BOOTSTRAP_SECRET no body. Remove após uso."""
-    import uuid as _uuid
-    from datetime import datetime as _dt, timezone as _tz
-    secret = os.environ.get("BOOTSTRAP_SECRET", "iv-boot-7f3a9c2e-1d84-4b56-a901-ef23cc78d500")
-    if payload.get("secret") != secret:
-        raise HTTPException(status_code=403, detail="Forbidden")
-    email = payload.get("email", "teste.admin@industriavisual.com.br")
-    password = payload.get("password", "")
-    if not password or len(password) < 6:
-        raise HTTPException(status_code=400, detail="password obrigatório (mín 6 chars)")
-    from security import get_password_hash as _hash
-    existing = db.users.find({"email": email.lower()})
-    if existing:
-        raise HTTPException(status_code=400, detail=f"Email já cadastrado: {existing[0]['id']}")
-    uid = str(_uuid.uuid4())
-    now = _dt.now(_tz.utc).isoformat()
-    db.users.insert_one({
-        "id": uid, "email": email.lower(), "name": "Admin Teste",
-        "full_name": "Admin Teste", "password_hash": _hash(password),
-        "role": "admin", "branch": "POA", "is_active": True, "created_at": now,
-    })
-    logger.info(f"Bootstrap admin criado: {email}")
-    return {"success": True, "id": uid, "email": email, "role": "admin"}
-
 
 @api_router.delete("/admin/cleanup-test-data")
 def cleanup_test_data(current_user: User = Depends(get_current_user)):
