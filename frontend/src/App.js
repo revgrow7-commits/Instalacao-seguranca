@@ -27,7 +27,7 @@ class ErrorBoundary extends Component {
     return this.props.children;
   }
 }
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
 import './App.css';
@@ -164,6 +164,23 @@ const InstallerLayout = ({ children }) => {
   );
 };
 
+// Redireciona instaladores de /jobs/:id para /installer/job/:id
+// Admin/Manager continuam vendo o JobDetail normal
+const JobDetailRouter = () => {
+  const { jobId } = useParams();
+  const { user } = useAuth();
+  if (user?.role === 'installer') {
+    return <Navigate to={`/installer/job/${jobId}`} replace />;
+  }
+  return (
+    <MainLayout>
+      <Suspense fallback={<PageLoader />}>
+        <JobDetail />
+      </Suspense>
+    </MainLayout>
+  );
+};
+
 const AppRoutes = () => {
   const { user } = useAuth();
 
@@ -233,9 +250,7 @@ const AppRoutes = () => {
         path="/jobs/:jobId"
         element={
           <ProtectedRoute>
-            <MainLayout>
-              <JobDetail />
-            </MainLayout>
+            <JobDetailRouter />
           </ProtectedRoute>
         }
       />

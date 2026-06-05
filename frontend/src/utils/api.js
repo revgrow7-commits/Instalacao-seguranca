@@ -554,6 +554,11 @@ export const api = {
   ),
   getInstallerAuthUrl: () => `${API_URL}/calendar/installer/auth/google`,
   syncJobToInstallerCalendar: (jobId) => axios.post(`${API_URL}/calendar/sync-installer/${jobId}`, {}, { headers: getAuthHeader() }),
+
+  // Job Photos
+  getJobPhotos: (jobId) => axios.get(`${API_URL}/jobs/${jobId}/photos`, { headers: getAuthHeader() }),
+  uploadJobPhoto: (jobId, data) => axios.post(`${API_URL}/jobs/${jobId}/photos`, data, { headers: getAuthHeader() }),
+  deleteJobPhoto: (jobId, photoId) => axios.delete(`${API_URL}/jobs/${jobId}/photos/${photoId}`, { headers: getAuthHeader() }),
 };
 
 export default api;

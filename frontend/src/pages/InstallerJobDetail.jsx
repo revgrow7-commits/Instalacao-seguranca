@@ -410,12 +410,15 @@ const InstallerJobDetail = () => {
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
-        userMessage = 'Sem conexão. Verifique sua internet e tente novamente.';
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
+        userMessage = isTimeout
+          ? 'O servidor demorou para responder. Tente novamente.'
+          : 'Falha na requisição. Verifique sua conexão e tente novamente.';
       } else {
         userMessage = 'Erro ao fazer check-in do item. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
-      console.error('[InstallerJobDetail] handleItemCheckin:', error.response?.data || error);
+      console.error('[InstallerJobDetail] handleItemCheckin:', error.code, error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
@@ -503,8 +506,6 @@ const InstallerJobDetail = () => {
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
-      // FIX C5: mensagens detalhadas + diagnóstico de problemas de rede
-      // e payload (mesma lógica do handleItemCheckin).
       const status = error.response?.status;
       const detail = error.response?.data?.detail;
       let userMessage;
@@ -515,12 +516,16 @@ const InstallerJobDetail = () => {
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
-        userMessage = 'Sem conexão. Verifique sua internet e tente novamente.';
+        // ERR_NETWORK / ECONNABORTED podem ser timeout do servidor, não ausência de internet.
+        const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
+        userMessage = isTimeout
+          ? 'O servidor demorou para responder. Tente novamente.'
+          : 'Falha na requisição. Verifique sua conexão e tente novamente.';
       } else {
         userMessage = 'Erro ao fazer check-out do item. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
-      console.error('[InstallerJobDetail] handleItemCheckout:', error.response?.data || error);
+      console.error('[InstallerJobDetail] handleItemCheckout:', error.code, error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
@@ -621,7 +626,9 @@ const InstallerJobDetail = () => {
     if (!checkin || !checkin.checkin_at) return 0;
     const start = new Date(checkin.checkin_at);
     const now = new Date();
-    return Math.floor((now - start) / 60000);
+    const grossMinutes = Math.floor((now - start) / 60000);
+    const pauseMin = pauseLogs[checkin.item_index]?.total_pause_minutes || 0;
+    return Math.max(0, grossMinutes - Math.round(pauseMin));
   };
 
   const getCompletedItemsCount = () => {

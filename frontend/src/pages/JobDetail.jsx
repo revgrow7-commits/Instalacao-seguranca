@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import { useReschedule } from '../hooks/useReschedule';
+import { extractExif } from '../lib/extractExif';
+import { getPhotoSrc } from '../lib/photo';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../components/ui/dialog';
@@ -10,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from '../components/ui/label';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
-import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler, UserPlus, Check, AlertTriangle, Play, MessageCircle, Phone, Archive, ArchiveRestore, Wrench, Plus, X } from 'lucide-react';
+import { ArrowLeft, Users, MapPin, Calendar, Briefcase, Clock, User, AlertCircle, CheckCircle, Image, Eye, FileText, Package, Ruler, UserPlus, Check, AlertTriangle, Play, MessageCircle, Phone, Archive, ArchiveRestore, Wrench, Plus, X, Camera, Trash2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 const JobDetail = () => {
@@ -60,6 +62,13 @@ const JobDetail = () => {
   const [remocaoPrevisita, setRemocaoPrevisita] = useState(false);
   const [ferramentasSelecionadas, setFerramentasSelecionadas] = useState([]);
   const [novaFerramenta, setNovaFerramenta] = useState('');
+
+  // Estados para fotos do job
+  const [jobPhotos, setJobPhotos] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [deletingPhotoId, setDeletingPhotoId] = useState(null);
+  const [lightboxPhoto, setLightboxPhoto] = useState(null);
+  const photoInputRef = useRef(null);
 
   // Opções pré-cadastradas de ferramentas
   const ferramentasOptions = [
@@ -147,11 +156,12 @@ const JobDetail = () => {
 
   const loadData = async () => {
     try {
-      const [jobRes, installersRes, checkinsRes, itemCheckinsRes] = await Promise.all([
+      const [jobRes, installersRes, checkinsRes, itemCheckinsRes, photosRes] = await Promise.all([
         api.getJob(jobId),
         isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] }),
         api.getCheckins(jobId),
-        api.getItemCheckins(jobId)
+        api.getItemCheckins(jobId),
+        api.getJobPhotos(jobId).catch(() => ({ data: [] })),
       ]);
       
       let jobData = jobRes.data;
@@ -176,6 +186,7 @@ const JobDetail = () => {
       setInstallers(installersRes.data);
       setCheckins(checkinsRes.data);
       setItemCheckins(itemCheckinsRes.data || []);
+      setJobPhotos(Array.isArray(photosRes.data) ? photosRes.data : []);
       setSelectedInstallers(jobData.assigned_installers || []);
       
       if (jobData.scheduled_date) {
@@ -289,6 +300,89 @@ const JobDetail = () => {
   const stalledItemsCount = itemCheckins.filter(c => 
     c.status !== 'completed' && isItemStalled(c)
   ).length;
+
+  // ── Fotos do Job ──────────────────────────────────────────────────────────
+
+  const compressImageForUpload = (file) => new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        const MAX_DIM = 1200;
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const ratio = Math.min(MAX_DIM / width, MAX_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        let quality = 0.85;
+        const tryCompress = () => {
+          const b64 = canvas.toDataURL('image/jpeg', quality);
+          const sizeKb = Math.round(b64.length * 0.75 / 1024);
+          if (sizeKb > 300 && quality > 0.30) {
+            quality -= 0.05;
+            tryCompress();
+          } else {
+            resolve(b64);
+          }
+        };
+        tryCompress();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  const handlePhotoFilesSelected = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploadingPhoto(true);
+    let successCount = 0;
+    for (const file of files) {
+      try {
+        const [b64, exif] = await Promise.all([
+          compressImageForUpload(file),
+          extractExif(file),
+        ]);
+        const res = await api.uploadJobPhoto(jobId, {
+          photo_base64: b64,
+          exif_lat: exif.exif_lat,
+          exif_long: exif.exif_long,
+          exif_datetime: exif.exif_datetime,
+          exif_device: exif.exif_device,
+          file_name: file.name,
+          file_size_bytes: file.size,
+        });
+        setJobPhotos(prev => [...prev, res.data]);
+        successCount++;
+      } catch (err) {
+        toast.error(`Erro ao enviar ${file.name}`);
+      }
+    }
+    if (successCount > 0) toast.success(`${successCount} foto(s) enviada(s)`);
+    setUploadingPhoto(false);
+    if (photoInputRef.current) photoInputRef.current.value = '';
+  };
+
+  const handleDeletePhoto = async (photoId) => {
+    setDeletingPhotoId(photoId);
+    try {
+      await api.deleteJobPhoto(jobId, photoId);
+      setJobPhotos(prev => prev.filter(p => p.id !== photoId));
+      if (lightboxPhoto?.id === photoId) setLightboxPhoto(null);
+      toast.success('Foto removida');
+    } catch {
+      toast.error('Erro ao remover foto');
+    } finally {
+      setDeletingPhotoId(null);
+    }
+  };
+
+  // ── Fim Fotos ─────────────────────────────────────────────────────────────
 
   const handleAssignInstallers = async () => {
     if (selectedInstallers.length === 0) {
@@ -560,7 +654,9 @@ const JobDetail = () => {
     return null;
   }
 
-  const assignedInstallersData = installers.filter(i => selectedInstallers.includes(i.id));
+  const assignedInstallersData = installers.filter(i =>
+    selectedInstallers.includes(i.id) || selectedInstallers.includes(i.user_id)
+  );
 
   return (
     <div className="p-4 md:p-8 space-y-4 md:space-y-6 pb-24 md:pb-8" data-testid="job-detail-page">
@@ -2376,6 +2472,184 @@ const JobDetail = () => {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* ── Fotos do Job ─────────────────────────────────────────────────── */}
+      <Card className="bg-card border-white/5">
+        <CardHeader>
+          <CardTitle className="text-white flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Camera className="h-5 w-5 text-primary" />
+              Fotos do Job ({jobPhotos.length})
+            </div>
+            <Button
+              size="sm"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={uploadingPhoto}
+              className="bg-primary hover:bg-primary/90 text-sm"
+            >
+              {uploadingPhoto ? (
+                <>
+                  <Upload className="h-4 w-4 mr-2 animate-pulse" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Adicionar Foto(s)
+                </>
+              )}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            capture="environment"
+            className="hidden"
+            onChange={handlePhotoFilesSelected}
+          />
+
+          {jobPhotos.length === 0 ? (
+            <div
+              className="border-2 border-dashed border-white/10 rounded-xl p-8 text-center cursor-pointer hover:border-primary/40 transition-colors"
+              onClick={() => photoInputRef.current?.click()}
+            >
+              <Camera className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">Nenhuma foto. Clique para adicionar.</p>
+              <p className="text-muted-foreground text-xs mt-1">Metadados EXIF (GPS, dispositivo, data) são capturados automaticamente.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {jobPhotos.map((photo) => {
+                const src = getPhotoSrc(photo.photo_base64, photo.photo_url);
+                return (
+                  <div
+                    key={photo.id}
+                    className="relative group rounded-lg overflow-hidden bg-white/5 border border-white/10 aspect-square"
+                  >
+                    <img
+                      src={src}
+                      alt={photo.file_name || 'Foto do job'}
+                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                      onClick={() => setLightboxPhoto(photo)}
+                    />
+                    {/* Overlay com metadados */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 pointer-events-none">
+                      {photo.exif_device && (
+                        <p className="text-white text-xs truncate">{photo.exif_device}</p>
+                      )}
+                      {photo.exif_datetime && (
+                        <p className="text-white/70 text-xs">
+                          {new Date(photo.exif_datetime).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      )}
+                      {photo.exif_lat && photo.exif_long && (
+                        <p className="text-primary text-xs">📍 GPS capturado</p>
+                      )}
+                    </div>
+                    {/* Botão deletar */}
+                    {(isAdmin || isManager) && (
+                      <button
+                        className="absolute top-1 right-1 p-1 rounded bg-red-600/80 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-auto"
+                        onClick={(e) => { e.stopPropagation(); handleDeletePhoto(photo.id); }}
+                        disabled={deletingPhotoId === photo.id}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* Botão adicionar mais */}
+              <div
+                className="aspect-square border-2 border-dashed border-white/10 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-primary/40 transition-colors"
+                onClick={() => photoInputRef.current?.click()}
+              >
+                <Plus className="h-6 w-6 text-muted-foreground mb-1" />
+                <p className="text-muted-foreground text-xs">Adicionar</p>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Lightbox */}
+      {lightboxPhoto && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxPhoto(null)}
+        >
+          <div
+            className="max-w-2xl w-full bg-card rounded-xl overflow-hidden shadow-2xl border border-white/10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <img
+                src={getPhotoSrc(lightboxPhoto.photo_base64, lightboxPhoto.photo_url)}
+                alt={lightboxPhoto.file_name || 'Foto'}
+                className="w-full max-h-[60vh] object-contain bg-black"
+              />
+              <button
+                className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-black text-white"
+                onClick={() => setLightboxPhoto(null)}
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-2">
+              <p className="text-white font-medium text-sm">{lightboxPhoto.file_name || 'Foto do job'}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                {lightboxPhoto.uploaded_by_name && (
+                  <div><span className="text-white/50">Enviado por:</span> {lightboxPhoto.uploaded_by_name}</div>
+                )}
+                {lightboxPhoto.created_at && (
+                  <div><span className="text-white/50">Enviado em:</span> {new Date(lightboxPhoto.created_at).toLocaleString('pt-BR')}</div>
+                )}
+                {lightboxPhoto.exif_device && (
+                  <div><span className="text-white/50">Dispositivo:</span> {lightboxPhoto.exif_device}</div>
+                )}
+                {lightboxPhoto.exif_datetime && (
+                  <div><span className="text-white/50">Capturada em:</span> {new Date(lightboxPhoto.exif_datetime).toLocaleString('pt-BR')}</div>
+                )}
+                {lightboxPhoto.exif_lat && lightboxPhoto.exif_long && (
+                  <div className="col-span-2">
+                    <span className="text-white/50">GPS:</span>{' '}
+                    <a
+                      href={`https://www.google.com/maps?q=${lightboxPhoto.exif_lat},${lightboxPhoto.exif_long}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {lightboxPhoto.exif_lat.toFixed(6)}, {lightboxPhoto.exif_long.toFixed(6)} → Ver no Maps
+                    </a>
+                  </div>
+                )}
+                {lightboxPhoto.file_size_bytes && (
+                  <div><span className="text-white/50">Tamanho original:</span> {(lightboxPhoto.file_size_bytes / 1024).toFixed(0)} KB</div>
+                )}
+              </div>
+              {(isAdmin || isManager) && (
+                <div className="pt-2 border-t border-white/10">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-red-500/40 text-red-400 hover:bg-red-500/10"
+                    onClick={() => handleDeletePhoto(lightboxPhoto.id)}
+                    disabled={deletingPhotoId === lightboxPhoto.id}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remover foto
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

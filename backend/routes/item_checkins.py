@@ -5,6 +5,7 @@ Handles per-item check-ins for installers (modern flow).
 from fastapi import APIRouter, HTTPException, Depends, Form
 from typing import Optional, List
 from datetime import datetime, timezone
+import asyncio
 import uuid
 import logging
 
@@ -786,17 +787,26 @@ async def complete_item_checkout(
         hours = net_duration_minutes / 60
         productivity_m2_h = round(installed_m2 / hours, 2)
     
-    compressed_checkout_photo = None
     checkout_photo_url = None
     if photo_base64:
-        compressed_checkout_photo = compress_base64_image(photo_base64, max_size_kb=300, max_dimension=1200)
-        checkout_photo_url = upload_photo_to_storage(
-            compressed_checkout_photo, f"item-checkins/{checkin_id}_checkout.jpg"
-        )
+        try:
+            # Compressão CPU-bound + upload I/O rodam em thread pool para não bloquear
+            # o event loop e evitar timeout do Vercel. Limite de 20s no total.
+            _compressed = await asyncio.wait_for(
+                asyncio.to_thread(compress_base64_image, photo_base64, 300, 1200),
+                timeout=8.0
+            )
+            checkout_photo_url = await asyncio.wait_for(
+                asyncio.to_thread(upload_photo_to_storage, _compressed, f"item-checkins/{checkin_id}_checkout.jpg"),
+                timeout=12.0
+            )
+        except (asyncio.TimeoutError, Exception) as _photo_err:
+            logger.warning(f"Checkout photo upload skipped for {checkin_id}: {_photo_err}")
 
     update_data = {
         "checkout_at": checkout_at.isoformat(),
-        "checkout_photo": compressed_checkout_photo,
+        # checkout_photo (base64) removido do update_data: armazenar ~400KB no
+        # PostgREST bloqueava a função e causava timeout no Vercel.
         **({"checkout_photo_url": checkout_photo_url} if checkout_photo_url else {}),
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
