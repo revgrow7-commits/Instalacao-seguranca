@@ -10,6 +10,14 @@ const API_URL = (process.env.REACT_APP_BACKEND_URL?.trim() || window.location.or
 const SESSION_KEY = 'auth_user_snapshot';
 const SESSION_TTL = 5 * 60 * 1000; // 5 min
 
+// Label legível do role, centralizado aqui para não espalhar switches pela UI.
+// Adicionar novo role exige mudar 1 lugar só.
+const ROLE_LABELS = {
+  admin: 'Administrador',
+  manager: 'Gerente',
+  installer: 'Instalador',
+};
+
 const readSessionSnapshot = () => {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY);
@@ -30,10 +38,9 @@ const writeSessionSnapshot = (user) => {
 };
 
 export const AuthProvider = ({ children }) => {
-  const snapshot = readSessionSnapshot();
-  const [user, setUser] = useState(snapshot);
-  const [loading, setLoading] = useState(!snapshot); // se já temos snapshot, não bloqueia
-  const [tokenVersion, setTokenVersion] = useState(0); // Force re-render when token changes
+  // Inicialização preguiçosa: roda apenas no primeiro mount, não a cada render.
+  const [user, setUser] = useState(() => readSessionSnapshot());
+  const [loading, setLoading] = useState(() => !readSessionSnapshot());
 
   // Migrate from localStorage on first load (one-time)
   useEffect(() => {
@@ -77,7 +84,7 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:expired', handleExpired);
   }, []);
 
-  const login = async (email, password) => {
+  const login = useCallback(async (email, password) => {
     try {
       const response = await axios.post(`${API_URL}/auth/login`, {
         email,
@@ -88,7 +95,6 @@ export const AuthProvider = ({ children }) => {
       tokenManager.setToken(access_token);
       setUser(userData);
       writeSessionSnapshot(userData);
-      setTokenVersion(v => v + 1); // Trigger re-render
       return { success: true };
     } catch (error) {
       return {
@@ -96,40 +102,33 @@ export const AuthProvider = ({ children }) => {
         message: error.response?.data?.detail || 'Erro ao fazer login'
       };
     }
-  };
+  }, []);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     tokenManager.clearToken();
     api.clearCache();
     setUser(null);
     writeSessionSnapshot(null);
-    setTokenVersion(v => v + 1); // Trigger re-render
-  };
+  }, []);
 
-  const isAdmin = user?.role === 'admin';
-  const isManager = user?.role === 'manager';
-  const isInstaller = user?.role === 'installer';
-  
-  // Get token for consumers who need it
-  const getToken = useCallback(() => tokenManager.getToken(), [tokenVersion]);
-  
-  // Memoize the current token value
-  const token = useMemo(() => tokenManager.getToken(), [tokenVersion]);
+  // Value memoizado: re-render dos consumidores apenas quando user ou loading mudam.
+  // Sem isso, qualquer setState no Provider re-render toda a árvore consumidora.
+  const value = useMemo(() => {
+    const role = user?.role;
+    return {
+      user,
+      loading,
+      login,
+      logout,
+      isAdmin: role === 'admin',
+      isManager: role === 'manager',
+      isInstaller: role === 'installer',
+      roleLabel: ROLE_LABELS[role] ?? 'Usuário',
+    };
+  }, [user, loading]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        logout,
-        isAdmin,
-        isManager,
-        isInstaller,
-        token,
-        getToken
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
