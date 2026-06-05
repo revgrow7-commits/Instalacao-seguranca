@@ -53,6 +53,7 @@ const InstallerJobDetail = () => {
   const [expandedItem, setExpandedItem] = useState(null);
   const [processingItem, setProcessingItem] = useState(null);
   const fileInputRef = useRef({});
+  const hasAutoExpanded = useRef(false);
 
   // GPS permission guide state (3D) — fluxo separado da máquina de GPS.
   const [locationPermissionGuideOpen, setLocationPermissionGuideOpen] = useState(false);
@@ -103,6 +104,19 @@ const InstallerJobDetail = () => {
     // This prevents the Android overlay permission error
     return () => { cancelled = true; };
   }, [jobId]);
+
+  // Auto-expande o primeiro item pendente (sem checkin ou em andamento)
+  useEffect(() => {
+    if (hasAutoExpanded.current || !job || expandedItem !== null) return;
+    const items = job.products_with_area || job.items || [];
+    const firstPendingIndex = items.findIndex((_, i) =>
+      !itemCheckins[i] || itemCheckins[i]?.status === 'pending'
+    );
+    if (firstPendingIndex !== -1) {
+      setExpandedItem(firstPendingIndex);
+      hasAutoExpanded.current = true;
+    }
+  }, [job, itemCheckins]);
 
   // Buscar os valores de atribuição definidos pelo gerente para um item
   const getItemAssignment = (itemIndex) => {

@@ -374,6 +374,178 @@ async def create_item_checkin(
     return checkin_dict
 
 
+# ============ BATCH CHECKIN ============
+
+class BatchCheckinRequest(BaseModel):
+    job_id: str
+    item_index: int
+    photos: List[str]  # base64 strings (máx 10)
+    exif_data: Optional[List[dict]] = None
+    gps_lat: Optional[float] = None
+    gps_long: Optional[float] = None
+    gps_accuracy: Optional[float] = None
+
+
+@router.post("/item-checkins/batch")
+async def batch_item_checkin(
+    request: BatchCheckinRequest,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Checkin com múltiplas fotos (lote).
+    GPS é opcional. Extrai timestamps EXIF para relatório de tempo.
+    """
+    if current_user.role != UserRole.INSTALLER:
+        raise HTTPException(status_code=403, detail="Apenas instaladores podem fazer check-in")
+
+    if not request.photos:
+        raise HTTPException(status_code=400, detail="Ao menos uma foto é obrigatória")
+
+    if len(request.photos) > 10:
+        raise HTTPException(status_code=400, detail="Máximo 10 fotos por lote")
+
+    installer = db.installers.find_one({"user_id": current_user.id}, {"_id": 0})
+    if not installer:
+        raise HTTPException(status_code=404, detail="Instalador não encontrado")
+
+    job = db.jobs.find_one({"id": request.job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job não encontrado")
+
+    # Validação de atribuição
+    item_assignments = job.get("item_assignments", [])
+    installer_id = installer["id"]
+    user_id = current_user.id
+    job_assigned_installers = job.get("assigned_installers", [])
+
+    item_assigned = any(
+        a.get("item_index") == request.item_index and
+        (a.get("installer_id") in [installer_id, user_id] or
+         installer_id in a.get("installer_ids", []) or
+         user_id in a.get("installer_ids", []))
+        for a in item_assignments
+    )
+    is_job_assigned = installer_id in job_assigned_installers or user_id in job_assigned_installers
+    if not item_assigned and not is_job_assigned:
+        raise HTTPException(status_code=403, detail="Você não está atribuído a este item")
+
+    products = job.get("products_with_area", []) or job.get("items", [])
+    if not products or request.item_index >= len(products) or request.item_index < 0:
+        raise HTTPException(status_code=400, detail=f"Item inválido. O job tem {len(products)} itens.")
+
+    archived_indices = {a.get("item_index") for a in job.get("archived_items", []) if a.get("item_index") is not None}
+    if request.item_index in archived_indices:
+        raise HTTPException(status_code=400, detail="Item arquivado. Contate o gerente.")
+
+    # Idempotência: retorna checkin existente se criado nos últimos 5 min
+    existing = db.item_checkins.find_one({
+        "job_id": request.job_id,
+        "item_index": request.item_index,
+        "installer_id": installer_id,
+        "status": "in_progress"
+    })
+    if existing:
+        try:
+            existing_at_raw = existing.get("checkin_at")
+            if isinstance(existing_at_raw, str):
+                existing_at = datetime.fromisoformat(existing_at_raw.replace('Z', '+00:00'))
+            elif isinstance(existing_at_raw, datetime):
+                existing_at = existing_at_raw
+            else:
+                existing_at = None
+            if existing_at:
+                if existing_at.tzinfo is None:
+                    existing_at = existing_at.replace(tzinfo=timezone.utc)
+                if (datetime.now(timezone.utc) - existing_at).total_seconds() < 300:
+                    return {"checkin_id": existing["id"], "status": "in_progress", "idempotent": True}
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=409,
+            detail="Já existe um check-in em andamento para este item. Faça o checkout antes de iniciar um novo."
+        )
+
+    product = products[request.item_index]
+    family_id, family_name = await detect_product_family([product.get("name", "")])
+
+    # Extrai timestamps EXIF e ordena para calcular duração estimada
+    exif_timestamps = []
+    exif_data_list = request.exif_data or []
+    for exif in exif_data_list:
+        dt_str = (exif or {}).get("exif_datetime")
+        if dt_str:
+            try:
+                ts = datetime.fromisoformat(dt_str.replace(' ', 'T'))
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                exif_timestamps.append(ts)
+            except Exception:
+                pass
+
+    exif_timestamps.sort()
+    exif_checkin_at = exif_timestamps[0] if exif_timestamps else None
+    exif_checkout_at = exif_timestamps[-1] if len(exif_timestamps) > 1 else None
+    exif_duration_minutes = None
+    if exif_checkin_at and exif_checkout_at:
+        diff = (exif_checkout_at - exif_checkin_at).total_seconds() / 60
+        exif_duration_minutes = int(diff) if diff >= 0 else None
+
+    checkin_time = exif_checkin_at or datetime.now(timezone.utc)
+
+    # Primeira foto: comprime e sobe ao Storage
+    compressed_first = compress_base64_image(request.photos[0], max_size_kb=200, max_dimension=1024)
+    first_exif = exif_data_list[0] if exif_data_list else {}
+
+    item_checkin = ItemCheckin(
+        job_id=request.job_id,
+        item_index=request.item_index,
+        installer_id=installer_id,
+        checkin_at=checkin_time,
+        checkin_photo=compressed_first,
+        gps_lat=request.gps_lat,
+        gps_long=request.gps_long,
+        gps_accuracy=request.gps_accuracy,
+        exif_lat=first_exif.get("exif_lat") if first_exif else None,
+        exif_long=first_exif.get("exif_long") if first_exif else None,
+        exif_datetime=first_exif.get("exif_datetime") if first_exif else None,
+        exif_device=first_exif.get("exif_device") if first_exif else None,
+        product_name=product.get("name", f"Item {request.item_index}"),
+        family_name=family_name,
+    )
+
+    photo_url = upload_photo_to_storage(
+        compressed_first, f"item-checkins/{item_checkin.id}_checkin.jpg"
+    )
+
+    checkin_dict = item_checkin.model_dump()
+    checkin_dict['checkin_at'] = checkin_time.isoformat()
+    if photo_url:
+        checkin_dict['checkin_photo_url'] = photo_url
+    checkin_dict['photos_count'] = len(request.photos)
+    if exif_checkin_at:
+        checkin_dict['exif_checkin_at'] = exif_checkin_at.isoformat()
+    if exif_checkout_at:
+        checkin_dict['exif_checkout_at'] = exif_checkout_at.isoformat()
+    if exif_duration_minutes is not None:
+        checkin_dict['exif_duration_minutes'] = exif_duration_minutes
+
+    db.item_checkins.insert_one(checkin_dict)
+    db.jobs.update_one({"id": request.job_id}, {"$set": {"status": "instalando"}})
+
+    checkin_dict.pop('_id', None)
+    checkin_dict.pop('checkin_photo', None)
+    checkin_dict.pop('checkout_photo', None)
+
+    return {
+        "checkin_id": checkin_dict["id"],
+        "status": "in_progress",
+        "photos_count": len(request.photos),
+        "exif_checkin_at": exif_checkin_at.isoformat() if exif_checkin_at else None,
+        "exif_checkout_at": exif_checkout_at.isoformat() if exif_checkout_at else None,
+        "exif_duration_minutes": exif_duration_minutes,
+    }
+
+
 @router.get("/item-checkins")
 async def get_item_checkins(
     job_id: str = None,

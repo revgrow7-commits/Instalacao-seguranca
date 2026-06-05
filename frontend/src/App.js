@@ -150,6 +150,20 @@ const MainLayout = ({ children }) => {
   );
 };
 
+// Layout sem sidebar — para instaladores (100% mobile, sem desperdiçar espaço)
+const InstallerLayout = ({ children }) => {
+  return (
+    <div className="min-h-screen bg-background">
+      <main className="flex-1 pb-20">
+        <Suspense fallback={<PageLoader />}>
+          {children}
+        </Suspense>
+      </main>
+      <BottomNav />
+    </div>
+  );
+};
+
 const AppRoutes = () => {
   const { user } = useAuth();
 
@@ -249,9 +263,9 @@ const AppRoutes = () => {
         path="/installer/dashboard"
         element={
           <ProtectedRoute>
-            <MainLayout>
+            <InstallerLayout>
               <InstallerDashboard />
-            </MainLayout>
+            </InstallerLayout>
           </ProtectedRoute>
         }
       />
@@ -331,9 +345,9 @@ const AppRoutes = () => {
         path="/installer/calendar"
         element={
           <ProtectedRoute>
-            <MainLayout>
+            <InstallerLayout>
               <InstallerCalendar />
-            </MainLayout>
+            </InstallerLayout>
           </ProtectedRoute>
         }
       />
