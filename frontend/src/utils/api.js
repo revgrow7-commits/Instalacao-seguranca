@@ -37,6 +37,18 @@ const clearCache = (key = null) => {
 const JOBS_CACHE_KEY = 'cache_jobs_v1';
 const JOBS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
+// Limpa TANTO o Map em memória QUANTO o localStorage para jobs.
+// Usar em qualquer mutation que mude jobs.status (checkin, checkout, schedule, etc.)
+const clearJobsCache = () => {
+  clearCache('jobs_false');
+  clearCache('jobs_true');
+  clearCache('team_calendar');
+  try {
+    localStorage.removeItem(`${JOBS_CACHE_KEY}_false`);
+    localStorage.removeItem(`${JOBS_CACHE_KEY}_true`);
+  } catch { /* localStorage indisponível */ }
+};
+
 // Boot cleanup: remove chaves corrompidas de versões anteriores que usavam
 // template string com objeto (ex: cache_jobs_v1_[object Object]).
 try {
@@ -163,7 +175,7 @@ export const api = {
   syncHoldprintJobs: (monthsBack = 2) => axios.post(`${API_URL}/jobs/sync-holdprint?months_back=${monthsBack}`, {}, { headers: getAuthHeader() }),
   getSyncStatus: () => axios.get(`${API_URL}/jobs/sync-status`, { headers: getAuthHeader() }),
   createJob: (data) => {
-    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    clearJobsCache();
     return axios.post(`${API_URL}/jobs`, data, { headers: getAuthHeader() });
   },
   getJobs: (includeArchived = false) => getJobsWithCache(includeArchived),
@@ -178,16 +190,16 @@ export const api = {
     20000
   ),
   updateJob: (jobId, data) => {
-    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    clearJobsCache();
     clearCache(`job_${jobId}`);
     return axios.put(`${API_URL}/jobs/${jobId}`, data, { headers: getAuthHeader() });
   },
   assignJob: (jobId, installerIds) => {
-    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    clearJobsCache();
     return axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() });
   },
   scheduleJob: async (jobId, { scheduledDate, scheduledTimeEnd, installerIds, status } = {}) => {
-    clearCache('jobs_false'); clearCache('jobs_true'); clearCache('team_calendar');
+    clearJobsCache();
     const response = await axios.put(`${API_URL}/jobs/${jobId}/schedule`, {
       scheduled_date: scheduledDate,
       scheduled_time_end: scheduledTimeEnd || null,
@@ -225,10 +237,12 @@ export const api = {
 
   // Check-ins
   createCheckin: (formData) => {
+    clearJobsCache();
     clearCache('checkins_all');
     return axios.post(`${API_URL}/checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } });
   },
   checkout: (checkinId, formData) => {
+    clearJobsCache();
     clearCache('checkins_all');
     clearCache('gamification_balance');
     clearCache('gamification_transactions');
@@ -248,6 +262,7 @@ export const api = {
   // Item Check-ins (per item) — submits críticos usam withRetry (instalador em campo, 3G)
   createItemCheckin: (formData) => {
     const jobId = formData.get ? formData.get('job_id') : null;
+    clearJobsCache();
     if (jobId) clearCache(`item_checkins_${jobId}`);
     return withRetry(() =>
       axios.post(`${API_URL}/item-checkins`, formData, { headers: { ...getAuthHeader(), 'Content-Type': 'multipart/form-data' } })
@@ -255,6 +270,7 @@ export const api = {
   },
   completeItemCheckout: (checkinId, formData) => {
     const jobId = formData.get ? formData.get('job_id') : null;
+    clearJobsCache();
     if (jobId) clearCache(`item_checkins_${jobId}`);
     clearCache(`item_pause_logs_${checkinId}`);
     clearCache('gamification_balance');
@@ -264,6 +280,7 @@ export const api = {
     );
   },
   batchCheckin: (payload) => {
+    clearJobsCache();
     if (payload.job_id) clearCache(`item_checkins_${payload.job_id}`);
     return withRetry(() =>
       axios.post(`${API_URL}/item-checkins/batch`, payload, { headers: getAuthHeader() })
