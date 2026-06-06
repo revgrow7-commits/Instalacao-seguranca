@@ -304,6 +304,7 @@ const Dashboard = () => {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wide">
+                      <th className="px-3 py-2 font-medium w-12">Foto</th>
                       <th className="text-left px-4 py-2 font-medium">Instalador</th>
                       <th className="text-left px-4 py-2 font-medium">Item / Produto</th>
                       <th className="text-left px-4 py-2 font-medium">H. Início</th>
@@ -332,6 +333,23 @@ const Dashboard = () => {
                           className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
                           onClick={() => navigate(`/checkin-viewer/${c.id}`)}
                         >
+                          <td className="px-3 py-2">
+                            {c.checkin_photo_url ? (
+                              <img
+                                src={c.checkin_photo_url}
+                                alt="foto"
+                                className="w-9 h-9 rounded-md object-cover border border-white/10"
+                                loading="lazy"
+                                onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex'; }}
+                              />
+                            ) : null}
+                            <div
+                              className="w-9 h-9 rounded-md bg-white/5 border border-white/10 items-center justify-center"
+                              style={{ display: c.checkin_photo_url ? 'none' : 'flex' }}
+                            >
+                              <Camera className="h-4 w-4 text-muted-foreground/40" />
+                            </div>
+                          </td>
                           <td className="px-4 py-2.5 text-white">{installer?.full_name || c.installer_id?.slice(0, 8) || '—'}</td>
                           <td className="px-4 py-2.5 text-muted-foreground max-w-[180px] truncate">{c.product_name || job?.title || '—'}</td>
                           <td className="px-4 py-2.5 font-mono text-green-400">{inicio}</td>
