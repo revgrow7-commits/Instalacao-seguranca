@@ -147,14 +147,14 @@ def run_scheduler_job_now(job_id: str, current_user: User = Depends(get_current_
 @api_router.post("/cron/sync-holdprint")
 def cron_sync_holdprint(request: Request):
     """Endpoint para Vercel Cron - sincronizacao Holdprint diaria (09:00 UTC / 06:00 BRT)."""
-    # Vercel envia x-vercel-cron: 1 em requests de cron autenticados
-    is_vercel_cron = request.headers.get('x-vercel-cron') == '1'
+    # Segurança (M3): exigir SEMPRE o segredo do cron.
+    # A Vercel injeta automaticamente "Authorization: Bearer <CRON_SECRET>" nos
+    # requests de cron quando a env CRON_SECRET está definida (padrão oficial Vercel).
+    # O header x-vercel-cron NÃO é usado como prova de autenticidade porque pode ser
+    # forjado por qualquer requisição externa. Fail-closed se o segredo não existir.
     cron_secret = os.environ.get('CRON_SECRET')
-    if cron_secret:
-        auth_header = request.headers.get('Authorization', '')
-        if not is_vercel_cron and auth_header != f"Bearer {cron_secret}":
-            raise HTTPException(status_code=401, detail="Unauthorized cron request")
-    elif not is_vercel_cron and os.environ.get('VERCEL') == '1':
+    auth_header = request.headers.get('Authorization', '')
+    if not cron_secret or auth_header != f"Bearer {cron_secret}":
         raise HTTPException(status_code=401, detail="Unauthorized cron request")
 
     result = sync_holdprint_jobs_sync(db)

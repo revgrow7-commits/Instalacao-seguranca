@@ -147,6 +147,7 @@ TABLE_COLUMNS = {
         "file_name", "file_size_bytes", "ordem", "created_at",
     ]),
     "password_resets": frozenset(["id", "user_id", "token", "expires_at", "created_at"]),
+    "login_attempts": frozenset(["id", "identifier", "created_at"]),
     "google_tokens": frozenset(["id", "user_id", "token", "created_at", "updated_at"]),
     "job_justifications": frozenset([
         "id", "job_id", "job_title", "job_code", "type", "type_label", "reason",

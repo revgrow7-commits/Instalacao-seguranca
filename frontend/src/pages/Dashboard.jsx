@@ -3,10 +3,10 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { 
-  Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2, 
+import {
+  Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2,
   Bell, AlertTriangle, PauseCircle, PlayCircle, Navigation, Timer, AlertCircle, MessageCircle,
-  ChevronRight, ExternalLink, X
+  ChevronRight, ExternalLink, X, Camera, FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
@@ -24,6 +24,7 @@ const Dashboard = () => {
   const [pausedCheckins, setPausedCheckins] = useState([]);
   const [pendingCheckins, setPendingCheckins] = useState([]);
   const [locationAlerts, setLocationAlerts] = useState([]);
+  const [completedCheckins, setCompletedCheckins] = useState([]);
   const [deletingId, setDeletingId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
@@ -119,6 +120,13 @@ const Dashboard = () => {
         setJobs(jobsRes.data);
         setMetrics(metricsRes.data);
         setInstallers(installersRes.data);
+
+        // Filter completed check-ins with location data (from images or GPS)
+        const completed = (checkinsRes || [])
+          .filter(c => c.status === 'completed' && c.checkout_at)
+          .sort((a, b) => new Date(b.checkout_at) - new Date(a.checkout_at))
+          .slice(0, 20);
+        setCompletedCheckins(completed);
 
         // Filter paused check-ins (status = 'paused')
         const paused = (checkinsRes || []).filter(c => c.status === 'paused');
@@ -259,6 +267,106 @@ const Dashboard = () => {
           {isAdmin ? 'Painel de Administração' : isManager ? 'Painel Gerencial' : 'Seus Jobs'}
         </p>
       </div>
+
+      {/* =============== RELATÓRIO CONSOLIDADO =============== */}
+      {(isAdmin || isManager) && completedCheckins.length > 0 && (
+        <Card className="bg-card/50 backdrop-blur border-white/10">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg text-white flex items-center gap-2">
+                <FileSpreadsheet className="h-5 w-5 text-primary" />
+                Relatório Consolidado
+                <span className="text-xs font-normal text-muted-foreground ml-1">
+                  — check-ins concluídos
+                </span>
+              </CardTitle>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Camera className="h-3.5 w-3.5" />
+                <span>Lat/Long via imagem</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wide">
+                    <th className="text-left px-4 py-2 font-medium">Instalador</th>
+                    <th className="text-left px-4 py-2 font-medium">Item / Produto</th>
+                    <th className="text-left px-4 py-2 font-medium">H. Início</th>
+                    <th className="text-left px-4 py-2 font-medium">H. Fim</th>
+                    <th className="text-left px-4 py-2 font-medium">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-blue-400" />
+                        Latitude
+                      </span>
+                    </th>
+                    <th className="text-left px-4 py-2 font-medium">
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3 text-blue-400" />
+                        Longitude
+                      </span>
+                    </th>
+                    <th className="text-left px-4 py-2 font-medium">Origem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {completedCheckins.map((c, idx) => {
+                    const installer = getInstallerById(c.installer_id);
+                    const job = jobs.find(j => j.id === c.job_id);
+                    const lat = c.exif_lat ?? c.gps_lat;
+                    const lng = c.exif_long ?? c.gps_long;
+                    const fromExif = c.exif_lat != null;
+                    const inicio = c.checkin_at
+                      ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                      : '—';
+                    const fim = c.checkout_at
+                      ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+                      : '—';
+                    return (
+                      <tr
+                        key={c.id}
+                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
+                        onClick={() => navigate(`/checkin-viewer/${c.id}`)}
+                      >
+                        <td className="px-4 py-2.5 text-white">
+                          {installer?.full_name || c.installer_id?.slice(0, 8) || '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-muted-foreground max-w-[180px] truncate">
+                          {c.product_name || job?.title || '—'}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-green-400">{inicio}</td>
+                        <td className="px-4 py-2.5 font-mono text-red-400">{fim}</td>
+                        <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
+                          {lat != null ? lat.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
+                          {lng != null ? lng.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5">
+                          {fromExif ? (
+                            <span className="flex items-center gap-1 text-xs text-yellow-400">
+                              <Camera className="h-3 w-3" />
+                              EXIF
+                            </span>
+                          ) : lat != null ? (
+                            <span className="flex items-center gap-1 text-xs text-blue-400">
+                              <Navigation className="h-3 w-3" />
+                              GPS
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Metrics Cards - Admin & Manager only */}
       {(isAdmin || isManager) && metrics && (
