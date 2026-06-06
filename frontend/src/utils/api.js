@@ -257,6 +257,7 @@ export const api = {
     15000
   ),
   getCheckinDetails: (checkinId) => axios.get(`${API_URL}/checkins/${checkinId}/details`, { headers: getAuthHeader() }),
+  archiveCheckin: (checkinId) => axios.put(`${API_URL}/checkins/${checkinId}/archive`, {}, { headers: getAuthHeader() }),
   deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
   // Item Check-ins (per item) — submits críticos usam withRetry (instalador em campo, 3G)

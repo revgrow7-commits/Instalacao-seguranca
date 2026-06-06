@@ -259,13 +259,13 @@ async def get_family_productivity_kpis(
         if date_filter:
             query["checkin_at"] = date_filter
     
-    checkins = db.item_checkins.find(query, {"_id": 0})
+    checkins = [c for c in db.item_checkins.find(query, {"_id": 0}) if not c.get("is_archived")]
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {j["id"]: j for j in jobs}
-    
+
     family_data = {}
     global_totals = {"total_m2": 0, "total_minutes": 0, "count": 0}
-    
+
     for checkin in checkins:
         family = checkin.get("family_name") or "Outros"
         installed_m2 = checkin.get("installed_m2", 0) or 0
@@ -366,9 +366,9 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     installers = db.installers.find({}, {"_id": 0})
-    item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
+    item_checkins = [c for c in db.item_checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
     jobs = db.jobs.find({}, {"_id": 0})
-    
+
     jobs_map = {job["id"]: job for job in jobs}
     installer_report = []
     
@@ -474,9 +474,9 @@ async def get_productivity_report(
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
-    item_checkins = db.item_checkins.find({"status": "completed"}, {"_id": 0})
+    item_checkins = [c for c in db.item_checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
     installers = db.installers.find({}, {"_id": 0})
-    legacy_checkins = db.checkins.find({"status": "completed"}, {"_id": 0})
+    legacy_checkins = [c for c in db.checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
     
     jobs_map = {job["id"]: job for job in jobs}
     installers_map = {inst["id"]: inst for inst in installers}
@@ -789,9 +789,9 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
     in_progress_jobs = len([j for j in all_jobs if j.get("status") in ["in_progress", "instalando"]])
     pending_jobs = len([j for j in all_jobs if j.get("status") in ["pending", "aguardando", "scheduled", "agendado"]])
     
-    # Queries simples para checkins
-    checkins = db.checkins.find({}, {"_id": 0, "status": 1})
-    item_checkins = db.item_checkins.find({}, {"_id": 0, "status": 1, "net_duration_minutes": 1})
+    # Queries simples para checkins (excluindo arquivados)
+    checkins = [c for c in db.checkins.find({}, {"_id": 0, "status": 1, "is_archived": 1}) if not c.get("is_archived")]
+    item_checkins = [c for c in db.item_checkins.find({}, {"_id": 0, "status": 1, "net_duration_minutes": 1, "is_archived": 1}) if not c.get("is_archived")]
 
     total_checkins = len(checkins) + len(item_checkins)
     completed_checkins = (
@@ -827,10 +827,10 @@ async def export_reports(current_user: User = Depends(get_current_user)):
 
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    checkins = db.item_checkins.find({}, {"_id": 0})
+    checkins = [c for c in db.item_checkins.find({}, {"_id": 0}) if not c.get("is_archived")]
     jobs = db.jobs.find({}, {"_id": 0})
     installers = db.installers.find({}, {"_id": 0})
-    
+
     logger.info(f"Exporting report: {len(checkins)} checkins, {len(jobs)} jobs, {len(installers)} installers")
     
     jobs_map = {job['id']: job for job in jobs}

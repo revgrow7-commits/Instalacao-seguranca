@@ -489,6 +489,22 @@ async def get_checkin_details(
     }
 
 
+@router.put("/checkins/{checkin_id}/archive")
+async def archive_checkin(
+    checkin_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """Archive a check-in — excluded from reports but not permanently deleted"""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    checkin = db.checkins.find_one({"id": checkin_id})
+    if not checkin:
+        raise HTTPException(status_code=404, detail="Check-in not found")
+
+    db.checkins.update_one({"id": checkin_id}, {"$set": {"is_archived": True}})
+    return {"message": "Check-in archived successfully"}
+
+
 @router.delete("/checkins/{checkin_id}")
 async def delete_checkin(
     checkin_id: str,
@@ -496,12 +512,12 @@ async def delete_checkin(
 ):
     """Delete a check-in - Only admin and managers"""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
     checkin = db.checkins.find_one({"id": checkin_id})
     if not checkin:
         raise HTTPException(status_code=404, detail="Check-in not found")
-    
+
     db.checkins.delete_one({"id": checkin_id})
     db.installed_products.delete_many({"checkin_id": checkin_id})
-    
+
     return {"message": "Check-in deleted successfully"}

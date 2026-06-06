@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MapPin, Clock, User, Image, FileText, ArrowLeft } from 'lucide-react';
+import { MapPin, Clock, User, Image, FileText, ArrowLeft, Archive, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 const WhatsAppIcon = () => (
@@ -17,6 +17,8 @@ const CheckinViewer = () => {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [confirm, setConfirm] = useState(null); // 'archive' | 'delete'
+  const [acting, setActing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -100,6 +102,43 @@ const CheckinViewer = () => {
 
   // Handle both old checkin format and new item_checkin format
   const checkin = data.checkin || data;
+  const isItemCheckin = checkin.item_index !== undefined && checkin.item_index !== null;
+
+  const handleArchive = async () => {
+    setActing(true);
+    try {
+      if (isItemCheckin) {
+        await api.archiveItemCheckin(checkin.id);
+      } else {
+        await api.archiveCheckin(checkin.id);
+      }
+      toast.success('Check-in arquivado. Não será contabilizado nos relatórios.');
+      navigate(-1);
+    } catch {
+      toast.error('Erro ao arquivar check-in');
+    } finally {
+      setActing(false);
+      setConfirm(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    setActing(true);
+    try {
+      if (isItemCheckin) {
+        await api.deleteItemCheckin(checkin.id);
+      } else {
+        await api.deleteCheckin(checkin.id);
+      }
+      toast.success('Check-in excluído permanentemente.');
+      navigate(-1);
+    } catch {
+      toast.error('Erro ao excluir check-in');
+    } finally {
+      setActing(false);
+      setConfirm(null);
+    }
+  };
   const installer = data.installer || { full_name: data.installer_name || 'N/A', email: '' };
   const job = data.job || { title: data.job_title || 'N/A', client_name: '' };
 
@@ -115,10 +154,68 @@ const CheckinViewer = () => {
           <ArrowLeft className="mr-2 h-4 w-4" />
           Voltar
         </Button>
-        <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
-          Detalhes do Check-in
-        </h1>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <h1 className="text-4xl font-heading font-bold text-white tracking-tight">
+            Detalhes do Check-in
+          </h1>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setConfirm('archive')}
+              className="border-yellow-500/50 text-yellow-400 hover:bg-yellow-500/10 gap-2"
+            >
+              <Archive className="h-4 w-4" />
+              Arquivar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setConfirm('delete')}
+              className="border-red-500/50 text-red-400 hover:bg-red-500/10 gap-2"
+            >
+              <Trash2 className="h-4 w-4" />
+              Excluir
+            </Button>
+          </div>
+        </div>
       </div>
+
+      {/* Confirmation dialog */}
+      {confirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <Card className="bg-card border-white/10 w-full max-w-sm mx-4">
+            <CardHeader>
+              <CardTitle className="text-white flex items-center gap-2">
+                <AlertTriangle className={`h-5 w-5 ${confirm === 'delete' ? 'text-red-400' : 'text-yellow-400'}`} />
+                {confirm === 'archive' ? 'Arquivar check-in?' : 'Excluir check-in?'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                {confirm === 'archive'
+                  ? 'O check-in será arquivado e não será contabilizado nos relatórios. Esta ação pode ser revertida.'
+                  : 'O check-in será excluído permanentemente. Esta ação não pode ser desfeita.'}
+              </p>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="ghost"
+                  onClick={() => setConfirm(null)}
+                  disabled={acting}
+                  className="text-white"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={confirm === 'archive' ? handleArchive : handleDelete}
+                  disabled={acting}
+                  className={confirm === 'delete' ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-yellow-600 hover:bg-yellow-700 text-white'}
+                >
+                  {acting ? 'Aguarde...' : confirm === 'archive' ? 'Arquivar' : 'Excluir'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Job & Installer Info */}
       <Card className="bg-card border-white/5">

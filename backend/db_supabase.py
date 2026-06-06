@@ -83,7 +83,7 @@ TABLE_COLUMNS = {
         "duration_minutes", "checkin_photo", "checkout_photo",
         "checkin_photo_url", "checkout_photo_url",
         "gps_lat", "gps_long", "checkout_gps_lat", "checkout_gps_long",
-        "notes", "created_at"
+        "notes", "created_at", "is_archived"
     ]),
     "item_checkins": frozenset([
         "id", "job_id", "installer_id", "item_index", "status", "checkin_at",
