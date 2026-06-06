@@ -17,16 +17,11 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      const response = await api.forgotPassword(email);
-      const data = response.data;
-      
-      if (data.error_type === 'test_mode') {
-        // Email service is in test mode
-        toast.error('O serviço de email está em modo de teste. Entre em contato com o administrador.');
-      } else {
-        setEmailSent(true);
-        toast.success('Solicitação enviada com sucesso!');
-      }
+      // M2: o backend responde sempre de forma idêntica (anti-enumeração de e-mails).
+      // A UI mostra sempre o mesmo estado de sucesso, exista ou não a conta.
+      await api.forgotPassword(email);
+      setEmailSent(true);
+      toast.success('Solicitação enviada com sucesso!');
     } catch (error) {
       console.error('[ForgotPassword] sendReset:', error);
       toast.error('Erro ao enviar solicitação. Tente novamente.');

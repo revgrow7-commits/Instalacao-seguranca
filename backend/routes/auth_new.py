@@ -10,6 +10,7 @@ Complete authentication system with:
 - Change Password
 """
 import os
+import re
 import uuid
 import logging
 import secrets
@@ -35,6 +36,65 @@ if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 
 logger.info(f"Auth module initialized. FRONTEND_URL: {FRONTEND_URL}, SENDER_EMAIL: {SENDER_EMAIL}")
+
+
+# ============ SEGURANÇA — POLÍTICA DE SENHA (B1) ============
+
+def validar_forca_senha(password: str, campo: str = "A senha") -> None:
+    """Valida a força mínima de senha (B1): >= 8 caracteres, com letra e número.
+
+    Lança HTTP 400 se a senha for fraca. Usado em todos os fluxos que definem
+    senha (cadastro, cadastro admin, reset e troca de senha).
+    """
+    if len(password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{campo} deve ter pelo menos 8 caracteres"
+        )
+    if not re.search(r"[A-Za-z]", password) or not re.search(r"\d", password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{campo} deve conter pelo menos uma letra e um número"
+        )
+
+
+# ============ SEGURANÇA — THROTTLE DE LOGIN (B1) ============
+# Bloqueio de força bruta efetivo em ambiente serverless: usa a tabela
+# `login_attempts` no Supabase (estado compartilhado entre instâncias), em vez
+# de memória local (que se perde a cada invocação). Falha-aberto (fail-open) em
+# caso de erro de infra para nunca trancar usuários legítimos por um problema do DB.
+
+THROTTLE_JANELA_MINUTOS = 15
+THROTTLE_MAX_TENTATIVAS = 5
+
+
+def _login_attempts_recentes(identificador: str) -> int:
+    """Conta tentativas de login falhas para o identificador na janela atual."""
+    try:
+        janela = (datetime.now(timezone.utc) - timedelta(minutes=THROTTLE_JANELA_MINUTOS)).isoformat()
+        registros = db.login_attempts.find({"identifier": identificador, "created_at": {"$gte": janela}})
+        return len(registros or [])
+    except Exception as e:  # noqa: BLE001 - fail-open intencional
+        logger.warning(f"Throttle de login indisponível (login_attempts): {e}")
+        return 0
+
+
+def _registrar_tentativa_falha(identificador: str) -> None:
+    try:
+        db.login_attempts.insert_one({
+            "id": str(uuid.uuid4()),
+            "identifier": identificador,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        })
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Não foi possível registrar tentativa de login: {e}")
+
+
+def _limpar_tentativas(identificador: str) -> None:
+    try:
+        db.login_attempts.delete_many({"identifier": identificador})
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Não foi possível limpar tentativas de login: {e}")
 
 
 # ============ MODELS ============
@@ -73,11 +133,22 @@ class ChangePasswordRequest(BaseModel):
 def login(request: LoginRequest):
     """Authenticate user and return JWT token"""
     
+    email = request.email.lower()
+
+    # B1: throttle por conta — bloqueia após muitas tentativas falhas na janela,
+    # impedindo força bruta de senha. Efetivo em serverless (estado no banco).
+    if _login_attempts_recentes(email) >= THROTTLE_MAX_TENTATIVAS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Muitas tentativas de login. Aguarde alguns minutos e tente novamente."
+        )
+
     # Find user by email (case-insensitive)
-    users = db.users.find({"email": request.email.lower()})
+    users = db.users.find({"email": email})
     user = users[0] if users else None
-    
+
     if not user:
+        _registrar_tentativa_falha(email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos"
@@ -92,11 +163,15 @@ def login(request: LoginRequest):
     
     # Verify password
     if not verify_password(request.password, user.get('password_hash', '')):
+        _registrar_tentativa_falha(email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos"
         )
-    
+
+    # B1: login bem-sucedido → zera o contador de tentativas da conta
+    _limpar_tentativas(email)
+
     # Create JWT token
     token_data = {
         "sub": user['id'],
@@ -148,11 +223,7 @@ def register(request: RegisterRequest):
         )
     
     # Validate password
-    if len(request.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A senha deve ter pelo menos 6 caracteres"
-        )
+    validar_forca_senha(request.password)
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -233,11 +304,7 @@ def admin_register(request: AdminRegisterRequest, current_user: User = Depends(g
         )
     
     # Validate password
-    if len(request.password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A senha deve ter pelo menos 6 caracteres"
-        )
+    validar_forca_senha(request.password)
     
     # Create user
     user_id = str(uuid.uuid4())
@@ -291,10 +358,10 @@ def admin_register(request: AdminRegisterRequest, current_user: User = Depends(g
 def forgot_password(request: ForgotPasswordRequest):
     """Send password reset email via Resend"""
     
-    # Always return success to prevent email enumeration
+    # Segurança (M2): resposta SEMPRE idêntica para prevenir enumeração de e-mails.
+    # Não expõe se a conta existe nem o resultado do envio do e-mail — apenas logs internos.
     response = {
-        "message": "Se o email existir, você receberá um link para redefinir sua senha.",
-        "email_sent": False
+        "message": "Se o email existir, você receberá um link para redefinir sua senha."
     }
     
     # Find user
@@ -375,17 +442,14 @@ def forgot_password(request: ForgotPasswordRequest):
                 "html": html_content
             })
             
-            response["email_sent"] = True
             logger.info(f"Password reset email sent to {user['email']}")
-            
+
         except Exception as e:
+            # Falha de envio é registrada apenas em log. A resposta ao cliente
+            # permanece idêntica para não vazar a existência da conta nem o estado
+            # do serviço de e-mail (anti-enumeração).
             logger.error(f"Failed to send reset email: {e}")
-            # Check if it's a test mode error
-            error_msg = str(e).lower()
-            if "testing emails" in error_msg or "verify a domain" in error_msg:
-                response["error_type"] = "test_mode"
-                response["message"] = "O serviço de email está em modo de teste. Entre em contato com o administrador."
-    
+
     return response
 
 
@@ -446,11 +510,7 @@ def reset_password(request: ResetPasswordRequest):
             logger.error(f"Error parsing expiry date: {e}")
     
     # Validate password
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A senha deve ter pelo menos 6 caracteres"
-        )
+    validar_forca_senha(request.new_password)
     
     # Update password
     new_hash = get_password_hash(request.new_password)
@@ -500,11 +560,7 @@ def change_password(request: ChangePasswordRequest, current_user: User = Depends
         )
     
     # Validate new password
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A nova senha deve ter pelo menos 6 caracteres"
-        )
+    validar_forca_senha(request.new_password, "A nova senha")
     
     # Update password
     new_hash = get_password_hash(request.new_password)
@@ -567,11 +623,7 @@ def admin_reset_user_password(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
     # Validate password
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A senha deve ter pelo menos 6 caracteres"
-        )
+    validar_forca_senha(request.new_password)
     
     # Update password
     new_hash = get_password_hash(request.new_password)

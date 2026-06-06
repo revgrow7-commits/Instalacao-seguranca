@@ -125,13 +125,18 @@ const InstallerJobDetail = () => {
 
       // Busca papel do usuário no Visual Connect (fire-and-forget, não bloqueia o carregamento)
       const hpId = jobRes.data?.holdprint_job_id;
-      if (hpId && user?.email) {
-        fetch('https://otyrrvkixegiqsthmaaj.supabase.co/functions/v1/installation-list', {
+      // M1: URL e chave do Visual Connect agora vêm de variáveis de ambiente
+      // (REACT_APP_VISUAL_CONNECT_URL / _KEY). Se não estiverem configuradas, a
+      // busca do papel (não essencial, fire-and-forget) é silenciosamente ignorada.
+      const VC_URL = process.env.REACT_APP_VISUAL_CONNECT_URL;
+      const VC_KEY = process.env.REACT_APP_VISUAL_CONNECT_KEY;
+      if (hpId && user?.email && VC_URL && VC_KEY) {
+        fetch(`${VC_URL}/installation-list`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': 'sb_publishable_EuYPYtSpr2X3-rXz1PhqUg_aU0Mj9Zv',
-            'Authorization': 'Bearer sb_publishable_EuYPYtSpr2X3-rXz1PhqUg_aU0Mj9Zv',
+            'apikey': VC_KEY,
+            'Authorization': `Bearer ${VC_KEY}`,
           },
           body: JSON.stringify({ holdprint_job_id: hpId }),
         })
