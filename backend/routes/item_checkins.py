@@ -605,6 +605,7 @@ async def get_item_checkins(
 async def get_all_item_checkins(
     limit: int = 500,
     offset: int = 0,
+    status: Optional[str] = None,
     current_user: User = Depends(get_current_user)
 ):
     """Get all item check-ins for reports (Admin/Manager only) - paginated"""
@@ -617,7 +618,15 @@ async def get_all_item_checkins(
         "checkout_photo": 0
     }
 
-    checkins = db.item_checkins.find({}, projection, sort=[("checkin_at", -1)], skip=offset, limit=limit)
+    query = {}
+    if status:
+        statuses = [s.strip() for s in status.split(",") if s.strip()]
+        if len(statuses) == 1:
+            query["status"] = statuses[0]
+        elif statuses:
+            query["status"] = {"$in": statuses}
+
+    checkins = db.item_checkins.find(query, projection, sort=[("checkin_at", -1)], skip=offset, limit=limit)
     
     # Busca jobs e installers em paralelo com projeção mínima
     jobs_list = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})

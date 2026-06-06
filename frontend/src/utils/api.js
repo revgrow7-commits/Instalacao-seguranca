@@ -298,7 +298,7 @@ export const api = {
     const all = [];
     while (true) {
       const r = await axios.get(
-        `${API_URL}/item-checkins/all?limit=${PAGE}&offset=${offset}`,
+        `${API_URL}/item-checkins/all?limit=${PAGE}&offset=${offset}&status=completed,paused,in_progress`,
         { headers: getAuthHeader(), timeout: 15000 }
       );
       const batch = r.data || [];

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -58,6 +58,10 @@ const Dashboard = () => {
 
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
+
+  // Guards contra double-fire do useEffect (user + isAdmin/isManager chegam em renders separados)
+  const primaryStartedRef = useRef(false);
+  const alertsStartedRef = useRef(false);
   const [modalData, setModalData] = useState({ title: '', items: [] });
 
   // ── O(1) lookup maps — avita .find() em loops de render ──
@@ -172,12 +176,22 @@ const Dashboard = () => {
   useEffect(() => {
     if (isInstaller) { navigate('/installer/dashboard'); return; }
     if (!user) return;
+
+    if (!primaryStartedRef.current) {
+      primaryStartedRef.current = true;
+      loadPrimary();
+    }
+
     if (isAdmin || isManager) {
-      loadPrimary();
-      loadAlerts();
+      if (!alertsStartedRef.current) {
+        alertsStartedRef.current = true;
+        loadAlerts();
+      }
     } else {
-      loadPrimary();
-      setLoadingAlerts(false);
+      if (!alertsStartedRef.current) {
+        alertsStartedRef.current = true;
+        setLoadingAlerts(false);
+      }
     }
   }, [isInstaller, navigate, user, isAdmin, isManager, loadPrimary, loadAlerts]);
 
