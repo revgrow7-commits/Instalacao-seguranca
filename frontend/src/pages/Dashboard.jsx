@@ -1,173 +1,185 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import {
-  Briefcase, CheckCircle, Clock, Users, TrendingUp, MapPin, Image, Eye, Trash2,
-  Bell, AlertTriangle, PauseCircle, PlayCircle, Navigation, Timer, AlertCircle, MessageCircle,
-  ChevronRight, ExternalLink, X, Camera, FileSpreadsheet
+  Briefcase, CheckCircle, Clock, Users, MapPin,
+  Bell, PauseCircle, Navigation, Timer, AlertCircle, MessageCircle,
+  ChevronRight, ExternalLink, Camera, FileSpreadsheet, Loader2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
 import { toast } from 'sonner';
-// [GAMIFICATION DISABLED 2026-05-15] import suspenso.
-// import GamificationHighlight from '../components/GamificationHighlight';
+
+// ── SessionStorage cache (60s) para dados primários do dashboard ──
+const DASH_CACHE_KEY = 'dash_primary_v2';
+const DASH_CACHE_TTL = 60_000;
+
+function readDashCache() {
+  try {
+    const raw = sessionStorage.getItem(DASH_CACHE_KEY);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > DASH_CACHE_TTL) { sessionStorage.removeItem(DASH_CACHE_KEY); return null; }
+    return data;
+  } catch { return null; }
+}
+
+function writeDashCache(data) {
+  try { sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// ── Skeleton placeholder ──
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse rounded bg-white/10 ${className}`} />
+);
 
 const Dashboard = () => {
   const { user, isAdmin, isManager, isInstaller } = useAuth();
   const navigate = useNavigate();
+
+  // Primary data (loaded first — fast path)
   const [metrics, setMetrics] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [installers, setInstallers] = useState([]);
-  const [lateCheckins, setLateCheckins] = useState([]);
-  const [pausedCheckins, setPausedCheckins] = useState([]);
   const [pendingCheckins, setPendingCheckins] = useState([]);
   const [locationAlerts, setLocationAlerts] = useState([]);
+  const [loadingPrimary, setLoadingPrimary] = useState(true);
+
+  // Secondary data (getAllItemCheckins — deferred)
+  const [lateCheckins, setLateCheckins] = useState([]);
+  const [pausedCheckins, setPausedCheckins] = useState([]);
   const [completedCheckins, setCompletedCheckins] = useState([]);
+  const [loadingAlerts, setLoadingAlerts] = useState(true);
+
   const [deletingId, setDeletingId] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
-  
-  // Drill-down modal states
-  const [showJobsModal, setShowJobsModal] = useState(false);
+
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
-  const [showInstallersModal, setShowInstallersModal] = useState(false);
   const [modalData, setModalData] = useState({ title: '', items: [] });
 
-  // Format phone number for WhatsApp (remove non-digits and add country code)
+  // ── O(1) lookup maps — avita .find() em loops de render ──
+  const installersById = useMemo(() => {
+    const m = new Map();
+    installers.forEach(i => {
+      m.set(i.id, i);
+      if (i.user_id) m.set(i.user_id, i);
+    });
+    return m;
+  }, [installers]);
+
+  const jobsById = useMemo(() => {
+    const m = new Map();
+    jobs.forEach(j => m.set(j.id, j));
+    return m;
+  }, [jobs]);
+
+  const getInstallerById = useCallback((id) => installersById.get(id) || null, [installersById]);
+
   const formatPhoneForWhatsApp = (phone) => {
     if (!phone) return null;
-    // Remove all non-digits
     const digits = phone.replace(/\D/g, '');
-    // Add Brazil country code if not present
     if (digits.startsWith('55')) return digits;
     if (digits.length === 11 || digits.length === 10) return `55${digits}`;
     return digits;
   };
 
-  // Get installer info by installer_id (from checkins) or user_id
-  const getInstallerById = (installerId) => {
-    // First try to find by installer id
-    let installer = installers.find(i => i.id === installerId);
-    // If not found, try by user_id
-    if (!installer) {
-      installer = installers.find(i => i.user_id === installerId);
-    }
-    return installer;
-  };
-
-  // Open WhatsApp with pre-filled message
   const openWhatsApp = (phone, messageType, jobTitle, installerName) => {
     const formattedPhone = formatPhoneForWhatsApp(phone);
-    if (!formattedPhone) {
-      toast.error('Telefone não cadastrado para este instalador');
-      return;
-    }
-
-    let message = '';
+    if (!formattedPhone) { toast.error('Telefone não cadastrado para este instalador'); return; }
     const appUrl = window.location.origin;
-    
-    switch (messageType) {
-      case 'paused':
-        message = `Olá ${installerName}! 👋\n\nVerificamos que seu check-in no job "${jobTitle}" está pausado.\n\nPor favor, atualize o status ou retome a instalação.\n\nAcesse: ${appUrl}`;
-        break;
-      case 'late':
-        message = `Olá ${installerName}! 👋\n\nSeu checkout no job "${jobTitle}" está em atraso (mais de 4 horas).\n\nPor favor, finalize o checkout ou entre em contato conosco.\n\nAcesse: ${appUrl}`;
-        break;
-      case 'pending':
-        message = `Olá ${installerName}! 👋\n\nO job "${jobTitle}" está agendado mas ainda não foi iniciado.\n\nPor favor, inicie o check-in assim que possível.\n\nAcesse: ${appUrl}`;
-        break;
-      case 'location':
-        message = `Olá ${installerName}! 👋\n\nVerificamos uma divergência de localização no job "${jobTitle}".\n\nPor favor, verifique se está no local correto da instalação.\n\nAcesse: ${appUrl}`;
-        break;
-      default:
-        message = `Olá ${installerName}! 👋\n\nPrecisamos falar sobre o job "${jobTitle}".\n\nAcesse: ${appUrl}`;
-    }
-
-    const encodedMessage = encodeURIComponent(message);
-    const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
-    window.open(whatsappUrl, '_blank');
+    const messages = {
+      paused: `Olá ${installerName}! 👋\n\nVerificamos que seu check-in no job "${jobTitle}" está pausado.\n\nPor favor, atualize o status ou retome a instalação.\n\nAcesse: ${appUrl}`,
+      late: `Olá ${installerName}! 👋\n\nSeu checkout no job "${jobTitle}" está em atraso (mais de 4 horas).\n\nPor favor, finalize o checkout ou entre em contato conosco.\n\nAcesse: ${appUrl}`,
+      pending: `Olá ${installerName}! 👋\n\nO job "${jobTitle}" está agendado mas ainda não foi iniciado.\n\nPor favor, inicie o check-in assim que possível.\n\nAcesse: ${appUrl}`,
+      location: `Olá ${installerName}! 👋\n\nVerificamos uma divergência de localização no job "${jobTitle}".\n\nPor favor, verifique se está no local correto da instalação.\n\nAcesse: ${appUrl}`,
+    };
+    const msg = messages[messageType] || `Olá ${installerName}! 👋\n\nPrecisamos falar sobre o job "${jobTitle}".\n\nAcesse: ${appUrl}`;
+    window.open(`https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // FIX B2 (hooks audit, 2026-05-14): wrapped in useCallback with explicit
-  // deps so the useEffect can list it. The function gates by `isAdmin` and
-  // `isManager`; previously the effect ran with [isInstaller, navigate, user]
-  // and re-fired on user change but called the captured (stale) version of
-  // loadDashboardData. Today benign because isAdmin/isManager don't change
-  // mid-session, but the bug would surface the moment role-switching is added.
-  //
-  // Why not useApiCall: this function does 6 parallel fetches AND non-trivial
-  // post-processing (filter paused, compute late from time delta) AND has two
-  // branches (admin/manager vs non). Splitting into 6 useApiCalls would lose
-  // the all-or-nothing behavior and complicate the role branch. See
-  // src/pages/Users.jsx for the canonical useApiCall demo.
-  const loadDashboardData = useCallback(async () => {
-    try {
-      if (isAdmin || isManager) {
-        // All calls are independent — run in parallel
-        const [jobsRes, metricsRes, installersRes, checkinsRes, pendingRes, locationRes] =
-          await Promise.all([
-            api.getJobs(),
-            api.getMetrics(),
-            api.getInstallers().catch((e) => { console.warn('Could not load installers:', e); return { data: [] }; }),
-            api.getAllItemCheckins(),
-            api.getPendingCheckins().catch((e) => { console.warn('Could not load pending checkins:', e); return { data: { pending_checkins: [] } }; }),
-            api.getLocationAlerts().catch((e) => { console.error('[Dashboard] Erro ao carregar location alerts:', e); setLocationAlerts([]); return { data: [] }; }),
-          ]);
-
-        setJobs(jobsRes.data);
-        setMetrics(metricsRes.data);
-        setInstallers(installersRes.data);
-
-        // Filter completed check-ins with location data (from images or GPS)
-        const completed = (checkinsRes || [])
-          .filter(c => c.status === 'completed' && c.checkout_at)
-          .sort((a, b) => new Date(b.checkout_at) - new Date(a.checkout_at))
-          .slice(0, 20);
-        setCompletedCheckins(completed);
-
-        // Filter paused check-ins (status = 'paused')
-        const paused = (checkinsRes || []).filter(c => c.status === 'paused');
-        setPausedCheckins(paused);
-
-        // Filter late check-ins (in_progress for more than 4 hours)
-        const now = new Date();
-        const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
-        const late = (checkinsRes || []).filter(c => {
-          if (c.status !== 'in_progress') return false;
-          const checkinTime = new Date(c.checkin_at);
-          return checkinTime < fourHoursAgo;
-        });
-        setLateCheckins(late);
-
-        setPendingCheckins(pendingRes.data.pending_checkins || []);
-        setLocationAlerts(locationRes.data || []);
-      } else {
-        // Non-admin/manager: only load jobs
-        const jobsRes = await api.getJobs({ days: 7 });
-        setJobs(jobsRes.data);
-      }
-    } catch (error) {
-      console.error('[Dashboard] loadDashboardData:', error);
-      toast.error('Erro ao carregar dados do dashboard');
-    } finally {
-      setLoading(false);
-    }
-  }, [isAdmin, isManager]);
-
-  useEffect(() => {
-    // Redirect installers to their specific dashboard
-    if (isInstaller) {
-      navigate('/installer/dashboard');
+  // ── Fase 1: dados rápidos (métricas, jobs, instaladores, pending, location) ──
+  const loadPrimary = useCallback(async () => {
+    const cached = readDashCache();
+    if (cached) {
+      setJobs(cached.jobs || []);
+      setMetrics(cached.metrics || null);
+      setInstallers(cached.installers || []);
+      setPendingCheckins(cached.pendingCheckins || []);
+      setLocationAlerts(cached.locationAlerts || []);
+      setLoadingPrimary(false);
       return;
     }
-    // Only load data when we have user info
-    if (user) {
-      loadDashboardData();
+
+    try {
+      const [jobsRes, metricsRes, installersRes, pendingRes, locationRes] = await Promise.all([
+        api.getJobs(),
+        api.getMetrics(),
+        api.getInstallers().catch((e) => { console.warn('[Dashboard] installers:', e); return { data: [] }; }),
+        api.getPendingCheckins().catch((e) => { console.warn('[Dashboard] pending:', e); return { data: { pending_checkins: [] } }; }),
+        api.getLocationAlerts().catch((e) => { console.warn('[Dashboard] location:', e); return { data: [] }; }),
+      ]);
+
+      const primaryData = {
+        jobs: jobsRes.data || [],
+        metrics: metricsRes.data || null,
+        installers: installersRes.data || [],
+        pendingCheckins: pendingRes.data?.pending_checkins || [],
+        locationAlerts: locationRes.data || [],
+      };
+
+      setJobs(primaryData.jobs);
+      setMetrics(primaryData.metrics);
+      setInstallers(primaryData.installers);
+      setPendingCheckins(primaryData.pendingCheckins);
+      setLocationAlerts(primaryData.locationAlerts);
+      writeDashCache(primaryData);
+    } catch (error) {
+      console.error('[Dashboard] loadPrimary:', error);
+      toast.error('Erro ao carregar dados do dashboard');
+    } finally {
+      setLoadingPrimary(false);
     }
-  }, [isInstaller, navigate, user, loadDashboardData]);
+  }, []);
+
+  // ── Fase 2: getAllItemCheckins (pesada — deferred) ──
+  const loadAlerts = useCallback(async () => {
+    try {
+      const checkins = await api.getAllItemCheckins();
+      const list = checkins || [];
+
+      const completed = list
+        .filter(c => c.status === 'completed' && c.checkout_at)
+        .sort((a, b) => new Date(b.checkout_at) - new Date(a.checkout_at))
+        .slice(0, 20);
+      setCompletedCheckins(completed);
+
+      const paused = list.filter(c => c.status === 'paused');
+      setPausedCheckins(paused);
+
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000);
+      const late = list.filter(c => c.status === 'in_progress' && new Date(c.checkin_at) < fourHoursAgo);
+      setLateCheckins(late);
+    } catch (error) {
+      console.error('[Dashboard] loadAlerts:', error);
+    } finally {
+      setLoadingAlerts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isInstaller) { navigate('/installer/dashboard'); return; }
+    if (!user) return;
+    if (isAdmin || isManager) {
+      loadPrimary();
+      loadAlerts();
+    } else {
+      loadPrimary();
+      setLoadingAlerts(false);
+    }
+  }, [isInstaller, navigate, user, isAdmin, isManager, loadPrimary, loadAlerts]);
 
   const handleSendLateAlerts = async () => {
     setSendingAlerts(true);
@@ -183,16 +195,12 @@ const Dashboard = () => {
   };
 
   const handleDeleteCheckin = async (checkinId) => {
-    if (!window.confirm('Tem certeza que deseja excluir este check-in? Esta ação não pode ser desfeita.')) {
-      return;
-    }
-    
+    if (!window.confirm('Tem certeza que deseja excluir este check-in? Esta ação não pode ser desfeita.')) return;
     try {
       setDeletingId(checkinId);
       await api.deleteCheckin(checkinId);
       toast.success('Check-in excluído com sucesso');
-      // Reload data
-      loadDashboardData();
+      loadAlerts();
     } catch (error) {
       console.error('[Dashboard] deleteCheckin:', error);
       toast.error('Erro ao excluir check-in');
@@ -201,60 +209,66 @@ const Dashboard = () => {
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleString('pt-BR', { 
-      day: '2-digit', 
-      month: '2-digit', 
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  // Drill-down handlers
-  const handleDrillDownJobs = () => {
-    // Navigate to jobs page
-    navigate('/jobs');
-  };
-
   const handleDrillDownCompleted = () => {
-    // Get completed jobs
     const completedJobs = jobs.filter(j => j.status === 'completed' || j.status === 'finalizado');
-    setModalData({
-      title: 'Jobs Concluídos',
-      type: 'completed',
-      items: completedJobs.slice(0, 20)
-    });
+    setModalData({ title: 'Jobs Concluídos', type: 'completed', items: completedJobs.slice(0, 20) });
     setShowCompletedModal(true);
   };
 
   const handleDrillDownTime = () => {
-    // Get jobs with time data sorted by duration
     const jobsWithTime = jobs
-      .filter(j => j.total_duration_minutes && j.total_duration_minutes > 0)
+      .filter(j => j.total_duration_minutes > 0)
       .sort((a, b) => (b.total_duration_minutes || 0) - (a.total_duration_minutes || 0));
-    setModalData({
-      title: 'Tempo por Job',
-      type: 'time',
-      items: jobsWithTime.slice(0, 20)
-    });
+    setModalData({ title: 'Tempo por Job', type: 'time', items: jobsWithTime.slice(0, 20) });
     setShowTimeModal(true);
   };
 
-  const handleDrillDownInstallers = () => {
-    // Navigate to users page with installer filter
-    navigate('/users');
-  };
+  // ── Skeleton para métricas ──
+  const MetricsSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[1, 2, 3, 4].map(i => (
+        <Card key={i} className="bg-card border-white/5">
+          <CardHeader className="pb-2">
+            <Skeleton className="h-4 w-24" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-9 w-16 mb-2" />
+            <Skeleton className="h-3 w-20" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="loading-pulse text-primary text-2xl font-heading">Carregando...</div>
-      </div>
-    );
-  }
+  // ── Skeleton para alertas ──
+  const AlertsSkeleton = () => (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {[1, 2, 3, 4].map(i => (
+        <div key={i} className="rounded-2xl p-4 bg-white/5 border border-white/10">
+          <Skeleton className="w-14 h-14 rounded-2xl mb-3" />
+          <Skeleton className="h-9 w-10 mb-1" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      ))}
+    </div>
+  );
+
+  // ── Skeleton para jobs ──
+  const JobsSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3].map(i => (
+        <Card key={i} className="bg-card border-white/5">
+          <CardHeader>
+            <Skeleton className="h-5 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-1/2" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-4 w-full" />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-8 space-y-8" data-testid="dashboard-page">
@@ -268,345 +282,281 @@ const Dashboard = () => {
         </p>
       </div>
 
-      {/* =============== RELATÓRIO CONSOLIDADO =============== */}
-      {(isAdmin || isManager) && completedCheckins.length > 0 && (
-        <Card className="bg-card/50 backdrop-blur border-white/10">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg text-white flex items-center gap-2">
-                <FileSpreadsheet className="h-5 w-5 text-primary" />
-                Relatório Consolidado
-                <span className="text-xs font-normal text-muted-foreground ml-1">
-                  — check-ins concluídos
-                </span>
-              </CardTitle>
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Camera className="h-3.5 w-3.5" />
-                <span>Lat/Long via imagem</span>
+      {/* ── Relatório Consolidado (fase 2) ── */}
+      {(isAdmin || isManager) && (
+        loadingAlerts ? null : completedCheckins.length > 0 ? (
+          <Card className="bg-card/50 backdrop-blur border-white/10">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg text-white flex items-center gap-2">
+                  <FileSpreadsheet className="h-5 w-5 text-primary" />
+                  Relatório Consolidado
+                  <span className="text-xs font-normal text-muted-foreground ml-1">— check-ins concluídos</span>
+                </CardTitle>
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Camera className="h-3.5 w-3.5" />
+                  <span>Lat/Long via imagem</span>
+                </div>
               </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wide">
-                    <th className="text-left px-4 py-2 font-medium">Instalador</th>
-                    <th className="text-left px-4 py-2 font-medium">Item / Produto</th>
-                    <th className="text-left px-4 py-2 font-medium">H. Início</th>
-                    <th className="text-left px-4 py-2 font-medium">H. Fim</th>
-                    <th className="text-left px-4 py-2 font-medium">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-blue-400" />
-                        Latitude
-                      </span>
-                    </th>
-                    <th className="text-left px-4 py-2 font-medium">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3 text-blue-400" />
-                        Longitude
-                      </span>
-                    </th>
-                    <th className="text-left px-4 py-2 font-medium">Origem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {completedCheckins.map((c, idx) => {
-                    const installer = getInstallerById(c.installer_id);
-                    const job = jobs.find(j => j.id === c.job_id);
-                    const lat = c.exif_lat ?? c.gps_lat;
-                    const lng = c.exif_long ?? c.gps_long;
-                    const fromExif = c.exif_lat != null;
-                    const inicio = c.checkin_at
-                      ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                      : '—';
-                    const fim = c.checkout_at
-                      ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
-                      : '—';
-                    return (
-                      <tr
-                        key={c.id}
-                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
-                        onClick={() => navigate(`/checkin-viewer/${c.id}`)}
-                      >
-                        <td className="px-4 py-2.5 text-white">
-                          {installer?.full_name || c.installer_id?.slice(0, 8) || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 text-muted-foreground max-w-[180px] truncate">
-                          {c.product_name || job?.title || '—'}
-                        </td>
-                        <td className="px-4 py-2.5 font-mono text-green-400">{inicio}</td>
-                        <td className="px-4 py-2.5 font-mono text-red-400">{fim}</td>
-                        <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
-                          {lat != null ? lat.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
-                          {lng != null ? lng.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          {fromExif ? (
-                            <span className="flex items-center gap-1 text-xs text-yellow-400">
-                              <Camera className="h-3 w-3" />
-                              EXIF
-                            </span>
-                          ) : lat != null ? (
-                            <span className="flex items-center gap-1 text-xs text-blue-400">
-                              <Navigation className="h-3 w-3" />
-                              GPS
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground/50">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wide">
+                      <th className="text-left px-4 py-2 font-medium">Instalador</th>
+                      <th className="text-left px-4 py-2 font-medium">Item / Produto</th>
+                      <th className="text-left px-4 py-2 font-medium">H. Início</th>
+                      <th className="text-left px-4 py-2 font-medium">H. Fim</th>
+                      <th className="text-left px-4 py-2 font-medium">
+                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Latitude</span>
+                      </th>
+                      <th className="text-left px-4 py-2 font-medium">
+                        <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Longitude</span>
+                      </th>
+                      <th className="text-left px-4 py-2 font-medium">Origem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {completedCheckins.map((c, idx) => {
+                      const installer = getInstallerById(c.installer_id);
+                      const job = jobsById.get(c.job_id);
+                      const lat = c.exif_lat ?? c.gps_lat;
+                      const lng = c.exif_long ?? c.gps_long;
+                      const fromExif = c.exif_lat != null;
+                      const inicio = c.checkin_at ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                      const fim = c.checkout_at ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                      return (
+                        <tr
+                          key={c.id}
+                          className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
+                          onClick={() => navigate(`/checkin-viewer/${c.id}`)}
+                        >
+                          <td className="px-4 py-2.5 text-white">{installer?.full_name || c.installer_id?.slice(0, 8) || '—'}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground max-w-[180px] truncate">{c.product_name || job?.title || '—'}</td>
+                          <td className="px-4 py-2.5 font-mono text-green-400">{inicio}</td>
+                          <td className="px-4 py-2.5 font-mono text-red-400">{fim}</td>
+                          <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
+                            {lat != null ? lat.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
+                            {lng != null ? lng.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {fromExif ? (
+                              <span className="flex items-center gap-1 text-xs text-yellow-400"><Camera className="h-3 w-3" />EXIF</span>
+                            ) : lat != null ? (
+                              <span className="flex items-center gap-1 text-xs text-blue-400"><Navigation className="h-3 w-3" />GPS</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground/50">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null
       )}
 
-      {/* Metrics Cards - Admin & Manager only */}
-      {(isAdmin || isManager) && metrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Total de Jobs - Clicável */}
-          <Card 
-            className="bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
-            data-testid="metric-total-jobs"
-            onClick={handleDrillDownJobs}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Total de Jobs</CardTitle>
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-5 w-5 text-blue-500" />
-                <ChevronRight className="h-4 w-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{metrics.total_jobs}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {metrics.pending_jobs} pendentes
-              </p>
-              <p className="text-xs text-blue-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                Clique para ver todos →
-              </p>
-            </CardContent>
-          </Card>
+      {/* ── Métricas (fase 1) ── */}
+      {(isAdmin || isManager) && (
+        loadingPrimary ? <MetricsSkeleton /> : metrics && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card
+              className="bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02]"
+              data-testid="metric-total-jobs"
+              onClick={() => navigate('/jobs')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-300">Total de Jobs</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Briefcase className="h-5 w-5 text-blue-500" />
+                  <ChevronRight className="h-4 w-4 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-white">{metrics.total_jobs}</div>
+                <p className="text-xs text-muted-foreground mt-1">{metrics.pending_jobs} pendentes</p>
+                <p className="text-xs text-blue-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Clique para ver todos →</p>
+              </CardContent>
+            </Card>
 
-          {/* Concluídos - Clicável */}
-          <Card 
-            className="bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
-            data-testid="metric-completed-jobs"
-            onClick={handleDrillDownCompleted}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Concluídos</CardTitle>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <ChevronRight className="h-4 w-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{metrics.completed_jobs}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {metrics.total_jobs > 0 ? ((metrics.completed_jobs / metrics.total_jobs) * 100).toFixed(0) : 0}% do total
-              </p>
-              <p className="text-xs text-green-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                Clique para detalhes →
-              </p>
-            </CardContent>
-          </Card>
+            <Card
+              className="bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02]"
+              data-testid="metric-completed-jobs"
+              onClick={handleDrillDownCompleted}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-300">Concluídos</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <ChevronRight className="h-4 w-4 text-green-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-white">{metrics.completed_jobs}</div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {metrics.total_jobs > 0 ? ((metrics.completed_jobs / metrics.total_jobs) * 100).toFixed(0) : 0}% do total
+                </p>
+                <p className="text-xs text-green-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Clique para detalhes →</p>
+              </CardContent>
+            </Card>
 
-          {/* Tempo Médio - Clicável */}
-          <Card 
-            className="bg-card border-white/5 hover:border-yellow-500/50 transition-all cursor-pointer group hover:scale-[1.02]" 
-            data-testid="metric-avg-duration"
-            onClick={handleDrillDownTime}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Tempo Médio</CardTitle>
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-yellow-500" />
-                <ChevronRight className="h-4 w-4 text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{metrics.avg_duration_minutes}min</div>
-              <p className="text-xs text-muted-foreground mt-1">por job</p>
-              <p className="text-xs text-yellow-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                Clique para ranking →
-              </p>
-            </CardContent>
-          </Card>
+            <Card
+              className="bg-card border-white/5 hover:border-yellow-500/50 transition-all cursor-pointer group hover:scale-[1.02]"
+              data-testid="metric-avg-duration"
+              onClick={handleDrillDownTime}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-300">Tempo Médio</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-yellow-500" />
+                  <ChevronRight className="h-4 w-4 text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-white">{metrics.avg_duration_minutes}min</div>
+                <p className="text-xs text-muted-foreground mt-1">por job</p>
+                <p className="text-xs text-yellow-400 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Clique para ranking →</p>
+              </CardContent>
+            </Card>
 
-          {/* Instaladores - Clicável */}
-          <Card 
-            className="bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02]" 
-            data-testid="metric-installers"
-            onClick={handleDrillDownInstallers}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-gray-300">Instaladores</CardTitle>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-primary" />
-                <ChevronRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-white">{metrics.total_installers}</div>
-              <p className="text-xs text-muted-foreground mt-1">ativos</p>
-              <p className="text-xs text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                Clique para gerenciar →
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+            <Card
+              className="bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02]"
+              data-testid="metric-installers"
+              onClick={() => navigate('/users')}
+            >
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-gray-300">Instaladores</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-primary" />
+                  <ChevronRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-white">{metrics.total_installers}</div>
+                <p className="text-xs text-muted-foreground mt-1">ativos</p>
+                <p className="text-xs text-primary mt-2 opacity-0 group-hover:opacity-100 transition-opacity">Clique para gerenciar →</p>
+              </CardContent>
+            </Card>
+          </div>
+        )
       )}
 
-      {/* =============== INFOGRAPHIC ALERTS CENTER =============== */}
+      {/* ── Centro de Alertas ── */}
       {(isAdmin || isManager) && (
         <div className="space-y-6">
-          {/* Alert Summary Cards - Infographic Style */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {/* Check-ins Não Iniciados */}
-            <div 
-              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
-                pendingCheckins.length > 0 
-                  ? 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500/50' 
-                  : 'bg-white/5 border border-white/10 opacity-50'
-              }`}
-              onClick={() => pendingCheckins.length > 0 && document.getElementById('pending-alerts')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <div className="absolute -right-4 -top-4 opacity-10">
-                <Timer className="h-24 w-24 text-red-500" />
-              </div>
-              <div className="relative z-10">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
-                  pendingCheckins.length > 0 ? 'bg-red-500/30' : 'bg-white/10'
-                }`}>
-                  <Timer className={`h-7 w-7 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`} />
+          {/* Contadores infográficos */}
+          {loadingPrimary || loadingAlerts ? (
+            <AlertsSkeleton />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {/* Não Iniciados */}
+              <div
+                className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                  pendingCheckins.length > 0
+                    ? 'bg-gradient-to-br from-red-500/20 to-red-600/10 border-2 border-red-500/50'
+                    : 'bg-white/5 border border-white/10 opacity-50'
+                }`}
+                onClick={() => pendingCheckins.length > 0 && document.getElementById('pending-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <div className="absolute -right-4 -top-4 opacity-10"><Timer className="h-24 w-24 text-red-500" /></div>
+                <div className="relative z-10">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${pendingCheckins.length > 0 ? 'bg-red-500/30' : 'bg-white/10'}`}>
+                    <Timer className={`h-7 w-7 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`} />
+                  </div>
+                  <p className={`text-3xl font-bold mb-1 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`}>{pendingCheckins.length}</p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Não Iniciados</p>
                 </div>
-                <p className={`text-3xl font-bold mb-1 ${pendingCheckins.length > 0 ? 'text-red-400' : 'text-gray-500'}`}>
-                  {pendingCheckins.length}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Não Iniciados
-                </p>
+                {pendingCheckins.length > 0 && <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-red-500 animate-pulse" />}
               </div>
-              {pendingCheckins.length > 0 && (
-                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-red-500 animate-pulse" />
-              )}
-            </div>
 
-            {/* Check-ins Prolongados */}
-            <div 
-              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
-                lateCheckins.length > 0 
-                  ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-2 border-yellow-500/50' 
-                  : 'bg-white/5 border border-white/10 opacity-50'
-              }`}
-              onClick={() => lateCheckins.length > 0 && document.getElementById('late-alerts')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <div className="absolute -right-4 -top-4 opacity-10">
-                <Clock className="h-24 w-24 text-yellow-500" />
-              </div>
-              <div className="relative z-10">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
-                  lateCheckins.length > 0 ? 'bg-yellow-500/30' : 'bg-white/10'
-                }`}>
-                  <Clock className={`h-7 w-7 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`} />
+              {/* Prolongados */}
+              <div
+                className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                  lateCheckins.length > 0
+                    ? 'bg-gradient-to-br from-yellow-500/20 to-yellow-600/10 border-2 border-yellow-500/50'
+                    : 'bg-white/5 border border-white/10 opacity-50'
+                }`}
+                onClick={() => lateCheckins.length > 0 && document.getElementById('late-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <div className="absolute -right-4 -top-4 opacity-10"><Clock className="h-24 w-24 text-yellow-500" /></div>
+                <div className="relative z-10">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${lateCheckins.length > 0 ? 'bg-yellow-500/30' : 'bg-white/10'}`}>
+                    {loadingAlerts
+                      ? <Loader2 className="h-7 w-7 text-yellow-500/50 animate-spin" />
+                      : <Clock className={`h-7 w-7 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`} />}
+                  </div>
+                  <p className={`text-3xl font-bold mb-1 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
+                    {loadingAlerts ? '…' : lateCheckins.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Prolongados</p>
                 </div>
-                <p className={`text-3xl font-bold mb-1 ${lateCheckins.length > 0 ? 'text-yellow-400' : 'text-gray-500'}`}>
-                  {lateCheckins.length}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Prolongados
-                </p>
+                {lateCheckins.length > 0 && <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />}
               </div>
-              {lateCheckins.length > 0 && (
-                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-yellow-500 animate-pulse" />
-              )}
-            </div>
 
-            {/* Check-ins Pausados */}
-            <div 
-              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
-                pausedCheckins.length > 0 
-                  ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-2 border-orange-500/50' 
-                  : 'bg-white/5 border border-white/10 opacity-50'
-              }`}
-              onClick={() => pausedCheckins.length > 0 && document.getElementById('paused-alerts')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <div className="absolute -right-4 -top-4 opacity-10">
-                <PauseCircle className="h-24 w-24 text-orange-500" />
-              </div>
-              <div className="relative z-10">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
-                  pausedCheckins.length > 0 ? 'bg-orange-500/30' : 'bg-white/10'
-                }`}>
-                  <PauseCircle className={`h-7 w-7 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`} />
+              {/* Pausados */}
+              <div
+                className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                  pausedCheckins.length > 0
+                    ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/10 border-2 border-orange-500/50'
+                    : 'bg-white/5 border border-white/10 opacity-50'
+                }`}
+                onClick={() => pausedCheckins.length > 0 && document.getElementById('paused-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <div className="absolute -right-4 -top-4 opacity-10"><PauseCircle className="h-24 w-24 text-orange-500" /></div>
+                <div className="relative z-10">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${pausedCheckins.length > 0 ? 'bg-orange-500/30' : 'bg-white/10'}`}>
+                    {loadingAlerts
+                      ? <Loader2 className="h-7 w-7 text-orange-500/50 animate-spin" />
+                      : <PauseCircle className={`h-7 w-7 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`} />}
+                  </div>
+                  <p className={`text-3xl font-bold mb-1 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`}>
+                    {loadingAlerts ? '…' : pausedCheckins.length}
+                  </p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Pausados</p>
                 </div>
-                <p className={`text-3xl font-bold mb-1 ${pausedCheckins.length > 0 ? 'text-orange-400' : 'text-gray-500'}`}>
-                  {pausedCheckins.length}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Pausados
-                </p>
+                {pausedCheckins.length > 0 && <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 animate-pulse" />}
               </div>
-              {pausedCheckins.length > 0 && (
-                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-orange-500 animate-pulse" />
-              )}
-            </div>
 
-            {/* Alertas de Localização */}
-            <div 
-              className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
-                locationAlerts.length > 0 
-                  ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-2 border-purple-500/50' 
-                  : 'bg-white/5 border border-white/10 opacity-50'
-              }`}
-              onClick={() => locationAlerts.length > 0 && document.getElementById('location-alerts')?.scrollIntoView({ behavior: 'smooth' })}
-            >
-              <div className="absolute -right-4 -top-4 opacity-10">
-                <Navigation className="h-24 w-24 text-purple-500" />
-              </div>
-              <div className="relative z-10">
-                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${
-                  locationAlerts.length > 0 ? 'bg-purple-500/30' : 'bg-white/10'
-                }`}>
-                  <Navigation className={`h-7 w-7 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`} />
+              {/* Localização */}
+              <div
+                className={`relative overflow-hidden rounded-2xl p-4 cursor-pointer transition-all hover:scale-105 ${
+                  locationAlerts.length > 0
+                    ? 'bg-gradient-to-br from-purple-500/20 to-purple-600/10 border-2 border-purple-500/50'
+                    : 'bg-white/5 border border-white/10 opacity-50'
+                }`}
+                onClick={() => locationAlerts.length > 0 && document.getElementById('location-alerts')?.scrollIntoView({ behavior: 'smooth' })}
+              >
+                <div className="absolute -right-4 -top-4 opacity-10"><Navigation className="h-24 w-24 text-purple-500" /></div>
+                <div className="relative z-10">
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-3 ${locationAlerts.length > 0 ? 'bg-purple-500/30' : 'bg-white/10'}`}>
+                    <Navigation className={`h-7 w-7 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`} />
+                  </div>
+                  <p className={`text-3xl font-bold mb-1 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`}>{locationAlerts.length}</p>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Localização</p>
                 </div>
-                <p className={`text-3xl font-bold mb-1 ${locationAlerts.length > 0 ? 'text-purple-400' : 'text-gray-500'}`}>
-                  {locationAlerts.length}
-                </p>
-                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
-                  Localização
-                </p>
+                {locationAlerts.length > 0 && <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-500 animate-pulse" />}
               </div>
-              {locationAlerts.length > 0 && (
-                <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-purple-500 animate-pulse" />
-              )}
             </div>
-          </div>
+          )}
 
-          {/* Detailed Alerts Section */}
-          {(pendingCheckins.length > 0 || lateCheckins.length > 0 || pausedCheckins.length > 0 || locationAlerts.length > 0) && (
+          {/* Detalhe dos alertas */}
+          {!loadingPrimary && (pendingCheckins.length > 0 || lateCheckins.length > 0 || pausedCheckins.length > 0 || locationAlerts.length > 0) && (
             <Card className="bg-card/50 backdrop-blur border-white/10">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg text-white flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-red-500" />
                     Detalhes dos Alertas
+                    {loadingAlerts && <Loader2 className="h-4 w-4 text-muted-foreground animate-spin ml-1" />}
                   </CardTitle>
                   {pendingCheckins.length > 0 && (
-                    <Button
-                      size="sm"
-                      onClick={handleSendLateAlerts}
-                      disabled={sendingAlerts}
-                      className="bg-red-500 hover:bg-red-600 text-white"
-                    >
+                    <Button size="sm" onClick={handleSendLateAlerts} disabled={sendingAlerts} className="bg-red-500 hover:bg-red-600 text-white">
                       <Bell className="h-4 w-4 mr-2" />
                       {sendingAlerts ? 'Enviando...' : 'Notificar'}
                     </Button>
@@ -614,8 +564,8 @@ const Dashboard = () => {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                
-                {/* Check-ins Não Iniciados */}
+
+                {/* Não Iniciados */}
                 {pendingCheckins.length > 0 && (
                   <div id="pending-alerts" className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -626,38 +576,18 @@ const Dashboard = () => {
                     </div>
                     <div className="grid gap-2 pl-10">
                       {pendingCheckins.slice(0, 5).map((job) => {
-                        const installer = job.assigned_installers?.length > 0 
-                          ? installers.find(i => i.id === job.assigned_installers[0])
-                          : null;
+                        const installer = job.assigned_installers?.length > 0 ? installersById.get(job.assigned_installers[0]) : null;
                         return (
-                          <div 
-                            key={job.id}
-                            className="flex items-center justify-between p-2 bg-red-500/5 border border-red-500/20 rounded-lg"
-                          >
-                            <div 
-                              className="flex-1 cursor-pointer hover:text-red-300"
-                              onClick={() => navigate(`/jobs/${job.id}`)}
-                            >
+                          <div key={job.id} className="flex items-center justify-between p-2 bg-red-500/5 border border-red-500/20 rounded-lg">
+                            <div className="flex-1 cursor-pointer hover:text-red-300" onClick={() => navigate(`/jobs/${job.id}`)}>
                               <span className="text-sm text-white truncate">{job.title}</span>
-                              {installer && (
-                                <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>
-                              )}
+                              {installer && <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>}
                             </div>
                             <div className="flex items-center gap-2 ml-2">
-                              <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold">
-                                {job.minutes_late}min
-                              </span>
+                              <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold">{job.minutes_late}min</span>
                               {installer?.phone && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openWhatsApp(installer.phone, 'pending', job.title, installer.full_name);
-                                  }}
-                                  title="Enviar WhatsApp"
-                                >
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => { e.stopPropagation(); openWhatsApp(installer.phone, 'pending', job.title, installer.full_name); }}>
                                   <MessageCircle className="h-4 w-4 text-green-500" />
                                 </Button>
                               )}
@@ -669,8 +599,8 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Check-ins Prolongados */}
-                {lateCheckins.length > 0 && (
+                {/* Prolongados */}
+                {!loadingAlerts && lateCheckins.length > 0 && (
                   <div id="late-alerts" className="space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
@@ -680,38 +610,20 @@ const Dashboard = () => {
                     </div>
                     <div className="grid gap-2 pl-10">
                       {lateCheckins.slice(0, 5).map((checkin) => {
-                        const job = jobs.find(j => j.id === checkin.job_id);
+                        const job = jobsById.get(checkin.job_id);
                         const installer = getInstallerById(checkin.installer_id);
-                        const hours = Math.floor((new Date() - new Date(checkin.checkin_at)) / (1000 * 60 * 60));
+                        const hours = Math.floor((Date.now() - new Date(checkin.checkin_at)) / (1000 * 60 * 60));
                         return (
-                          <div 
-                            key={checkin.id}
-                            className="flex items-center justify-between p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg"
-                          >
-                            <div 
-                              className="flex-1 cursor-pointer hover:text-yellow-300"
-                              onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
-                            >
+                          <div key={checkin.id} className="flex items-center justify-between p-2 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
+                            <div className="flex-1 cursor-pointer hover:text-yellow-300" onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}>
                               <span className="text-sm text-white truncate">{job?.title || 'Job'}</span>
-                              {installer && (
-                                <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>
-                              )}
+                              {installer && <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>}
                             </div>
                             <div className="flex items-center gap-2 ml-2">
-                              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">
-                                {hours}h+
-                              </span>
+                              <span className="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded text-xs font-bold">{hours}h+</span>
                               {installer?.phone && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openWhatsApp(installer.phone, 'late', job?.title || 'Job', installer.full_name);
-                                  }}
-                                  title="Enviar WhatsApp"
-                                >
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => { e.stopPropagation(); openWhatsApp(installer.phone, 'late', job?.title || 'Job', installer.full_name); }}>
                                   <MessageCircle className="h-4 w-4 text-green-500" />
                                 </Button>
                               )}
@@ -723,8 +635,8 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Check-ins Pausados */}
-                {pausedCheckins.length > 0 && (
+                {/* Pausados */}
+                {!loadingAlerts && pausedCheckins.length > 0 && (
                   <div id="paused-alerts" className="space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
@@ -734,37 +646,19 @@ const Dashboard = () => {
                     </div>
                     <div className="grid gap-2 pl-10">
                       {pausedCheckins.slice(0, 5).map((checkin) => {
-                        const job = jobs.find(j => j.id === checkin.job_id);
+                        const job = jobsById.get(checkin.job_id);
                         const installer = getInstallerById(checkin.installer_id);
                         return (
-                          <div 
-                            key={checkin.id}
-                            className="flex items-center justify-between p-2 bg-orange-500/5 border border-orange-500/20 rounded-lg"
-                          >
-                            <div 
-                              className="flex-1 cursor-pointer hover:text-orange-300"
-                              onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}
-                            >
+                          <div key={checkin.id} className="flex items-center justify-between p-2 bg-orange-500/5 border border-orange-500/20 rounded-lg">
+                            <div className="flex-1 cursor-pointer hover:text-orange-300" onClick={() => navigate(`/checkin-viewer/${checkin.id}`)}>
                               <span className="text-sm text-white truncate">{job?.title || 'Job'}</span>
-                              {installer && (
-                                <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>
-                              )}
+                              {installer && <span className="text-xs text-muted-foreground ml-2">({installer.full_name})</span>}
                             </div>
                             <div className="flex items-center gap-2 ml-2">
-                              <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs font-bold">
-                                ⏸ Pausa
-                              </span>
+                              <span className="px-2 py-0.5 bg-orange-500/20 text-orange-400 rounded text-xs font-bold">⏸ Pausa</span>
                               {installer?.phone && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openWhatsApp(installer.phone, 'paused', job?.title || 'Job', installer.full_name);
-                                  }}
-                                  title="Enviar WhatsApp"
-                                >
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => { e.stopPropagation(); openWhatsApp(installer.phone, 'paused', job?.title || 'Job', installer.full_name); }}>
                                   <MessageCircle className="h-4 w-4 text-green-500" />
                                 </Button>
                               )}
@@ -776,7 +670,7 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Alertas de Localização */}
+                {/* Localização */}
                 {locationAlerts.length > 0 && (
                   <div id="location-alerts" className="space-y-2">
                     <div className="flex items-center gap-2">
@@ -789,29 +683,16 @@ const Dashboard = () => {
                       {locationAlerts.slice(0, 5).map((alert) => {
                         const installer = installers.find(i => i.full_name === alert.installer_name);
                         return (
-                          <div 
-                            key={alert.id}
-                            className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg"
-                          >
+                          <div key={alert.id} className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg">
                             <div className="truncate flex-1">
                               <span className="text-sm text-white">{alert.job_title}</span>
                               <span className="text-xs text-muted-foreground ml-2">({alert.installer_name})</span>
                             </div>
                             <div className="flex items-center gap-2 ml-2">
-                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">
-                                {alert.distance_meters?.toFixed(0)}m
-                              </span>
+                              <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">{alert.distance_meters?.toFixed(0)}m</span>
                               {installer?.phone && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-7 w-7 p-0 hover:bg-green-500/20"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openWhatsApp(installer.phone, 'location', alert.job_title, installer.full_name);
-                                  }}
-                                  title="Enviar WhatsApp"
-                                >
+                                <Button size="sm" variant="ghost" className="h-7 w-7 p-0 hover:bg-green-500/20"
+                                  onClick={(e) => { e.stopPropagation(); openWhatsApp(installer.phone, 'location', alert.job_title, installer.full_name); }}>
                                   <MessageCircle className="h-4 w-4 text-green-500" />
                                 </Button>
                               )}
@@ -827,8 +708,10 @@ const Dashboard = () => {
             </Card>
           )}
 
-          {/* All Clear Message */}
-          {pendingCheckins.length === 0 && lateCheckins.length === 0 && pausedCheckins.length === 0 && locationAlerts.length === 0 && (
+          {/* Tudo em ordem */}
+          {!loadingPrimary && !loadingAlerts &&
+            pendingCheckins.length === 0 && lateCheckins.length === 0 &&
+            pausedCheckins.length === 0 && locationAlerts.length === 0 && (
             <Card className="bg-gradient-to-br from-green-500/10 to-emerald-500/5 border-green-500/30">
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
@@ -846,9 +729,8 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* =============== JOBS RECENTES E GAMIFICAÇÃO =============== */}
+      {/* ── Jobs Recentes ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Jobs Recentes - 2 colunas */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
@@ -864,81 +746,67 @@ const Dashboard = () => {
             </button>
           </div>
 
-        {jobs.length === 0 ? (
-          <Card className="bg-card border-white/5">
-            <CardContent className="py-12 text-center">
-              <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">
-                {isInstaller ? 'Nenhum job atribuído ainda' : 'Nenhum job cadastrado'}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {jobs.slice(0, 6).map((job) => (
-              <Card
-                key={job.id}
-                onClick={() => navigate(`/jobs/${job.id}`)}
-                className="bg-card border-white/5 hover:border-primary/50 transition-colors cursor-pointer"
-                data-testid={`job-card-${job.id}`}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg text-white line-clamp-1">
-                        {job.title}
-                      </CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">{job.client_name}</p>
-                    </div>
-                    <span
-                      className={
-                        `px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
-                          job.status === 'completed' || job.status === 'finalizado'
-                            ? 'bg-green-500/20 text-green-500 border-green-500/20'
-                            : job.status === 'in_progress' || job.status === 'instalando'
-                            ? 'bg-blue-500/20 text-blue-500 border-blue-500/20'
-                            : job.status === 'pausado'
-                            ? 'bg-orange-500/20 text-orange-500 border-orange-500/20'
-                            : job.status === 'atrasado'
-                            ? 'bg-red-500/20 text-red-500 border-red-500/20'
-                            : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'
-                        }`
-                      }
-                    >
-                      {job.status === 'completed' || job.status === 'finalizado' ? 'FINALIZADO' : 
-                       job.status === 'in_progress' || job.status === 'instalando' ? 'INSTALANDO' :
-                       job.status === 'pausado' ? 'PAUSADO' :
-                       job.status === 'atrasado' ? 'ATRASADO' : 'AGUARDANDO'}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Filial: {job.branch}</span>
-                    {job.assigned_installers?.length > 0 && (
-                      <span className="text-primary font-medium">
-                        {job.assigned_installers.length} instalador(es)
+          {loadingPrimary ? (
+            <JobsSkeleton />
+          ) : jobs.length === 0 ? (
+            <Card className="bg-card border-white/5">
+              <CardContent className="py-12 text-center">
+                <Briefcase className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">
+                  {isInstaller ? 'Nenhum job atribuído ainda' : 'Nenhum job cadastrado'}
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {jobs.slice(0, 6).map((job) => (
+                <Card
+                  key={job.id}
+                  onClick={() => navigate(`/jobs/${job.id}`)}
+                  className="bg-card border-white/5 hover:border-primary/50 transition-colors cursor-pointer"
+                  data-testid={`job-card-${job.id}`}
+                >
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <CardTitle className="text-lg text-white line-clamp-1">{job.title}</CardTitle>
+                        <p className="text-sm text-muted-foreground mt-1">{job.client_name}</p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${
+                        job.status === 'completed' || job.status === 'finalizado'
+                          ? 'bg-green-500/20 text-green-500 border-green-500/20'
+                          : job.status === 'in_progress' || job.status === 'instalando'
+                          ? 'bg-blue-500/20 text-blue-500 border-blue-500/20'
+                          : job.status === 'pausado'
+                          ? 'bg-orange-500/20 text-orange-500 border-orange-500/20'
+                          : job.status === 'atrasado'
+                          ? 'bg-red-500/20 text-red-500 border-red-500/20'
+                          : 'bg-yellow-500/20 text-yellow-500 border-yellow-500/20'
+                      }`}>
+                        {job.status === 'completed' || job.status === 'finalizado' ? 'FINALIZADO'
+                          : job.status === 'in_progress' || job.status === 'instalando' ? 'INSTALANDO'
+                          : job.status === 'pausado' ? 'PAUSADO'
+                          : job.status === 'atrasado' ? 'ATRASADO'
+                          : 'AGUARDANDO'}
                       </span>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Filial: {job.branch}</span>
+                      {job.assigned_installers?.length > 0 && (
+                        <span className="text-primary font-medium">{job.assigned_installers.length} instalador(es)</span>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
-
-        {/* [GAMIFICATION DISABLED 2026-05-15] highlight suspenso. */}
-        {/* {(isAdmin || isManager) && (
-          <div className="lg:col-span-1">
-            <GamificationHighlight />
-          </div>
-        )} */}
       </div>
 
-      {/* =============== DRILL-DOWN MODALS =============== */}
-      
-      {/* Modal de Jobs Concluídos */}
+      {/* ── Modais drill-down ── */}
       <Dialog open={showCompletedModal} onOpenChange={setShowCompletedModal}>
         <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -946,22 +814,17 @@ const Dashboard = () => {
               <CheckCircle className="h-5 w-5 text-green-500" />
               Jobs Concluídos ({modalData.items?.length || 0})
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Lista de jobs finalizados recentemente
-            </DialogDescription>
+            <DialogDescription className="text-muted-foreground">Lista de jobs finalizados recentemente</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
             {modalData.items?.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">Nenhum job concluído encontrado</p>
             ) : (
               modalData.items?.map((job) => (
-                <div 
+                <div
                   key={job.id}
                   className="flex items-center justify-between p-3 bg-green-500/5 border border-green-500/20 rounded-lg hover:bg-green-500/10 cursor-pointer transition-colors"
-                  onClick={() => {
-                    setShowCompletedModal(false);
-                    navigate(`/jobs/${job.id}`);
-                  }}
+                  onClick={() => { setShowCompletedModal(false); navigate(`/jobs/${job.id}`); }}
                 >
                   <div className="flex-1">
                     <p className="text-white font-medium truncate">{job.title}</p>
@@ -980,22 +843,13 @@ const Dashboard = () => {
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-white/10">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setShowCompletedModal(false);
-                navigate('/jobs');
-              }}
-            >
-              Ver Todos os Jobs
-              <ChevronRight className="h-4 w-4 ml-2" />
+            <Button variant="outline" className="w-full" onClick={() => { setShowCompletedModal(false); navigate('/jobs'); }}>
+              Ver Todos os Jobs <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Tempo por Job */}
       <Dialog open={showTimeModal} onOpenChange={setShowTimeModal}>
         <DialogContent className="bg-card border-white/10 max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -1003,9 +857,7 @@ const Dashboard = () => {
               <Clock className="h-5 w-5 text-yellow-500" />
               Ranking de Tempo por Job
             </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Jobs ordenados por duração total de instalação
-            </DialogDescription>
+            <DialogDescription className="text-muted-foreground">Jobs ordenados por duração total de instalação</DialogDescription>
           </DialogHeader>
           <div className="space-y-2 mt-4">
             {modalData.items?.length === 0 ? (
@@ -1015,13 +867,10 @@ const Dashboard = () => {
                 const hours = Math.floor((job.total_duration_minutes || 0) / 60);
                 const minutes = (job.total_duration_minutes || 0) % 60;
                 return (
-                  <div 
+                  <div
                     key={job.id}
                     className="flex items-center justify-between p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg hover:bg-yellow-500/10 cursor-pointer transition-colors"
-                    onClick={() => {
-                      setShowTimeModal(false);
-                      navigate(`/jobs/${job.id}`);
-                    }}
+                    onClick={() => { setShowTimeModal(false); navigate(`/jobs/${job.id}`); }}
                   >
                     <div className="flex items-center gap-3">
                       <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
@@ -1029,9 +878,7 @@ const Dashboard = () => {
                         index === 1 ? 'bg-gray-400/30 text-gray-300' :
                         index === 2 ? 'bg-orange-500/30 text-orange-400' :
                         'bg-white/10 text-muted-foreground'
-                      }`}>
-                        {index + 1}
-                      </span>
+                      }`}>{index + 1}</span>
                       <div className="flex-1">
                         <p className="text-white font-medium truncate">{job.title}</p>
                         <p className="text-xs text-muted-foreground">{job.client_name}</p>
@@ -1049,16 +896,8 @@ const Dashboard = () => {
             )}
           </div>
           <div className="mt-4 pt-4 border-t border-white/10">
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setShowTimeModal(false);
-                navigate('/reports');
-              }}
-            >
-              Ver Relatórios Completos
-              <ChevronRight className="h-4 w-4 ml-2" />
+            <Button variant="outline" className="w-full" onClick={() => { setShowTimeModal(false); navigate('/reports'); }}>
+              Ver Relatórios Completos <ChevronRight className="h-4 w-4 ml-2" />
             </Button>
           </div>
         </DialogContent>
