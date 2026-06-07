@@ -248,7 +248,7 @@ const InstallerDashboard = () => {
             const isLate = !!(job.scheduled_date && new Date(job.scheduled_date) < new Date());
             const badge = statusBadge(job.status, isLate);
             const client = job.holdprint_data?.customerName || job.client_name || '';
-            const itemCount = getJobItems(job).length;
+            const itemCount = getJobItemsWithIndex(job).length;
             const code = job.holdprint_data?.code || job.code || '';
 
             return (
