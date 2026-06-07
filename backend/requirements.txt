@@ -5,9 +5,9 @@ starlette==0.37.2
 python-multipart==0.0.20
 
 # Database - Supabase
-# Pinado abaixo de 2.30.0: a partir dessa versão o supabase-py puxou pyiceberg
-# como dependência transitiva (~100MB+), estourando o limite Lambda (245MB).
-supabase>=2.0.0,<2.30.0
+# Pinado em 2.9.1: versões >=2.23.0 puxam pyiceberg como dependência transitiva
+# (~100MB+) via storage3, estourando o limite Lambda do Vercel (245MB).
+supabase==2.9.1
 
 # Authentication
 passlib==1.7.4
