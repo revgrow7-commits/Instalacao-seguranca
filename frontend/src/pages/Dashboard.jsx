@@ -53,7 +53,6 @@ const Dashboard = () => {
   const [completedCheckins, setCompletedCheckins] = useState([]);
   const [loadingAlerts, setLoadingAlerts] = useState(true);
 
-  const [deletingId, setDeletingId] = useState(null);
   const [sendingAlerts, setSendingAlerts] = useState(false);
 
   const [showCompletedModal, setShowCompletedModal] = useState(false);
@@ -81,6 +80,12 @@ const Dashboard = () => {
   }, [jobs]);
 
   const getInstallerById = useCallback((id) => installersById.get(id) || null, [installersById]);
+
+  const installersByName = useMemo(() => {
+    const m = new Map();
+    installers.forEach(i => { if (i.full_name) m.set(i.full_name, i); });
+    return m;
+  }, [installers]);
 
   const formatPhoneForWhatsApp = (phone) => {
     if (!phone) return null;
@@ -205,21 +210,6 @@ const Dashboard = () => {
       toast.error('Erro ao enviar alertas');
     } finally {
       setSendingAlerts(false);
-    }
-  };
-
-  const handleDeleteCheckin = async (checkinId) => {
-    if (!window.confirm('Tem certeza que deseja excluir este check-in? Esta ação não pode ser desfeita.')) return;
-    try {
-      setDeletingId(checkinId);
-      await api.deleteCheckin(checkinId);
-      toast.success('Check-in excluído com sucesso');
-      loadAlerts();
-    } catch (error) {
-      console.error('[Dashboard] deleteCheckin:', error);
-      toast.error('Erro ao excluir check-in');
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -713,7 +703,7 @@ const Dashboard = () => {
                     </div>
                     <div className="grid gap-2 pl-10">
                       {locationAlerts.slice(0, 5).map((alert) => {
-                        const installer = installers.find(i => i.full_name === alert.installer_name);
+                        const installer = installersByName.get(alert.installer_name);
                         return (
                           <div key={alert.id} className="flex items-center justify-between p-2 bg-purple-500/5 border border-purple-500/20 rounded-lg">
                             <div className="truncate flex-1">
@@ -762,8 +752,7 @@ const Dashboard = () => {
       )}
 
       {/* ── Jobs Recentes ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-4">
+      <div className="space-y-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xl font-heading font-bold text-white flex items-center gap-2">
               <Briefcase className="h-5 w-5 text-primary" />
@@ -835,7 +824,6 @@ const Dashboard = () => {
               ))}
             </div>
           )}
-        </div>
       </div>
 
       {/* ── Modais drill-down ── */}
