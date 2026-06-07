@@ -1,93 +1,122 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../context/AuthContext';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { 
+import {
   BarChart3, TrendingUp, Clock, Ruler, Package, Users, Briefcase,
-  ArrowUp, ArrowDown, Minus, RefreshCw, Calendar, Target, Zap,
-  Award, Percent
+  ArrowUp, ArrowDown, Minus, RefreshCw, Calendar, Target, Zap, Percent
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Cache de sessão — invalida quando filtro muda
+const CACHE_TTL = 2 * 60 * 1000;
+function readCache(key) {
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(key); return null; }
+    return data;
+  } catch { return null; }
+}
+function writeCache(key, data) {
+  try { sessionStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch {}
+}
+
+// Skeleton
+const Skeleton = ({ className = '' }) => (
+  <div className={`animate-pulse rounded bg-white/10 ${className}`} />
+);
+
+const SummarySkeleton = () => (
+  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+    {[1, 2, 3, 4, 5].map(i => (
+      <Card key={i} className="bg-card border-white/10">
+        <CardContent className="p-4">
+          <Skeleton className="h-4 w-20 mb-3" />
+          <Skeleton className="h-8 w-16" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
+
+const KpisSkeleton = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {[1, 2, 3].map(i => (
+      <Card key={i} className="bg-card border-white/10">
+        <CardHeader>
+          <Skeleton className="h-6 w-32 mb-2" />
+          <Skeleton className="h-4 w-20" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-3">
+            {[1, 2, 3, 4].map(j => <Skeleton key={j} className="h-14 rounded-lg" />)}
+          </div>
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
+
+const getEfficiencyColor = (efficiency) => {
+  if (efficiency >= 120) return 'text-green-400';
+  if (efficiency >= 90) return 'text-yellow-400';
+  return 'text-red-400';
+};
+
+const getEfficiencyIcon = (efficiency) => {
+  if (efficiency >= 110) return <ArrowUp className="h-4 w-4 text-green-400" />;
+  if (efficiency >= 90) return <Minus className="h-4 w-4 text-yellow-400" />;
+  return <ArrowDown className="h-4 w-4 text-red-400" />;
+};
+
+const FAMILY_ICONS = {
+  'Adesivos': '🏷️', 'Lonas': '🎪', 'Chapas': '🪧',
+  'Placas': '📋', 'Displays': '🖥️', 'Serviços': '🔧', 'Outros': '📦',
+};
+const FAMILY_COLORS = {
+  'Adesivos': 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
+  'Lonas': 'from-green-500/20 to-green-600/10 border-green-500/30',
+  'Chapas': 'from-orange-500/20 to-orange-600/10 border-orange-500/30',
+  'Placas': 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+  'Displays': 'from-pink-500/20 to-pink-600/10 border-pink-500/30',
+  'Serviços': 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30',
+  'Outros': 'from-gray-500/20 to-gray-600/10 border-gray-500/30',
+};
+const getFamilyIcon = (f) => FAMILY_ICONS[f] ?? '📦';
+const getFamilyColor = (f) => FAMILY_COLORS[f] ?? FAMILY_COLORS['Outros'];
+
 const FamilyKPIsReport = () => {
-  const { isAdmin, isManager } = useAuth();
   const [loading, setLoading] = useState(true);
   const [kpisData, setKpisData] = useState(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  useEffect(() => {
-    loadKpis();
-  }, []);
+  const cacheKey = useMemo(() => `kpis_${startDate}_${endDate}`, [startDate, endDate]);
 
-  const loadKpis = async () => {
+  const loadKpis = useCallback(async ({ bust = false } = {}) => {
+    if (!bust) {
+      const cached = readCache(cacheKey);
+      if (cached) { setKpisData(cached); setLoading(false); return; }
+    }
     setLoading(true);
     try {
-      const response = await api.getFamilyProductivityKpis(
-        startDate || null,
-        endDate || null
-      );
+      const response = await api.getFamilyProductivityKpis(startDate || null, endDate || null);
       setKpisData(response.data);
+      writeCache(cacheKey, response.data);
     } catch (error) {
       console.error('Error loading KPIs:', error);
       toast.error('Erro ao carregar KPIs');
     } finally {
       setLoading(false);
     }
-  };
+  }, [cacheKey, startDate, endDate]);
 
-  const handleFilter = () => {
-    loadKpis();
-  };
-
-  const getEfficiencyColor = (efficiency) => {
-    if (efficiency >= 120) return 'text-green-400';
-    if (efficiency >= 90) return 'text-yellow-400';
-    return 'text-red-400';
-  };
-
-  const getEfficiencyIcon = (efficiency) => {
-    if (efficiency >= 110) return <ArrowUp className="h-4 w-4 text-green-400" />;
-    if (efficiency >= 90) return <Minus className="h-4 w-4 text-yellow-400" />;
-    return <ArrowDown className="h-4 w-4 text-red-400" />;
-  };
-
-  const getFamilyIcon = (family) => {
-    const icons = {
-      'Adesivos': '🏷️',
-      'Lonas': '🎪',
-      'Chapas': '🪧',
-      'Placas': '📋',
-      'Displays': '🖥️',
-      'Serviços': '🔧',
-      'Outros': '📦'
-    };
-    return icons[family] || '📦';
-  };
-
-  const getFamilyColor = (family) => {
-    const colors = {
-      'Adesivos': 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
-      'Lonas': 'from-green-500/20 to-green-600/10 border-green-500/30',
-      'Chapas': 'from-orange-500/20 to-orange-600/10 border-orange-500/30',
-      'Placas': 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
-      'Displays': 'from-pink-500/20 to-pink-600/10 border-pink-500/30',
-      'Serviços': 'from-yellow-500/20 to-yellow-600/10 border-yellow-500/30',
-      'Outros': 'from-gray-500/20 to-gray-600/10 border-gray-500/30'
-    };
-    return colors[family] || colors['Outros'];
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="loading-pulse text-primary text-2xl font-heading">Carregando KPIs...</div>
-      </div>
-    );
-  }
+  useEffect(() => { loadKpis(); }, [loadKpis]);
 
   const { kpis = [], summary = {} } = kpisData || {};
 
@@ -104,7 +133,7 @@ const FamilyKPIsReport = () => {
             Análise de produtividade m²/hora por tipo de material
           </p>
         </div>
-        <Button onClick={loadKpis} variant="outline" className="border-white/20">
+        <Button onClick={() => loadKpis({ bust: true })} variant="outline" className="border-white/20">
           <RefreshCw className="h-4 w-4 mr-2" />
           Atualizar
         </Button>
@@ -132,7 +161,7 @@ const FamilyKPIsReport = () => {
                 className="bg-white/5 border-white/10 w-40"
               />
             </div>
-            <Button onClick={handleFilter} className="bg-primary hover:bg-primary/90">
+            <Button onClick={() => loadKpis({ bust: true })} className="bg-primary hover:bg-primary/90">
               <Calendar className="h-4 w-4 mr-2" />
               Filtrar
             </Button>
@@ -141,66 +170,64 @@ const FamilyKPIsReport = () => {
       </Card>
 
       {/* Global Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Ruler className="h-5 w-5 text-primary" />
-              <span className="text-xs text-muted-foreground uppercase">Total m²</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{summary.global_total_m2?.toLocaleString()}</p>
-          </CardContent>
-        </Card>
+      {loading ? <SummarySkeleton /> : (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card className="bg-gradient-to-br from-primary/20 to-primary/5 border-primary/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Ruler className="h-5 w-5 text-primary" />
+                <span className="text-xs text-muted-foreground uppercase">Total m²</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{summary.global_total_m2?.toLocaleString()}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Clock className="h-5 w-5 text-blue-400" />
+                <span className="text-xs text-muted-foreground uppercase">Total Horas</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{summary.global_total_hours?.toLocaleString()}h</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="h-5 w-5 text-green-400" />
+                <span className="text-xs text-muted-foreground uppercase">Média m²/h</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{summary.global_avg_m2_per_hour}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Target className="h-5 w-5 text-yellow-400" />
+                <span className="text-xs text-muted-foreground uppercase">Instalações</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{summary.global_installations}</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Package className="h-5 w-5 text-purple-400" />
+                <span className="text-xs text-muted-foreground uppercase">Famílias</span>
+              </div>
+              <p className="text-2xl font-bold text-white">{summary.total_families}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-        <Card className="bg-gradient-to-br from-blue-500/20 to-blue-500/5 border-blue-500/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Clock className="h-5 w-5 text-blue-400" />
-              <span className="text-xs text-muted-foreground uppercase">Total Horas</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{summary.global_total_hours?.toLocaleString()}h</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-green-500/20 to-green-500/5 border-green-500/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="h-5 w-5 text-green-400" />
-              <span className="text-xs text-muted-foreground uppercase">Média m²/h</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{summary.global_avg_m2_per_hour}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-yellow-500/20 to-yellow-500/5 border-yellow-500/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Target className="h-5 w-5 text-yellow-400" />
-              <span className="text-xs text-muted-foreground uppercase">Instalações</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{summary.global_installations}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-purple-500/20 to-purple-500/5 border-purple-500/30">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Package className="h-5 w-5 text-purple-400" />
-              <span className="text-xs text-muted-foreground uppercase">Famílias</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{summary.total_families}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* KPIs by Family - Visual Cards */}
+      {/* KPIs by Family */}
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-white flex items-center gap-2">
           <TrendingUp className="h-5 w-5 text-primary" />
           Desempenho por Família
         </h2>
 
-        {kpis.length === 0 ? (
+        {loading ? <KpisSkeleton /> : kpis.length === 0 ? (
           <Card className="bg-card border-white/10">
             <CardContent className="p-8 text-center">
               <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -210,7 +237,7 @@ const FamilyKPIsReport = () => {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {kpis.map((kpi) => (
-              <Card 
+              <Card
                 key={kpi.family_name}
                 className={`bg-gradient-to-br ${getFamilyColor(kpi.family_name)} border overflow-hidden`}
               >
@@ -230,14 +257,11 @@ const FamilyKPIsReport = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Main KPI */}
                   <div className="bg-black/20 rounded-xl p-4 text-center">
                     <p className="text-xs text-muted-foreground uppercase mb-1">Produtividade</p>
                     <p className="text-4xl font-bold text-white">{kpi.avg_m2_per_hour}</p>
                     <p className="text-sm text-muted-foreground">m²/hora</p>
                   </div>
-
-                  {/* Secondary KPIs */}
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-black/10 rounded-lg p-3">
                       <div className="flex items-center gap-1 mb-1">
@@ -268,8 +292,6 @@ const FamilyKPIsReport = () => {
                       <p className="text-lg font-bold text-white">{kpi.share_of_total_m2}%</p>
                     </div>
                   </div>
-
-                  {/* Additional Info */}
                   <div className="flex items-center justify-between pt-2 border-t border-white/10 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
@@ -280,8 +302,6 @@ const FamilyKPIsReport = () => {
                       <span>{kpi.unique_jobs} job(s)</span>
                     </div>
                   </div>
-
-                  {/* Time Range */}
                   <div className="text-xs text-muted-foreground text-center">
                     <span>Tempo médio: </span>
                     <span className="text-white font-medium">{kpi.avg_duration_minutes.toFixed(0)} min</span>
@@ -295,7 +315,7 @@ const FamilyKPIsReport = () => {
       </div>
 
       {/* Detailed Table */}
-      {kpis.length > 0 && (
+      {!loading && kpis.length > 0 && (
         <Card className="bg-card border-white/10">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
