@@ -45,6 +45,7 @@ const InstallerJobDetail = () => {
   const [processingItem, setProcessingItem] = useState(null);
   const fileInputRef = useRef({});
   const hasAutoExpanded = useRef(false);
+  const itemRefs = useRef({});
 
   // Pause modal state
   const [showPauseModal, setShowPauseModal] = useState(false);
@@ -106,6 +107,16 @@ const InstallerJobDetail = () => {
       hasAutoExpanded.current = true;
     }
   }, [job, itemCheckins]);
+
+  const toggleExpanded = (itemIndex) => {
+    const next = expandedItem === itemIndex ? null : itemIndex;
+    setExpandedItem(next);
+    if (next !== null) {
+      setTimeout(() => {
+        itemRefs.current[next]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    }
+  };
 
   // Buscar os valores de atribuição definidos pelo gerente para um item
   const getItemAssignment = (itemIndex) => {
@@ -653,15 +664,16 @@ const InstallerJobDetail = () => {
             return (
               <Card
                 key={itemIndex}
-                className={`bg-card/50 border transition-all ${
+                ref={el => { itemRefs.current[itemIndex] = el; }}
+                className={`bg-card/50 border transition-all scroll-mt-4 ${
                   status === 'in_progress' ? 'border-blue-500/30' : 'border-border'
                 }`}
               >
                 <CardContent className="p-4">
                   {/* Item Header */}
                   <div
-                    className="flex items-start justify-between cursor-pointer"
-                    onClick={() => setExpandedItem(isExpanded ? null : itemIndex)}
+                    className="flex items-start justify-between cursor-pointer min-h-[56px]"
+                    onClick={() => toggleExpanded(itemIndex)}
                   >
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -797,7 +809,7 @@ const InstallerJobDetail = () => {
                           <Button
                             onClick={() => handleItemCheckin(itemIndex)}
                             disabled={isProcessing || (checkinPhotos[itemIndex] || []).length === 0}
-                            className="w-full bg-blue-600 hover:bg-blue-700 h-12 active:scale-[0.98] transition-transform disabled:opacity-40"
+                            className="w-full bg-blue-600 hover:bg-blue-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
                           >
                             {isProcessing ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -893,7 +905,7 @@ const InstallerJobDetail = () => {
                               onClick={() => handleOpenPauseModal(itemIndex)}
                               disabled={isProcessing}
                               variant="outline"
-                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-12 active:scale-[0.98] transition-transform"
+                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-14 active:scale-[0.98] transition-transform"
                             >
                               <Pause className="h-4 w-4 mr-2" />
                               Pausar
@@ -901,7 +913,7 @@ const InstallerJobDetail = () => {
                             <Button
                               onClick={() => handleItemCheckout(itemIndex)}
                               disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0}
-                              className="flex-1 bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform disabled:opacity-40"
+                              className="flex-1 bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
                             >
                               {isProcessing ? (
                                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
@@ -942,7 +954,7 @@ const InstallerJobDetail = () => {
                           <Button
                             onClick={() => handleResumeItem(itemIndex)}
                             disabled={isProcessing}
-                            className="w-full bg-green-600 hover:bg-green-700 h-12 active:scale-[0.98] transition-transform"
+                            className="w-full bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform"
                           >
                             {isProcessing ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />

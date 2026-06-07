@@ -7,15 +7,22 @@ import { Button } from '../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
   Package, ChevronRight, AlertTriangle, CheckCircle2,
-  Camera, X, Clock, Images, CheckCheck
+  Camera, Clock, CheckCheck, MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { extractExif } from '../lib/extractExif';
+import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_B64_BYTES = 200 * 1024; // 200KB por foto no lote
 
 const STATUS_ORDER = { instalando: 0, in_progress: 0, agendado: 1, scheduled: 1, aguardando: 2, pending: 2 };
+
+const getGreeting = () => {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+};
 
 const statusBadge = (status, isLate) => {
   if (isLate) return { label: 'ATRASADO', cls: 'bg-red-500/20 text-red-400 border border-red-500/30' };
@@ -137,33 +144,15 @@ const InstallerDashboard = () => {
     if (checkinResult) loadJobs();
   };
 
-  const handleAddPhotos = () => {
-    if (selectedFiles.length >= MAX_PHOTOS) {
-      toast.warning(`Máximo de ${MAX_PHOTOS} fotos por lote`);
-      return;
-    }
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.multiple = true;
-    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) input.setAttribute('capture', 'environment');
-    input.onchange = async (e) => {
-      const files = Array.from(e.target.files || []).slice(0, MAX_PHOTOS - selectedFiles.length);
-      if (!files.length) return;
-      const processed = await Promise.all(
-        files.map(async (file) => {
-          const exif = await extractExif(file).catch(() => ({}));
-          const preview = URL.createObjectURL(file);
-          return { file, exif, preview };
-        })
-      );
-      setSelectedFiles(prev => [...prev, ...processed]);
-    };
-    input.click();
+  const addSheetPhotos = (newPhotos) => {
+    setSelectedFiles(prev => {
+      const available = MAX_PHOTOS - prev.length;
+      if (available <= 0) return prev;
+      return [...prev, ...newPhotos.slice(0, available)];
+    });
   };
 
-  const removePhoto = (idx) => {
+  const removeSheetPhoto = (idx) => {
     setSelectedFiles(prev => {
       const copy = [...prev];
       URL.revokeObjectURL(copy[idx].preview);
@@ -197,21 +186,18 @@ const InstallerDashboard = () => {
   };
 
   const sheetItems = sheetJob ? getJobItems(sheetJob) : [];
-  const earliestExif = selectedFiles.length
-    ? selectedFiles.map(f => f.exif?.exif_datetime).filter(Boolean).sort()[0]
-    : null;
-  const latestExif = selectedFiles.length > 1
-    ? selectedFiles.map(f => f.exif?.exif_datetime).filter(Boolean).sort().slice(-1)[0]
-    : null;
 
   return (
     <div className="min-h-screen bg-background pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-white/5 px-4 py-3">
-        <p className="text-xs text-muted-foreground">Olá,</p>
+        <p className="text-xs text-muted-foreground">{getGreeting()},</p>
         <h1 className="text-lg font-bold text-white leading-tight">
           {user?.name?.split(' ')[0] || 'Instalador'}
         </h1>
+        <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+          {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+        </p>
       </div>
 
       <div className="px-4 pt-4 space-y-2">
@@ -261,6 +247,12 @@ const InstallerDashboard = () => {
                     </div>
                     <p className="text-sm font-semibold text-white line-clamp-1">{job.title}</p>
                     {client && <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{client}</p>}
+                    {job.client_address && (
+                      <p className="flex items-center gap-1 text-[11px] text-muted-foreground/60 line-clamp-1 mt-0.5">
+                        <MapPin className="h-2.5 w-2.5 shrink-0" />
+                        {job.client_address}
+                      </p>
+                    )}
                     <div className="flex items-center gap-3 mt-2">
                       {itemCount > 0 && (
                         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -395,73 +387,15 @@ const InstallerDashboard = () => {
                   </div>
                 )}
 
-                {/* Preview das fotos selecionadas */}
-                {selectedFiles.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {selectedFiles.length} foto{selectedFiles.length !== 1 ? 's' : ''} selecionada{selectedFiles.length !== 1 ? 's' : ''}
-                      {selectedFiles.length < MAX_PHOTOS && ` (máx ${MAX_PHOTOS})`}
-                    </p>
-                    <div className="grid grid-cols-4 gap-1.5">
-                      {selectedFiles.map((f, i) => (
-                        <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
-                          <img src={f.preview} alt="" className="w-full h-full object-cover" />
-                          <button
-                            onClick={() => removePhoto(i)}
-                            className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
-                          >
-                            <X className="h-3 w-3 text-white" />
-                          </button>
-                          {f.exif?.exif_datetime && (
-                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-1 py-0.5">
-                              <p className="text-[9px] text-white/80 text-center truncate">
-                                {formatExifTime(f.exif.exif_datetime)}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Resumo EXIF se tiver timestamps */}
-                {earliestExif && (
-                  <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">Relatório de tempo (EXIF)</p>
-                    <div className="flex items-center gap-4 text-xs">
-                      <span>
-                        <span className="text-muted-foreground">Início: </span>
-                        <span className="text-white">{formatExifTime(earliestExif)}</span>
-                      </span>
-                      {latestExif && latestExif !== earliestExif && (
-                        <span>
-                          <span className="text-muted-foreground">Fim: </span>
-                          <span className="text-white">{formatExifTime(latestExif)}</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Botão de adicionar fotos */}
-                <button
-                  onClick={handleAddPhotos}
-                  disabled={selectedFiles.length >= MAX_PHOTOS}
-                  className={`w-full flex items-center justify-center gap-2 h-14 rounded-xl border-2 border-dashed text-sm font-medium transition-colors
-                    ${selectedFiles.length >= MAX_PHOTOS
-                      ? 'border-white/10 text-muted-foreground cursor-not-allowed'
-                      : 'border-primary/40 text-primary hover:border-primary/70 hover:bg-primary/5 active:bg-primary/10'
-                    }`}
-                >
-                  <Images className="h-5 w-5" />
-                  {selectedFiles.length === 0
-                    ? 'Adicionar Fotos (câmera ou galeria)'
-                    : selectedFiles.length >= MAX_PHOTOS
-                      ? `Limite atingido (${MAX_PHOTOS})`
-                      : `Adicionar mais fotos (${selectedFiles.length}/${MAX_PHOTOS})`
-                  }
-                </button>
+                {/* Seletor de fotos — câmera ou galeria (com EXIF automático) */}
+                <PhotoGalleryPicker
+                  photos={selectedFiles}
+                  onPhotos={addSheetPhotos}
+                  onRemove={removeSheetPhoto}
+                  disabled={isSubmitting}
+                  maxPhotos={MAX_PHOTOS}
+                  label="Fotos do check-in"
+                />
 
                 {/* Ações */}
                 <div className="flex gap-2 pt-2">

@@ -36,7 +36,7 @@ const BottomNav = () => {
       name: 'Visitas',
       href: '/visitas-tecnicas',
       icon: MapPin,
-      roles: ['admin', 'manager', 'installer']
+      roles: ['admin', 'manager']
     },
     {
       name: 'Calendário',
@@ -69,7 +69,7 @@ const BottomNav = () => {
   };
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-white/5 z-50">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-white/5 z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
       <nav className="flex justify-around items-center h-16" data-testid="bottom-navigation">
         {filteredNav.map((item) => {
           const active = isActive(item);

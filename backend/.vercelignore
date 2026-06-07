@@ -1,0 +1,6 @@
+__pycache__/
+**/__pycache__/
+*.pyc
+migrations/
+tests/
+database_supabase.py

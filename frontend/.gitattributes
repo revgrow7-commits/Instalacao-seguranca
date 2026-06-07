@@ -1,0 +1,41 @@
+# Normalize line endings in the repo to LF.
+# Working tree files on Windows can stay CRLF (auto), but git stores LF.
+# This eliminates the perpetual "186 files changed" ghost diff that
+# happens when developers on Windows save without an editor that respects
+# the repo's line ending convention.
+#
+# Apply with:
+#   git add --renormalize .
+#
+# Keep binary files binary.
+
+* text=auto eol=lf
+
+# Explicit text files (defensive, in case `text=auto` misclassifies)
+*.js    text eol=lf
+*.jsx   text eol=lf
+*.ts    text eol=lf
+*.tsx   text eol=lf
+*.json  text eol=lf
+*.css   text eol=lf
+*.html  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.svg   text eol=lf
+
+# Explicit binary
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.pdf   binary
+
+# Lockfiles: don't touch
+package-lock.json -text
+yarn.lock         -text

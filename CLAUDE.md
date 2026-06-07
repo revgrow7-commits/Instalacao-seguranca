@@ -8,6 +8,8 @@ Sistema full-stack de gestão operacional de instalações de comunicação visu
 - **Idioma:** Português do Brasil
 - **Tema:** Dark mode, cor de destaque rosa `#e94560`
 
+> 📋 **Auditoria pré-produção em andamento** — ver `AUDITORIA-STATUS.md` (memória de retomada) e `AUDITORIA-PRE-PRODUCAO.md` (relatório completo). Feito no código: B1, M1, M2, M3, M4, M5, M6 + correção do `find/find_one` que engoliam erros. **Pendências manuais:** rodar migrations `038_login_attempts.sql` e `039_increment_field_atomic.sql` no Supabase + setar envs `REACT_APP_VISUAL_CONNECT_URL/_KEY` e `INLINE_RUNTIME_CHUNK=false` na Vercel. Feitos também: M7 (paginação opt-in backend) e P1-A (CSP Report-Only). Faltam M8, M9, adoção da paginação no frontend e melhorias 🟢 (ver `PLANO-DE-MELHORIA.md`).
+
 ---
 
 ## Stack Técnica

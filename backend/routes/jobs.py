@@ -303,12 +303,25 @@ async def create_job(job_data: JobCreate, current_user: User = Depends(get_curre
     return job
 
 
+# P2 (escalabilidade): teto de segurança quando o cliente NÃO pagina.
+# Protege o serverless de carregar a tabela inteira; o frontend deve migrar
+# gradualmente para `?page=&page_size=`.
+MAX_UNPAGINATED_JOBS = 1000
+
+
 @router.get("/jobs", response_model=List[Job])
 async def list_jobs(
     current_user: User = Depends(get_current_user),
     include_archived: bool = Query(False),
+    page: Optional[int] = Query(None, ge=1, description="Página (1+). Se omitido, comportamento legado com teto de segurança."),
+    page_size: int = Query(50, ge=1, le=200, description="Itens por página (1-200). Usado apenas quando `page` é informado."),
 ):
-    """List jobs based on user role - optimized. By default excludes archived jobs."""
+    """List jobs based on user role - optimized. By default excludes archived jobs.
+
+    Paginação opt-in (P2): com `?page=N`, retorna a página N ordenada por
+    created_at desc. Sem `page`, mantém o comportamento legado, porém limitado
+    a MAX_UNPAGINATED_JOBS registros mais recentes (teto de segurança).
+    """
     query = {}
 
     if not include_archived:
@@ -345,11 +358,35 @@ async def list_jobs(
         id_or = ",".join(f'assigned_installers.cs.["{i}"]' for i in ids)
         builder = builder.or_(id_or)
 
+        # P2: paginação opt-in (range é inclusivo no PostgREST)
+        if page:
+            builder = builder.order("created_at", desc=True).range(
+                (page - 1) * page_size, page * page_size - 1
+            )
+
         result = builder.execute()
         jobs = [_deserialize(d) for d in (result.data or [])]
     else:
-        # Busca otimizada com projeção
-        jobs = db.jobs.find(query, projection)
+        # Busca otimizada com projeção. P2: paginação opt-in com ordenação
+        # determinística; sem `page`, teto de segurança (registros mais recentes).
+        if page:
+            jobs = db.jobs.find(
+                query, projection,
+                sort=[("created_at", -1)],
+                limit=page_size,
+                skip=(page - 1) * page_size,
+            )
+        else:
+            jobs = db.jobs.find(
+                query, projection,
+                sort=[("created_at", -1)],
+                limit=MAX_UNPAGINATED_JOBS,
+            )
+            if len(jobs) == MAX_UNPAGINATED_JOBS:
+                logger.warning(
+                    "list_jobs: teto de %s jobs sem paginação atingido — "
+                    "frontend deve adotar ?page=&page_size=", MAX_UNPAGINATED_JOBS
+                )
     
     if not jobs:
         return []

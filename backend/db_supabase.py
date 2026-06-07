@@ -343,8 +343,11 @@ class SupabaseTable:
             return None
 
         except Exception as e:
-            logger.error(f"find_one error on {self.table_name}: {e}")
-            return None
+            # Resultados vazios legítimos retornam data=[] (não lançam exceção).
+            # Qualquer exceção aqui é erro real (query/RLS/conexão) e deve ser
+            # propagada, em vez de virar um None silencioso que mascara o bug.
+            logger.exception("find_one error on %s: %s", self.table_name, e)
+            raise
 
     def find(
         self,
@@ -392,8 +395,11 @@ class SupabaseTable:
             return [_deserialize(doc) for doc in (result.data or [])]
 
         except Exception as e:
+            # Resultados vazios legítimos retornam data=[] (não lançam exceção).
+            # Qualquer exceção aqui é erro real (query/RLS/conexão) e deve ser
+            # propagada para virar um 500 visível, em vez de "[]" que mascara o bug.
             logger.exception("find error on %s: %s", self.table_name, e)
-            return []
+            raise
 
     # ============ INSERT OPERATIONS ============
 
@@ -432,16 +438,21 @@ class SupabaseTable:
     def update_one(self, query: Dict[str, Any], update: Dict[str, Any], upsert: bool = False) -> Dict:
         """Update single document"""
         try:
-            update_data = {}
+            # Operadores podem coexistir ($set + $inc + $push); cada um é tratado
+            # de forma independente. Antes era if/elif, que descartava silenciosamente
+            # o $inc/$push quando vinham junto com $set (landmine corrigida).
+            has_set = '$set' in update
+            has_inc = '$inc' in update
+            has_push = '$push' in update
+            is_operator_update = has_set or has_inc or has_push
 
-            if '$set' in update:
+            # $inc ATÔMICO (M4): incremento feito no banco via RPC, sem race condition.
+            inc_aplicado_via_rpc = self._apply_inc_atomico(query, update['$inc']) if has_inc else False
+
+            update_data = {}
+            if has_set:
                 update_data.update(update['$set'])
-            elif '$inc' in update:
-                existing = self.find_one(query)
-                if existing:
-                    for field, inc_val in update['$inc'].items():
-                        update_data[field] = (existing.get(field, 0) or 0) + inc_val
-            elif '$push' in update:
+            if has_push:
                 existing = self.find_one(query)
                 if existing:
                     for field, push_val in update['$push'].items():
@@ -453,13 +464,24 @@ class SupabaseTable:
                                 current = []
                         current.append(push_val)
                         update_data[field] = current
-            else:
+            if has_inc and not inc_aplicado_via_rpc:
+                # Fallback não-atômico (RPC indisponível, ex.: migration 039 ainda
+                # não aplicada): read-then-write — mantém o deploy não-quebrável.
+                existing = self.find_one(query)
+                if existing:
+                    for field, inc_val in update['$inc'].items():
+                        update_data[field] = (existing.get(field, 0) or 0) + inc_val
+            if not is_operator_update:
                 update_data = update
 
             clean_update = {k: _serialize(v) for k, v in update_data.items() if v is not None}
             clean_update = _filter_columns(self.table_name, clean_update)
 
             if not clean_update:
+                # Se o $inc já foi aplicado atomicamente via RPC, a operação foi
+                # bem-sucedida mesmo sem nenhum outro campo a escrever.
+                if has_inc and inc_aplicado_via_rpc:
+                    return {'modified_count': 1, 'matched_count': 1}
                 return {'modified_count': 0, 'matched_count': 0}
 
             builder = self._table().update(clean_update)
@@ -478,6 +500,29 @@ class SupabaseTable:
         except Exception as e:
             logger.error(f"update_one error on {self.table_name}: {e}")
             raise
+
+    def _apply_inc_atomico(self, query: Dict[str, Any], increments: Dict[str, Any]) -> bool:
+        """Aplica $inc de forma ATÔMICA via RPC Postgres (M4 — sem race condition).
+
+        Requer query por 'id' (caso de uso atual). Retorna True se aplicado via RPC;
+        False se a RPC não estiver disponível (o caller faz fallback read-then-write).
+        """
+        record_id = query.get('id')
+        if record_id is None:
+            logger.warning("$inc sem 'id' em %s — usando fallback nao-atomico", self.table_name)
+            return False
+        try:
+            for field, delta in increments.items():
+                self._client.rpc('increment_field', {
+                    'p_table': self.table_name,
+                    'p_id': str(record_id),
+                    'p_field': field,
+                    'p_delta': delta,
+                }).execute()
+            return True
+        except Exception as e:
+            logger.warning("RPC increment_field indisponivel em %s (%s) — fallback nao-atomico", self.table_name, e)
+            return False
 
     def update_many(self, query: Dict[str, Any], update: Dict[str, Any]) -> Dict:
         """Update multiple documents"""
