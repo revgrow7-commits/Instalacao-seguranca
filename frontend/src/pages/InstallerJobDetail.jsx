@@ -518,7 +518,7 @@ const InstallerJobDetail = () => {
   const totalM2Job = job.area_m2 || products.reduce((sum, p) => sum + (p.total_area_m2 || 0), 0);
 
   return (
-    <div className={`min-h-screen bg-background ${completedItems === totalItems && totalItems > 0 ? 'pb-28' : 'pb-8'}`}>
+    <div className={`min-h-screen bg-background overflow-x-hidden ${completedItems === totalItems && totalItems > 0 ? 'pb-28' : 'pb-8'}`}>
       {/* [GAMIFICATION DISABLED 2026-05-15] CoinAnimation suspenso. */}
 
       {/* Header */}
@@ -531,7 +531,7 @@ const InstallerJobDetail = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           
-          <h1 className="text-xl font-bold text-foreground">{job.title}</h1>
+          <h1 className="text-xl font-bold text-foreground line-clamp-2">{job.title}</h1>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <p className="text-sm text-muted-foreground">
               {job.holdprint_data?.client_name || job.client_name || 'Cliente não informado'}
@@ -545,7 +545,7 @@ const InstallerJobDetail = () => {
           <div className="flex items-center gap-1.5 mt-1">
             <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             {job.client_address ? (
-              <p className="text-xs text-muted-foreground">{job.client_address}</p>
+              <p className="text-xs text-muted-foreground truncate">{job.client_address}</p>
             ) : (
               <p className="text-xs text-yellow-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
@@ -629,10 +629,10 @@ const InstallerJobDetail = () => {
               return (
                 <div
                   key={itemIndex}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/20 transition-all duration-300 ${isExpanded ? '' : ''}`}
+                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-green-500/10 border border-green-500/20 transition-all duration-300 overflow-hidden"
                 >
                   <Check className="h-4 w-4 text-green-400 shrink-0" />
-                  <span className="flex-1 text-sm text-foreground truncate">{item.name || `Item ${index + 1}`}</span>
+                  <span className="flex-1 min-w-0 text-sm text-foreground truncate">{item.name || `Item ${index + 1}`}</span>
                   <span className="text-xs text-green-400/70 shrink-0">
                     {(item.total_area_m2 || 0).toFixed(1)} m²
                   </span>
@@ -976,7 +976,7 @@ const InstallerJobDetail = () => {
 
       {/* Complete Job Button */}
       {completedItems === totalItems && totalItems > 0 && (
-        <div className="fixed bottom-6 left-4 right-4 pb-safe">
+        <div className="fixed bottom-0 left-0 right-0 px-4" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
           <Button
             onClick={async () => {
               try {
