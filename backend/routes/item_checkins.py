@@ -647,7 +647,7 @@ async def complete_item_checkout(
     
     if current_user.role != UserRole.INSTALLER:
         logger.error(f"User {current_user.email} is not an installer (role: {current_user.role})")
-        raise HTTPException(status_code=403, detail="Only installers can complete item checkouts")
+        raise HTTPException(status_code=403, detail=f"Sua conta ({current_user.email}) não tem perfil de instalador. Faça logout e entre com a conta correta.")
     
     checkin = db.item_checkins.find_one({"id": checkin_id}, {"_id": 0})
     if not checkin:

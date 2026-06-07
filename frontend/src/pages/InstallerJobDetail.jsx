@@ -250,18 +250,20 @@ const InstallerJobDetail = () => {
       let userMessage;
       if (detail) {
         userMessage = detail;
+      } else if (status === 403) {
+        userMessage = 'Acesso negado. Verifique se está logado com a conta de instalador.';
       } else if (status === 413) {
         userMessage = 'Foto muito grande. Tente novamente com menor resolução.';
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
-        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha na requisição. Verifique sua conexão.';
+        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha de conexão. Tente novamente.';
       } else {
         userMessage = 'Erro ao fazer check-in. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
-      console.error('[InstallerJobDetail] handleItemCheckin:', error.code, error.response?.data || error);
+      console.error('[InstallerJobDetail] handleItemCheckin:', error.code, status, error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
@@ -343,18 +345,20 @@ const InstallerJobDetail = () => {
       let userMessage;
       if (detail) {
         userMessage = detail;
+      } else if (status === 403) {
+        userMessage = 'Acesso negado. Verifique se está logado com a conta de instalador.';
       } else if (status === 413) {
         userMessage = 'Foto muito grande. Tente novamente.';
       } else if (status >= 500) {
         userMessage = 'Erro no servidor. Tente novamente em alguns segundos.';
       } else if (!error.response) {
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
-        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha na requisição. Verifique sua conexão.';
+        userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha de conexão. Tente novamente.';
       } else {
         userMessage = 'Erro ao finalizar item. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
-      console.error('[InstallerJobDetail] handleItemCheckout:', error.code, error.response?.data || error);
+      console.error('[InstallerJobDetail] handleItemCheckout:', error.code, status, error.response?.data || error);
     } finally {
       setProcessingItem(null);
     }
