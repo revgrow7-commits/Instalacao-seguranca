@@ -293,6 +293,19 @@ export const api = {
     20000
   ),
   getAllItemCheckins: async () => {
+    const CACHE_KEY = 'checkins_all_v1';
+    const CACHE_TTL = 60 * 1000;
+
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < CACHE_TTL) {
+          return data;
+        }
+      }
+    } catch (_) {}
+
     const PAGE = 500;
     let offset = 0;
     const all = [];
@@ -307,6 +320,11 @@ export const api = {
       offset += PAGE;
       if (offset > 50000) break;
     }
+
+    try {
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data: all, ts: Date.now() }));
+    } catch (_) {}
+
     return all;
   },
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),

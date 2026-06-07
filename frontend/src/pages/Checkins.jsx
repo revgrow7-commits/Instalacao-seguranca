@@ -7,8 +7,8 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { 
-  CheckCircle, MapPin, Clock, Image, Eye, Search, Filter, 
+import {
+  CheckCircle, MapPin, Clock, Image, Eye, Search,
   Trash2, Archive, RefreshCw, LogIn, LogOut, Play, Pause,
   ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight, MessageCircle
 } from 'lucide-react';
@@ -292,6 +292,11 @@ const Checkins = () => {
     loadData();
   }, [isAdmin, isManager, navigate]);
 
+  // Reset visibleCount when filters change
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [searchTerm, statusFilter, installerFilter, activeTab]);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
@@ -364,11 +369,12 @@ const Checkins = () => {
     if (!window.confirm('Tem certeza que deseja excluir este registro?\n\nEsta ação não pode ser desfeita.')) {
       return;
     }
-    
+
     try {
       setDeletingId(checkinId);
       await api.deleteItemCheckin(checkinId);
       setCheckins(prev => prev.filter(c => c.id !== checkinId));
+      try { sessionStorage.removeItem('checkins_all_v1'); } catch (_) {}
       toast.success('Registro excluído com sucesso');
     } catch (error) {
       console.error('Error deleting checkin:', error);
@@ -382,11 +388,12 @@ const Checkins = () => {
     if (!window.confirm('Arquivar este registro?\n\nEle será removido da lista mas não excluído.')) {
       return;
     }
-    
+
     try {
       setArchivingId(checkinId);
       await api.archiveItemCheckin(checkinId);
       setCheckins(prev => prev.filter(c => c.id !== checkinId));
+      try { sessionStorage.removeItem('checkins_all_v1'); } catch (_) {}
       toast.success('Registro arquivado');
     } catch (error) {
       console.error('Error archiving checkin:', error);

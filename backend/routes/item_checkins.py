@@ -14,6 +14,7 @@ from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import MAX_CHECKOUT_DISTANCE_METERS
 from services.gps import calculate_gps_distance
+from services.image import compress_base64_image
 
 
 router = APIRouter()
@@ -62,59 +63,26 @@ LEGACY_PAUSE_REASON_LABELS = {
 _ALL_PAUSE_REASON_LABELS = {**LEGACY_PAUSE_REASON_LABELS, **PAUSE_REASON_LABELS}
 
 
+# ============ IN-PROCESS CACHE FOR ENRICHMENT ============
+
+_enrichment_cache = {"jobs": {}, "installers": {}, "ts": 0}
+CACHE_TTL_SECS = 30
+
+
+def _get_enrichment_maps():
+    """Retorna maps em-memória de jobs e installers com TTL de 30s."""
+    import time
+    now = time.time()
+    if now - _enrichment_cache["ts"] > CACHE_TTL_SECS:
+        jobs_list = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})
+        installers_list = db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1})
+        _enrichment_cache["jobs"] = {j["id"]: j for j in jobs_list}
+        _enrichment_cache["installers"] = {i["id"]: i for i in installers_list}
+        _enrichment_cache["ts"] = now
+    return _enrichment_cache["jobs"], _enrichment_cache["installers"]
+
+
 # ============ HELPER FUNCTIONS ============
-
-def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimension: int = 1200) -> str:
-    """Compress a base64-encoded image string."""
-    if not base64_string:
-        return base64_string
-    
-    try:
-        import base64
-        from io import BytesIO
-        from PIL import Image
-        
-        if ',' in base64_string:
-            base64_string = base64_string.split(',')[1]
-        
-        image_data = base64.b64decode(base64_string)
-        original_size_kb = len(image_data) / 1024
-        
-        if original_size_kb <= max_size_kb:
-            return base64_string
-        
-        img = Image.open(BytesIO(image_data))
-        
-        if img.mode in ('RGBA', 'P', 'LA'):
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        if img.width > max_dimension or img.height > max_dimension:
-            ratio = min(max_dimension / img.width, max_dimension / img.height)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        quality = 85
-        output = BytesIO()
-        
-        while quality >= 20:
-            output = BytesIO()
-            img.save(output, format='JPEG', quality=quality, optimize=True)
-            if len(output.getvalue()) / 1024 <= max_size_kb:
-                break
-            quality -= 5
-        
-        return base64.b64encode(output.getvalue()).decode('utf-8')
-        
-    except Exception as e:
-        logger.error(f"Error compressing image: {e}")
-        return base64_string
-
 
 async def detect_product_family(product_names: list) -> tuple:
     """Detects the product family based on product names."""
@@ -627,16 +595,9 @@ async def get_all_item_checkins(
             query["status"] = {"$in": statuses}
 
     checkins = db.item_checkins.find(query, projection, sort=[("checkin_at", -1)], skip=offset, limit=limit)
-    
-    # Busca jobs e installers em paralelo com projeção mínima
-    jobs_list = db.jobs.find({}, {"_id": 0, "id": 1, "title": 1, "client_name": 1})
-    installers_list = db.installers.find({}, {"_id": 0, "id": 1, "full_name": 1})
-    
-    jobs = jobs_list
-    installers = installers_list
-    
-    jobs_map = {job["id"]: job for job in jobs}
-    installers_map = {inst["id"]: inst for inst in installers}
+
+    # Usa cache in-process com TTL de 30s para jobs e installers
+    jobs_map, installers_map = _get_enrichment_maps()
     
     enriched_checkins = []
     for c in checkins:

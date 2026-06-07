@@ -11,70 +11,13 @@ import logging
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
+from services.image import compress_base64_image
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 # ============ HELPER FUNCTIONS ============
-
-def compress_base64_image(base64_string: str, max_size_kb: int = 300, max_dimension: int = 1200) -> str:
-    """Compress a base64-encoded image string."""
-    if not base64_string:
-        return base64_string
-    
-    try:
-        import base64
-        from io import BytesIO
-        from PIL import Image
-        
-        # Remove data URL prefix if present
-        if ',' in base64_string:
-            base64_string = base64_string.split(',')[1]
-        
-        # Decode base64 to bytes
-        image_data = base64.b64decode(base64_string)
-        original_size_kb = len(image_data) / 1024
-        
-        # Skip compression for small images
-        if original_size_kb <= max_size_kb:
-            return base64_string
-        
-        img = Image.open(BytesIO(image_data))
-        
-        # Convert to RGB if necessary
-        if img.mode in ('RGBA', 'P', 'LA'):
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            if img.mode == 'P':
-                img = img.convert('RGBA')
-            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
-        
-        # Resize if image is too large
-        if img.width > max_dimension or img.height > max_dimension:
-            ratio = min(max_dimension / img.width, max_dimension / img.height)
-            new_size = (int(img.width * ratio), int(img.height * ratio))
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
-        
-        # Progressive compression
-        quality = 85
-        output = BytesIO()
-        
-        while quality >= 20:
-            output = BytesIO()
-            img.save(output, format='JPEG', quality=quality, optimize=True)
-            if len(output.getvalue()) / 1024 <= max_size_kb:
-                break
-            quality -= 5
-        
-        return base64.b64encode(output.getvalue()).decode('utf-8')
-        
-    except Exception as e:
-        logger.error(f"Error compressing image: {e}")
-        return base64_string
-
 
 async def detect_product_family(product_names: list) -> tuple:
     """Detects the product family based on product names."""
