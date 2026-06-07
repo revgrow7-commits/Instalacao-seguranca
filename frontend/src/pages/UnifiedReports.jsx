@@ -10,10 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
-  FileText, Users, Briefcase, Clock, CheckCircle, AlertCircle, TrendingUp,
-  Calendar, Download, Layers, User, Camera, Image, X, MapPin, Pause,
+  Users, Briefcase, Clock, CheckCircle, TrendingUp,
+  Download, User, Camera, X, MapPin,
   ChevronLeft, ChevronRight, Loader2, BarChart3, Ruler, RefreshCw,
-  Filter, ChevronDown, ChevronUp, Package, Navigation, DollarSign, FileSpreadsheet
+  ChevronDown, ChevronUp, Package, Navigation, DollarSign, FileSpreadsheet
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -197,6 +197,15 @@ const UnifiedReports = () => {
     return m;
   }, [jobs]);
 
+  const checkinsByJobId = useMemo(() => {
+    const m = new Map();
+    itemCheckins.forEach(c => {
+      if (!m.has(c.job_id)) m.set(c.job_id, []);
+      m.get(c.job_id).push(c);
+    });
+    return m;
+  }, [itemCheckins]);
+
   // Stats — calculados somente a partir de itemCheckins
   const stats = useMemo(() => {
     const completedCheckins = itemCheckins.filter(c => c.status === 'completed');
@@ -340,14 +349,28 @@ const UnifiedReports = () => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
-  // Fase 1 ainda carregando — spinner mínimo
+  // Fase 1 ainda carregando — skeleton da estrutura principal
   if (loadingPrimary) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-4" />
-          <p className="text-muted-foreground">Carregando relatórios...</p>
+      <div className="p-4 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-9 w-72" />
+            <Skeleton className="h-4 w-56" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-9 w-28" />
+            <Skeleton className="h-9 w-36" />
+          </div>
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-10 w-full rounded-lg" />)}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-20 w-full rounded-lg" />)}
+        </div>
+        <Skeleton className="h-12 w-full rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-lg" />
       </div>
     );
   }
@@ -708,7 +731,7 @@ const UnifiedReports = () => {
                   <Package className="h-4 w-4 text-muted-foreground" />
                   <Label className="text-sm text-muted-foreground">Filtrar por Família:</Label>
                 </div>
-                <Select value={selectedProductFamily} onValueChange={setSelectedProductFamily}>
+                <Select value={selectedProductFamily} onValueChange={v => { setSelectedProductFamily(v); setJobsPage(1); }}>
                   <SelectTrigger className="bg-white/5 border-white/10 text-white w-48 h-9">
                     <SelectValue placeholder="Todas as Famílias" />
                   </SelectTrigger>
@@ -719,7 +742,7 @@ const UnifiedReports = () => {
                   </SelectContent>
                 </Select>
                 {selectedProductFamily !== 'all' && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedProductFamily('all')} className="text-muted-foreground hover:text-white h-9">
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedProductFamily('all'); setJobsPage(1); }} className="text-muted-foreground hover:text-white h-9">
                     <X className="h-4 w-4 mr-1" />Limpar
                   </Button>
                 )}
@@ -738,7 +761,7 @@ const UnifiedReports = () => {
                   })
                   .slice((jobsPage - 1) * ITEMS_PER_PAGE, jobsPage * ITEMS_PER_PAGE)
                   .map(job => {
-                    const jobCheckins = itemCheckins.filter(c => c.job_id === job.id);
+                    const jobCheckins = checkinsByJobId.get(job.id) || [];
                     const completedItems = jobCheckins.filter(c => c.status === 'completed').length;
                     const totalM2 = jobCheckins.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
                     const totalMinutes = jobCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
