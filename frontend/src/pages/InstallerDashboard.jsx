@@ -125,15 +125,20 @@ const InstallerDashboard = () => {
       return dateA.localeCompare(dateB);
     });
 
-  const getJobItems = (job) =>
-    (job.products_with_area || job.items || []).filter(
-      (_, i) => !(job.archived_items || []).some(a => a.item_index === i)
-    );
+  // Retorna itens não-arquivados COM o índice original em products_with_area
+  const getJobItemsWithIndex = (job) => {
+    const products = job.products_with_area || job.items || [];
+    const archivedSet = new Set((job.archived_items || []).map(a => a.item_index));
+    return products
+      .map((item, originalIndex) => ({ item, originalIndex }))
+      .filter(({ originalIndex }) => !archivedSet.has(originalIndex));
+  };
 
   const openCheckinSheet = (e, job) => {
     e.stopPropagation();
+    const items = getJobItemsWithIndex(job);
     setSheetJob(job);
-    setSheetItemIndex('0');
+    setSheetItemIndex(String(items[0]?.originalIndex ?? 0));
     setSelectedFiles([]);
     setCheckinResult(null);
     setSheetOpen(true);
@@ -164,8 +169,16 @@ const InstallerDashboard = () => {
   const handleSubmit = async () => {
     if (!sheetJob || selectedFiles.length === 0) return;
     setIsSubmitting(true);
+    let photos;
     try {
-      const photos = await Promise.all(selectedFiles.map(f => compressForBatch(f.file)));
+      photos = await Promise.all(selectedFiles.map(f => compressForBatch(f.file)));
+    } catch (compressionErr) {
+      console.error('[InstallerDashboard] compressForBatch falhou:', compressionErr);
+      toast.error('Erro ao processar a foto. Tente outra imagem.', { duration: 6000 });
+      setIsSubmitting(false);
+      return;
+    }
+    try {
       const exif_data = selectedFiles.map(f => f.exif);
 
       const res = await api.batchCheckin({
@@ -178,14 +191,31 @@ const InstallerDashboard = () => {
       setCheckinResult(res.data);
       toast.success('Check-in registrado!');
     } catch (error) {
-      const msg = error.response?.data?.detail || 'Erro ao fazer check-in. Tente novamente.';
+      const status = error.response?.status;
+      const data = error.response?.data;
+      const detail = data && typeof data === 'object' ? data.detail : null;
+      console.error('[InstallerDashboard] handleSubmit API error:', status, data, error.message);
+      let msg;
+      if (detail && typeof detail === 'string') {
+        msg = detail;
+      } else if (!error.response) {
+        msg = 'Sem resposta do servidor. Verifique sua conexão e tente novamente.';
+      } else if (status === 413) {
+        msg = 'Foto muito grande. Tente novamente com menor resolução.';
+      } else if (status >= 500) {
+        msg = 'Erro no servidor. Tente novamente em alguns segundos.';
+      } else if (status === 403) {
+        msg = 'Sua conta não tem perfil de instalador. Faça logout e entre com a conta correta.';
+      } else {
+        msg = 'Erro ao fazer check-in. Tente novamente.';
+      }
       toast.error(msg, { duration: 6000 });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const sheetItems = sheetJob ? getJobItems(sheetJob) : [];
+  const sheetItems = sheetJob ? getJobItemsWithIndex(sheetJob) : [];
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -377,9 +407,9 @@ const InstallerDashboard = () => {
                         <SelectValue placeholder="Selecione o item..." />
                       </SelectTrigger>
                       <SelectContent className="bg-card border-white/10">
-                        {sheetItems.map((item, i) => (
-                          <SelectItem key={i} value={String(i)}>
-                            {item.name || `Item ${i + 1}`}
+                        {sheetItems.map(({ item, originalIndex }) => (
+                          <SelectItem key={originalIndex} value={String(originalIndex)}>
+                            {item.name || `Item ${originalIndex + 1}`}
                           </SelectItem>
                         ))}
                       </SelectContent>
