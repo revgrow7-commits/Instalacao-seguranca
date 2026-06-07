@@ -329,6 +329,7 @@ export const api = {
   },
   deleteItemCheckin: (checkinId) => axios.delete(`${API_URL}/item-checkins/${checkinId}`, { headers: getAuthHeader() }),
   archiveItemCheckin: (checkinId) => axios.put(`${API_URL}/item-checkins/${checkinId}/archive`, {}, { headers: getAuthHeader() }),
+  bulkArchiveItemCheckins: (ids) => axios.put(`${API_URL}/item-checkins/bulk-archive`, { ids }, { headers: getAuthHeader() }),
   
   // Item Pause/Resume
   pauseItemCheckin: (checkinId, reason) => {

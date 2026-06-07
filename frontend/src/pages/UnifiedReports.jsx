@@ -13,7 +13,8 @@ import {
   Users, Briefcase, Clock, CheckCircle, TrendingUp,
   Download, User, Camera, X, MapPin,
   ChevronLeft, ChevronRight, Loader2, BarChart3, Ruler, RefreshCw,
-  ChevronDown, ChevronUp, Package, Navigation, DollarSign, FileSpreadsheet
+  ChevronDown, ChevronUp, Package, Navigation, DollarSign, FileSpreadsheet,
+  AlertTriangle, Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -84,6 +85,11 @@ const UnifiedReports = () => {
   const [visitasEndDate, setVisitasEndDate] = useState('');
   const [visitasInstalador, setVisitasInstalador] = useState('all');
   const [visitasStatus, setVisitasStatus] = useState('all');
+
+  // Seleção para exclusão dos KPIs
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [archiving, setArchiving] = useState(false);
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // Guards contra double-fire
   const primaryStartedRef = useRef(false);
@@ -161,8 +167,45 @@ const UnifiedReports = () => {
     setLoadingPrimary(true);
     setLoadingCheckins(true);
     setItemCheckins([]);
+    setSelectedIds(new Set());
     loadPrimary();
     loadCheckins();
+  };
+
+  const handleBulkArchive = async () => {
+    setArchiving(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await api.bulkArchiveItemCheckins(ids);
+      setItemCheckins(prev => prev.filter(c => !selectedIds.has(c.id)));
+      sessionStorage.removeItem(REPORTS_CACHE_KEY);
+      setSelectedIds(new Set());
+      toast.success(`${ids.length} registro(s) excluído(s) dos KPIs.`);
+    } catch {
+      toast.error('Erro ao excluir registros dos KPIs.');
+    } finally {
+      setArchiving(false);
+      setShowArchiveConfirm(false);
+    }
+  };
+
+  const toggleRow = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAllVisible = () => {
+    const visibleIds = consolidatedCheckins.map(c => c.id);
+    const allSelected = visibleIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) visibleIds.forEach(id => next.delete(id));
+      else visibleIds.forEach(id => next.add(id));
+      return next;
+    });
   };
 
   const handleExportExcel = async () => {
@@ -403,17 +446,37 @@ const UnifiedReports = () => {
       {/* ── Relatório Consolidado — primeira seção ── */}
       <Card className="bg-card/50 backdrop-blur border-white/10">
         <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <CardTitle className="text-lg text-white flex items-center gap-2">
               <FileSpreadsheet className="h-5 w-5 text-primary" />
               Relatório Consolidado
               <span className="text-xs font-normal text-muted-foreground ml-1">— check-ins concluídos</span>
             </CardTitle>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              {loadingCheckins
-                ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /><span>Carregando...</span></>
-                : <><Camera className="h-3.5 w-3.5" /><span>{consolidatedCheckins.length} registros</span></>
-              }
+            <div className="flex items-center gap-3">
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-yellow-400 font-medium">{selectedIds.size} selecionado(s)</span>
+                  <button
+                    onClick={() => setShowArchiveConfirm(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-medium hover:bg-red-500/30 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Excluir dos KPIs
+                  </button>
+                  <button
+                    onClick={() => setSelectedIds(new Set())}
+                    className="text-xs text-muted-foreground hover:text-white transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                {loadingCheckins
+                  ? <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /><span>Carregando...</span></>
+                  : <><Camera className="h-3.5 w-3.5" /><span>{consolidatedCheckins.length} registros</span></>
+                }
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -432,6 +495,15 @@ const UnifiedReports = () => {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-white/10 text-xs text-muted-foreground uppercase tracking-wide">
+                    <th className="px-3 py-2 font-medium w-8">
+                      <input
+                        type="checkbox"
+                        className="w-3.5 h-3.5 rounded accent-primary cursor-pointer"
+                        checked={consolidatedCheckins.length > 0 && consolidatedCheckins.every(c => selectedIds.has(c.id))}
+                        onChange={toggleAllVisible}
+                        title="Selecionar todos"
+                      />
+                    </th>
                     <th className="px-3 py-2 font-medium w-12">Foto</th>
                     <th className="text-left px-4 py-2 font-medium">Instalador</th>
                     <th className="text-left px-4 py-2 font-medium">Item / Produto</th>
@@ -457,12 +529,21 @@ const UnifiedReports = () => {
                     const inicio = c.checkin_at ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
                     const fim = c.checkout_at ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
                     const jobCode = job?.holdprint_data?.code || job?.code || c.job_id?.slice(0, 6);
+                    const isSelected = selectedIds.has(c.id);
                     return (
                       <tr
                         key={c.id}
-                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
+                        className={`border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer ${isSelected ? 'bg-red-500/10' : idx % 2 === 0 ? '' : 'bg-white/[0.02]'}`}
                         onClick={() => navigate(`/checkin-viewer/${c.id}`)}
                       >
+                        <td className="px-3 py-2" onClick={e => { e.stopPropagation(); toggleRow(c.id); }}>
+                          <input
+                            type="checkbox"
+                            className="w-3.5 h-3.5 rounded accent-primary cursor-pointer"
+                            checked={isSelected}
+                            onChange={() => toggleRow(c.id)}
+                          />
+                        </td>
                         <td className="px-3 py-2">
                           {c.checkin_photo_url ? (
                             <img
@@ -1094,6 +1175,47 @@ const UnifiedReports = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Confirm Archive Dialog */}
+      <Dialog open={showArchiveConfirm} onOpenChange={setShowArchiveConfirm}>
+        <DialogContent className="bg-card border-white/10 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-400" />
+              Excluir dos KPIs
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-muted-foreground text-sm">
+              <strong className="text-white">{selectedIds.size} registro(s)</strong> serão marcados como excluídos.
+              Eles não serão mais computados em relatórios e KPIs, mas os dados permanecem no sistema.
+            </p>
+            <p className="text-xs text-muted-foreground bg-white/5 rounded-md p-3">
+              Esta ação é indicada para check-ins de teste que não devem influenciar as métricas de produtividade.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowArchiveConfirm(false)}
+                className="border-white/20 text-white hover:bg-white/5"
+                disabled={archiving}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleBulkArchive}
+                disabled={archiving}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                {archiving
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Excluindo...</>
+                  : <><Trash2 className="h-4 w-4 mr-2" />Confirmar exclusão</>
+                }
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Photo Viewer Dialog */}
       <Dialog open={!!selectedPhoto} onOpenChange={() => setSelectedPhoto(null)}>

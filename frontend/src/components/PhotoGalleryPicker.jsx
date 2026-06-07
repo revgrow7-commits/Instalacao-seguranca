@@ -35,9 +35,45 @@ const PhotoGalleryPicker = ({
     input.onchange = async (e) => {
       const files = Array.from(e.target.files || []).slice(0, available);
       if (!files.length) return;
+
+      // Pre-fetch GPS once for all files — one permission prompt, shared result
+      let liveGpsPromise = null;
+      const getLiveGps = () => {
+        if (!liveGpsPromise) {
+          liveGpsPromise = new Promise((resolve) => {
+            if (!navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ lat: pos.coords.latitude, long: pos.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+            );
+          });
+        }
+        return liveGpsPromise;
+      };
+
       const processed = await Promise.all(files.map(async (file) => {
         const exif = await extractExif(file).catch(() => ({}));
         const preview = URL.createObjectURL(file);
+
+        // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
+        if (exif.exif_lat == null) {
+          const gps = await getLiveGps();
+          if (gps) {
+            exif.exif_lat = gps.lat;
+            exif.exif_long = gps.long;
+            exif.gps_fallback = true; // marca como GPS ao vivo, não EXIF
+          }
+        }
+
+        // Fallback: se não tiver horário no EXIF, usar horário atual
+        if (!exif.exif_datetime) {
+          const now = new Date();
+          // formato compatível com o backend: "YYYY-MM-DD HH:MM:SS"
+          exif.exif_datetime = now.toISOString().replace('T', ' ').slice(0, 19);
+          exif.datetime_fallback = true;
+        }
+
         return { file, exif, preview };
       }));
       onPhotos(processed);
@@ -82,7 +118,7 @@ const PhotoGalleryPicker = ({
               )}
               {f.exif?.exif_lat != null && (
                 <div className="absolute top-0.5 left-0.5">
-                  <MapPin className="h-3 w-3 text-green-400 drop-shadow" />
+                  <MapPin className={`h-3 w-3 drop-shadow ${f.exif.gps_fallback ? 'text-blue-400' : 'text-green-400'}`} />
                 </div>
               )}
             </div>
@@ -94,7 +130,7 @@ const PhotoGalleryPicker = ({
         <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
             <Clock className="h-3 w-3" />
-            Registro EXIF
+            {photos.some(f => f.exif?.datetime_fallback) ? 'Registro (horário atual)' : 'Registro EXIF'}
           </div>
           <div className="flex gap-4">
             <span><span className="text-muted-foreground">Início: </span><span className="text-white">{formatTime(earliest)}</span></span>
@@ -103,9 +139,10 @@ const PhotoGalleryPicker = ({
             )}
           </div>
           {withGps && (
-            <div className="flex items-center gap-1 text-green-400/80">
+            <div className={`flex items-center gap-1 ${withGps.exif.gps_fallback ? 'text-blue-400/80' : 'text-green-400/80'}`}>
               <MapPin className="h-3 w-3" />
               <span className="font-mono">{withGps.exif.exif_lat.toFixed(4)}, {withGps.exif.exif_long.toFixed(4)}</span>
+              {withGps.exif.gps_fallback && <span className="text-muted-foreground ml-1">(GPS atual)</span>}
             </div>
           )}
         </div>

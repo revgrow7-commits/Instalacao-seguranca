@@ -921,8 +921,35 @@ async def archive_item_checkin(
         {"id": checkin_id},
         {"$set": {"is_archived": True}}
     )
-    
+
     return {"message": "Item check-in archived successfully"}
+
+
+@router.put("/item-checkins/bulk-archive")
+async def bulk_archive_item_checkins(
+    payload: dict,
+    current_user: User = Depends(get_current_user)
+):
+    """Archive multiple item check-ins at once — excluded from KPIs and reports"""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    ids = payload.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+    if len(ids) > 200:
+        raise HTTPException(status_code=400, detail="Too many IDs (max 200)")
+
+    archived = 0
+    not_found = []
+    for checkin_id in ids:
+        checkin = db.item_checkins.find_one({"id": checkin_id})
+        if not checkin:
+            not_found.append(checkin_id)
+            continue
+        db.item_checkins.update_one({"id": checkin_id}, {"$set": {"is_archived": True}})
+        archived += 1
+
+    return {"archived": archived, "not_found": not_found}
 
 
 @router.post("/item-checkins/{checkin_id}/pause")
