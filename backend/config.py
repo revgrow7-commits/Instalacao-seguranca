@@ -48,6 +48,7 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual
 
 # GPS/Location Settings
 MAX_CHECKOUT_DISTANCE_METERS = 500
+MIN_CHECKOUT_DURATION_SECONDS = 300  # 5 minutos mínimos entre check-in e checkout
 
 # Feature Flags
 # [GAMIFICATION DISABLED 2026-05-15] forçado False no código para deixar inativa

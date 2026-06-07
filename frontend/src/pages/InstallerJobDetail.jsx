@@ -65,6 +65,13 @@ const InstallerJobDetail = () => {
   // Fotos de conclusão múltiplas (galeria) — { [itemIndex]: [{file, exif, preview}] }
   const [checkoutPhotos, setCheckoutPhotos] = useState({});
 
+  // Relógio reativo para contagem regressiva do tempo mínimo de checkout
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const formatExifTime = (isoStr) => {
     if (!isoStr) return null;
     try { return new Date(isoStr.replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
@@ -264,6 +271,15 @@ const InstallerJobDetail = () => {
   const handleItemCheckout = async (itemIndex) => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) { toast.error('Faça o check-in primeiro'); return; }
+
+    // Mínimo 5 minutos entre check-in e checkout
+    if (checkin.checkin_at) {
+      const elapsedMs = Date.now() - new Date(checkin.checkin_at).getTime();
+      if (elapsedMs < 5 * 60 * 1000) {
+        toast.error('você precisa registrar checkin e checkout no tempo correto', { duration: 8000 });
+        return;
+      }
+    }
 
     const photos = checkoutPhotos[itemIndex] || [];
     if (photos.length === 0) {
@@ -900,29 +916,47 @@ const InstallerJobDetail = () => {
                           />
 
                           {/* Action Buttons */}
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleOpenPauseModal(itemIndex)}
-                              disabled={isProcessing}
-                              variant="outline"
-                              className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-14 active:scale-[0.98] transition-transform"
-                            >
-                              <Pause className="h-4 w-4 mr-2" />
-                              Pausar
-                            </Button>
-                            <Button
-                              onClick={() => handleItemCheckout(itemIndex)}
-                              disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0}
-                              className="flex-1 bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
-                            >
-                              {isProcessing ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                              ) : (
-                                <Check className="h-4 w-4 mr-2" />
-                              )}
-                              {(checkoutPhotos[itemIndex] || []).length === 0 ? 'Adicione fotos' : 'Finalizar'}
-                            </Button>
-                          </div>
+                          {(() => {
+                            const checkinAt = checkin?.checkin_at ? new Date(checkin.checkin_at).getTime() : null;
+                            const remainingMs = checkinAt ? Math.max(0, 5 * 60 * 1000 - (now - checkinAt)) : 0;
+                            const tooEarly = remainingMs > 0;
+                            const remainingMin = Math.floor(remainingMs / 60000);
+                            const remainingSec = Math.ceil((remainingMs % 60000) / 1000);
+                            const countdownLabel = remainingMin > 0 ? `${remainingMin}m ${remainingSec}s` : `${remainingSec}s`;
+                            return (
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleOpenPauseModal(itemIndex)}
+                                  disabled={isProcessing}
+                                  variant="outline"
+                                  className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-14 active:scale-[0.98] transition-transform"
+                                >
+                                  <Pause className="h-4 w-4 mr-2" />
+                                  Pausar
+                                </Button>
+                                <Button
+                                  onClick={() => handleItemCheckout(itemIndex)}
+                                  disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0 || tooEarly}
+                                  className="flex-1 bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
+                                >
+                                  {isProcessing ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+                                  ) : tooEarly ? (
+                                    <Clock className="h-4 w-4 mr-2" />
+                                  ) : (
+                                    <Check className="h-4 w-4 mr-2" />
+                                  )}
+                                  {isProcessing
+                                    ? 'Aguarde...'
+                                    : tooEarly
+                                      ? `Aguarde ${countdownLabel}`
+                                      : (checkoutPhotos[itemIndex] || []).length === 0
+                                        ? 'Adicione fotos'
+                                        : 'Finalizar'}
+                                </Button>
+                              </div>
+                            );
+                          })()}
                         </div>
                       )}
 

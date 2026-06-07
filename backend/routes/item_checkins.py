@@ -12,7 +12,7 @@ import logging
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
-from config import MAX_CHECKOUT_DISTANCE_METERS
+from config import MAX_CHECKOUT_DISTANCE_METERS, MIN_CHECKOUT_DURATION_SECONDS
 from services.gps import calculate_gps_distance
 from services.image import compress_base64_image
 
@@ -659,6 +659,20 @@ async def complete_item_checkout(
     if checkin["status"] == "completed":
         logger.error(f"Checkin {checkin_id} already completed")
         raise HTTPException(status_code=400, detail="Item already checked out")
+
+    # Regra de tempo mínimo: checkout não permitido antes de 5 minutos do check-in
+    checkin_at_raw = checkin.get('checkin_at')
+    if checkin_at_raw:
+        checkin_at_parsed = datetime.fromisoformat(checkin_at_raw.replace('Z', '+00:00')) if isinstance(checkin_at_raw, str) else checkin_at_raw
+        if checkin_at_parsed.tzinfo is None:
+            checkin_at_parsed = checkin_at_parsed.replace(tzinfo=timezone.utc)
+        elapsed_seconds = (datetime.now(timezone.utc) - checkin_at_parsed).total_seconds()
+        if elapsed_seconds < MIN_CHECKOUT_DURATION_SECONDS:
+            remaining = int(MIN_CHECKOUT_DURATION_SECONDS - elapsed_seconds)
+            remaining_min = remaining // 60
+            remaining_sec = remaining % 60
+            detail = f"Você precisa registrar checkin e checkout no tempo correto. Aguarde mais {remaining_min}min {remaining_sec}s para finalizar."
+            raise HTTPException(status_code=400, detail=detail)
 
     # FIX M9 (relaxado para produção): se o item foi arquivado APÓS o check-in,
     # NÃO bloqueia o checkout — apenas loga warning. Bloquear deixaria o
