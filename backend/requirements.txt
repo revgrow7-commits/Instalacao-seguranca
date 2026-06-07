@@ -5,7 +5,9 @@ starlette==0.37.2
 python-multipart==0.0.20
 
 # Database - Supabase
-supabase>=2.0.0
+# Pinado abaixo de 2.30.0: a partir dessa versão o supabase-py puxou pyiceberg
+# como dependência transitiva (~100MB+), estourando o limite Lambda (245MB).
+supabase>=2.0.0,<2.30.0
 
 # Authentication
 passlib==1.7.4
