@@ -60,14 +60,32 @@ const PhotoGalleryPicker = ({
 
       try {
         const results = await Promise.allSettled(files.map(async (file) => {
-          // Rejeitar formatos não suportados pelo Canvas antes de tentar processar
-          const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-          if (file.type && !supported.includes(file.type.toLowerCase())) {
-            throw new Error(`Formato não suportado: ${file.type}. Use JPEG, PNG ou WebP.`);
+          // Converter HEIC/HEIF para JPEG (Android e iOS podem retornar HEIC)
+          let processedFile = file;
+          const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
+            || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
+          if (isHeic) {
+            try {
+              const heic2any = (await import('heic2any')).default;
+              const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
+              processedFile = new File(
+                [Array.isArray(blob) ? blob[0] : blob],
+                file.name.replace(/\.hei[cf]$/i, '.jpg'),
+                { type: 'image/jpeg' }
+              );
+            } catch {
+              throw new Error('Não foi possível converter esta foto. Tente salvar como JPEG nas configurações da câmera.');
+            }
           }
 
-          const exif = await extractExif(file).catch(() => ({}));
-          const preview = URL.createObjectURL(file);
+          // Rejeitar formatos não suportados pelo Canvas
+          const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+          if (processedFile.type && !supported.includes(processedFile.type.toLowerCase())) {
+            throw new Error(`Formato não suportado: ${processedFile.type}. Use JPEG, PNG ou WebP.`);
+          }
+
+          const exif = await extractExif(processedFile).catch(() => ({}));
+          const preview = URL.createObjectURL(processedFile);
 
           // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
           if (exif.exif_lat == null) {
@@ -86,7 +104,7 @@ const PhotoGalleryPicker = ({
             exif.datetime_fallback = true;
           }
 
-          return { file, exif, preview };
+          return { file: processedFile, exif, preview };
         }));
 
         const valid = results
