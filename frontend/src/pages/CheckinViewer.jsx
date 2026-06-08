@@ -320,6 +320,9 @@ const CheckinViewer = () => {
                     <p className="text-sm font-medium text-green-400">Metadados da Foto (EXIF)</p>
                     {checkin.exif_lat && checkin.exif_long && (
                       <>
+                        {checkin.exif_address && (
+                          <p className="text-sm font-medium text-white mt-1">{checkin.exif_address}</p>
+                        )}
                         <p className="text-xs text-muted-foreground mt-1">
                           GPS: {checkin.exif_lat.toFixed(6)}, {checkin.exif_long.toFixed(6)}
                         </p>
@@ -434,6 +437,9 @@ const CheckinViewer = () => {
                       <p className="text-sm font-medium text-green-400">Metadados da Foto (EXIF)</p>
                       {checkin.checkout_exif_lat && checkin.checkout_exif_long && (
                         <>
+                          {checkin.checkout_exif_address && (
+                            <p className="text-sm font-medium text-white mt-1">{checkin.checkout_exif_address}</p>
+                          )}
                           <p className="text-xs text-muted-foreground mt-1">
                             GPS: {checkin.checkout_exif_lat.toFixed(6)}, {checkin.checkout_exif_long.toFixed(6)}
                           </p>

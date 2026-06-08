@@ -160,6 +160,11 @@ class ItemCheckin(BaseModel):
     checkout_gps_lat: Optional[float] = None
     checkout_gps_long: Optional[float] = None
     checkout_gps_accuracy: Optional[float] = None
+    exif_lat: Optional[float] = None
+    exif_long: Optional[float] = None
+    exif_datetime: Optional[str] = None
+    exif_device: Optional[str] = None
+    exif_address: Optional[str] = None
     product_name: Optional[str] = None
     family_name: Optional[str] = None
     installed_m2: Optional[float] = None
@@ -202,6 +207,7 @@ async def create_item_checkin(
     exif_long: Optional[float] = Form(None),
     exif_datetime: Optional[str] = Form(None),
     exif_device: Optional[str] = Form(None),
+    exif_address: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
     """Create a check-in for a specific item in a job"""
@@ -319,6 +325,7 @@ async def create_item_checkin(
         exif_long=exif_long,
         exif_datetime=exif_datetime,
         exif_device=exif_device,
+        exif_address=exif_address,
         product_name=product.get("name", f"Item {item_index}"),
         family_name=family_name
     )
@@ -489,6 +496,7 @@ async def batch_item_checkin(
         exif_long=first_exif.get("exif_long") if first_exif else None,
         exif_datetime=first_exif.get("exif_datetime") if first_exif else None,
         exif_device=first_exif.get("exif_device") if first_exif else None,
+        exif_address=first_exif.get("exif_address") if first_exif else None,
         product_name=product.get("name", f"Item {request.item_index}"),
         family_name=family_name,
     )
@@ -633,6 +641,7 @@ async def complete_item_checkout(
     exif_long: Optional[float] = Form(None),
     exif_datetime: Optional[str] = Form(None),
     exif_device: Optional[str] = Form(None),
+    exif_address: Optional[str] = Form(None),
     installed_m2: Optional[float] = Form(None),
     complexity_level: Optional[int] = Form(None),
     height_category: Optional[str] = Form(None),
@@ -799,6 +808,7 @@ async def complete_item_checkout(
         "checkout_exif_long": exif_long,
         "checkout_exif_datetime": exif_datetime,
         "checkout_exif_device": exif_device,
+        "checkout_exif_address": exif_address,
         "installed_m2": installed_m2,
         "complexity_level": complexity_level,
         "height_category": height_category,

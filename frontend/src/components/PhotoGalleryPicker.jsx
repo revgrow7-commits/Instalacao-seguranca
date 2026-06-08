@@ -1,6 +1,7 @@
 import React from 'react';
 import { Images, X, MapPin, Clock, Camera } from 'lucide-react';
 import { extractExif } from '../lib/extractExif';
+import { reverseGeocode } from '../lib/reverseGeocode';
 import { toast } from 'sonner';
 
 /**
@@ -93,6 +94,18 @@ const PhotoGalleryPicker = ({
           .filter(r => r.status === 'fulfilled')
           .map(r => r.value);
 
+        // Geocodificação reversa: uma chamada para o lote inteiro (mesmo local)
+        const firstWithGps = valid.find(p => p.exif?.exif_lat != null);
+        if (firstWithGps) {
+          const address = await reverseGeocode(
+            firstWithGps.exif.exif_lat,
+            firstWithGps.exif.exif_long
+          ).catch(() => null);
+          if (address) {
+            valid.forEach(p => { if (p.exif) p.exif.exif_address = address; });
+          }
+        }
+
         const rejected = results.filter(r => r.status === 'rejected');
         if (rejected.length > 0) {
           const msg = rejected[0].reason?.message || 'Formato de imagem não suportado';
@@ -166,10 +179,18 @@ const PhotoGalleryPicker = ({
             )}
           </div>
           {withGps && (
-            <div className={`flex items-center gap-1 ${withGps.exif.gps_fallback ? 'text-blue-400/80' : 'text-green-400/80'}`}>
-              <MapPin className="h-3 w-3" />
-              <span className="font-mono">{withGps.exif.exif_lat.toFixed(4)}, {withGps.exif.exif_long.toFixed(4)}</span>
-              {withGps.exif.gps_fallback && <span className="text-muted-foreground ml-1">(GPS atual)</span>}
+            <div className={`space-y-0.5 ${withGps.exif.gps_fallback ? 'text-blue-400/80' : 'text-green-400/80'}`}>
+              <div className="flex items-center gap-1">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <span className="font-mono text-[10px]">{withGps.exif.exif_lat.toFixed(4)}, {withGps.exif.exif_long.toFixed(4)}</span>
+                {withGps.exif.gps_fallback && <span className="text-muted-foreground ml-1">(GPS atual)</span>}
+              </div>
+              {withGps.exif.exif_address && (
+                <p className="text-[10px] text-white/60 pl-4 leading-tight">{withGps.exif.exif_address}</p>
+              )}
+              {withGps.exif.exif_lat && !withGps.exif.exif_address && (
+                <p className="text-[10px] text-muted-foreground pl-4">Obtendo endereço...</p>
+              )}
             </div>
           )}
         </div>
