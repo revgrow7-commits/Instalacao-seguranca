@@ -100,3 +100,5 @@ VERCEL_ENV_*.txt
 
 # Git bundles (backups)
 *.bundle
+
+.vercel
