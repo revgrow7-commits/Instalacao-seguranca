@@ -36,8 +36,41 @@ const statusBadge = (status, isLate) => {
 };
 
 // Comprime imagem para ~200KB de base64 (uso no lote)
-const compressForBatch = (file) =>
-  new Promise((resolve, reject) => {
+// Para HEIC: tenta createImageBitmap (alguns Android suportam); senão envia bytes crus
+// para o backend converter com pillow-heif.
+const compressForBatch = (file) => {
+  const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
+    || (file.name && (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')));
+
+  if (isHeic) {
+    return new Promise((resolve, reject) => {
+      if (typeof createImageBitmap !== 'undefined') {
+        createImageBitmap(file).then((bitmap) => {
+          const MAX = 800;
+          let w = bitmap.width, h = bitmap.height;
+          if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+          else if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+          const canvas = document.createElement('canvas');
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+          bitmap.close();
+          resolve(canvas.toDataURL('image/jpeg', 0.65));
+        }).catch(() => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const img = new Image();
@@ -60,6 +93,7 @@ const compressForBatch = (file) =>
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+};
 
 const formatExifTime = (isoStr) => {
   if (!isoStr) return null;
