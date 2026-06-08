@@ -369,8 +369,8 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onResched
         {/* Action Buttons */}
         {(isAdmin || isManager) && (
           <div className="flex gap-2 pt-2 border-t border-white/5">
-            {/* Reschedule Button — only for in-progress jobs */}
-            {isInProgress ? (
+            {/* Reschedule Button — for in-progress or already-scheduled jobs */}
+            {(isInProgress || job.status === 'agendado') ? (
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -384,7 +384,7 @@ const JobCard = React.memo(({ job, onNavigate, onFinalize, onSchedule, onResched
                 Reagendar
               </Button>
             ) : (
-              /* Schedule Button — for non in-progress jobs */
+              /* Schedule Button — for jobs not yet scheduled */
               <Button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -878,14 +878,19 @@ const Jobs = () => {
         await api.unarchiveJob(job.id);
       }
       
-      toast.success(shouldArchive ? 'Job arquivado com sucesso!' : 'Job restaurado com sucesso!');
-      
+      toast.success(shouldArchive ? 'Job arquivado com sucesso!' : 'Job restaurado! Agendamento disponível.');
+
+      const updatedJob = { ...job, archived: shouldArchive, status: shouldArchive ? 'arquivado' : 'aguardando', scheduled_date: shouldArchive ? job.scheduled_date : null };
       // Update local state
-      setJobs(prev => prev.map(j => 
-        j.id === job.id 
-          ? { ...j, archived: shouldArchive, status: shouldArchive ? 'arquivado' : 'aguardando' }
-          : j
+      setJobs(prev => prev.map(j =>
+        j.id === job.id ? updatedJob : j
       ));
+
+      // After restoring, open schedule dialog so admin can immediately reschedule
+      if (!shouldArchive) {
+        setStatusFilter('all');
+        handleOpenScheduleDialog(updatedJob);
+      }
     } catch (error) {
       console.error('Error archiving job:', error);
       const errorMsg = error.response?.data?.detail || error.message || `Erro ao ${action} job`;
@@ -1933,7 +1938,7 @@ const Jobs = () => {
         <DialogContent className="bg-card border-white/10 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white flex items-center gap-2">
-              {(selectedJob?.status === 'instalando' || selectedJob?.status === 'in_progress') ? (
+              {(selectedJob?.status === 'instalando' || selectedJob?.status === 'in_progress' || selectedJob?.status === 'agendado') ? (
                 <>
                   <CalendarClock className="h-5 w-5 text-orange-400" />
                   Reagendar Job
