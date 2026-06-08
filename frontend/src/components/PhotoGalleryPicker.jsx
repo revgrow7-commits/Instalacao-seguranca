@@ -74,12 +74,14 @@ const PhotoGalleryPicker = ({
           const preview = isHeic ? null : URL.createObjectURL(file);
           const processedFile = file;
 
-          // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
+          // Fallback: se a foto não tiver GPS no EXIF, capturar posição do dispositivo.
+          // Guardar em _live_lat/_live_long (NÃO em exif_lat) para que o relatório
+          // mostre badge "GPS" (azul) e não "EXIF" (amarelo) nesses casos.
           if (exif.exif_lat == null) {
             const gps = await getLiveGps();
             if (gps) {
-              exif.exif_lat = gps.lat;
-              exif.exif_long = gps.long;
+              exif._live_lat = gps.lat;
+              exif._live_long = gps.long;
               exif.gps_fallback = true;
             }
           }
@@ -98,8 +100,8 @@ const PhotoGalleryPicker = ({
           .filter(r => r.status === 'fulfilled')
           .map(r => r.value);
 
-        // Geocodificação reversa: uma chamada para o lote inteiro (mesmo local)
-        const firstWithGps = valid.find(p => p.exif?.exif_lat != null);
+        // Geocodificação reversa: apenas para GPS real do EXIF (não fallback do dispositivo)
+        const firstWithGps = valid.find(p => p.exif?.exif_lat != null && !p.exif?.gps_fallback);
         if (firstWithGps) {
           const address = await reverseGeocode(
             firstWithGps.exif.exif_lat,
@@ -134,7 +136,8 @@ const PhotoGalleryPicker = ({
   const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
   const earliest = exifTimes[0];
   const latest = exifTimes[exifTimes.length - 1];
-  const withGps = photos.find(f => f.exif?.exif_lat != null);
+  // withGps: prefere GPS real do EXIF; fallback: GPS do dispositivo (_live_lat)
+  const withGps = photos.find(f => f.exif?.exif_lat != null || f.exif?._live_lat != null);
 
   return (
     <div className="space-y-2">
@@ -166,7 +169,7 @@ const PhotoGalleryPicker = ({
                   <p className="text-[9px] text-white/90 text-center truncate">{formatTime(f.exif.exif_datetime)}</p>
                 </div>
               )}
-              {f.exif?.exif_lat != null && (
+              {(f.exif?.exif_lat != null || f.exif?._live_lat != null) && (
                 <div className="absolute top-0.5 left-0.5">
                   <MapPin className={`h-3 w-3 drop-shadow ${f.exif.gps_fallback ? 'text-blue-400' : 'text-green-400'}`} />
                 </div>
@@ -188,21 +191,28 @@ const PhotoGalleryPicker = ({
               <span><span className="text-muted-foreground">Fim: </span><span className="text-green-400">{formatTime(latest)}</span></span>
             )}
           </div>
-          {withGps && (
-            <div className={`space-y-0.5 ${withGps.exif.gps_fallback ? 'text-blue-400/80' : 'text-green-400/80'}`}>
-              <div className="flex items-center gap-1">
-                <MapPin className="h-3 w-3 shrink-0" />
-                <span className="font-mono text-[10px]">{withGps.exif.exif_lat.toFixed(4)}, {withGps.exif.exif_long.toFixed(4)}</span>
-                {withGps.exif.gps_fallback && <span className="text-muted-foreground ml-1">(GPS atual)</span>}
+          {withGps && (() => {
+            const isFromExif = withGps.exif.exif_lat != null;
+            const displayLat = isFromExif ? withGps.exif.exif_lat : withGps.exif._live_lat;
+            const displayLng = isFromExif ? withGps.exif.exif_long : withGps.exif._live_long;
+            return (
+              <div className={`space-y-0.5 ${withGps.exif.gps_fallback ? 'text-blue-400/80' : 'text-green-400/80'}`}>
+                <div className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  <span className="font-mono text-[10px]">{displayLat?.toFixed(4)}, {displayLng?.toFixed(4)}</span>
+                  {withGps.exif.gps_fallback
+                    ? <span className="text-muted-foreground ml-1">(GPS atual)</span>
+                    : <span className="text-green-400/60 ml-1">EXIF</span>}
+                </div>
+                {withGps.exif.exif_address && (
+                  <p className="text-[10px] text-white/60 pl-4 leading-tight">{withGps.exif.exif_address}</p>
+                )}
+                {isFromExif && !withGps.exif.exif_address && (
+                  <p className="text-[10px] text-muted-foreground pl-4">Obtendo endereço...</p>
+                )}
               </div>
-              {withGps.exif.exif_address && (
-                <p className="text-[10px] text-white/60 pl-4 leading-tight">{withGps.exif.exif_address}</p>
-              )}
-              {withGps.exif.exif_lat && !withGps.exif.exif_address && (
-                <p className="text-[10px] text-muted-foreground pl-4">Obtendo endereço...</p>
-              )}
-            </div>
-          )}
+            );
+          })()}
         </div>
       )}
 
