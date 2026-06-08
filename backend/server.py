@@ -222,12 +222,13 @@ def health_check():
 
 _cors_env = os.environ.get('CORS_ORIGINS', '').strip()
 if not _cors_env:
-    # Falhar rápido em produção se env não estiver configurada.
-    # Em dev local, definir CORS_ORIGINS=http://localhost:3000 no .env.
-    raise RuntimeError(
-        "CORS_ORIGINS env var obrigatória. "
-        "Prod: https://instal-visual.com.br — Dev: http://localhost:3000"
-    )
+    # Default CORS origins for production/staging
+    if IS_SERVERLESS:
+        _cors_env = "https://instal-visual.com.br,https://www.instal-visual.com.br"
+    else:
+        _cors_env = "http://localhost:3000,http://localhost:5173"
+    logger.info(f"CORS_ORIGINS not configured, using defaults: {_cors_env}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
