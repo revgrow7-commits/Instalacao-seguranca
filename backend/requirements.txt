@@ -38,6 +38,8 @@ resend==2.19.0
 # except silencioso e devolve a foto SEM compressão — base64 grande pode
 # estourar body limit do Vercel (4.5MB) e RAM da serverless function.
 Pillow>=10.0.0,<11.0.0
+# Suporte a HEIC/HEIF (Android/iOS) — pillow-heif registra o decoder no Pillow
+pillow-heif>=0.13.0
 
 # Excel handling
 openpyxl==3.1.5

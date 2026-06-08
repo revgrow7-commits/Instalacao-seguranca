@@ -4,34 +4,6 @@ import { extractExif } from '../lib/extractExif';
 import { reverseGeocode } from '../lib/reverseGeocode';
 import { toast } from 'sonner';
 
-// Converte HEIC/HEIF para JPEG usando createImageBitmap + Canvas.
-// Funciona em Android Chrome (que suporta createImageBitmap para HEIC).
-// Em browsers sem suporte, lança erro com mensagem amigável.
-async function convertToJpeg(file) {
-  let bitmap;
-  try {
-    bitmap = await createImageBitmap(file);
-  } catch {
-    throw new Error('Este formato de foto não é suportado. Nas configurações da câmera, altere para formato JPEG.');
-  }
-  const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(bitmap, 0, 0);
-  bitmap.close();
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (blob) => {
-        if (!blob) return reject(new Error('Falha ao converter foto. Tente tirar uma nova com a câmera.'));
-        resolve(new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), { type: 'image/jpeg' }));
-      },
-      'image/jpeg',
-      0.85
-    );
-  });
-}
-
 /**
  * Seletor de fotos com suporte a câmera e galeria.
  * Props:
@@ -88,22 +60,19 @@ const PhotoGalleryPicker = ({
 
       try {
         const results = await Promise.allSettled(files.map(async (file) => {
-          // Converter HEIC/HEIF para JPEG via Canvas (Android/iOS podem retornar HEIC)
-          let processedFile = file;
           const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
-            || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
-          if (isHeic) {
-            processedFile = await convertToJpeg(file);
+            || (file.name && (file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif')));
+
+          // Rejeitar apenas formatos que não são imagem de forma alguma
+          const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif'];
+          if (file.type && !supported.includes(file.type.toLowerCase())) {
+            throw new Error(`Formato não suportado: ${file.type}. Use JPEG, PNG ou WebP.`);
           }
 
-          // Rejeitar formatos não suportados pelo Canvas
-          const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-          if (processedFile.type && !supported.includes(processedFile.type.toLowerCase())) {
-            throw new Error(`Formato não suportado: ${processedFile.type}. Use JPEG ou PNG.`);
-          }
-
-          const exif = await extractExif(processedFile).catch(() => ({}));
-          const preview = URL.createObjectURL(processedFile);
+          const exif = await extractExif(file).catch(() => ({}));
+          // HEIC não pode ser renderizado no browser — usar placeholder
+          const preview = isHeic ? null : URL.createObjectURL(file);
+          const processedFile = file;
 
           // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
           if (exif.exif_lat == null) {
@@ -122,7 +91,7 @@ const PhotoGalleryPicker = ({
             exif.datetime_fallback = true;
           }
 
-          return { file: processedFile, exif, preview };
+          return { file: processedFile, exif, preview, isHeic };
         }));
 
         const valid = results
@@ -177,7 +146,13 @@ const PhotoGalleryPicker = ({
         <div className="grid grid-cols-3 gap-1.5">
           {photos.map((f, pi) => (
             <div key={pi} className="relative aspect-square rounded-lg overflow-hidden bg-white/5">
-              <img src={f.preview} alt="" className="w-full h-full object-cover" loading="lazy" />
+              {f.preview
+                ? <img src={f.preview} alt="" className="w-full h-full object-cover" loading="lazy" />
+                : <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-white/5">
+                    <Camera className="h-6 w-6 text-white/40" />
+                    <span className="text-[9px] text-white/40">HEIC</span>
+                  </div>
+              }
               <button
                 type="button"
                 onClick={() => onRemove(pi)}
