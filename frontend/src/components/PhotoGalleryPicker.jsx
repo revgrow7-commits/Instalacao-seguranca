@@ -29,12 +29,11 @@ const PhotoGalleryPicker = ({
     const available = maxPhotos - photos.length;
     const input = document.createElement('input');
     input.type = 'file';
-    // Galeria: restringir a formatos que o Canvas consegue processar.
-    // No iOS, isso força a conversão automática de HEIC/HEIF para JPEG antes de retornar o arquivo.
-    // Câmera: image/* — a câmera sempre gera JPEG/PNG compatível.
-    input.accept = mode === 'gallery'
-      ? 'image/jpeg,image/jpg,image/png,image/webp'
-      : 'image/*';
+    // Galeria: image/* abre a galeria nativa no Android e mostra todas as fotos recentes.
+    // MIME types específicos causam filtragem no Android e escondem fotos recentes.
+    // Validação de formato é feita depois da seleção (bloco "supported" abaixo).
+    // Câmera: image/* — sempre gera JPEG/PNG compatível.
+    input.accept = 'image/*';
     input.multiple = mode === 'gallery';
     const isMobile = /Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (mode === 'camera' && isMobile) input.setAttribute('capture', 'environment');
