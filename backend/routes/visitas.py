@@ -70,6 +70,27 @@ def _enrich_installer_name(doc: dict) -> dict:
     return doc
 
 
+def _prime_installer_name_cache(docs: list) -> None:
+    """Pré-carrega o cache de nomes em 1 query ($in) para listas de visitas.
+
+    Evita o N+1 de _enrich_installer_name (um find_one por instalador
+    não-cacheado dentro de list comprehension)."""
+    missing = {
+        d.get("installer_id")
+        for d in docs
+        if d.get("installer_id") and d.get("installer_id") not in _installer_name_cache
+    }
+    if not missing:
+        return
+    for rec in db.installers.find(
+        {"id": {"$in": list(missing)}}, {"_id": 0, "id": 1, "full_name": 1}
+    ):
+        _installer_name_cache[rec["id"]] = rec.get("full_name", "")
+    # ids não encontrados: cacheia vazio para não re-consultar
+    for mid in missing:
+        _installer_name_cache.setdefault(mid, "")
+
+
 def _resolve_installer_id(installer_id: Optional[str], installer_email: Optional[str] = None) -> Optional[str]:
     """Resolve um identificador de instalador para installers.id.
 
@@ -242,7 +263,9 @@ async def list_visitas(
         skip=offset,
     )
 
-    return [VisitaOut(**_parse_datetimes(_enrich_installer_name(d))) for d in (docs or [])]
+    docs = docs or []
+    _prime_installer_name_cache(docs)
+    return [VisitaOut(**_parse_datetimes(_enrich_installer_name(d))) for d in docs]
 
 
 @router.get("/visitas/reports/excel")
@@ -282,6 +305,7 @@ async def export_visitas_excel(
         query["scheduled_date"] = date_filter
 
     docs_raw = db.visitas_tecnicas.find(query, {"_id": 0}, sort=[("created_at", -1)]) or []
+    _prime_installer_name_cache(docs_raw)
     docs = [_enrich_installer_name(dict(d)) for d in docs_raw]
 
     wb = Workbook()

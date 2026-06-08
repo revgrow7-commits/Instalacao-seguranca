@@ -259,7 +259,7 @@ async def get_family_productivity_kpis(
         if date_filter:
             query["checkin_at"] = date_filter
     
-    checkins = [c for c in db.item_checkins.find(query, {"_id": 0}) if not c.get("is_archived")]
+    checkins = db.item_checkins.find({**query, "is_archived": {"$ne": True}}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {j["id"]: j for j in jobs}
 
@@ -366,7 +366,7 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     installers = db.installers.find({}, {"_id": 0})
-    item_checkins = [c for c in db.item_checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
+    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
 
     jobs_map = {job["id"]: job for job in jobs}
@@ -474,9 +474,9 @@ async def get_productivity_report(
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
-    item_checkins = [c for c in db.item_checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
+    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     installers = db.installers.find({}, {"_id": 0})
-    legacy_checkins = [c for c in db.checkins.find({"status": "completed"}, {"_id": 0}) if not c.get("is_archived")]
+    legacy_checkins = db.checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     
     jobs_map = {job["id"]: job for job in jobs}
     installers_map = {inst["id"]: inst for inst in installers}
@@ -790,8 +790,8 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
     pending_jobs = len([j for j in all_jobs if j.get("status") in ["pending", "aguardando", "scheduled", "agendado"]])
     
     # Queries simples para checkins (excluindo arquivados)
-    checkins = [c for c in db.checkins.find({}, {"_id": 0, "status": 1, "is_archived": 1}) if not c.get("is_archived")]
-    item_checkins = [c for c in db.item_checkins.find({}, {"_id": 0, "status": 1, "net_duration_minutes": 1, "is_archived": 1}) if not c.get("is_archived")]
+    checkins = db.checkins.find({"is_archived": {"$ne": True}}, {"_id": 0, "status": 1})
+    item_checkins = db.item_checkins.find({"is_archived": {"$ne": True}}, {"_id": 0, "status": 1, "net_duration_minutes": 1})
 
     total_checkins = len(checkins) + len(item_checkins)
     completed_checkins = (
@@ -827,7 +827,7 @@ async def export_reports(current_user: User = Depends(get_current_user)):
 
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    checkins = [c for c in db.item_checkins.find({}, {"_id": 0}) if not c.get("is_archived")]
+    checkins = db.item_checkins.find({"is_archived": {"$ne": True}}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
     installers = db.installers.find({}, {"_id": 0})
 

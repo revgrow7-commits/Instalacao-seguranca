@@ -72,6 +72,14 @@ def sync_holdprint_jobs_sync(
     total_errors = 0
     branches_synced = []
 
+    # Dedup em memória: 1 query com projeção mínima substitui um find_one
+    # por job dentro do loop (N+1 — era o maior custo do sync).
+    existing_ids = {
+        j["holdprint_job_id"]
+        for j in db.jobs.find({}, {"_id": 0, "holdprint_job_id": 1})
+        if j.get("holdprint_job_id")
+    }
+
     with httpx.Client(timeout=55.0) as client:
         for branch in ["POA", "SP"]:
             api_key = HOLDPRINT_API_KEY_POA if branch == "POA" else HOLDPRINT_API_KEY_SP
@@ -106,12 +114,12 @@ def sync_holdprint_jobs_sync(
                         if not jobs:
                             break
 
+                        page_docs = []
                         for holdprint_job in jobs:
                             holdprint_job_id = str(holdprint_job.get('id', ''))
 
-                            # Defence-in-depth: skip if already imported
-                            existing = db.jobs.find_one({"holdprint_job_id": holdprint_job_id})
-                            if existing:
+                            # Defence-in-depth: skip if already imported (set em memória)
+                            if holdprint_job_id in existing_ids:
                                 branch_skipped += 1
                                 total_skipped += 1
                                 continue
@@ -150,13 +158,33 @@ def sync_holdprint_jobs_sync(
                                     "created_at": datetime.now(timezone.utc).isoformat()
                                 }
 
-                                db.jobs.insert_one(job_doc)
-                                branch_imported += 1
-                                total_imported += 1
+                                page_docs.append(job_doc)
+                                existing_ids.add(holdprint_job_id)
 
                             except Exception as e:
                                 total_errors += 1
-                                logger.error(f"Error importing job {holdprint_job_id}: {e}")
+                                logger.error(f"Error building job {holdprint_job_id}: {e}")
+
+                        # Batch insert: 1 roundtrip por página (até 100 jobs)
+                        # em vez de 1 por job. Fallback individual se o lote falhar
+                        # (ex.: violação do unique idx_jobs_holdprint_job_id).
+                        if page_docs:
+                            try:
+                                db.jobs.insert_many(page_docs)
+                                branch_imported += len(page_docs)
+                                total_imported += len(page_docs)
+                            except Exception as e:
+                                logger.warning(f"insert_many falhou ({e}); fallback job a job")
+                                for doc in page_docs:
+                                    try:
+                                        db.jobs.insert_one(doc)
+                                        branch_imported += 1
+                                        total_imported += 1
+                                    except Exception as e2:
+                                        total_errors += 1
+                                        logger.error(
+                                            f"Error importing job {doc.get('holdprint_job_id')}: {e2}"
+                                        )
 
                         if not has_next:
                             break

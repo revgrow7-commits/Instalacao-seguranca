@@ -261,6 +261,11 @@ def _apply_filter(builder, key: str, value: Any):
             elif op == '$ne':
                 if op_val is None:
                     builder = builder.not_.is_(key, 'null')
+                elif isinstance(op_val, bool):
+                    # Semântica Mongo: $ne inclui linhas com campo NULL.
+                    # neq SQL exclui NULL (NULL <> true → NULL → linha some).
+                    # IS NOT TRUE/FALSE inclui NULL e o booleano oposto.
+                    builder = builder.not_.is_(key, 'true' if op_val else 'false')
                 else:
                     builder = builder.neq(key, op_val)
             elif op == '$exists':
@@ -299,7 +304,11 @@ def _build_or_filter(or_conditions: list) -> str:
                     elif op == '$lte':
                         parts.append(f"{key}.lte.{op_val}")
                     elif op == '$ne':
-                        parts.append(f"{key}.neq.{op_val}")
+                        if isinstance(op_val, bool):
+                            # Inclui NULL (ver _apply_filter): IS NOT TRUE/FALSE
+                            parts.append(f"{key}.not.is.{str(op_val).lower()}")
+                        else:
+                            parts.append(f"{key}.neq.{op_val}")
                     elif op == '$contains':
                         parts.append(f"{key}.cs.{json.dumps(op_val)}")
             elif isinstance(val, list):
