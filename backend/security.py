@@ -69,6 +69,10 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
     if isinstance(user_doc.get('created_at'), str):
         user_doc['created_at'] = datetime.fromisoformat(user_doc['created_at'])
 
+    # Normalize role to lowercase to handle any case inconsistency in the DB
+    if user_doc.get('role'):
+        user_doc['role'] = user_doc['role'].lower().strip()
+
     return User(**user_doc)
 
 
