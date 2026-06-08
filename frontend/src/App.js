@@ -7,10 +7,25 @@ const isChunkLoadError = (error) =>
   /Failed to fetch dynamically imported module/i.test(error?.message || '') ||
   /Importing a module script failed/i.test(error?.message || '');
 
+async function clearCachesAndReload() {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+  } catch (_) { /* seguro ignorar */ }
+  window.location.reload(true);
+}
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null, isReloading: false };
+    this.state = { hasError: false, error: null, isReloading: false, clearing: false };
+    this.handleClear = this.handleClear.bind(this);
   }
   static getDerivedStateFromError(error) {
     return { hasError: true, error, isReloading: isChunkLoadError(error) };
@@ -20,17 +35,20 @@ class ErrorBoundary extends Component {
   }
   componentDidUpdate(_prev, prevState) {
     if (this.state.isReloading && !prevState.isReloading) {
-      // Rate-limit: recarrega no máximo uma vez a cada 30 segundos
       const RELOAD_KEY = 'eb_chunk_reload_ts';
       const last = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
       if (Date.now() - last > 30_000) {
         sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
-        window.location.reload();
+        // Limpa caches antes de recarregar para evitar chunks obsoletos do SW
+        clearCachesAndReload();
       } else {
-        // Já recarregou recentemente — mostra tela de erro normalmente
         this.setState({ isReloading: false });
       }
     }
+  }
+  handleClear() {
+    this.setState({ clearing: true });
+    clearCachesAndReload();
   }
   render() {
     if (this.state.isReloading) {
@@ -42,8 +60,20 @@ class ErrorBoundary extends Component {
     }
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace' }}>
-          <p>Erro no app, recarregue a página (Ctrl+Shift+R) para limpar cache.</p>
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace', maxWidth: 360, margin: '0 auto' }}>
+          <p style={{ marginBottom: '1.5rem' }}>Erro no app. Toque no botão abaixo para limpar o cache e recarregar.</p>
+          <button
+            onClick={this.handleClear}
+            disabled={this.state.clearing}
+            style={{
+              background: '#e94560', color: '#fff', border: 'none', borderRadius: 8,
+              padding: '0.75rem 1.5rem', fontSize: 15, fontFamily: 'inherit',
+              cursor: this.state.clearing ? 'default' : 'pointer', opacity: this.state.clearing ? 0.7 : 1,
+              width: '100%', marginBottom: '0.75rem'
+            }}
+          >
+            {this.state.clearing ? 'Limpando...' : 'Limpar cache e recarregar'}
+          </button>
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <pre style={{ textAlign: 'left', fontSize: 11, marginTop: '1rem', background: '#111', padding: '1rem', borderRadius: 6, overflow: 'auto', maxHeight: 300 }}>
               {this.state.error.stack}
