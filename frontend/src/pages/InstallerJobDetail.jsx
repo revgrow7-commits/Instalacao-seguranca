@@ -274,10 +274,10 @@ const InstallerJobDetail = () => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) { toast.error('Faça o check-in primeiro'); return; }
 
-    // Mínimo 5 minutos entre check-in e checkout
+    // Mínimo 1 minuto entre check-in e checkout
     if (checkin.checkin_at) {
       const elapsedMs = Date.now() - new Date(checkin.checkin_at).getTime();
-      if (elapsedMs < 5 * 60 * 1000) {
+      if (elapsedMs < 60 * 1000) {
         toast.error('você precisa registrar checkin e checkout no tempo correto', { duration: 8000 });
         return;
       }
@@ -922,7 +922,7 @@ const InstallerJobDetail = () => {
                           {/* Action Buttons */}
                           {(() => {
                             const checkinAt = checkin?.checkin_at ? new Date(checkin.checkin_at).getTime() : null;
-                            const remainingMs = checkinAt ? Math.max(0, 5 * 60 * 1000 - (now - checkinAt)) : 0;
+                            const remainingMs = checkinAt ? Math.max(0, 60 * 1000 - (now - checkinAt)) : 0;
                             const tooEarly = remainingMs > 0;
                             const remainingMin = Math.floor(remainingMs / 60000);
                             const remainingSec = Math.ceil((remainingMs % 60000) / 1000);
