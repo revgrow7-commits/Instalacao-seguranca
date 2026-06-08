@@ -4,6 +4,34 @@ import { extractExif } from '../lib/extractExif';
 import { reverseGeocode } from '../lib/reverseGeocode';
 import { toast } from 'sonner';
 
+// Converte HEIC/HEIF para JPEG usando createImageBitmap + Canvas.
+// Funciona em Android Chrome (que suporta createImageBitmap para HEIC).
+// Em browsers sem suporte, lança erro com mensagem amigável.
+async function convertToJpeg(file) {
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error('Este formato de foto não é suportado. Nas configurações da câmera, altere para formato JPEG.');
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return reject(new Error('Falha ao converter foto. Tente tirar uma nova com a câmera.'));
+        resolve(new File([blob], file.name.replace(/\.hei[cf]$/i, '.jpg'), { type: 'image/jpeg' }));
+      },
+      'image/jpeg',
+      0.85
+    );
+  });
+}
+
 /**
  * Seletor de fotos com suporte a câmera e galeria.
  * Props:
@@ -60,28 +88,18 @@ const PhotoGalleryPicker = ({
 
       try {
         const results = await Promise.allSettled(files.map(async (file) => {
-          // Converter HEIC/HEIF para JPEG (Android e iOS podem retornar HEIC)
+          // Converter HEIC/HEIF para JPEG via Canvas (Android/iOS podem retornar HEIC)
           let processedFile = file;
           const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
             || file.name.toLowerCase().endsWith('.heic') || file.name.toLowerCase().endsWith('.heif');
           if (isHeic) {
-            try {
-              const heic2any = (await import('heic2any')).default;
-              const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.85 });
-              processedFile = new File(
-                [Array.isArray(blob) ? blob[0] : blob],
-                file.name.replace(/\.hei[cf]$/i, '.jpg'),
-                { type: 'image/jpeg' }
-              );
-            } catch {
-              throw new Error('Não foi possível converter esta foto. Tente salvar como JPEG nas configurações da câmera.');
-            }
+            processedFile = await convertToJpeg(file);
           }
 
           // Rejeitar formatos não suportados pelo Canvas
           const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
           if (processedFile.type && !supported.includes(processedFile.type.toLowerCase())) {
-            throw new Error(`Formato não suportado: ${processedFile.type}. Use JPEG, PNG ou WebP.`);
+            throw new Error(`Formato não suportado: ${processedFile.type}. Use JPEG ou PNG.`);
           }
 
           const exif = await extractExif(processedFile).catch(() => ({}));
