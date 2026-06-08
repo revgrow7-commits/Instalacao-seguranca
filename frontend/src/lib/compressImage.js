@@ -47,10 +47,13 @@ export function compressImage(file) {
 
         resolve(base64);
       };
-      img.onerror = reject;
+      img.onerror = () => {
+        const type = file?.type || 'desconhecido';
+        reject(new Error(`Formato de imagem não suportado (${type}). Use JPEG, PNG ou WebP.`));
+      };
       img.src = event.target.result;
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('Falha ao ler o arquivo de imagem.'));
     reader.readAsDataURL(file);
   });
 }

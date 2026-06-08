@@ -37,9 +37,14 @@ const clearCache = (key = null) => {
 const JOBS_CACHE_KEY = 'cache_jobs_v1';
 const JOBS_CACHE_TTL = 5 * 60 * 1000; // 5 minutos
 
+// Contador de geração: impede que fetches em background anteriores a uma invalidação
+// reescrevam dados velhos no localStorage após clearJobsCache() ser chamado.
+let jobsCacheGeneration = 0;
+
 // Limpa TANTO o Map em memória QUANTO o localStorage para jobs.
 // Usar em qualquer mutation que mude jobs.status (checkin, checkout, schedule, etc.)
 const clearJobsCache = () => {
+  jobsCacheGeneration++; // invalida qualquer _fresh em voo
   clearCache('jobs_false');
   clearCache('jobs_true');
   clearCache('team_calendar');
@@ -68,12 +73,17 @@ const getJobsWithCache = async (options = false) => {
     if (raw) stale = JSON.parse(raw);
   } catch { /* localStorage indisponível */ }
 
+  // Captura a geração atual: o .then só escreve se nenhum clearJobsCache ocorreu
+  // entre o disparo do fetch e a resposta (race condition SWR).
+  const capturedGeneration = jobsCacheGeneration;
   const freshPromise = axios
     .get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() })
     .then(res => {
-      try {
-        localStorage.setItem(key, JSON.stringify({ data: res.data, t: Date.now() }));
-      } catch { /* quota exceeded */ }
+      if (jobsCacheGeneration === capturedGeneration) {
+        try {
+          localStorage.setItem(key, JSON.stringify({ data: res.data, t: Date.now() }));
+        } catch { /* quota exceeded */ }
+      }
       return res;
     });
 

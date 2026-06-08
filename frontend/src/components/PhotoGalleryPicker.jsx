@@ -1,6 +1,7 @@
 import React from 'react';
 import { Images, X, MapPin, Clock, Camera } from 'lucide-react';
 import { extractExif } from '../lib/extractExif';
+import { toast } from 'sonner';
 
 /**
  * Seletor de fotos com suporte a câmera e galeria.
@@ -27,7 +28,12 @@ const PhotoGalleryPicker = ({
     const available = maxPhotos - photos.length;
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    // Galeria: restringir a formatos que o Canvas consegue processar.
+    // No iOS, isso força a conversão automática de HEIC/HEIF para JPEG antes de retornar o arquivo.
+    // Câmera: image/* — a câmera sempre gera JPEG/PNG compatível.
+    input.accept = mode === 'gallery'
+      ? 'image/jpeg,image/jpg,image/png,image/webp'
+      : 'image/*';
     input.multiple = mode === 'gallery';
     const isMobile = /Android|webOS|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (mode === 'camera' && isMobile) input.setAttribute('capture', 'environment');
@@ -52,31 +58,52 @@ const PhotoGalleryPicker = ({
         return liveGpsPromise;
       };
 
-      const processed = await Promise.all(files.map(async (file) => {
-        const exif = await extractExif(file).catch(() => ({}));
-        const preview = URL.createObjectURL(file);
-
-        // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
-        if (exif.exif_lat == null) {
-          const gps = await getLiveGps();
-          if (gps) {
-            exif.exif_lat = gps.lat;
-            exif.exif_long = gps.long;
-            exif.gps_fallback = true; // marca como GPS ao vivo, não EXIF
+      try {
+        const results = await Promise.allSettled(files.map(async (file) => {
+          // Rejeitar formatos não suportados pelo Canvas antes de tentar processar
+          const supported = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+          if (file.type && !supported.includes(file.type.toLowerCase())) {
+            throw new Error(`Formato não suportado: ${file.type}. Use JPEG, PNG ou WebP.`);
           }
+
+          const exif = await extractExif(file).catch(() => ({}));
+          const preview = URL.createObjectURL(file);
+
+          // Fallback: se a foto não tiver GPS no EXIF, usar posição atual do dispositivo
+          if (exif.exif_lat == null) {
+            const gps = await getLiveGps();
+            if (gps) {
+              exif.exif_lat = gps.lat;
+              exif.exif_long = gps.long;
+              exif.gps_fallback = true;
+            }
+          }
+
+          // Fallback: se não tiver horário no EXIF, usar horário atual
+          if (!exif.exif_datetime) {
+            const now = new Date();
+            exif.exif_datetime = now.toISOString().replace('T', ' ').slice(0, 19);
+            exif.datetime_fallback = true;
+          }
+
+          return { file, exif, preview };
+        }));
+
+        const valid = results
+          .filter(r => r.status === 'fulfilled')
+          .map(r => r.value);
+
+        const rejected = results.filter(r => r.status === 'rejected');
+        if (rejected.length > 0) {
+          const msg = rejected[0].reason?.message || 'Formato de imagem não suportado';
+          toast.error(msg, { duration: 5000 });
         }
 
-        // Fallback: se não tiver horário no EXIF, usar horário atual
-        if (!exif.exif_datetime) {
-          const now = new Date();
-          // formato compatível com o backend: "YYYY-MM-DD HH:MM:SS"
-          exif.exif_datetime = now.toISOString().replace('T', ' ').slice(0, 19);
-          exif.datetime_fallback = true;
-        }
-
-        return { file, exif, preview };
-      }));
-      onPhotos(processed);
+        if (valid.length > 0) onPhotos(valid);
+      } catch (err) {
+        console.error('[PhotoGalleryPicker] erro ao processar fotos:', err);
+        toast.error('Erro ao processar foto. Tente tirar uma nova com a câmera.', { duration: 5000 });
+      }
     };
     input.click();
   };
