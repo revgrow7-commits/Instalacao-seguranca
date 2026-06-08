@@ -1,17 +1,45 @@
 import React, { Suspense, lazy, Component } from 'react';
 
+// Detecta erros de carregamento de chunk (ChunkLoadError após novo deploy)
+const isChunkLoadError = (error) =>
+  error?.name === 'ChunkLoadError' ||
+  /Loading chunk \d+ failed/i.test(error?.message || '') ||
+  /Failed to fetch dynamically imported module/i.test(error?.message || '') ||
+  /Importing a module script failed/i.test(error?.message || '');
+
 class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, isReloading: false };
   }
   static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+    return { hasError: true, error, isReloading: isChunkLoadError(error) };
   }
   componentDidCatch(error, info) {
     console.error('ErrorBoundary caught:', error, info);
   }
+  componentDidUpdate(_prev, prevState) {
+    if (this.state.isReloading && !prevState.isReloading) {
+      // Rate-limit: recarrega no máximo uma vez a cada 30 segundos
+      const RELOAD_KEY = 'eb_chunk_reload_ts';
+      const last = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
+      if (Date.now() - last > 30_000) {
+        sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
+        window.location.reload();
+      } else {
+        // Já recarregou recentemente — mostra tela de erro normalmente
+        this.setState({ isReloading: false });
+      }
+    }
+  }
   render() {
+    if (this.state.isReloading) {
+      return (
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace' }}>
+          <p>Atualizando app...</p>
+        </div>
+      );
+    }
     if (this.state.hasError) {
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace' }}>
@@ -73,15 +101,34 @@ const PageLoader = () => (
 );
 
 // Banner de aviso de conexão offline
+// Debounce de 4s antes de mostrar — evita falso positivo em mobile quando
+// o dispositivo troca de rede (WiFi → dados) e navigator.onLine fica false
+// por alguns instantes antes do evento "online" disparar.
 const OfflineBanner = () => {
-  const [offline, setOffline] = React.useState(!navigator.onLine);
+  const [offline, setOffline] = React.useState(false);
+  const timerRef = React.useRef(null);
+
   React.useEffect(() => {
-    const on = () => setOffline(false);
-    const off = () => setOffline(true);
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+    const showBanner = () => {
+      timerRef.current = setTimeout(() => setOffline(true), 4000);
+    };
+    const hideBanner = () => {
+      clearTimeout(timerRef.current);
+      setOffline(false);
+    };
+
+    // Só agenda o banner se já começou offline
+    if (!navigator.onLine) showBanner();
+
+    window.addEventListener('online', hideBanner);
+    window.addEventListener('offline', showBanner);
+    return () => {
+      clearTimeout(timerRef.current);
+      window.removeEventListener('online', hideBanner);
+      window.removeEventListener('offline', showBanner);
+    };
   }, []);
+
   if (!offline) return null;
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] flex items-center justify-center gap-2 bg-yellow-500/95 text-black text-xs font-semibold py-2 px-4 text-center" role="alert">
