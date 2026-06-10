@@ -20,6 +20,18 @@ logger = logging.getLogger(__name__)
 
 # ============ HELPER FUNCTIONS ============
 
+def _metrics_excluded(job: dict) -> bool:
+    """
+    Retorna True se o job NÃO deve servir de base para relatórios e KPIs.
+    Cobre jobs arquivados, marcados para exclusão de métricas ou soft-deletados.
+    """
+    return bool(
+        job.get("archived")
+        or job.get("exclude_from_metrics")
+        or job.get("deleted")
+    )
+
+
 def classify_product_to_family(product_name: str) -> tuple:
     """
     Classifies a product into a family based on keywords.
@@ -111,7 +123,7 @@ async def get_report_by_family(current_user: User = Depends(get_current_user)):
     """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
-    jobs = db.jobs.find({}, {"_id": 0})
+    jobs = [j for j in db.jobs.find({}, {"_id": 0}) if not _metrics_excluded(j)]
     families = db.product_families.find({}, {"_id": 0})
     family_map = {f["name"]: f for f in families}
     
@@ -259,9 +271,12 @@ async def get_family_productivity_kpis(
         if date_filter:
             query["checkin_at"] = date_filter
     
-    checkins = db.item_checkins.find({**query, "is_archived": {"$ne": True}}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
-    jobs_map = {j["id"]: j for j in jobs}
+    jobs_map = {j["id"]: j for j in jobs if not _metrics_excluded(j)}
+    checkins = [
+        c for c in db.item_checkins.find({**query, "is_archived": {"$ne": True}}, {"_id": 0})
+        if c.get("job_id") in jobs_map
+    ]
 
     family_data = {}
     global_totals = {"total_m2": 0, "total_minutes": 0, "count": 0}
@@ -366,10 +381,12 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     installers = db.installers.find({}, {"_id": 0})
-    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
-
-    jobs_map = {job["id"]: job for job in jobs}
+    jobs_map = {job["id"]: job for job in jobs if not _metrics_excluded(job)}
+    item_checkins = [
+        c for c in db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
+        if c.get("job_id") in jobs_map
+    ]
     installer_report = []
     
     for installer in installers:
@@ -478,7 +495,9 @@ async def get_productivity_report(
     installers = db.installers.find({}, {"_id": 0})
     legacy_checkins = db.checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     
-    jobs_map = {job["id"]: job for job in jobs}
+    # Apenas jobs válidos entram no mapa; check-ins de jobs arquivados/excluídos/deletados
+    # são ignorados automaticamente pelos loops (que fazem `if not job: continue`).
+    jobs_map = {job["id"]: job for job in jobs if not _metrics_excluded(job)}
     installers_map = {inst["id"]: inst for inst in installers}
     
     by_installer = {}
@@ -782,7 +801,10 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     # Queries simples para jobs (Supabase não suporta aggregation pipelines)
-    all_jobs = db.jobs.find({"archived": {"$ne": True}}, {"_id": 0, "status": 1})
+    all_jobs = [
+        j for j in db.jobs.find({"archived": {"$ne": True}}, {"_id": 0, "status": 1, "exclude_from_metrics": 1, "deleted": 1})
+        if not _metrics_excluded(j)
+    ]
     
     total_jobs = len(all_jobs)
     completed_jobs = len([j for j in all_jobs if j.get("status") in ["completed", "finalizado"]])
@@ -832,8 +854,9 @@ async def export_reports(current_user: User = Depends(get_current_user)):
     installers = db.installers.find({}, {"_id": 0})
 
     logger.info(f"Exporting report: {len(checkins)} checkins, {len(jobs)} jobs, {len(installers)} installers")
-    
-    jobs_map = {job['id']: job for job in jobs}
+
+    # Jobs arquivados/excluídos/deletados ficam fora do export (check-ins deles caem no `if not job: continue`).
+    jobs_map = {job['id']: job for job in jobs if not _metrics_excluded(job)}
     installers_map = {installer['id']: installer for installer in installers}
     
     wb = Workbook()
@@ -913,20 +936,22 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         ws.cell(row=row_num, column=11, value=checkin.get('checkout_gps_lat', '')).border = border
         ws.cell(row=row_num, column=12, value=checkin.get('checkout_gps_long', '')).border = border
         
-        checkin_at = checkin.get('checkin_at')
-        if isinstance(checkin_at, str):
+        # Horários do relatório vêm do EXIF da foto (momento real da captura), não do
+        # clique de check-in/checkout. Sem EXIF de data → célula vazia (não inventa hora).
+        def _parse_exif_dt(val):
+            if not val:
+                return None
+            if isinstance(val, datetime):
+                return val
             try:
-                checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
+                return datetime.fromisoformat(str(val).replace('Z', '+00:00').replace(' ', 'T'))
             except (ValueError, TypeError):
-                checkin_at = None
+                return None
+
+        checkin_at = _parse_exif_dt(checkin.get('exif_checkin_at') or checkin.get('exif_datetime'))
         ws.cell(row=row_num, column=13, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
-        
-        checkout_at = checkin.get('checkout_at')
-        if isinstance(checkout_at, str):
-            try:
-                checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
-            except (ValueError, TypeError):
-                checkout_at = None
+
+        checkout_at = _parse_exif_dt(checkin.get('exif_checkout_at') or checkin.get('checkout_exif_datetime'))
         ws.cell(row=row_num, column=14, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
         
         ws.cell(row=row_num, column=15, value=checkin.get('duration_minutes', 0)).border = border

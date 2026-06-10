@@ -86,10 +86,10 @@ const PhotoGalleryPicker = ({
             }
           }
 
-          // Fallback: se não tiver horário no EXIF, usar horário atual
+          // Sem DateTimeOriginal no EXIF: NÃO inventar horário (now()).
+          // Deixar exif_datetime nulo e apenas sinalizar — o relatório mostra "—"
+          // em vez de fingir um horário que não é o real da captura.
           if (!exif.exif_datetime) {
-            const now = new Date();
-            exif.exif_datetime = now.toISOString().replace('T', ' ').slice(0, 19);
             exif.datetime_fallback = true;
           }
 
@@ -183,7 +183,7 @@ const PhotoGalleryPicker = ({
         <div className="rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-xs space-y-1">
           <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
             <Clock className="h-3 w-3" />
-            {photos.some(f => f.exif?.datetime_fallback) ? 'Registro (horário atual)' : 'Registro EXIF'}
+            {photos.some(f => f.exif?.datetime_fallback) ? 'Registro EXIF (algumas fotos sem horário)' : 'Registro EXIF'}
           </div>
           <div className="flex gap-4">
             <span><span className="text-muted-foreground">Início: </span><span className="text-white">{formatTime(earliest)}</span></span>

@@ -796,11 +796,39 @@ async def complete_item_checkout(
         except (asyncio.TimeoutError, Exception) as _photo_err:
             logger.warning(f"Checkout photo upload skipped for {checkin_id}: {_photo_err}")
 
+    # Horários reais (EXIF) — fonte de verdade do relatório.
+    # exif_checkout_at = maior timestamp EXIF das fotos do checkout (frontend envia
+    # o latestExif.exif_datetime). Recalcula a duração EXIF usando o exif_checkin_at
+    # já gravado no check-in. Se a foto não tiver EXIF de data, deixa nulo (mostra "—").
+    exif_checkout_at_iso = None
+    exif_duration_minutes_calc = None
+    if exif_datetime:
+        try:
+            _exif_out = datetime.fromisoformat(exif_datetime.replace(' ', 'T'))
+            if _exif_out.tzinfo is None:
+                _exif_out = _exif_out.replace(tzinfo=timezone.utc)
+            exif_checkout_at_iso = _exif_out.isoformat()
+            _exif_in_raw = checkin.get('exif_checkin_at')
+            if _exif_in_raw:
+                _exif_in = (
+                    datetime.fromisoformat(_exif_in_raw.replace('Z', '+00:00').replace(' ', 'T'))
+                    if isinstance(_exif_in_raw, str) else _exif_in_raw
+                )
+                if _exif_in.tzinfo is None:
+                    _exif_in = _exif_in.replace(tzinfo=timezone.utc)
+                _diff_min = (_exif_out - _exif_in).total_seconds() / 60
+                if _diff_min >= 0:
+                    exif_duration_minutes_calc = int(_diff_min)
+        except Exception:
+            pass
+
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         # checkout_photo (base64) removido do update_data: armazenar ~400KB no
         # PostgREST bloqueava a função e causava timeout no Vercel.
         **({"checkout_photo_url": checkout_photo_url} if checkout_photo_url else {}),
+        **({"exif_checkout_at": exif_checkout_at_iso} if exif_checkout_at_iso else {}),
+        **({"exif_duration_minutes": exif_duration_minutes_calc} if exif_duration_minutes_calc is not None else {}),
         "checkout_gps_lat": gps_lat,
         "checkout_gps_long": gps_long,
         "checkout_gps_accuracy": gps_accuracy,

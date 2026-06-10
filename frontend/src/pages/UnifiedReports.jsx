@@ -526,8 +526,17 @@ const UnifiedReports = () => {
                     const lat = c.exif_lat ?? c.gps_lat;
                     const lng = c.exif_long ?? c.gps_long;
                     const fromExif = c.exif_lat != null;
-                    const inicio = c.checkin_at ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
-                    const fim = c.checkout_at ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                    // Horários vêm do EXIF da foto (momento real da captura), NÃO do clique
+                    // de check-in/checkout. Foto sem EXIF de data → "—" (não inventa horário).
+                    const toExifTime = (v) => {
+                      if (!v) return null;
+                      const d = new Date(String(v).replace(' ', 'T'));
+                      return isNaN(d) ? null : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    };
+                    const inicioFromExif = c.exif_checkin_at || c.exif_datetime;
+                    const fimFromExif = c.exif_checkout_at || c.checkout_exif_datetime;
+                    const inicio = toExifTime(inicioFromExif) || '—';
+                    const fim = toExifTime(fimFromExif) || '—';
                     const jobCode = job?.holdprint_data?.code || job?.code || c.job_id?.slice(0, 6);
                     const isSelected = selectedIds.has(c.id);
                     return (
@@ -566,8 +575,8 @@ const UnifiedReports = () => {
                         <td className="px-4 py-2.5">
                           {jobCode ? <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">#{jobCode}</span> : '—'}
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-green-400">{inicio}</td>
-                        <td className="px-4 py-2.5 font-mono text-red-400">{fim}</td>
+                        <td className="px-4 py-2.5 font-mono text-green-400" title={inicioFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{inicio}</td>
+                        <td className="px-4 py-2.5 font-mono text-red-400" title={fimFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{fim}</td>
                         <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
                           {lat != null ? lat.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
                         </td>
