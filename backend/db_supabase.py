@@ -77,7 +77,8 @@ TABLE_COLUMNS = {
         "archived_by_name", "exclude_from_metrics", "no_installation", "notes",
         "cancelled_at", "justification", "justified_at", "installation_config",
         "completed_at", "finalized_at", "created_at",
-        "reschedule_history"
+        "reschedule_history",
+        "deleted", "deleted_at", "deleted_by", "deleted_by_name"
     ]),
     "checkins": frozenset([
         "id", "job_id", "installer_id", "status", "checkin_at", "checkout_at",

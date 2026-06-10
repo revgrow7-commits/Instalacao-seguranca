@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import {
   Briefcase, CheckCircle, Clock, Users, MapPin,
   Bell, PauseCircle, Navigation, Timer, AlertCircle, MessageCircle,
-  ChevronRight, ExternalLink, Camera, FileSpreadsheet, Loader2
+  ChevronRight, ExternalLink, Camera, FileSpreadsheet, Loader2,
+  Archive, Trash2
 } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
@@ -57,6 +58,36 @@ const Dashboard = () => {
 
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showTimeModal, setShowTimeModal] = useState(false);
+
+  // Ação de arquivar/excluir job a partir do Relatório Consolidado
+  // jobAction: { type: 'archive' | 'delete', jobId, label }
+  const [jobAction, setJobAction] = useState(null);
+  const [actionBusy, setActionBusy] = useState(false);
+
+  const confirmJobAction = useCallback(async () => {
+    if (!jobAction) return;
+    const { type, jobId } = jobAction;
+    setActionBusy(true);
+    try {
+      if (type === 'archive') {
+        await api.archiveJob(jobId, true); // exclude_from_metrics = true
+      } else {
+        await api.deleteJob(jobId); // soft-delete reversível
+      }
+      // Remove do relatório todas as linhas (check-ins) pertencentes a esse job
+      setCompletedCheckins(prev => prev.filter(c => c.job_id !== jobId));
+      toast.success(
+        type === 'archive'
+          ? 'Job arquivado — não conta mais em relatórios e KPIs'
+          : 'Job excluído — não conta mais em relatórios e KPIs'
+      );
+    } catch (e) {
+      toast.error(e.response?.data?.detail || 'Erro ao processar a ação do job');
+    } finally {
+      setActionBusy(false);
+      setJobAction(null);
+    }
+  }, [jobAction]);
 
   // Guards contra double-fire do useEffect (user + isAdmin/isManager chegam em renders separados)
   const primaryStartedRef = useRef(false);
@@ -132,11 +163,11 @@ const Dashboard = () => {
       ]);
 
       const primaryData = {
-        jobs: jobsRes.data || [],
-        metrics: metricsRes.data || null,
-        installers: installersRes.data || [],
-        pendingCheckins: pendingRes.data?.pending_checkins || [],
-        locationAlerts: locationRes.data || [],
+        jobs: Array.isArray(jobsRes.data) ? jobsRes.data : [],
+        metrics: metricsRes.data && typeof metricsRes.data === 'object' && !Array.isArray(metricsRes.data) ? metricsRes.data : null,
+        installers: Array.isArray(installersRes.data) ? installersRes.data : [],
+        pendingCheckins: Array.isArray(pendingRes.data?.pending_checkins) ? pendingRes.data.pending_checkins : [],
+        locationAlerts: Array.isArray(locationRes.data) ? locationRes.data : [],
       };
 
       setJobs(primaryData.jobs);
@@ -320,6 +351,7 @@ const Dashboard = () => {
                         <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Longitude</span>
                       </th>
                       <th className="text-left px-4 py-2 font-medium">Origem</th>
+                      <th className="text-right px-4 py-2 font-medium">Ações</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -373,6 +405,34 @@ const Dashboard = () => {
                               <span className="text-xs text-muted-foreground/50">—</span>
                             )}
                           </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <button
+                                type="button"
+                                title={c.job_id ? 'Arquivar job (sai dos relatórios e KPIs)' : 'Job não identificado'}
+                                disabled={!c.job_id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setJobAction({ type: 'archive', jobId: c.job_id, label: c.product_name || job?.title || c.job_id });
+                                }}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                <Archive className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                title={c.job_id ? 'Excluir job (soft-delete, reversível)' : 'Job não identificado'}
+                                disabled={!c.job_id}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setJobAction({ type: 'delete', jobId: c.job_id, label: c.product_name || job?.title || c.job_id });
+                                }}
+                                className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       );
                     })}
@@ -383,6 +443,44 @@ const Dashboard = () => {
           </Card>
         ) : null
       )}
+
+      {/* ── Confirmação de arquivar/excluir job ── */}
+      <Dialog open={!!jobAction} onOpenChange={(open) => { if (!open && !actionBusy) setJobAction(null); }}>
+        <DialogContent className="bg-card border-white/10">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              {jobAction?.type === 'archive'
+                ? <><Archive className="h-5 w-5 text-amber-400" /> Arquivar job</>
+                : <><Trash2 className="h-5 w-5 text-red-400" /> Excluir job</>}
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              {jobAction?.type === 'archive' ? (
+                <>O job <span className="text-white">{jobAction?.label}</span> será arquivado e
+                  <strong className="text-white"> deixará de contar em relatórios e KPIs</strong>.
+                  Você pode restaurá-lo depois.</>
+              ) : (
+                <>O job <span className="text-white">{jobAction?.label}</span> será excluído
+                  (<span className="text-white">soft-delete reversível</span>) e
+                  <strong className="text-white"> deixará de contar em relatórios e KPIs</strong>.
+                  Os dados continuam no banco para auditoria.</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" disabled={actionBusy} onClick={() => setJobAction(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={actionBusy}
+              onClick={confirmJobAction}
+              className={jobAction?.type === 'delete' ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-amber-500 hover:bg-amber-600 text-white'}
+            >
+              {actionBusy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {jobAction?.type === 'archive' ? 'Arquivar' : 'Excluir'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Métricas (fase 1) ── */}
       {(isAdmin || isManager) && (

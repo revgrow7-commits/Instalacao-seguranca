@@ -22,7 +22,7 @@ from security import get_current_user, require_role
 from models.user import User, UserRole
 from config import (
     HOLDPRINT_API_KEY_POA, HOLDPRINT_API_KEY_SP, HOLDPRINT_API_URL,
-    SENDER_EMAIL, RESEND_API_KEY
+    SENDER_EMAIL, RESEND_API_KEY, NOTIFICATION_EMAILS
 )
 
 if RESEND_API_KEY:
@@ -109,8 +109,8 @@ class JobJustificationRequest(BaseModel):
     job_code: str
 
 
-# Emails to notify when job is justified
-NOTIFICATION_EMAILS = ["bruno@industriavisual.com.br", "marcelo@industriavisual.com.br"]
+# Emails de notificação de job justificado: ver NOTIFICATION_EMAILS em config.py
+# (carregado da env var NOTIFICATION_EMAILS, CSV).
 
 
 # ============ HELPER FUNCTIONS ============
@@ -325,6 +325,9 @@ async def list_jobs(
     """
     query = {}
 
+    # Jobs soft-deletados nunca aparecem na listagem (mesmo com include_archived).
+    query["deleted"] = {"$ne": True}
+
     if not include_archived:
         query["archived"] = False
 
@@ -351,6 +354,8 @@ async def list_jobs(
         from db_supabase import _deserialize
         cols = [k for k in projection if k != "_id"]
         builder = get_client().table("jobs").select(",".join(cols))
+
+        builder = builder.neq("deleted", True)  # soft-deletados nunca aparecem
 
         if not include_archived:
             builder = builder.neq("archived", True)  # cobre NULL e false
@@ -1210,19 +1215,55 @@ async def finalize_job(job_id: str, current_user: User = Depends(get_current_use
 
 @router.delete("/jobs/{job_id}")
 async def delete_job(job_id: str, current_user: User = Depends(get_current_user)):
-    """Delete a job and all related data"""
+    """
+    Soft-delete de um job: marca como deletado e o remove de listas, relatórios e KPIs,
+    mas mantém os dados (check-ins, produtos) no banco para auditoria/reversão.
+    Use /jobs/{id}/restore para reverter.
+    """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
-    job = db.jobs.find_one({"id": job_id})
+
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    db.checkins.delete_many({"job_id": job_id})
-    db.item_checkins.delete_many({"job_id": job_id})
-    db.installed_products.delete_many({"job_id": job_id})
-    db.jobs.delete_one({"id": job_id})
-    
-    return {"message": "Job and all related data deleted successfully"}
+
+    now = datetime.now(timezone.utc).isoformat()
+    db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "deleted": True,
+            "deleted_at": now,
+            "deleted_by": current_user.id,
+            "deleted_by_name": getattr(current_user, "name", None) or current_user.email,
+            "exclude_from_metrics": True,
+        }}
+    )
+
+    logger.info(f"Job {job_id} soft-deleted by {current_user.email}")
+    return {"message": "Job excluído (soft-delete) com sucesso", "job_id": job_id}
+
+
+@router.post("/jobs/{job_id}/restore")
+async def restore_job(job_id: str, current_user: User = Depends(get_current_user)):
+    """Restaura um job soft-deletado, devolvendo-o às listas, relatórios e KPIs."""
+    require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
+
+    job = db.jobs.find_one({"id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    db.jobs.update_one(
+        {"id": job_id},
+        {"$set": {
+            "deleted": False,
+            "deleted_at": None,
+            "deleted_by": None,
+            "deleted_by_name": None,
+            "exclude_from_metrics": False,
+        }}
+    )
+
+    logger.info(f"Job {job_id} restored by {current_user.email}")
+    return {"message": "Job restaurado com sucesso", "job_id": job_id}
 
 
 @router.post("/jobs/{job_id}/reprocess-products")
@@ -2144,6 +2185,9 @@ async def submit_job_justification(
     )
     
     def send_justification_email():
+        if not NOTIFICATION_EMAILS:
+            logger.warning("NOTIFICATION_EMAILS não configurado; e-mail de justificativa não enviado")
+            return
         try:
             scheduled_date = job.get("scheduled_date", "")
             if scheduled_date:
@@ -2190,7 +2234,7 @@ body{{font-family:Arial,sans-serif;line-height:1.6;color:#333}}
     return {
         "message": "Justificativa registrada com sucesso",
         "justification_id": justification_record["id"],
-        "emails_sent_to": NOTIFICATION_EMAILS
+        "emails_sent": len(NOTIFICATION_EMAILS)
     }
 
 
