@@ -35,6 +35,8 @@ const Users = () => {
   useEffect(() => {
     if (isAdmin) {
       loadData();
+    } else {
+      setLoading(false);
     }
   }, [isAdmin]);
 

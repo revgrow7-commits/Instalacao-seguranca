@@ -10,6 +10,7 @@ from io import BytesIO
 import logging
 import uuid
 import base64
+import time
 
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
@@ -55,17 +56,30 @@ def _parse_datetimes(doc: dict) -> dict:
     return doc
 
 
-# Cache simples em memória: installer_id → full_name
+# Cache simples em memória: installer_id → full_name, com TTL de 5 min.
+# Sem TTL, instâncias serverless warm serviam nome antigo indefinidamente
+# após troca de nome do instalador (mesmo padrão de item_checkins.py).
 _installer_name_cache: dict = {}
+_installer_name_cache_ts: dict = {}
+_INSTALLER_CACHE_TTL = 300  # 5 min
+
+
+def _installer_cache_fresh(installer_id: str) -> bool:
+    """True se o installer_id está no cache e ainda dentro do TTL."""
+    if installer_id not in _installer_name_cache:
+        return False
+    return time.time() - _installer_name_cache_ts.get(installer_id, 0) <= _INSTALLER_CACHE_TTL
+
 
 def _enrich_installer_name(doc: dict) -> dict:
     """Adiciona installer_name ao doc buscando na tabela installers pelo installer_id."""
     installer_id = doc.get("installer_id")
     if not installer_id:
         return doc
-    if installer_id not in _installer_name_cache:
+    if not _installer_cache_fresh(installer_id):
         rec = db.installers.find_one({"id": installer_id})
         _installer_name_cache[installer_id] = rec.get("full_name", "") if rec else ""
+        _installer_name_cache_ts[installer_id] = time.time()
     doc["installer_name"] = _installer_name_cache[installer_id]
     return doc
 
@@ -78,17 +92,20 @@ def _prime_installer_name_cache(docs: list) -> None:
     missing = {
         d.get("installer_id")
         for d in docs
-        if d.get("installer_id") and d.get("installer_id") not in _installer_name_cache
+        if d.get("installer_id") and not _installer_cache_fresh(d.get("installer_id"))
     }
     if not missing:
         return
+    now = time.time()
     for rec in db.installers.find(
         {"id": {"$in": list(missing)}}, {"_id": 0, "id": 1, "full_name": 1}
     ):
         _installer_name_cache[rec["id"]] = rec.get("full_name", "")
-    # ids não encontrados: cacheia vazio para não re-consultar
+        _installer_name_cache_ts[rec["id"]] = now
+    # ids não encontrados: cacheia vazio (com ts) para não re-consultar dentro do TTL
     for mid in missing:
         _installer_name_cache.setdefault(mid, "")
+        _installer_name_cache_ts.setdefault(mid, now)
 
 
 def _resolve_installer_id(installer_id: Optional[str], installer_email: Optional[str] = None) -> Optional[str]:

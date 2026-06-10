@@ -105,7 +105,11 @@ const Calendar = () => {
       const [jobsRes, installersRes, visitasRes] = await Promise.all([
         api.getJobs(),
         isAdmin || isManager ? api.getInstallers() : Promise.resolve({ data: [] }),
-        api.listVisitas().catch(() => ({ data: [] })),
+        api.listVisitas().catch(err => {
+          console.warn('[Calendar] listVisitas falhou:', err?.message);
+          toast.warning('Não foi possível carregar visitas técnicas');
+          return { data: [] };
+        }),
       ]);
 
       const visitasAsEvents = (visitasRes.data || [])

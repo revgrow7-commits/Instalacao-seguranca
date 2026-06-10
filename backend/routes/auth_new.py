@@ -495,19 +495,24 @@ def reset_password(request: ResetPasswordRequest):
             detail="Token inválido ou expirado"
         )
     
-    # Check expiration
+    # Check expiration — parse e validação separados para que um expires_at
+    # malformado NÃO deixe o reset prosseguir como se o token fosse válido.
     expires_at_str = reset_record.get('expires_at', '')
+    expires_at = None
     if expires_at_str:
         try:
             expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
-            if datetime.now(timezone.utc) > expires_at:
-                db.password_resets.delete_one({"token": request.token})
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Token expirado. Solicite um novo link."
-                )
-        except ValueError as e:
+        except (ValueError, TypeError) as e:
             logger.error(f"Error parsing expiry date: {e}")
+            expires_at = None
+
+    # Sem data válida de expiração: tratar como token inválido (fail-closed).
+    if expires_at is None or datetime.now(timezone.utc) > expires_at:
+        db.password_resets.delete_one({"token": request.token})
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token expirado. Solicite um novo link."
+        )
     
     # Validate password
     validar_forca_senha(request.new_password)

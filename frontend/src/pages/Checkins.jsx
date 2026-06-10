@@ -335,7 +335,7 @@ const Checkins = () => {
         .sort((a, b) => new Date(b.checkin_at || 0) - new Date(a.checkin_at || 0));
 
       setCheckins(activeCheckins);
-      setInstallers(installersRes.data);
+      setInstallers(installersRes.data || []);
     } catch (error) {
       console.error('Error loading checkins:', error);
       toast.error('Erro ao carregar check-ins');

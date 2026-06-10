@@ -41,10 +41,16 @@ RESEND_FROM_EMAIL = os.environ.get('RESEND_FROM_EMAIL', 'Indústria Visual <nore
 # Production URL - fallback to instal-visual.com.br if env not set
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'https://instal-visual.com.br')
 
+# Emails internos notificados quando um job é justificado (CSV na env).
+# Sem default hardcoded para não vazar endereços internos no código/response.
+NOTIFICATION_EMAILS = [
+    e.strip() for e in os.environ.get('NOTIFICATION_EMAILS', '').split(',') if e.strip()
+]
+
 # Web Push Notification Config
 VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', '')
 VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '')
-VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'bruno@industriavisual.com.br')
+VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'noreply@instal-visual.com.br')
 
 # GPS/Location Settings
 MAX_CHECKOUT_DISTANCE_METERS = 500

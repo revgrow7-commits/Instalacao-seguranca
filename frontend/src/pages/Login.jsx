@@ -115,7 +115,7 @@ const Login = () => {
           </div>
 
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>© 2025 INDÚSTRIA VISUAL</p>
+            <p>© {new Date().getFullYear()} INDÚSTRIA VISUAL</p>
           </div>
         </div>
       </div>
