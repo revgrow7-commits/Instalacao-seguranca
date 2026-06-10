@@ -102,3 +102,4 @@ VERCEL_ENV_*.txt
 *.bundle
 
 .vercel
+.env*

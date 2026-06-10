@@ -73,6 +73,7 @@ class JobSchedule(BaseModel):
     scheduled_time_end: Optional[datetime] = None
     installer_ids: Optional[List[str]] = None
     status: Optional[str] = None
+    reschedule_note: Optional[str] = None
 
 
 class ItemAssignment(BaseModel):
@@ -959,6 +960,22 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
         update_data["assigned_installers"] = schedule_data.installer_ids
     # Status: explícito no body ou default "agendado"
     update_data["status"] = schedule_data.status or "agendado"
+
+    # Append reschedule history entry
+    current_job = db.jobs.find_one({"id": job_id}, {"reschedule_history": 1, "status": 1, "scheduled_date": 1}) or {}
+    old_status = current_job.get("status", "")
+    history_entry = {
+        "rescheduled_at": sched_dt.replace(microsecond=0).isoformat(),
+        "rescheduled_by": getattr(current_user, "name", None) or getattr(current_user, "full_name", None) or getattr(current_user, "email", str(current_user.id)),
+        "old_date": str(current_job.get("scheduled_date", "")),
+        "new_date": sched_dt.replace(microsecond=0).isoformat(),
+        "note": schedule_data.reschedule_note or "",
+        "job_status": old_status,
+    }
+    existing_history = current_job.get("reschedule_history") or []
+    if not isinstance(existing_history, list):
+        existing_history = []
+    update_data["reschedule_history"] = existing_history + [history_entry]
 
     client = get_client()
     result = client.table("jobs").update(update_data).eq("id", job_id).execute()

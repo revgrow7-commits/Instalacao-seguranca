@@ -5,7 +5,7 @@ import api from '../utils/api';
 export function useReschedule(onSuccess) {
   const [loading, setLoading] = useState(false);
 
-  const reschedule = async (jobId, { date, time, timeEnd, installerIds, status }) => {
+  const reschedule = async (jobId, { date, time, timeEnd, installerIds, status, rescheduleNote }) => {
     if (!date || !time) {
       toast.error('Informe data e hora.');
       return false;
@@ -26,6 +26,7 @@ export function useReschedule(onSuccess) {
         scheduledTimeEnd: timeEndUtc,
         installerIds: installerIds?.length ? installerIds : null,
         status: status || 'agendado',
+        rescheduleNote: rescheduleNote || undefined,
       });
       toast.success('Job reagendado com sucesso!');
       onSuccess?.(updated);

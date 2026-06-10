@@ -208,13 +208,14 @@ export const api = {
     clearJobsCache();
     return axios.put(`${API_URL}/jobs/${jobId}/assign`, { installer_ids: installerIds }, { headers: getAuthHeader() });
   },
-  scheduleJob: async (jobId, { scheduledDate, scheduledTimeEnd, installerIds, status } = {}) => {
+  scheduleJob: async (jobId, { scheduledDate, scheduledTimeEnd, installerIds, status, rescheduleNote } = {}) => {
     clearJobsCache();
     const response = await axios.put(`${API_URL}/jobs/${jobId}/schedule`, {
       scheduled_date: scheduledDate,
       scheduled_time_end: scheduledTimeEnd || null,
       installer_ids: installerIds || null,
       status: status || null,
+      reschedule_note: rescheduleNote || null,
     }, { headers: getAuthHeader() });
     return response.data;
   },

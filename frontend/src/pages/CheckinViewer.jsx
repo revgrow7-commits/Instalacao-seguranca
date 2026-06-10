@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { MapPin, Clock, User, Image, FileText, ArrowLeft, Archive, Trash2, AlertTriangle } from 'lucide-react';
+import { MapPin, Clock, User, Image, FileText, ArrowLeft, Archive, Trash2, AlertTriangle, CalendarClock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const WhatsAppIcon = () => (
@@ -497,6 +497,60 @@ const CheckinViewer = () => {
                 </div>
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Reschedule History */}
+      {job.reschedule_history && job.reschedule_history.length > 0 && (
+        <Card className="bg-card border-white/5">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-white flex items-center gap-2">
+              <CalendarClock className="h-4 w-4 text-blue-400" />
+              Histórico de Reagendamentos ({job.reschedule_history.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {[...job.reschedule_history].reverse().map((entry, idx) => (
+              <div key={idx} className="bg-white/5 border border-white/10 rounded-lg p-3 space-y-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-xs font-medium text-blue-400">
+                    {entry.rescheduled_at
+                      ? new Date(entry.rescheduled_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+                      : 'Data não registrada'}
+                  </span>
+                  {entry.rescheduled_by && (
+                    <span className="text-xs text-muted-foreground">por {entry.rescheduled_by}</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                  {entry.old_date && (
+                    <span>
+                      De: <span className="text-white">
+                        {new Date(entry.old_date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </span>
+                  )}
+                  {entry.new_date && (
+                    <span>
+                      → Para: <span className="text-white">
+                        {new Date(entry.new_date).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </span>
+                  )}
+                  {entry.job_status && (
+                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-white/70 capitalize">
+                      Status: {entry.job_status}
+                    </span>
+                  )}
+                </div>
+                {entry.note && (
+                  <p className="text-xs text-muted-foreground italic border-t border-white/10 pt-1 mt-1">
+                    "{entry.note}"
+                  </p>
+                )}
+              </div>
+            ))}
           </CardContent>
         </Card>
       )}

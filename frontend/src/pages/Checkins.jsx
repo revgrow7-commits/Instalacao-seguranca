@@ -5,15 +5,19 @@ import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../components/ui/dialog';
 import {
   CheckCircle, MapPin, Clock, Image, Eye, Search,
   Trash2, Archive, RefreshCw, LogIn, LogOut, Play, Pause,
-  ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight, MessageCircle
+  ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight, MessageCircle,
+  CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
+import { useReschedule } from '../hooks/useReschedule';
 
 // Skeleton loader component
 const CheckinSkeleton = () => (
@@ -33,38 +37,38 @@ const CheckinSkeleton = () => (
 // Cronometer component that updates every second
 const Cronometer = ({ startTime, isPaused }) => {
   const [elapsed, setElapsed] = useState('');
-  
+
   useEffect(() => {
     if (!startTime) return;
-    
+
     const updateTimer = () => {
       const start = new Date(startTime);
       const now = new Date();
       const diffMs = now - start;
-      
+
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-      
+
       if (hours > 0) {
         setElapsed(`${hours}h ${minutes.toString().padStart(2, '0')}m`);
       } else {
         setElapsed(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
       }
     };
-    
+
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
-    
+
     return () => clearInterval(interval);
   }, [startTime]);
-  
+
   if (!startTime) return null;
-  
+
   return (
     <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-bold ${
-      isPaused 
-        ? 'bg-orange-500/20 text-orange-400' 
+      isPaused
+        ? 'bg-orange-500/20 text-orange-400'
         : 'bg-blue-500/20 text-blue-400'
     }`}>
       <Timer className="h-3 w-3" />
@@ -74,15 +78,15 @@ const Cronometer = ({ startTime, isPaused }) => {
 };
 
 // Mini card for check-in/checkout without photo for performance
-const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, type, installers }) => {
+const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, onReschedule, type, installers }) => {
   const isCheckout = type === 'checkout';
   const photo = isCheckout ? checkin.checkout_photo : checkin.checkin_photo;
   const date = isCheckout ? checkin.checkout_at : checkin.checkin_at;
-  
+
   // Get installer phone
   const installer = installers?.find(i => i.id === checkin.installer_id || i.user_id === checkin.installer_id);
   const installerPhone = installer?.phone;
-  
+
   // Calculate if checkin is late (more than 4 hours without checkout)
   const isLate = useMemo(() => {
     if (checkin.status === 'completed') return false;
@@ -91,16 +95,16 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
     const hours = (now - start) / (1000 * 60 * 60);
     return hours >= 4;
   }, [checkin]);
-  
+
   // Check if paused
   const isPaused = checkin.status === 'paused';
-  
+
   // Check if in progress (not completed, not paused)
   const isInProgress = checkin.status === 'in_progress';
-  
+
   return (
     <Card className={`bg-card border-white/5 hover:border-primary/50 transition-all group ${
-      isLate ? 'border-l-4 border-l-red-500' : 
+      isLate ? 'border-l-4 border-l-red-500' :
       isPaused ? 'border-l-4 border-l-orange-500' : ''
     }`}>
       <CardContent className="p-4">
@@ -117,8 +121,8 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
                 />
               ) : (
                 <div className={`w-full h-full flex items-center justify-center ${
-                  checkin.status === 'completed' ? 'bg-green-500/20' : 
-                  isPaused ? 'bg-orange-500/20' : 
+                  checkin.status === 'completed' ? 'bg-green-500/20' :
+                  isPaused ? 'bg-orange-500/20' :
                   isLate ? 'bg-red-500/20' : 'bg-blue-500/20'
                 }`}>
                   {checkin.status === 'completed' ? (
@@ -133,7 +137,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
                 </div>
               )}
             </div>
-            
+
             {/* Alert Icon Overlay */}
             {(isLate || isPaused) && photo && (
               <div className={`absolute -top-1 -right-1 p-1 rounded-full ${
@@ -147,7 +151,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
               </div>
             )}
           </div>
-          
+
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
@@ -160,7 +164,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {date ? new Date(date).toLocaleString('pt-BR', {
-                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
                   }) : 'N/A'}
                 </p>
               </div>
@@ -173,12 +177,12 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
                   ? 'bg-red-500/20 text-red-400'
                   : 'bg-blue-500/20 text-blue-400'
               }`}>
-                {checkin.status === 'completed' ? 'OK' : 
-                 checkin.status === 'paused' ? 'PAUSA' : 
+                {checkin.status === 'completed' ? 'OK' :
+                 checkin.status === 'paused' ? 'PAUSA' :
                  isLate ? 'ATRASO' : 'ATIVO'}
               </span>
             </div>
-            
+
             {/* Product & Duration/Cronometer */}
             <div className="flex items-center gap-2 mt-2 text-xs flex-wrap">
               {checkin.product_name && (
@@ -187,7 +191,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
                   {checkin.product_name.substring(0, 15)}...
                 </span>
               )}
-              
+
               {/* Show cronometer for active/paused checkins, duration for completed */}
               {checkin.status === 'completed' && checkin.duration_minutes ? (
                 <span className="text-green-400 whitespace-nowrap">
@@ -200,11 +204,11 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
             </div>
           </div>
         </div>
-        
+
         {/* Alert Banner for Late/Paused */}
         {(isLate || isPaused) && checkin.status !== 'completed' && (
           <div className={`mt-3 p-2 rounded-lg flex items-center gap-2 text-xs font-medium ${
-            isLate ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 
+            isLate ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
             'bg-orange-500/20 text-orange-400 border border-orange-500/30'
           }`}>
             {isLate ? (
@@ -220,7 +224,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
             )}
           </div>
         )}
-        
+
         {/* Actions - Always visible */}
         <div className="flex gap-2 mt-3">
           <Button
@@ -232,7 +236,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
             <Eye className="h-3 w-3 mr-1" />
             Ver
           </Button>
-          
+
           {/* WhatsApp Button - Visible when paused or late */}
           {(isPaused || isLate) && checkin.status !== 'completed' && installerPhone && (
             <Button
@@ -245,7 +249,18 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, typ
               <MessageCircle className="h-3 w-3" />
             </Button>
           )}
-          
+
+          {/* Reagendar Button - Available for all statuses */}
+          <Button
+            onClick={() => onReschedule(checkin)}
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+            title="Reagendar job"
+          >
+            <CalendarClock className="h-3 w-3" />
+          </Button>
+
           <Button
             onClick={() => onArchive(checkin.id)}
             variant="outline"
@@ -284,6 +299,15 @@ const Checkins = () => {
   const [deletingId, setDeletingId] = useState(null);
   const [archivingId, setArchivingId] = useState(null);
 
+  // Reagendar state
+  const [rescheduleCheckin, setRescheduleCheckin] = useState(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [rescheduleTimeEnd, setRescheduleTimeEnd] = useState('');
+  const [rescheduleInstallerIds, setRescheduleInstallerIds] = useState([]);
+  const [rescheduleNote, setRescheduleNote] = useState('');
+  const { reschedule, loading: rescheduling } = useReschedule();
+
   useEffect(() => {
     if (!isAdmin && !isManager) {
       navigate('/dashboard');
@@ -302,14 +326,14 @@ const Checkins = () => {
     try {
       const [checkinsRes, installersRes] = await Promise.all([
         api.getAllItemCheckins(),
-        api.getInstallers()
+        api.getInstallers(),
       ]);
-      
+
       // Filter out archived checkins and sort by most recent
       const activeCheckins = (checkinsRes || [])
         .filter(c => !c.archived)
         .sort((a, b) => new Date(b.checkin_at || 0) - new Date(a.checkin_at || 0));
-      
+
       setCheckins(activeCheckins);
       setInstallers(installersRes.data);
     } catch (error) {
@@ -326,13 +350,13 @@ const Checkins = () => {
       const jobTitle = (checkin.job_title || '').toLowerCase();
       const installerName = (checkin.installer_name || '').toLowerCase();
       const productName = (checkin.product_name || '').toLowerCase();
-      const matchesSearch = !searchTerm || 
-        jobTitle.includes(searchTerm.toLowerCase()) || 
+      const matchesSearch = !searchTerm ||
+        jobTitle.includes(searchTerm.toLowerCase()) ||
         installerName.includes(searchTerm.toLowerCase()) ||
         productName.includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === 'all' || checkin.status === statusFilter;
       const matchesInstaller = installerFilter === 'all' || checkin.installer_id === installerFilter;
-      
+
       return matchesSearch && matchesStatus && matchesInstaller;
     });
 
@@ -349,7 +373,7 @@ const Checkins = () => {
         inProgress: filtered.filter(c => c.status === 'in_progress').length,
         completed: filtered.filter(c => c.status === 'completed').length,
         paused: filtered.filter(c => c.status === 'paused').length,
-      }
+      },
     };
   }, [checkins, searchTerm, statusFilter, installerFilter]);
 
@@ -407,30 +431,67 @@ const Checkins = () => {
     navigate(`/checkin-viewer/${checkinId}`);
   };
 
-  // Função para enviar WhatsApp manualmente
   const handleWhatsApp = (phone, installerName, jobTitle, alertType) => {
     if (!phone) {
       toast.error('Telefone do instalador não encontrado');
       return;
     }
-    
-    // Limpar telefone (remover caracteres especiais)
+
     const cleanPhone = phone.replace(/\D/g, '');
     const phoneWithCountry = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
-    
-    // Montar mensagem baseada no tipo de alerta
+
     let message = '';
     if (alertType === 'paused') {
       message = `⏸️ *Instalação Pausada*\n\nOlá ${installerName}!\n\nNotamos que o item "${jobTitle}" está pausado.\n\nPor favor, retome o trabalho assim que possível ou informe o motivo da pausa prolongada.\n\n_Mensagem enviada pelo sistema Indústria Visual_`;
     } else if (alertType === 'late') {
       message = `⚠️ *Alerta de Atraso*\n\nOlá ${installerName}!\n\nO check-in do job "${jobTitle}" está há mais de 4 horas sem checkout.\n\nPor favor, finalize o trabalho ou informe a situação atual.\n\n_Mensagem enviada pelo sistema Indústria Visual_`;
     }
-    
+
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${phoneWithCountry}?text=${encodedMessage}`;
-    
+
     window.open(whatsappUrl, '_blank');
     toast.success(`WhatsApp aberto para ${installerName}`);
+  };
+
+  const handleOpenReschedule = (checkin) => {
+    const today = new Date().toISOString().split('T')[0];
+    setRescheduleCheckin(checkin);
+    setRescheduleDate(today);
+    setRescheduleTime('08:00');
+    setRescheduleTimeEnd('');
+    setRescheduleInstallerIds(checkin.installer_id ? [checkin.installer_id] : []);
+    setRescheduleNote('');
+  };
+
+  const handleCloseReschedule = () => {
+    setRescheduleCheckin(null);
+    setRescheduleDate('');
+    setRescheduleTime('');
+    setRescheduleTimeEnd('');
+    setRescheduleInstallerIds([]);
+    setRescheduleNote('');
+  };
+
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleCheckin) return;
+    const success = await reschedule(rescheduleCheckin.job_id, {
+      date: rescheduleDate,
+      time: rescheduleTime,
+      timeEnd: rescheduleTimeEnd || undefined,
+      installerIds: rescheduleInstallerIds,
+      status: rescheduleCheckin.status === 'completed' ? 'agendado' : rescheduleCheckin.status,
+      rescheduleNote: rescheduleNote || undefined,
+    });
+    if (success) handleCloseReschedule();
+  };
+
+  const toggleRescheduleInstaller = (installerId) => {
+    setRescheduleInstallerIds(prev =>
+      prev.includes(installerId)
+        ? prev.filter(id => id !== installerId)
+        : [...prev, installerId]
+    );
   };
 
   const loadMore = () => {
@@ -449,292 +510,404 @@ const Checkins = () => {
   }
 
   return (
-    <div className="p-4 md:p-8 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-white tracking-tight">
-            Check-ins
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Gerencie os registros de check-in e checkout
-          </p>
-        </div>
-        <Button
-          onClick={loadData}
-          variant="outline"
-          className="border-primary/50 text-primary hover:bg-primary/10"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Atualizar
-        </Button>
-      </div>
-
-      {/* Stats Cards - Clicáveis com Drill-down */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {/* Total */}
-        <Card 
-          className={`bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02] ${
-            statusFilter === 'all' ? 'ring-2 ring-primary' : ''
-          }`}
-          onClick={() => setStatusFilter('all')}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/20">
-              <CheckCircle className="h-5 w-5 text-primary" />
-            </div>
-            <div className="flex-1">
-              <p className="text-2xl font-bold text-white">{stats.total}</p>
-              <p className="text-xs text-muted-foreground">Total</p>
-            </div>
-            <ChevronRight className={`h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity ${
-              statusFilter === 'all' ? 'opacity-100' : ''
-            }`} />
-          </CardContent>
-        </Card>
-        
-        {/* Em Andamento */}
-        <Card 
-          className={`bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
-            statusFilter === 'in_progress' ? 'ring-2 ring-blue-500' : ''
-          }`}
-          onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-blue-500/20">
-              <Play className="h-5 w-5 text-blue-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
-              <p className="text-xs text-muted-foreground">Em Andamento</p>
-            </div>
-            <ChevronRight className={`h-4 w-4 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity ${
-              statusFilter === 'in_progress' ? 'opacity-100' : ''
-            }`} />
-          </CardContent>
-        </Card>
-        
-        {/* Completos */}
-        <Card 
-          className={`bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
-            statusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
-          }`}
-          onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-green-500/20">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-2xl font-bold text-white">{stats.completed}</p>
-              <p className="text-xs text-muted-foreground">Completos</p>
-            </div>
-            <ChevronRight className={`h-4 w-4 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity ${
-              statusFilter === 'completed' ? 'opacity-100' : ''
-            }`} />
-          </CardContent>
-        </Card>
-        
-        {/* Pausados */}
-        <Card 
-          className={`bg-card border-white/5 hover:border-orange-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
-            statusFilter === 'paused' ? 'ring-2 ring-orange-500' : ''
-          }`}
-          onClick={() => setStatusFilter(statusFilter === 'paused' ? 'all' : 'paused')}
-        >
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-orange-500/20">
-              <Pause className="h-5 w-5 text-orange-400" />
-            </div>
-            <div className="flex-1">
-              <p className="text-2xl font-bold text-white">{stats.paused}</p>
-              <p className="text-xs text-muted-foreground">Pausados</p>
-            </div>
-            <ChevronRight className={`h-4 w-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity ${
-              statusFilter === 'paused' ? 'opacity-100' : ''
-            }`} />
-          </CardContent>
-        </Card>
-      </div>
-      
-      {/* Active Filter Badge */}
-      {statusFilter !== 'all' && (
-        <div className="flex items-center gap-2">
-          <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            statusFilter === 'in_progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
-            statusFilter === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-            statusFilter === 'paused' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
-            'bg-primary/20 text-primary'
-          }`}>
-            {statusFilter === 'in_progress' && <Play className="h-4 w-4" />}
-            {statusFilter === 'completed' && <CheckCircle className="h-4 w-4" />}
-            {statusFilter === 'paused' && <Pause className="h-4 w-4" />}
-            Filtro ativo: {statusFilter === 'in_progress' ? 'Em Andamento' : 
-                          statusFilter === 'completed' ? 'Completos' : 
-                          statusFilter === 'paused' ? 'Pausados' : statusFilter}
-          </span>
-          <button 
-            onClick={() => setStatusFilter('all')}
-            className="text-xs text-muted-foreground hover:text-white transition-colors"
-          >
-            Limpar filtro ×
-          </button>
-        </div>
-      )}
-
-      {/* Filters */}
-      <Card className="bg-card border-white/5">
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative md:col-span-2">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por job, instalador ou produto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-white/5 border-white/10 text-white"
-              />
-            </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="all">Todos os status</SelectItem>
-                <SelectItem value="in_progress">🔵 Em andamento</SelectItem>
-                <SelectItem value="completed">🟢 Completo</SelectItem>
-                <SelectItem value="paused">🟠 Pausado</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={installerFilter} onValueChange={setInstallerFilter}>
-              <SelectTrigger className="bg-white/5 border-white/10 text-white">
-                <SelectValue placeholder="Instalador" />
-              </SelectTrigger>
-              <SelectContent className="bg-card border-white/10">
-                <SelectItem value="all">Todos os instaladores</SelectItem>
-                {installers.map(installer => (
-                  <SelectItem key={installer.id} value={installer.id}>
-                    {installer.full_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <>
+      <div className="p-4 md:p-8 space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-heading font-bold text-white tracking-tight">
+              Check-ins
+            </h1>
+            <p className="text-muted-foreground text-sm mt-1">
+              Gerencie os registros de check-in e checkout
+            </p>
           </div>
-        </CardContent>
-      </Card>
+          <Button
+            onClick={loadData}
+            variant="outline"
+            className="border-primary/50 text-primary hover:bg-primary/10"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Atualizar
+          </Button>
+        </div>
 
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-white/5">
-          <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-white">
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Todos ({filteredCheckins.length})
-          </TabsTrigger>
-          <TabsTrigger value="checkins" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
-            <LogIn className="h-4 w-4 mr-2" />
-            Check-ins ({checkinsOnly.length})
-          </TabsTrigger>
-          <TabsTrigger value="checkouts" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
-            <LogOut className="h-4 w-4 mr-2" />
-            Check-outs ({checkoutsOnly.length})
-          </TabsTrigger>
-        </TabsList>
+        {/* Stats Cards - Clicáveis com Drill-down */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Total */}
+          <Card
+            className={`bg-card border-white/5 hover:border-primary/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+              statusFilter === 'all' ? 'ring-2 ring-primary' : ''
+            }`}
+            onClick={() => setStatusFilter('all')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/20">
+                <CheckCircle className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-2xl font-bold text-white">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total</p>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-opacity ${
+                statusFilter === 'all' ? 'opacity-100' : ''
+              }`} />
+            </CardContent>
+          </Card>
 
-        <TabsContent value={activeTab} className="mt-6">
-          {displayData.length === 0 ? (
-            <Card className="bg-card border-white/5">
-              <CardContent className="py-12 text-center">
-                <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <p className="text-muted-foreground">
-                  Nenhum registro encontrado com os filtros selecionados
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Two Column Layout for Checkouts Tab */}
-              {activeTab === 'checkouts' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Check-in Column */}
-                  <div className="space-y-4">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <LogIn className="h-5 w-5 text-blue-400" />
-                      Entrada (Check-in)
-                    </h2>
-                    <div className="space-y-3">
-                      {displayData.slice(0, visibleCount).map(checkin => (
-                        <MiniCheckinCard
-                          key={`checkin-${checkin.id}`}
-                          checkin={checkin}
-                          type="checkin"
-                          onView={handleView}
-                          onDelete={handleDelete}
-                          onArchive={handleArchive}
-                          onWhatsApp={handleWhatsApp}
-                          installers={installers}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {/* Check-out Column */}
-                  <div className="space-y-4">
-                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                      <LogOut className="h-5 w-5 text-green-400" />
-                      Saída (Check-out)
-                    </h2>
-                    <div className="space-y-3">
-                      {displayData.slice(0, visibleCount).map(checkin => (
-                        <MiniCheckinCard
-                          key={`checkout-${checkin.id}`}
-                          checkin={checkin}
-                          type="checkout"
-                          onView={handleView}
-                          onDelete={handleDelete}
-                          onArchive={handleArchive}
-                          onWhatsApp={handleWhatsApp}
-                          installers={installers}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Grid Layout for All/Check-ins Tab */
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {displayData.slice(0, visibleCount).map(checkin => (
-                    <MiniCheckinCard
-                      key={checkin.id}
-                      checkin={checkin}
-                      type={checkin.checkout_at ? 'checkout' : 'checkin'}
-                      onView={handleView}
-                      onDelete={handleDelete}
-                      onArchive={handleArchive}
-                      onWhatsApp={handleWhatsApp}
-                      installers={installers}
-                    />
+          {/* Em Andamento */}
+          <Card
+            className={`bg-card border-white/5 hover:border-blue-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+              statusFilter === 'in_progress' ? 'ring-2 ring-blue-500' : ''
+            }`}
+            onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-500/20">
+                <Play className="h-5 w-5 text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-2xl font-bold text-white">{stats.inProgress}</p>
+                <p className="text-xs text-muted-foreground">Em Andamento</p>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-blue-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+                statusFilter === 'in_progress' ? 'opacity-100' : ''
+              }`} />
+            </CardContent>
+          </Card>
+
+          {/* Completos */}
+          <Card
+            className={`bg-card border-white/5 hover:border-green-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+              statusFilter === 'completed' ? 'ring-2 ring-green-500' : ''
+            }`}
+            onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-500/20">
+                <CheckCircle className="h-5 w-5 text-green-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-2xl font-bold text-white">{stats.completed}</p>
+                <p className="text-xs text-muted-foreground">Completos</p>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-green-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+                statusFilter === 'completed' ? 'opacity-100' : ''
+              }`} />
+            </CardContent>
+          </Card>
+
+          {/* Pausados */}
+          <Card
+            className={`bg-card border-white/5 hover:border-orange-500/50 transition-all cursor-pointer group hover:scale-[1.02] ${
+              statusFilter === 'paused' ? 'ring-2 ring-orange-500' : ''
+            }`}
+            onClick={() => setStatusFilter(statusFilter === 'paused' ? 'all' : 'paused')}
+          >
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-orange-500/20">
+                <Pause className="h-5 w-5 text-orange-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-2xl font-bold text-white">{stats.paused}</p>
+                <p className="text-xs text-muted-foreground">Pausados</p>
+              </div>
+              <ChevronRight className={`h-4 w-4 text-orange-400 opacity-0 group-hover:opacity-100 transition-opacity ${
+                statusFilter === 'paused' ? 'opacity-100' : ''
+              }`} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Active Filter Badge */}
+        {statusFilter !== 'all' && (
+          <div className="flex items-center gap-2">
+            <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
+              statusFilter === 'in_progress' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+              statusFilter === 'completed' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+              statusFilter === 'paused' ? 'bg-orange-500/20 text-orange-400 border border-orange-500/30' :
+              'bg-primary/20 text-primary'
+            }`}>
+              {statusFilter === 'in_progress' && <Play className="h-4 w-4" />}
+              {statusFilter === 'completed' && <CheckCircle className="h-4 w-4" />}
+              {statusFilter === 'paused' && <Pause className="h-4 w-4" />}
+              Filtro ativo: {statusFilter === 'in_progress' ? 'Em Andamento' :
+                            statusFilter === 'completed' ? 'Completos' :
+                            statusFilter === 'paused' ? 'Pausados' : statusFilter}
+            </span>
+            <button
+              onClick={() => setStatusFilter('all')}
+              className="text-xs text-muted-foreground hover:text-white transition-colors"
+            >
+              Limpar filtro ×
+            </button>
+          </div>
+        )}
+
+        {/* Filters */}
+        <Card className="bg-card border-white/5">
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="relative md:col-span-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por job, instalador ou produto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 bg-white/5 border-white/10 text-white"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  <SelectItem value="in_progress">🔵 Em andamento</SelectItem>
+                  <SelectItem value="completed">🟢 Completo</SelectItem>
+                  <SelectItem value="paused">🟠 Pausado</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={installerFilter} onValueChange={setInstallerFilter}>
+                <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                  <SelectValue placeholder="Instalador" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-white/10">
+                  <SelectItem value="all">Todos os instaladores</SelectItem>
+                  {installers.map(installer => (
+                    <SelectItem key={installer.id} value={installer.id}>
+                      {installer.full_name}
+                    </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3 bg-white/5">
+            <TabsTrigger value="all" className="data-[state=active]:bg-primary data-[state=active]:text-white">
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Todos ({filteredCheckins.length})
+            </TabsTrigger>
+            <TabsTrigger value="checkins" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              <LogIn className="h-4 w-4 mr-2" />
+              Check-ins ({checkinsOnly.length})
+            </TabsTrigger>
+            <TabsTrigger value="checkouts" className="data-[state=active]:bg-green-500 data-[state=active]:text-white">
+              <LogOut className="h-4 w-4 mr-2" />
+              Check-outs ({checkoutsOnly.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={activeTab} className="mt-6">
+            {displayData.length === 0 ? (
+              <Card className="bg-card border-white/5">
+                <CardContent className="py-12 text-center">
+                  <CheckCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground">
+                    Nenhum registro encontrado com os filtros selecionados
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                {/* Two Column Layout for Checkouts Tab */}
+                {activeTab === 'checkouts' ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Check-in Column */}
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <LogIn className="h-5 w-5 text-blue-400" />
+                        Entrada (Check-in)
+                      </h2>
+                      <div className="space-y-3">
+                        {displayData.slice(0, visibleCount).map(checkin => (
+                          <MiniCheckinCard
+                            key={`checkin-${checkin.id}`}
+                            checkin={checkin}
+                            type="checkin"
+                            onView={handleView}
+                            onDelete={handleDelete}
+                            onArchive={handleArchive}
+                            onWhatsApp={handleWhatsApp}
+                            onReschedule={handleOpenReschedule}
+                            installers={installers}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Check-out Column */}
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <LogOut className="h-5 w-5 text-green-400" />
+                        Saída (Check-out)
+                      </h2>
+                      <div className="space-y-3">
+                        {displayData.slice(0, visibleCount).map(checkin => (
+                          <MiniCheckinCard
+                            key={`checkout-${checkin.id}`}
+                            checkin={checkin}
+                            type="checkout"
+                            onView={handleView}
+                            onDelete={handleDelete}
+                            onArchive={handleArchive}
+                            onWhatsApp={handleWhatsApp}
+                            onReschedule={handleOpenReschedule}
+                            installers={installers}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* Grid Layout for All/Check-ins Tab */
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {displayData.slice(0, visibleCount).map(checkin => (
+                      <MiniCheckinCard
+                        key={checkin.id}
+                        checkin={checkin}
+                        type={checkin.checkout_at ? 'checkout' : 'checkin'}
+                        onView={handleView}
+                        onDelete={handleDelete}
+                        onArchive={handleArchive}
+                        onWhatsApp={handleWhatsApp}
+                        onReschedule={handleOpenReschedule}
+                        installers={installers}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Load More Button */}
+                {visibleCount < displayData.length && (
+                  <div className="flex justify-center mt-6">
+                    <Button
+                      onClick={loadMore}
+                      variant="outline"
+                      className="border-white/20 text-white hover:bg-white/5"
+                    >
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Carregar mais ({displayData.length - visibleCount} restantes)
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      {/* Reagendar Modal */}
+      <Dialog open={!!rescheduleCheckin} onOpenChange={(open) => { if (!open) handleCloseReschedule(); }}>
+        <DialogContent className="bg-card border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-white">
+              <CalendarClock className="h-5 w-5 text-blue-400" />
+              Reagendar Job
+            </DialogTitle>
+          </DialogHeader>
+
+          {rescheduleCheckin && (
+            <div className="space-y-4 py-2">
+              <p className="text-sm text-muted-foreground">
+                Job: <span className="text-white font-medium">{rescheduleCheckin.job_title}</span>
+              </p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Data *</Label>
+                  <Input
+                    type="date"
+                    value={rescheduleDate}
+                    onChange={(e) => setRescheduleDate(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Horário início *</Label>
+                  <Input
+                    type="time"
+                    value={rescheduleTime}
+                    onChange={(e) => setRescheduleTime(e.target.value)}
+                    className="bg-white/5 border-white/10 text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Horário fim (opcional)</Label>
+                <Input
+                  type="time"
+                  value={rescheduleTimeEnd}
+                  onChange={(e) => setRescheduleTimeEnd(e.target.value)}
+                  className="bg-white/5 border-white/10 text-white"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Motivo do reagendamento</Label>
+                <textarea
+                  value={rescheduleNote}
+                  onChange={(e) => setRescheduleNote(e.target.value)}
+                  placeholder="Ex: Instalador indisponível, condição climática, solicitação do cliente..."
+                  rows={2}
+                  className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-blue-500 resize-none"
+                />
+              </div>
+
+              {installers.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Instaladores</Label>
+                  <div className="max-h-36 overflow-y-auto space-y-1 rounded-md border border-white/10 p-2">
+                    {installers.map(installer => (
+                      <label
+                        key={installer.id}
+                        className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-white/5 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="accent-blue-400"
+                          checked={rescheduleInstallerIds.includes(installer.id)}
+                          onChange={() => toggleRescheduleInstaller(installer.id)}
+                        />
+                        <span className="text-white">{installer.full_name}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
-              
-              {/* Load More Button */}
-              {visibleCount < displayData.length && (
-                <div className="flex justify-center mt-6">
-                  <Button
-                    onClick={loadMore}
-                    variant="outline"
-                    className="border-white/20 text-white hover:bg-white/5"
-                  >
-                    <ChevronDown className="h-4 w-4 mr-2" />
-                    Carregar mais ({displayData.length - visibleCount} restantes)
-                  </Button>
-                </div>
-              )}
-            </>
+            </div>
           )}
-        </TabsContent>
-      </Tabs>
-    </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleCloseReschedule}
+              disabled={rescheduling}
+              className="border-white/20 text-white hover:bg-white/5"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleConfirmReschedule}
+              disabled={rescheduling || !rescheduleDate || !rescheduleTime}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {rescheduling ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CalendarClock className="h-4 w-4 mr-2" />
+              )}
+              {rescheduling ? 'Reagendando...' : 'Confirmar Reagendamento'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

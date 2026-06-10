@@ -76,7 +76,8 @@ TABLE_COLUMNS = {
         "item_assignments", "archived_items", "archived", "archived_at", "archived_by",
         "archived_by_name", "exclude_from_metrics", "no_installation", "notes",
         "cancelled_at", "justification", "justified_at", "installation_config",
-        "completed_at", "finalized_at", "created_at"
+        "completed_at", "finalized_at", "created_at",
+        "reschedule_history"
     ]),
     "checkins": frozenset([
         "id", "job_id", "installer_id", "status", "checkin_at", "checkout_at",
