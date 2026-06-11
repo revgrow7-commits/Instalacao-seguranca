@@ -691,7 +691,9 @@ const Jobs = () => {
     }
   };
 
-  const handleFinalizeNoInstallation = async (job) => {
+  const handleNavigate = useCallback((id) => navigate(`/jobs/${id}`), [navigate]);
+
+  const handleFinalizeNoInstallation = useCallback(async (job) => {
     const confirmed = window.confirm(
       `Finalizar "${job.title}" como SEM INSTALAÇÃO?\n\n` +
       `⚠️ Este job será:\n` +
@@ -721,17 +723,17 @@ const Jobs = () => {
     } finally {
       setProcessingJobId(null);
     }
-  };
+  }, []);
 
   // Open justification dialog
-  const handleOpenJustifyDialog = (job) => {
+  const handleOpenJustifyDialog = useCallback((job) => {
     setJustifyJob(job);
     setJustifyReason('');
     setJustifyType('no_checkin');
     setShowJustifyDialog(true);
-  };
+  }, []);
 
-  const handleOpenTicketDialog = (job) => {
+  const handleOpenTicketDialog = useCallback((job) => {
     setTicketJob(job);
     setTicketCategoria('Instalação');
     setTicketPrioridade('Média');
@@ -746,7 +748,7 @@ const Jobs = () => {
         .catch(err => console.error('Erro ao buscar responsáveis:', err))
         .finally(() => setLoadingResponsaveis(false));
     }
-  };
+  }, [responsaveis]);
 
   const handleSubmitTicket = async () => {
     if (ticketDescricao.trim().length < 10) {
@@ -812,12 +814,12 @@ const Jobs = () => {
     }
   };
 
-  const handleOpenScheduleDialog = (job) => {
+  const handleOpenScheduleDialog = useCallback((job) => {
     setSelectedJob(job);
     setScheduleDate(job.scheduled_date ? job.scheduled_date.split('T')[0] : '');
     setScheduleInstallerIds(new Set(Array.isArray(job.assigned_installers) ? job.assigned_installers : []));
     setShowScheduleDialog(true);
-  };
+  }, []);
 
   const handleScheduleJob = async () => {
     if (!selectedJob) return;
@@ -864,7 +866,7 @@ const Jobs = () => {
   };
 
   // Arquivar/Desarquivar job
-  const handleArchiveJob = async (job, shouldArchive) => {
+  const handleArchiveJob = useCallback(async (job, shouldArchive) => {
     const action = shouldArchive ? 'arquivar' : 'restaurar';
     if (!window.confirm(`Deseja ${action} o job "${job.title}"?\n\n${shouldArchive ? 'O job será removido da lista principal e não será contabilizado nos relatórios.' : 'O job voltará para a lista principal.'}`)) {
       return;
@@ -898,7 +900,7 @@ const Jobs = () => {
     } finally {
       setProcessingJobId(null);
     }
-  };
+  }, [handleOpenScheduleDialog]);
 
   const toggleBatchInstaller = (id) => {
     setBatchScheduleInstallerIds(prev => {
@@ -1616,7 +1618,7 @@ const Jobs = () => {
               >
                 <JobCard
                   job={job}
-                  onNavigate={(id) => navigate(`/jobs/${id}`)}
+                  onNavigate={handleNavigate}
                   onFinalize={handleFinalizeNoInstallation}
                   onSchedule={handleOpenScheduleDialog}
                   onReschedule={handleOpenScheduleDialog}
