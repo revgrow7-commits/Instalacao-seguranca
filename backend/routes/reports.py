@@ -32,6 +32,42 @@ def _metrics_excluded(job: dict) -> bool:
     )
 
 
+# ── Fonte de verdade dos relatórios: EXIF das fotos da galeria ──
+# Início, fim e duração vêm SOMENTE do EXIF (momento real da captura). Sem EXIF
+# de data → None: não usa o horário do clique de check-in/checkout. Aplica-se aos
+# item_checkins (fluxo atual com fotos). A tabela legada `checkins` não tem EXIF.
+def _exif_start(c: dict):
+    return c.get("exif_checkin_at") or c.get("exif_datetime") or None
+
+
+def _exif_end(c: dict):
+    return c.get("exif_checkout_at") or c.get("checkout_exif_datetime") or None
+
+
+def _parse_dt(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v).replace('Z', '+00:00').replace(' ', 'T'))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+
+
+def _exif_duration_min(c: dict):
+    """Duração (min) SOMENTE pelo EXIF da foto. None quando falta EXIF de data."""
+    v = c.get("exif_duration_minutes")
+    if v is not None:
+        return v
+    s, e = _parse_dt(_exif_start(c)), _parse_dt(_exif_end(c))
+    if not s or not e:
+        return None
+    diff = (e - s).total_seconds() / 60
+    return diff if diff >= 0 else None
+
+
 def classify_product_to_family(product_name: str) -> tuple:
     """
     Classifies a product into a family based on keywords.
@@ -284,7 +320,8 @@ async def get_family_productivity_kpis(
     for checkin in checkins:
         family = checkin.get("family_name") or "Outros"
         installed_m2 = checkin.get("installed_m2", 0) or 0
-        duration = checkin.get("net_duration_minutes") or checkin.get("duration_minutes", 0) or 0
+        # Duração SOMENTE pelo EXIF da foto (não pelo clique)
+        duration = _exif_duration_min(checkin) or 0
         
         if installed_m2 <= 0:
             continue
@@ -398,7 +435,7 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
         total_m2_installed = 0
         
         for checkin in installer_checkins:
-            net_minutes = checkin.get("net_duration_minutes") or checkin.get("duration_minutes") or 0
+            net_minutes = _exif_duration_min(checkin) or 0  # EXIF da foto
             total_net_duration_min += net_minutes
             
             job = jobs_map.get(checkin.get("job_id"))
@@ -419,7 +456,7 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
             if job:
                 job_area = job.get("area_m2", 0) or 0
                 job_item_checkins = [c for c in installer_checkins if c.get("job_id") == job_id]
-                job_net_duration = sum(c.get("net_duration_minutes") or c.get("duration_minutes") or 0 for c in job_item_checkins)
+                job_net_duration = sum(_exif_duration_min(c) or 0 for c in job_item_checkins)
                 
                 job_m2_installed = 0
                 products = job.get("products_with_area", [])
@@ -510,45 +547,32 @@ async def get_productivity_report(
         if not job:
             continue
         
-        checkin_at = checkin.get("checkin_at")
-        if isinstance(checkin_at, str):
-            checkin_at = datetime.fromisoformat(checkin_at.replace('Z', '+00:00'))
-        
-        if date_from:
-            start_date = datetime.fromisoformat(date_from + "T00:00:00+00:00")
-            if checkin_at and checkin_at < start_date:
+        # Início e fim SOMENTE pelo EXIF da foto (não pelo clique)
+        checkin_at = _parse_dt(_exif_start(checkin))
+        checkout_at = _parse_dt(_exif_end(checkin))
+
+        # Filtro por data usa o início EXIF; sem EXIF de data, fica fora de intervalos
+        if date_from or date_to:
+            if not checkin_at:
                 continue
-        
-        if date_to:
-            end_date = datetime.fromisoformat(date_to + "T23:59:59+00:00")
-            if checkin_at and checkin_at > end_date:
-                continue
-        
+            if date_from:
+                start_date = datetime.fromisoformat(date_from + "T00:00:00+00:00")
+                if checkin_at < start_date:
+                    continue
+            if date_to:
+                end_date = datetime.fromisoformat(date_to + "T23:59:59+00:00")
+                if checkin_at > end_date:
+                    continue
+
         products = job.get("products_with_area", [])
         item_index = checkin.get("item_index", 0)
         item = products[item_index] if item_index < len(products) else {}
-        
+
         item_m2 = item.get("total_area_m2", 0) or 0
-        
-        checkout_at = checkin.get("checkout_at")
-        if isinstance(checkout_at, str):
-            checkout_at = datetime.fromisoformat(checkout_at.replace('Z', '+00:00'))
-        
-        if checkin_at and checkin_at.tzinfo is None:
-            checkin_at = checkin_at.replace(tzinfo=timezone.utc)
-        if checkout_at and checkout_at.tzinfo is None:
-            checkout_at = checkout_at.replace(tzinfo=timezone.utc)
-        
-        net_duration_minutes = checkin.get("net_duration_minutes")
+
         total_pause_minutes = checkin.get("total_pause_minutes", 0) or 0
-        
-        if net_duration_minutes is None:
-            if checkin_at and checkout_at:
-                net_duration_minutes = (checkout_at - checkin_at).total_seconds() / 60
-            else:
-                net_duration_minutes = 0
-        
-        duration_minutes = net_duration_minutes
+        # Duração SOMENTE pelo EXIF (fim - início pela foto); sem EXIF → 0
+        duration_minutes = _exif_duration_min(checkin) or 0
         
         installer_id = checkin.get("installer_id")
         installer = installers_map.get(installer_id, {})
@@ -813,7 +837,11 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
     
     # Queries simples para checkins (excluindo arquivados)
     checkins = db.checkins.find({"is_archived": {"$ne": True}}, {"_id": 0, "status": 1})
-    item_checkins = db.item_checkins.find({"is_archived": {"$ne": True}}, {"_id": 0, "status": 1, "net_duration_minutes": 1})
+    item_checkins = db.item_checkins.find(
+        {"is_archived": {"$ne": True}},
+        {"_id": 0, "status": 1, "exif_duration_minutes": 1,
+         "exif_checkin_at": 1, "exif_checkout_at": 1, "exif_datetime": 1, "checkout_exif_datetime": 1}
+    )
 
     total_checkins = len(checkins) + len(item_checkins)
     completed_checkins = (
@@ -821,11 +849,15 @@ async def get_metrics(current_user: User = Depends(get_current_user)):
         len([c for c in item_checkins if c.get("status") == "completed"])
     )
 
-    # Calcular duração média dos item_checkins completados
-    completed_with_time = [c for c in item_checkins if c.get("status") == "completed" and c.get("net_duration_minutes")]
+    # Duração média dos item_checkins completados — SOMENTE pelo EXIF da foto.
+    # Itens sem EXIF de data não entram na média (apenas metadados das fotos contam).
+    _completed_durations = [
+        _exif_duration_min(c) for c in item_checkins if c.get("status") == "completed"
+    ]
+    completed_with_time = [d for d in _completed_durations if d is not None]
     avg_duration = 0
     if completed_with_time:
-        avg_duration = sum(c.get("net_duration_minutes", 0) for c in completed_with_time) / len(completed_with_time)
+        avg_duration = sum(completed_with_time) / len(completed_with_time)
     
     total_installers = db.installers.count_documents({})
     
