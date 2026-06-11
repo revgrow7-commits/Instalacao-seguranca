@@ -35,10 +35,12 @@ function writeDashCache(data) {
 // Início/fim vêm SOMENTE do EXIF da foto da galeria; sem EXIF mostra "—" (não usa o clique).
 const exifStart = (c) => c?.exif_checkin_at || c?.exif_datetime || null;
 const exifEnd = (c) => c?.exif_checkout_at || c?.checkout_exif_datetime || null;
+// Relógio de parede do EXIF (sem conversão de fuso) — consistente com /reports e
+// o backend. new Date().toLocaleTimeString deslocava o horário do dado legado.
 const exifTime = (v) => {
   if (!v) return '—';
-  const d = new Date(v);
-  return isNaN(d) ? '—' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const m = String(v).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
+  return m ? m[1] : '—';
 };
 
 // ── Skeleton placeholder ──

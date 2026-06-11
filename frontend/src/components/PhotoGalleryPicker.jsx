@@ -138,10 +138,11 @@ const PhotoGalleryPicker = ({
     input.click();
   };
 
+  // Relógio de parede do EXIF (sem conversão de fuso), igual a /reports e backend.
   const formatTime = (isoStr) => {
     if (!isoStr) return null;
-    try { return new Date(isoStr.replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-    catch { return null; }
+    const m = String(isoStr).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
+    return m ? m[1] : null;
   };
 
   const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
