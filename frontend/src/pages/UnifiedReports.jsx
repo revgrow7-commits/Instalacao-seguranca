@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { exifTimeHM } from '../lib/exifTime';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -41,11 +42,7 @@ const exifDurationMin = (c) => {
 // mostrar, qualquer que seja o rótulo de fuso. Por isso extraímos verbatim e NÃO
 // reconvertemos: cobre tanto o dado novo (-03:00) quanto o legado carimbado +00:00
 // (cujos dígitos 14:26 também são o horário local real, não 11:26).
-const exifTime = (v) => {
-  if (!v) return '—';
-  const m = String(v).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
-  return m ? m[1] : '—';
-};
+const exifTime = (v) => exifTimeHM(v) || '—';
 
 // Dispositivo registrado no EXIF (Make + Model). Check-in tem prioridade sobre checkout.
 const exifDevice = (c) => c?.exif_device || c?.checkout_exif_device || null;

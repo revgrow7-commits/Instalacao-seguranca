@@ -1,6 +1,7 @@
 import React from 'react';
 import { Images, X, MapPin, Clock, Camera } from 'lucide-react';
 import { extractExif } from '../lib/extractExif';
+import { exifTimeHM } from '../lib/exifTime';
 import { reverseGeocode } from '../lib/reverseGeocode';
 import { toast } from 'sonner';
 
@@ -138,12 +139,7 @@ const PhotoGalleryPicker = ({
     input.click();
   };
 
-  // Relógio de parede do EXIF (sem conversão de fuso), igual a /reports e backend.
-  const formatTime = (isoStr) => {
-    if (!isoStr) return null;
-    const m = String(isoStr).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
-    return m ? m[1] : null;
-  };
+  const formatTime = (isoStr) => exifTimeHM(isoStr);
 
   const exifTimes = photos.map(f => f.exif?.exif_datetime).filter(Boolean).sort();
   const earliest = exifTimes[0];

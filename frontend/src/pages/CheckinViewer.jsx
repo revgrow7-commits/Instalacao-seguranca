@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { exifDateTimeBR } from '../lib/exifTime';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -292,7 +293,7 @@ const CheckinViewer = () => {
           <div className="space-y-2 text-white">
             <div>
               <p className="text-sm text-muted-foreground">Horário</p>
-              <p className="font-medium">{formatDate(exifCheckinAt || checkin.checkin_at)}</p>
+              <p className="font-medium">{exifDateTimeBR(exifCheckinAt) || formatDate(checkin.checkin_at)}</p>
             </div>
             
             {checkin.gps_lat && checkin.gps_long && (
@@ -397,7 +398,7 @@ const CheckinViewer = () => {
             <div className="space-y-2 text-white">
               <div>
                 <p className="text-sm text-muted-foreground">Horário</p>
-                <p className="font-medium">{formatDate(exifCheckoutAt || checkin.checkout_at)}</p>
+                <p className="font-medium">{exifDateTimeBR(exifCheckoutAt) || formatDate(checkin.checkout_at)}</p>
               </div>
 
               <div>

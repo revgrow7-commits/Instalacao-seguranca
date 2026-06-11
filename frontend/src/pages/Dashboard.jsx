@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { exifTimeHM } from '../lib/exifTime';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -35,13 +36,8 @@ function writeDashCache(data) {
 // Início/fim vêm SOMENTE do EXIF da foto da galeria; sem EXIF mostra "—" (não usa o clique).
 const exifStart = (c) => c?.exif_checkin_at || c?.exif_datetime || null;
 const exifEnd = (c) => c?.exif_checkout_at || c?.checkout_exif_datetime || null;
-// Relógio de parede do EXIF (sem conversão de fuso) — consistente com /reports e
-// o backend. new Date().toLocaleTimeString deslocava o horário do dado legado.
-const exifTime = (v) => {
-  if (!v) return '—';
-  const m = String(v).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
-  return m ? m[1] : '—';
-};
+// Horário do EXIF no fuso de operação (America/Sao_Paulo), determinístico.
+const exifTime = (v) => exifTimeHM(v) || '—';
 
 // ── Skeleton placeholder ──
 const Skeleton = ({ className = '' }) => (
