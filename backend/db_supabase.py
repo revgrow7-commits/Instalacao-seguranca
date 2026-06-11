@@ -537,8 +537,47 @@ class SupabaseTable:
             return False
 
     def update_many(self, query: Dict[str, Any], update: Dict[str, Any]) -> Dict:
-        """Update multiple documents"""
-        return self.update_one(query, update)
+        """Update TODOS os documentos que casam com o filtro.
+
+        - $set / update direto: um único UPDATE set-based com o filtro (atinge todas
+          as linhas que casam de uma vez), com suporte a operadores via _apply_filter.
+        - $inc / $push: o novo valor depende do registro atual, então a semântica é
+          por-linha — itera sobre cada registro casado aplicando update_one por id
+          (garante incremento/append corretos em múltiplas linhas).
+        """
+        try:
+            has_inc = '$inc' in update
+            has_push = '$push' in update
+
+            if has_inc or has_push:
+                matched = self.find(query)
+                modified = 0
+                for doc in matched:
+                    doc_id = doc.get('id')
+                    if doc_id is None:
+                        continue
+                    res = self.update_one({'id': doc_id}, update)
+                    modified += res.get('modified_count', 0)
+                return {'modified_count': modified, 'matched_count': len(matched)}
+
+            has_set = '$set' in update
+            update_data = update['$set'] if has_set else update
+            clean_update = {k: _serialize(v) for k, v in update_data.items() if v is not None}
+            clean_update = _filter_columns(self.table_name, clean_update)
+            if not clean_update:
+                return {'modified_count': 0, 'matched_count': 0}
+
+            builder = self._table().update(clean_update)
+            for key, value in query.items():
+                if not key.startswith('$'):
+                    builder = _apply_filter(builder, key, value)
+            result = builder.execute()
+            n = len(result.data) if result.data else 0
+            return {'modified_count': n, 'matched_count': n}
+
+        except Exception as e:
+            logger.error(f"update_many error on {self.table_name}: {e}")
+            raise
 
     def find_one_and_update(
         self,
@@ -572,8 +611,19 @@ class SupabaseTable:
             raise
 
     def delete_many(self, query: Dict[str, Any]) -> Dict:
-        """Delete multiple documents"""
-        return self.delete_one(query)
+        """Delete TODOS os documentos que casam com o filtro (DELETE set-based,
+        com suporte a operadores via _apply_filter). Filtro vazio apaga todas as
+        linhas da tabela — comportamento usado pela rota de reset de dados de teste."""
+        try:
+            builder = self._table().delete()
+            for key, value in query.items():
+                if not key.startswith('$'):
+                    builder = _apply_filter(builder, key, value)
+            result = builder.execute()
+            return {'deleted_count': len(result.data) if result.data else 0}
+        except Exception as e:
+            logger.error(f"delete_many error on {self.table_name}: {e}")
+            raise
 
     # ============ COUNT OPERATIONS ============
 
