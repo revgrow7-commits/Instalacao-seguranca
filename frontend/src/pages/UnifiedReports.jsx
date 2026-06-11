@@ -20,6 +20,21 @@ import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 10;
 
+// ── Fonte de verdade dos relatórios: metadados EXIF das fotos da galeria ──
+// Início, fim e duração SEMPRE vêm do EXIF (momento real da captura da foto no
+// celular). Sem EXIF de data → null: o relatório NÃO usa o horário do clique de
+// check-in/checkout. Registros sem EXIF aparecem como "—" e não entram nas
+// somas de duração/produtividade.
+const exifStart = (c) => c?.exif_checkin_at || c?.exif_datetime || null;
+const exifEnd = (c) => c?.exif_checkout_at || c?.checkout_exif_datetime || null;
+const exifDurationMin = (c) => {
+  if (c?.exif_duration_minutes != null) return c.exif_duration_minutes;
+  const s = exifStart(c), e = exifEnd(c);
+  if (!s || !e) return null;
+  const diff = (new Date(e).getTime() - new Date(s).getTime()) / 60000;
+  return Number.isFinite(diff) && diff >= 0 ? diff : null;
+};
+
 // ── SessionStorage cache para checkins pesados (2 minutos) ──
 const REPORTS_CACHE_KEY = 'reports_checkins_v1';
 const REPORTS_CACHE_TTL = 2 * 60_000;
@@ -253,7 +268,9 @@ const UnifiedReports = () => {
   const stats = useMemo(() => {
     const completedCheckins = itemCheckins.filter(c => c.status === 'completed');
     const totalM2 = completedCheckins.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
-    const totalMinutes = completedCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+    // Duração total = soma das durações EXIF (fim - início pela foto). Itens sem
+    // EXIF não somam tempo (apenas metadados das fotos contam).
+    const totalMinutes = completedCheckins.reduce((sum, c) => sum + (exifDurationMin(c) || 0), 0);
     const avgProductivity = totalMinutes > 0 ? (totalM2 / (totalMinutes / 60)).toFixed(2) : 0;
     const jobsByStatus = {
       aguardando: jobs.filter(j => j.status === 'aguardando' || j.status === 'pending').length,
@@ -278,7 +295,8 @@ const UnifiedReports = () => {
       const instCheckins = itemCheckins.filter(c => c.installer_id === installer.id);
       const completed = instCheckins.filter(c => c.status === 'completed');
       const totalM2 = completed.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
-      const totalMins = completed.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+      // Duração por instalador via EXIF (foto), não pelo clique
+      const totalMins = completed.reduce((sum, c) => sum + (exifDurationMin(c) || 0), 0);
       const avgProd = totalMins > 0 ? (totalM2 / (totalMins / 60)).toFixed(2) : 0;
       return { ...installer, totalCheckins: instCheckins.length, completedCheckins: completed.length, totalM2, totalMinutes: totalMins, avgProductivity: avgProd };
     }).sort((a, b) => b.totalM2 - a.totalM2);
@@ -288,7 +306,8 @@ const UnifiedReports = () => {
   const consolidatedCheckins = useMemo(() => {
     return itemCheckins
       .filter(c => c.status === 'completed')
-      .sort((a, b) => new Date(b.checkin_at || 0) - new Date(a.checkin_at || 0))
+      // Ordena pelo início EXIF (foto); sem EXIF cai pro checkin_at só para ordenar
+      .sort((a, b) => new Date(exifStart(b) || b.checkin_at || 0) - new Date(exifStart(a) || a.checkin_at || 0))
       .slice(0, 100);
   }, [itemCheckins]);
 
@@ -302,9 +321,16 @@ const UnifiedReports = () => {
       }
       let matchesDate = true;
       if (startDate || endDate) {
-        const checkinDate = new Date(c.checkin_at);
-        if (startDate && checkinDate < new Date(startDate)) matchesDate = false;
-        if (endDate && checkinDate > new Date(endDate + 'T23:59:59')) matchesDate = false;
+        // Filtra pela data de captura da foto (EXIF). Sem EXIF de data, o item
+        // não tem timeline de relatório → fica fora de qualquer intervalo.
+        const exifS = exifStart(c);
+        if (!exifS) {
+          matchesDate = false;
+        } else {
+          const checkinDate = new Date(exifS);
+          if (startDate && checkinDate < new Date(startDate)) matchesDate = false;
+          if (endDate && checkinDate > new Date(endDate + 'T23:59:59')) matchesDate = false;
+        }
       }
       return matchesInstaller && matchesJob && matchesFamily && matchesDate && (c.checkin_photo || c.checkout_photo || c.checkin_photo_url);
     });
@@ -533,8 +559,8 @@ const UnifiedReports = () => {
                       const d = new Date(String(v).replace(' ', 'T'));
                       return isNaN(d) ? null : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                     };
-                    const inicioFromExif = c.exif_checkin_at || c.exif_datetime;
-                    const fimFromExif = c.exif_checkout_at || c.checkout_exif_datetime;
+                    const inicioFromExif = exifStart(c);
+                    const fimFromExif = exifEnd(c);
                     const inicio = toExifTime(inicioFromExif) || '—';
                     const fim = toExifTime(fimFromExif) || '—';
                     const jobCode = job?.holdprint_data?.code || job?.code || c.job_id?.slice(0, 6);
@@ -854,7 +880,8 @@ const UnifiedReports = () => {
                     const jobCheckins = checkinsByJobId.get(job.id) || [];
                     const completedItems = jobCheckins.filter(c => c.status === 'completed').length;
                     const totalM2 = jobCheckins.reduce((sum, c) => sum + (c.installed_m2 || 0), 0);
-                    const totalMinutes = jobCheckins.reduce((sum, c) => sum + (c.duration_minutes || 0), 0);
+                    // Tempo do job via EXIF das fotos (não pelo clique)
+                    const totalMinutes = jobCheckins.reduce((sum, c) => sum + (exifDurationMin(c) || 0), 0);
                     return (
                       <div key={job.id} className="border border-white/5 rounded-lg overflow-hidden">
                         <div
@@ -984,6 +1011,9 @@ const UnifiedReports = () => {
                   const jobTitle = checkin.job_title || job?.title || 'Job';
                   const photo = checkin.checkin_photo_url || checkin.checkin_photo || checkin.checkout_photo;
                   const pType = checkin.checkout_photo ? 'checkout' : 'checkin';
+                  // Data exibida = registro EXIF da foto (saída→fim, entrada→início); "—" se sem EXIF
+                  const photoExif = pType === 'checkout' ? exifEnd(checkin) : exifStart(checkin);
+                  const photoWhen = photoExif ? formatDate(String(photoExif).replace(' ', 'T')) : '—';
                   return (
                     <Card key={checkin.id} className="bg-card border-white/5 overflow-hidden group">
                       <div className="px-3 py-2 bg-primary/10 border-b border-white/5">
@@ -1013,14 +1043,14 @@ const UnifiedReports = () => {
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
                           <div className="w-full">
                             <p className="text-white font-medium text-sm truncate">{checkin.installer_name}</p>
-                            <p className="text-muted-foreground text-xs">{formatDate(checkin.checkin_at)}</p>
+                            <p className="text-muted-foreground text-xs">{photoWhen}</p>
                           </div>
                         </div>
                       </div>
                       <div className="px-3 py-2 bg-white/5 border-t border-white/5">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-muted-foreground truncate flex-1">{checkin.installer_name}</span>
-                          <span className="text-muted-foreground ml-2">{formatDate(checkin.checkin_at)}</span>
+                          <span className="text-muted-foreground ml-2">{photoWhen}</span>
                         </div>
                       </div>
                     </Card>
