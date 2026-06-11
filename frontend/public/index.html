@@ -51,13 +51,17 @@
         <div id="root"></div>
         <script>
         (function(){
-          var T='v8';
-          if(localStorage.getItem('iv_clear')===T)return;
-          localStorage.setItem('iv_clear',T);
-          var jobs=[];
-          if('caches'in window)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
-          if('serviceWorker'in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
-          Promise.all(jobs).then(function(){window.location.replace(location.pathname+'?_v=v8');}).catch(function(){window.location.replace(location.pathname+'?_v=v8');});
+          try{
+            var T='v8';
+            if(localStorage.getItem('iv_clear')===T)return;
+            localStorage.setItem('iv_clear',T);
+            var jobs=[];
+            if('caches'in window)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
+            if('serviceWorker'in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
+            // PRESERVA a querystring existente (ex.: /reset-password?token=X) — só adiciona _v.
+            var go=function(){try{var u=new URL(location.href);u.searchParams.set('_v',T);window.location.replace(u.toString());}catch(e){window.location.replace(location.pathname+'?_v='+T);}};
+            Promise.all(jobs).then(go).catch(go);
+          }catch(e){/* localStorage indisponível (ex.: Safari privado): segue sem sentinel para não entrar em loop de reload */}
         })();
         </script>
         <script>

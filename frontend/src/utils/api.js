@@ -372,7 +372,8 @@ export const api = {
   // @deprecated usar getJob (mesma rota, com cache de 20s). Alias mantido para compatibilidade.
   getJobById: (jobId) => api.getJob(jobId),
   deleteJob: (jobId) => axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
-  reprocessJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/reprocess-products`, {}, { headers: getAuthHeader() }),
+  reprocessJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/reprocess-products`, {}, { headers: getAuthHeader() })
+    .then((r) => { clearCache(`job_${jobId}`); return r; }), // invalida o cache de getJob — senão a releitura pós-reprocess vem stale
   finalizeJob: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/finalize`, {}, { headers: getAuthHeader() }),
 
   // Metrics

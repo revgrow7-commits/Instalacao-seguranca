@@ -54,8 +54,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
-  // Skip cross-origin requests
-  if (!url.origin.includes(self.location.origin)) {
+  // Skip cross-origin requests (igualdade estrita de origin — substring daria
+  // falso positivo, ex.: evil-app.com "inclui" app.com)
+  if (url.origin !== self.location.origin) {
     return;
   }
   
@@ -69,11 +70,14 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
-          // Clone and cache the fresh response
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+          // Só cacheia resposta saudável — cachear um 404/500 serviria
+          // página de erro no modo offline para sempre.
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
           return response;
         })
         .catch(() => {

@@ -29,7 +29,9 @@ _FAMILIES_TTL_SECONDS = 300
 def _get_product_families_cached():
     import time
     now = time.monotonic()
-    if _FAMILIES_CACHE["data"] is None or (now - _FAMILIES_CACHE["at"]) > _FAMILIES_TTL_SECONDS:
+    # 'not data' (e não 'is None'): lista vazia também força re-fetch — senão uma
+    # falha transitória na 1ª query deixaria todos os check-ins sem família por 5 min.
+    if not _FAMILIES_CACHE["data"] or (now - _FAMILIES_CACHE["at"]) > _FAMILIES_TTL_SECONDS:
         _FAMILIES_CACHE["data"] = db.product_families.find({}, {"_id": 0})
         _FAMILIES_CACHE["at"] = now
     return _FAMILIES_CACHE["data"]
