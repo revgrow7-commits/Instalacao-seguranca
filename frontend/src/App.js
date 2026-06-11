@@ -74,6 +74,11 @@ class ErrorBoundary extends Component {
           >
             {this.state.clearing ? 'Limpando...' : 'Limpar cache e recarregar'}
           </button>
+          {this.state.error && (
+            <p style={{ fontSize: 11, marginTop: '1rem', color: '#888', wordBreak: 'break-word' }}>
+              {(this.state.error.name ? this.state.error.name + ': ' : '') + (this.state.error.message || String(this.state.error)).slice(0, 200)}
+            </p>
+          )}
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <pre style={{ textAlign: 'left', fontSize: 11, marginTop: '1rem', background: '#111', padding: '1rem', borderRadius: 6, overflow: 'auto', maxHeight: 300 }}>
               {this.state.error.stack}

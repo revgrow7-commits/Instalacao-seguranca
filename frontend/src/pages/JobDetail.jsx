@@ -1143,8 +1143,17 @@ const JobDetail = () => {
             onClick={() => {
               if (job.scheduled_date) {
                 const d = new Date(job.scheduled_date);
-                const brtStr = d.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' });
-                const [brtDate, brtTimeFull] = brtStr.split(' ');
+                let brtDate, brtTimeFull;
+                try {
+                  // sv-SE => "YYYY-MM-DD HH:MM:SS"
+                  [brtDate, brtTimeFull] = d.toLocaleString('sv-SE', { timeZone: 'America/Sao_Paulo' }).split(' ');
+                } catch {
+                  // Fallback p/ WebView sem dados de fuso ICU: BRT = UTC-3 fixo
+                  const b = new Date(d.getTime() - 3 * 60 * 60 * 1000);
+                  const p2 = (n) => String(n).padStart(2, '0');
+                  brtDate = `${b.getUTCFullYear()}-${p2(b.getUTCMonth() + 1)}-${p2(b.getUTCDate())}`;
+                  brtTimeFull = `${p2(b.getUTCHours())}:${p2(b.getUTCMinutes())}:00`;
+                }
                 setRescheduleDate(brtDate);
                 setRescheduleTime(brtTimeFull.substring(0, 5));
               }
