@@ -145,6 +145,13 @@ async def google_login(current_user: User = Depends(get_current_user)):
 @router.get("/auth/google/callback")
 async def google_callback(code: str, state: str = None):
     """Handles Google OAuth callback."""
+    # Valida o state HMAC ANTES do exchange do code — previne CSRF.
+    # _verify_oauth_state levanta HTTPException 400 em state inválido/expirado;
+    # fica fora do try para que o 400 propague (não vire redirect de auth_failed).
+    if not state:
+        raise HTTPException(status_code=400, detail="OAuth state ausente")
+    verified_user_id = _verify_oauth_state(state)
+
     try:
         # Exchange code for tokens
         token_response = requests.post(
@@ -174,16 +181,10 @@ async def google_callback(code: str, state: str = None):
         
         google_user = userinfo_response.json()
         google_email = google_user.get('email')
-        
-        # Valida state HMAC — rejeita tentativas forjadas de CSRF
-        user = None
-        if state:
-            verified_user_id = _verify_oauth_state(state)
-            user = db.users.find_one({"id": verified_user_id}, {"_id": 0})
-        
-        if not user:
-            user = db.users.find_one({"email": google_email}, {"_id": 0})
-        
+
+        # Usuário é determinado pelo state já verificado (não por email não-confiável do Google)
+        user = db.users.find_one({"id": verified_user_id}, {"_id": 0})
+
         if not user:
             # Close window with error
             return RedirectResponse(
