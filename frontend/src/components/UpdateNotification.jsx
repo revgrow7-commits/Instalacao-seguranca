@@ -7,37 +7,48 @@ const UpdateNotification = () => {
   const [registration, setRegistration] = useState(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let swReg = null;
+    let installingWorker = null;
+    let refreshing = false;
+
+    // Handlers nomeados para poderem ser removidos no cleanup.
+    const handleStateChange = () => {
+      if (installingWorker && installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+        setShowUpdate(true);
+      }
+    };
+    const handleUpdateFound = () => {
+      installingWorker = swReg ? swReg.installing : null;
+      if (installingWorker) {
+        installingWorker.addEventListener('statechange', handleStateChange);
+      }
+    };
+    const handleControllerChange = () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    };
+
     // Check for service worker updates
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
+        if (!isMounted) return;
+        swReg = reg;
         setRegistration(reg);
-        
+
         // Check for waiting worker
         if (reg.waiting) {
           setShowUpdate(true);
         }
-        
+
         // Listen for new service worker
-        reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                setShowUpdate(true);
-              }
-            });
-          }
-        });
+        reg.addEventListener('updatefound', handleUpdateFound);
       });
 
       // Handle controller change (new SW activated)
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
+      navigator.serviceWorker.addEventListener('controllerchange', handleControllerChange);
     }
 
     // Força o browser a verificar se há um novo SW — tanto no intervalo quanto
@@ -50,8 +61,18 @@ const UpdateNotification = () => {
     document.addEventListener('visibilitychange', triggerUpdate);
 
     return () => {
+      isMounted = false;
       clearInterval(checkForUpdates);
       document.removeEventListener('visibilitychange', triggerUpdate);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
+      }
+      if (swReg) {
+        swReg.removeEventListener('updatefound', handleUpdateFound);
+      }
+      if (installingWorker) {
+        installingWorker.removeEventListener('statechange', handleStateChange);
+      }
     };
   }, []);
 
