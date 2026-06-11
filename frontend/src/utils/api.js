@@ -369,7 +369,8 @@ export const api = {
   getPauseReasons: () => axios.get(`${API_URL}/pause-reasons`, { headers: getAuthHeader() }),
   
   // Job by ID
-  getJobById: (jobId) => axios.get(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
+  // @deprecated usar getJob (mesma rota, com cache de 20s). Alias mantido para compatibilidade.
+  getJobById: (jobId) => api.getJob(jobId),
   deleteJob: (jobId) => axios.delete(`${API_URL}/jobs/${jobId}`, { headers: getAuthHeader() }),
   reprocessJobProducts: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/reprocess-products`, {}, { headers: getAuthHeader() }),
   finalizeJob: (jobId) => axios.post(`${API_URL}/jobs/${jobId}/finalize`, {}, { headers: getAuthHeader() }),

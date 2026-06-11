@@ -137,7 +137,7 @@ const InstallerJobDetail = () => {
   const loadJobData = async (isCancelled = () => false) => {
     try {
       setLoading(true);
-      const jobRes = await api.getJobById(jobId);
+      const jobRes = await api.getJob(jobId);
       if (isCancelled()) return;
       setJob(jobRes.data);
 
