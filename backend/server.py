@@ -39,8 +39,6 @@ from routes.products import router as products_router
 from routes.reports import router as reports_router
 from routes.calendar import router as calendar_router
 from routes.notifications import router as notifications_router
-# [GAMIFICATION DISABLED 2026-05-15] import suspenso para desativar /gamification/*
-# from routes.gamification import router as gamification_router
 from routes.installers import router as installers_router
 from routes.visitas import router as visitas_router
 from routes.visitas_reports import router as visitas_reports_router
@@ -58,8 +56,6 @@ api_router.include_router(products_router, tags=["Products"])
 api_router.include_router(reports_router, tags=["Reports"])
 api_router.include_router(calendar_router, tags=["Calendar"])
 api_router.include_router(notifications_router, tags=["Notifications"])
-# [GAMIFICATION DISABLED 2026-05-15] endpoints /gamification/* desativados.
-# api_router.include_router(gamification_router, tags=["Gamification"])
 api_router.include_router(installers_router, tags=["Installers"])
 api_router.include_router(visitas_router, tags=["Visitas Técnicas"])
 api_router.include_router(visitas_reports_router)

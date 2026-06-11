@@ -163,9 +163,6 @@ const FamilyReport = lazyWithRetry(() => import('./pages/FamilyReport'));
 const InstallerReport = lazyWithRetry(() => import('./pages/InstallerReport'));
 const FamilyKPIsReport = lazyWithRetry(() => import('./pages/FamilyKPIsReport'));
 const Profile = lazyWithRetry(() => import('./pages/Profile'));
-// [GAMIFICATION DISABLED 2026-05-15] páginas suspensas (rotas redirecionam para /dashboard).
-// const LojaFaixaPreta = lazyWithRetry(() => import('./pages/LojaFaixaPreta'));
-// const GamificationReport = lazyWithRetry(() => import('./pages/GamificationReport'));
 const SchedulerAdmin = lazyWithRetry(() => import('./pages/SchedulerAdmin'));
 const VisitasTecnicas = lazyWithRetry(() => import('./pages/VisitasTecnicas'));
 const VisitaDetail = lazyWithRetry(() => import('./pages/VisitaDetail'));
@@ -533,7 +530,7 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
-      {/* [GAMIFICATION DISABLED 2026-05-15] rotas redirecionam para /dashboard. */}
+      {/* [GAMIFICATION REMOVIDA 2026-06-11] redirects mantidos para bookmarks antigos. */}
       <Route path="/loja-faixa-preta" element={<Navigate to="/dashboard" replace />} />
       <Route path="/gamification-report" element={<Navigate to="/dashboard" replace />} />
       <Route

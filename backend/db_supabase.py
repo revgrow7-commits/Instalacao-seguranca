@@ -117,22 +117,8 @@ TABLE_COLUMNS = {
         "id", "family_id", "family_name", "installer_id", "date", "total_m2",
         "total_minutes", "items_count", "productivity_m2_h", "created_at"
     ]),
-    "gamification_balances": frozenset([
-        "id", "user_id", "total_coins", "lifetime_coins", "current_level", "level",
-        "streak_days", "last_activity", "daily_engagement_date", "created_at", "updated_at"
-    ]),
-    "coin_transactions": frozenset([
-        "id", "user_id", "amount", "transaction_type", "description", "reference_type",
-        "reference_id", "breakdown", "balance_after", "created_at"
-    ]),
-    "rewards": frozenset([
-        "id", "name", "description", "cost_coins", "category", "image_url", "stock",
-        "is_active", "created_at"
-    ]),
-    "reward_requests": frozenset([
-        "id", "user_id", "reward_id", "reward_name", "cost_coins", "status", "notes",
-        "processed_at", "created_at"
-    ]),
+    # [GAMIFICATION REMOVIDA 2026-06-11] tabelas gamification_balances/coin_transactions/
+    # rewards/reward_requests continuam no banco (dados históricos) mas sem uso no código.
     "location_alerts": frozenset([
         "id", "item_checkin_id", "job_id", "installer_id", "event_type", "checkin_lat",
         "checkin_long", "checkout_lat", "checkout_long", "distance_meters",

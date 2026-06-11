@@ -56,13 +56,6 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'noreply@instal-visual
 MAX_CHECKOUT_DISTANCE_METERS = 500
 MIN_CHECKOUT_DURATION_SECONDS = 60  # 1 minuto mínimo entre check-in e checkout
 
-# Feature Flags
-# [GAMIFICATION DISABLED 2026-05-15] forçado False no código para deixar inativa
-# independente da env var. Para reativar: trocar para a linha abaixo (env var-driven)
-# ou setar diretamente True aqui.
-# GAMIFICATION_ENABLED = os.environ.get('GAMIFICATION_ENABLED', 'false').lower() == 'true'
-GAMIFICATION_ENABLED = False
-
 # Upload directory
 _is_serverless = os.environ.get('VERCEL') == '1' or os.environ.get('SERVERLESS') == 'true'
 UPLOAD_DIR = Path(os.environ.get('UPLOAD_DIR', '/tmp/uploads' if _is_serverless else str(ROOT_DIR / 'uploads')))

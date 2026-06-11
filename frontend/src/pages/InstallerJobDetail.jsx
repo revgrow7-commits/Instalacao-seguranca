@@ -52,9 +52,6 @@ const InstallerJobDetail = () => {
   const [pauseItemIndex, setPauseItemIndex] = useState(null);
   const [pauseReason, setPauseReason] = useState('');
 
-  // [GAMIFICATION DISABLED 2026-05-15] removidos showCoinAnimation/earnedCoins
-  // e handleCoinAnimationComplete — eram dead state desde a desativação.
-
   // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
     notes: ''
@@ -366,9 +363,6 @@ const InstallerJobDetail = () => {
     }
   };
 
-  // [GAMIFICATION DISABLED 2026-05-15] handleCoinAnimationComplete removido —
-  // toast de sucesso do checkout já é emitido em handleItemCheckout.
-
   const getItemByIndex = (index) => {
     const products = job?.products_with_area?.length
       ? job.products_with_area
@@ -541,8 +535,6 @@ const InstallerJobDetail = () => {
 
   return (
     <div className={`min-h-screen bg-background overflow-x-hidden ${completedItems === totalItems && totalItems > 0 ? 'pb-28' : 'pb-8'}`}>
-      {/* [GAMIFICATION DISABLED 2026-05-15] CoinAnimation suspenso. */}
-
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border">
         <div className="p-4">
