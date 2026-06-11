@@ -143,7 +143,7 @@ async def google_login(current_user: User = Depends(get_current_user)):
 
 
 @router.get("/auth/google/callback")
-async def google_callback(code: str, state: str = None):
+def google_callback(code: str, state: str = None):
     """Handles Google OAuth callback."""
     # Valida o state HMAC ANTES do exchange do code — previne CSRF.
     # _verify_oauth_state levanta HTTPException 400 em state inválido/expirado;
