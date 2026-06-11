@@ -18,7 +18,15 @@ async function clearCachesAndReload() {
       await Promise.all(regs.map((r) => r.unregister()));
     }
   } catch (_) { /* seguro ignorar */ }
-  window.location.reload(true);
+  // Cache-bust forte: garante index.html fresco mesmo se o SW antigo ainda
+  // controlar a página por um instante (reload simples poderia reservir stale).
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('_cb', Date.now());
+    window.location.replace(u.toString());
+  } catch (_) {
+    window.location.reload();
+  }
 }
 
 class ErrorBoundary extends Component {
