@@ -19,9 +19,25 @@ logger = logging.getLogger(__name__)
 
 # ============ HELPER FUNCTIONS ============
 
+# Cache simples de product_families (tabela pequena e quase estática).
+# Evita 1 query extra ao banco em CADA check-in/checkout. TTL de 5 minutos;
+# em serverless o cache vive por instância warm, o que é suficiente.
+_FAMILIES_CACHE = {"data": None, "at": 0.0}
+_FAMILIES_TTL_SECONDS = 300
+
+
+def _get_product_families_cached():
+    import time
+    now = time.monotonic()
+    if _FAMILIES_CACHE["data"] is None or (now - _FAMILIES_CACHE["at"]) > _FAMILIES_TTL_SECONDS:
+        _FAMILIES_CACHE["data"] = db.product_families.find({}, {"_id": 0})
+        _FAMILIES_CACHE["at"] = now
+    return _FAMILIES_CACHE["data"]
+
+
 async def detect_product_family(product_names: list) -> tuple:
     """Detects the product family based on product names."""
-    families = db.product_families.find({}, {"_id": 0})
+    families = _get_product_families_cached()
     
     family_keywords = {
         "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],

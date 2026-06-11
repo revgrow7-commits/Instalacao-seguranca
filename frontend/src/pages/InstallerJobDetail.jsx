@@ -168,7 +168,7 @@ const InstallerJobDetail = () => {
             );
             if (inst?.papel) setMeuPapel(inst.papel);
           })
-          .catch(() => {});
+          .catch((e) => { console.warn('[InstallerJobDetail] Visual Connect indisponível (fire-and-forget):', e?.message); });
       }
 
       // Load item checkins

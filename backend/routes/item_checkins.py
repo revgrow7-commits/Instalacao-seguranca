@@ -483,7 +483,7 @@ async def batch_item_checkin(
                 if (datetime.now(timezone.utc) - existing_at).total_seconds() < 300:
                     return {"checkin_id": existing["id"], "status": "in_progress", "idempotent": True}
         except Exception:
-            pass
+            logger.warning("Falha ao avaliar idempotência de check-in duplicado", exc_info=True)
         raise HTTPException(
             status_code=409,
             detail="Já existe um check-in em andamento para este item. Faça o checkout antes de iniciar um novo."
@@ -726,7 +726,7 @@ async def complete_item_checkout(
         except HTTPException:
             raise
         except Exception:
-            pass
+            logger.warning("Falha ao validar ordem temporal das fotos EXIF no checkout", exc_info=True)
 
     # FIX M9 (relaxado para produção): se o item foi arquivado APÓS o check-in,
     # NÃO bloqueia o checkout — apenas loga warning. Bloquear deixaria o
@@ -868,7 +868,7 @@ async def complete_item_checkout(
                     if _diff_min >= 0:
                         exif_duration_minutes_calc = int(_diff_min)
         except Exception:
-            pass
+            logger.warning("Falha ao calcular duração EXIF no checkout", exc_info=True)
 
     update_data = {
         "checkout_at": checkout_at.isoformat(),

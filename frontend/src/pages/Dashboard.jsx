@@ -100,6 +100,11 @@ const Dashboard = () => {
   // Guards contra double-fire do useEffect (user + isAdmin/isManager chegam em renders separados)
   const primaryStartedRef = useRef(false);
   const alertsStartedRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
   const [modalData, setModalData] = useState({ title: '', items: [] });
 
   // ── O(1) lookup maps — avita .find() em loops de render ──
@@ -178,17 +183,18 @@ const Dashboard = () => {
         locationAlerts: Array.isArray(locationRes.data) ? locationRes.data : [],
       };
 
+      writeDashCache(primaryData);
+      if (!mountedRef.current) return; // evita setState após unmount
       setJobs(primaryData.jobs);
       setMetrics(primaryData.metrics);
       setInstallers(primaryData.installers);
       setPendingCheckins(primaryData.pendingCheckins);
       setLocationAlerts(primaryData.locationAlerts);
-      writeDashCache(primaryData);
     } catch (error) {
       console.error('[Dashboard] loadPrimary:', error);
-      toast.error('Erro ao carregar dados do dashboard');
+      if (mountedRef.current) toast.error('Erro ao carregar dados do dashboard');
     } finally {
-      setLoadingPrimary(false);
+      if (mountedRef.current) setLoadingPrimary(false);
     }
   }, []);
 
@@ -196,6 +202,7 @@ const Dashboard = () => {
   const loadAlerts = useCallback(async () => {
     try {
       const checkins = await api.getAllItemCheckins();
+      if (!mountedRef.current) return; // evita setState após unmount
       const list = checkins || [];
 
       const completed = list
@@ -213,7 +220,7 @@ const Dashboard = () => {
     } catch (error) {
       console.error('[Dashboard] loadAlerts:', error);
     } finally {
-      setLoadingAlerts(false);
+      if (mountedRef.current) setLoadingAlerts(false);
     }
   }, []);
 

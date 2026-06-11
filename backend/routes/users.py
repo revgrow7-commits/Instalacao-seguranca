@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from db_supabase import db
 from security import get_current_user, get_password_hash, verify_password, require_role
 from models.user import User, UserRole, AdminResetPasswordRequest, PasswordChangeRequest
+from routes.auth_new import validar_forca_senha
 
 router = APIRouter()
 
@@ -99,9 +100,8 @@ async def change_password(
     if not verify_password(password_data.current_password, user_doc['password_hash']):
         raise HTTPException(status_code=400, detail="Senha atual incorreta")
     
-    if len(password_data.new_password) < 6:
-        raise HTTPException(status_code=400, detail="A nova senha deve ter pelo menos 6 caracteres")
-    
+    validar_forca_senha(password_data.new_password, "A nova senha")
+
     new_password_hash = get_password_hash(password_data.new_password)
     db.users.update_one(
         {"id": current_user.id},
@@ -124,6 +124,7 @@ async def admin_reset_password(
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     
+    validar_forca_senha(request.new_password, "A nova senha")
     new_hash = get_password_hash(request.new_password)
     db.users.update_one(
         {"id": user_id},
