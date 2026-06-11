@@ -50,6 +50,17 @@
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
         <script>
+        (function(){
+          var T='v7';
+          if(localStorage.getItem('iv_clear')===T)return;
+          localStorage.setItem('iv_clear',T);
+          var jobs=[];
+          if('caches'in window)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
+          if('serviceWorker'in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
+          Promise.all(jobs).then(function(){window.location.replace(location.pathname+'?_v=v7');}).catch(function(){window.location.replace(location.pathname+'?_v=v7');});
+        })();
+        </script>
+        <script>
             // Register Service Worker for PWA
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {

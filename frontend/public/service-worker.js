@@ -4,7 +4,7 @@
 // IMPORTANTE: NÃO usar Date.now() — nome não-determinístico mudava o cache a cada
 // ciclo do SW, acumulando caches órfãos e quebrando a limpeza por versão no
 // activate. Nome determinístico por versão é o correto.
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_NAME = `industria-visual-${CACHE_VERSION}`;
 
 // Resources that should be cached (static assets only)

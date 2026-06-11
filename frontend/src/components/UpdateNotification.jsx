@@ -40,15 +40,19 @@ const UpdateNotification = () => {
       });
     }
 
-    // Check for updates periodically — skip when tab is not visible
-    const checkForUpdates = setInterval(() => {
-      if (document.visibilityState !== 'visible') return; // don't fire in inactive tab
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({ type: 'CHECK_UPDATE' });
-      }
-    }, 60000); // Check every minute
+    // Força o browser a verificar se há um novo SW — tanto no intervalo quanto
+    // quando o instalador reabre o app (visibilitychange).
+    const triggerUpdate = () => {
+      if (document.visibilityState !== 'visible') return;
+      navigator.serviceWorker.ready.then(reg => reg.update()).catch(() => {});
+    };
+    const checkForUpdates = setInterval(triggerUpdate, 60000);
+    document.addEventListener('visibilitychange', triggerUpdate);
 
-    return () => clearInterval(checkForUpdates);
+    return () => {
+      clearInterval(checkForUpdates);
+      document.removeEventListener('visibilitychange', triggerUpdate);
+    };
   }, []);
 
   const handleUpdate = () => {
