@@ -4,7 +4,7 @@
 // IMPORTANTE: NÃO usar Date.now() — nome não-determinístico mudava o cache a cada
 // ciclo do SW, acumulando caches órfãos e quebrando a limpeza por versão no
 // activate. Nome determinístico por versão é o correto.
-const CACHE_VERSION = 'v7';
+const CACHE_VERSION = 'v8';
 const CACHE_NAME = `industria-visual-${CACHE_VERSION}`;
 
 // Resources that should be cached (static assets only)
@@ -86,7 +86,26 @@ self.addEventListener('fetch', (event) => {
     return;
   }
   
-  // For static assets (JS, CSS, images) - Network first with cache fallback
+  // Chunks e assets com hash no path (/static/) são imutáveis: cache-first.
+  // Uma vez baixado, serve do cache sem precisar da rede (lazy routes funcionam offline).
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.open(CACHE_NAME).then((cache) =>
+        cache.match(event.request).then((cached) => {
+          if (cached) return cached;
+          return fetch(event.request).then((response) => {
+            if (response && response.status === 200) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          });
+        })
+      )
+    );
+    return;
+  }
+
+  // Outros assets estáticos (logo, favicon, etc.) - network-first com fallback
   if (url.pathname.match(/\.(js|css|png|jpg|jpeg|svg|ico|woff|woff2)$/)) {
     event.respondWith(
       fetch(event.request)

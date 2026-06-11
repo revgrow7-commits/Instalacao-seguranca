@@ -51,13 +51,13 @@
         <div id="root"></div>
         <script>
         (function(){
-          var T='v7';
+          var T='v8';
           if(localStorage.getItem('iv_clear')===T)return;
           localStorage.setItem('iv_clear',T);
           var jobs=[];
           if('caches'in window)jobs.push(caches.keys().then(function(ks){return Promise.all(ks.map(function(k){return caches.delete(k);}));}));
           if('serviceWorker'in navigator)jobs.push(navigator.serviceWorker.getRegistrations().then(function(rs){return Promise.all(rs.map(function(r){return r.unregister();}));}));
-          Promise.all(jobs).then(function(){window.location.replace(location.pathname+'?_v=v7');}).catch(function(){window.location.replace(location.pathname+'?_v=v7');});
+          Promise.all(jobs).then(function(){window.location.replace(location.pathname+'?_v=v8');}).catch(function(){window.location.replace(location.pathname+'?_v=v8');});
         })();
         </script>
         <script>
