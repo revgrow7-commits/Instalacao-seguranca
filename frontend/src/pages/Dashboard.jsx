@@ -31,6 +31,16 @@ function writeDashCache(data) {
   try { sessionStorage.setItem(DASH_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })); } catch {}
 }
 
+// ── EXIF da foto como fonte de verdade de horário (mesmo padrão do /reports) ──
+// Início/fim vêm SOMENTE do EXIF da foto da galeria; sem EXIF mostra "—" (não usa o clique).
+const exifStart = (c) => c?.exif_checkin_at || c?.exif_datetime || null;
+const exifEnd = (c) => c?.exif_checkout_at || c?.checkout_exif_datetime || null;
+const exifTime = (v) => {
+  if (!v) return '—';
+  const d = new Date(v);
+  return isNaN(d) ? '—' : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+};
+
 // ── Skeleton placeholder ──
 const Skeleton = ({ className = '' }) => (
   <div className={`animate-pulse rounded bg-white/10 ${className}`} />
@@ -361,8 +371,9 @@ const Dashboard = () => {
                       const lat = c.exif_lat ?? c.gps_lat;
                       const lng = c.exif_long ?? c.gps_long;
                       const fromExif = c.exif_lat != null;
-                      const inicio = c.checkin_at ? new Date(c.checkin_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
-                      const fim = c.checkout_at ? new Date(c.checkout_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '—';
+                      // H. Início / H. Fim vêm do EXIF da foto (entrada/saída); sem EXIF mostra "—"
+                      const inicio = exifTime(exifStart(c));
+                      const fim = exifTime(exifEnd(c));
                       return (
                         <tr
                           key={c.id}

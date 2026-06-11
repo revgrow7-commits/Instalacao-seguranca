@@ -48,6 +48,19 @@ const CheckinViewer = () => {
     return date.toLocaleString('pt-BR');
   };
 
+  // EXIF da foto como fonte de verdade de horário (entrada/saída/duração).
+  // Cai para o clique apenas se a foto não tiver EXIF de data.
+  const exifCheckinAt = checkin?.exif_checkin_at || checkin?.exif_datetime || null;
+  const exifCheckoutAt = checkin?.exif_checkout_at || checkin?.checkout_exif_datetime || null;
+  const exifDurationMin = (() => {
+    if (checkin?.exif_duration_minutes != null) return checkin.exif_duration_minutes;
+    if (exifCheckinAt && exifCheckoutAt) {
+      const diff = (new Date(exifCheckoutAt) - new Date(exifCheckinAt)) / 60000;
+      return diff >= 0 ? Math.round(diff) : null;
+    }
+    return null;
+  })();
+
   const buildWhatsAppUrl = (installerData, jobData, checkinData) => {
     const phone = installerData?.phone;
     if (!phone) return null;
@@ -279,7 +292,7 @@ const CheckinViewer = () => {
           <div className="space-y-2 text-white">
             <div>
               <p className="text-sm text-muted-foreground">Horário</p>
-              <p className="font-medium">{formatDate(checkin.checkin_at)}</p>
+              <p className="font-medium">{formatDate(exifCheckinAt || checkin.checkin_at)}</p>
             </div>
             
             {checkin.gps_lat && checkin.gps_long && (
@@ -384,12 +397,12 @@ const CheckinViewer = () => {
             <div className="space-y-2 text-white">
               <div>
                 <p className="text-sm text-muted-foreground">Horário</p>
-                <p className="font-medium">{formatDate(checkin.checkout_at)}</p>
+                <p className="font-medium">{formatDate(exifCheckoutAt || checkin.checkout_at)}</p>
               </div>
 
               <div>
                 <p className="text-sm text-muted-foreground">⏱️ Duração</p>
-                <p className="font-medium">{checkin.duration_minutes || 0} minutos</p>
+                <p className="font-medium">{exifDurationMin != null ? `${exifDurationMin} minutos` : '—'}</p>
               </div>
 
               {checkin.installed_m2 && (
