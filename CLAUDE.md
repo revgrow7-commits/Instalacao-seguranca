@@ -274,8 +274,8 @@ Não remover essa verificação.
 ### ARCH-001: Wrapper MongoDB-like sobre Supabase
 O backend usa sintaxe MongoDB (`find`, `insert_one`, `$set`, `$inc`) implementada como wrapper sobre o Supabase PostgREST. Isso facilita a leitura do código legado mas esconde funcionalidades SQL (joins, transações, RPC atômico). Ver `docs/adr/0001-db-wrapper-mongodb.md`.
 
-### ARCH-002: JWT expira em 1 dia no backend, 7 dias no frontend
-Assimetria intencional: o frontend usa 7 dias para não forçar login diário em dispositivos móveis dos instaladores. O `AuthContext` captura o 401 de `/auth/me` e faz logout automático, então o usuário só percebe a expiração na próxima abertura do app. Ver `docs/adr/0002-jwt-expiry-assimetria.md`.
+### ARCH-002: JWT expira em 7 dias (backend e frontend, alinhados)
+Backend e frontend usam **7 dias** — `ACCESS_TOKEN_EXPIRE_DAYS = 7` em `config.py` e `tokenManager.setToken(token, expiresInDays=7)` — alinhados desde 2026-05-15. O prazo de 7 dias evita forçar login diário nos dispositivos móveis dos instaladores. O `AuthContext` captura o 401 de `/auth/me` e faz logout automático. (Histórico: o ADR `docs/adr/0002-jwt-expiry-assimetria.md` descrevia uma assimetria 1d/7d que **não existe mais** no código — corrigido neste documento em 2026-06-11.)
 
 ### ARCH-003: `$inc` e `add_coins` não são atômicos (dívida técnica)
 `db.update_one({...}, {"$inc": {"field": 1}})` faz read-then-write. Em `add_coins()` também. Race condition possível sob carga. Correção: RPC Supabase atômica. Ver TASKS.md BUG-001.
@@ -291,29 +291,29 @@ Evita erros 400 do Supabase por campos desconhecidos. Custo: campos novos adicio
 ## Bugs Conhecidos / Pendentes
 
 ### PENDING-001: `$inc` não atômico — race condition em contadores
-**Arquivo:** `backend/db_supabase.py` linha ~415 (`$inc` handler em `update_one`)
+**Arquivo:** `backend/db_supabase.py` (`$inc` handler em `update_one` + `_apply_inc_atomico`)
 **Impacto:** Dois updates concorrentes do mesmo campo numérico (ex: `total_jobs` do instalador) podem perder um incremento.
-**Fix:** Substituir `$inc` por RPC Supabase: `supabase.rpc("increment_field", {table, id, field, delta})`.
+**Status (2026-06-11):** ✅ **corrigido no código** — `update_one` chama `_apply_inc_atomico`, que faz o incremento atômico via RPC Postgres `increment_field`; se a RPC não existir, cai no fallback read-then-write (não-quebrável). **Pendente manual:** aplicar a migration `039_increment_field_atomic.sql` no Supabase para ativar o caminho atômico (sem ela, roda o fallback não-atômico).
 
 ### PENDING-002: `add_coins()` assíncrona mas chamada de forma síncrona
 **Arquivo:** `backend/services/gamification.py` linha 45 — `async def add_coins()`
-**Impacto:** Chamadores que não fazem `await` recebem uma coroutine em vez do resultado. Verificar todos os callers com `grep -r "add_coins" backend/routes/`.
-**Fix:** Converter para `def add_coins()` síncrono (o DB é síncrono), ou garantir `await` em todos os callers async.
+**Impacto:** Chamadores que não fazem `await` recebem uma coroutine em vez do resultado.
+**Status (2026-06-11):** ⏸ **em espera** — módulo de gamificação **desabilitado desde 2026-05-15** (router não incluído no `server.py`, ver linha comentada). Sem impacto em produção enquanto inativo. Resolver apenas se a gamificação for reativada (decisão de negócio pendente — arquivos mantidos de propósito).
 
 ### PENDING-003: Inconsistência no schema de nível de gamificação
 **Arquivo:** `backend/services/gamification.py` — `level` (numérico "1"-"10") vs `current_level` (string "bronze"/"silver")
 **Impacto:** Frontend pode exibir nível errado dependendo de qual campo usa.
-**Fix:** Migrar todos os registros para usar apenas `level` numérico; deprecar `current_level`.
+**Status (2026-06-11):** ⏸ **em espera** — mesma situação do PENDING-002 (gamificação desabilitada). Ao ler nível, usar sempre `level` (numérico). Resolver só se reativar.
 
 ### PENDING-004: `update_many` delega para `update_one`
-**Arquivo:** `backend/db_supabase.py` linha ~456
-**Impacto:** `db.table.update_many({...}, {...})` só atualiza o primeiro registro que o PostgREST retornar, não todos.
-**Fix:** Implementar `update_many` como loop ou usar `.update()` sem filtro único.
+**Arquivo:** `backend/db_supabase.py`
+**Impacto:** `db.table.update_many({...}, {...})` / `delete_many` afetavam só 1 registro conceitualmente.
+**Status (2026-06-11):** ✅ **RESOLVIDO** — `update_many`/`delete_many` implementados de verdade: DELETE/UPDATE set-based com `_apply_filter` (suporta operadores como `$in`), e `$inc`/`$push` aplicados por-linha (valor depende do registro atual). Assinatura preservada.
 
 ### PENDING-005: Senha mínima de 6 caracteres em auto-registro
-**Arquivo:** `backend/routes/auth_new.py` linha ~152
+**Arquivo:** `backend/routes/auth_new.py`
 **Impacto:** Força bruta facilitada em contas de instaladores.
-**Fix:** Aumentar para mínimo 8 caracteres com validação de complexidade.
+**Status (2026-06-11):** ✅ **RESOLVIDO** — todos os caminhos de senha usam `validar_forca_senha` (mín. 8 chars + letra + número): `register`/`self-register`/`admin-register` (auth_new.py) e `change-password`/admin reset (users.py). Política unificada.
 
 ---
 
@@ -355,6 +355,30 @@ Evita erros 400 do Supabase por campos desconhecidos. Custo: campos novos adicio
 
 **Dívida de segurança:**
 - Token Vercel `vcp_...` e n8n JWT estão em texto-claro no `claude_desktop_config.json` E no histórico de uma conversa Cowork (esposição de print do usuário). Rotacionar ambos em até 24h.
+
+## Sessão 2026-06-11 — Limpeza, estabilidade e performance (auditoria `PLANO-LIMPEZA-E-PERFORMANCE.md`)
+
+Commits atômicos (branch `main`, **não** deployados/pushados — aguardando autorização):
+
+1. `fix: correções da auditoria 2026-06-11` — senha (política unificada em users.py), logging dos `except: pass` (item_checkins.py), cache TTL de `product_families` (checkins.py), guard de unmount (Dashboard.jsx), log no catch do Visual Connect (InstallerJobDetail.jsx).
+2. `chore: remove código morto` — 4 arquivos backend mortos (database.py, database_supabase.py com URL do projeto **errado**, 2 migrations one-off), 4 componentes frontend nunca importados, 23 componentes shadcn/ui órfãos + cluster toast/toaster/use-toast (app usa `sonner` direto), `test_reports/` e `test_result.md`. **Gamificação NÃO foi tocada** (decisão de negócio).
+3. `fix(oauth)` — valida `state` HMAC **antes** do exchange do code no `google_callback` (era CSRF: validava depois e tinha fallback inseguro por email); retorna 400 em mismatch.
+4. `fix(db)` — `update_many`/`delete_many` reais (PENDING-004).
+5. `fix: remove rota duplicada de reset de senha` — removida a de `auth_new.py` (`/auth/users/{id}/reset-password`, código morto); mantida a de `users.py` que o frontend chama.
+6. `perf(oauth)` — `google_callback` de `async def` → `def` (não bloqueia o event loop; usa requests/DB síncronos).
+7. `fix(sw)` — remove listeners do Service Worker (`updatefound`/`statechange`/`controllerchange`) no cleanup do `useEffect` (UpdateNotification.jsx).
+8. `perf(reports)` — `/reports/by-installer` de O(n³) → O(n) via pré-indexação dos checkins (JSON de resposta idêntico).
+9. `perf(api)` — `getJobById` agora delega para `getJob` (com cache 20s); alias deprecado mantido.
+10. `perf(jobs)` — callbacks do `JobCard` (já `React.memo`) estabilizados via `useCallback`.
+11. `perf(img)` — `loading="lazy"` + `decoding="async"` nas fotos (JobDetail.jsx, UnifiedReports.jsx).
+12. `docs` — esta seção + ARCH-002 (JWT 7d) + status PENDING-001..005.
+
+**Pendências manuais (NÃO executadas — fora do meu escopo de permissão):**
+- **Supabase** (`qfsxtwkltfraounsjjah`): rodar migrations `038_login_attempts.sql` (throttle de brute-force está fail-open) e `039_increment_field_atomic.sql` (ativa o `$inc` atômico — hoje roda fallback).
+- **Vercel:** setar `REACT_APP_VISUAL_CONNECT_URL` / `REACT_APP_VISUAL_CONNECT_KEY` e `INLINE_RUNTIME_CHUNK=false`.
+- **Lixo local** não-versionado removido: `.claude/worktrees/`, `backend/supabase/.temp/` (eram cópias do repo lotando o disco).
+
+**Nota de ambiente:** o import `python -c "from server import app"` não roda neste host (Python 3.14 + starlette 1.0.0 incompatível com o `requirements.txt` que fixa `starlette<1.0.0`); validação backend feita via `py_compile`/`compileall`. Frontend validado com `npm run build` (Compiled successfully) após cada fase.
 
 ---
 
