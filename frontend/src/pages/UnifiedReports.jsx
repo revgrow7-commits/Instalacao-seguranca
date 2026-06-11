@@ -1052,6 +1052,7 @@ const UnifiedReports = () => {
                             alt={`${pType}_job_${jobCode}`}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             loading="lazy"
+                            decoding="async"
                           />
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
