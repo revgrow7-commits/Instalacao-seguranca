@@ -96,8 +96,9 @@ TABLE_COLUMNS = {
         "family_name", "installed_m2", "complexity_level", "height_category",
         "scenario_category", "notes", "productivity_m2_h", "is_archived",
         "products_installed", "is_late", "created_at",
-        "exif_lat", "exif_long", "exif_datetime", "exif_device",
+        "exif_lat", "exif_long", "exif_datetime", "exif_device", "exif_address", "exif_offset",
         "checkout_exif_lat", "checkout_exif_long", "checkout_exif_datetime", "checkout_exif_device",
+        "checkout_exif_address", "checkout_exif_offset",
         "exif_checkin_at", "exif_checkout_at", "exif_duration_minutes", "photos_count"
     ]),
     "item_pause_logs": frozenset([

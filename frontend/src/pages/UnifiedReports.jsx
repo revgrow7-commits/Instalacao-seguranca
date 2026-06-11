@@ -35,6 +35,21 @@ const exifDurationMin = (c) => {
   return Number.isFinite(diff) && diff >= 0 ? diff : null;
 };
 
+// Exibe o horário EXIF de forma DETERMINÍSTICA e legacy-safe — independe do fuso do
+// navegador de quem abre o relatório. O DateTimeOriginal do EXIF é sempre o relógio
+// de parede LOCAL da câmera, então os dígitos HH:MM são a verdade que queremos
+// mostrar, qualquer que seja o rótulo de fuso. Por isso extraímos verbatim e NÃO
+// reconvertemos: cobre tanto o dado novo (-03:00) quanto o legado carimbado +00:00
+// (cujos dígitos 14:26 também são o horário local real, não 11:26).
+const exifTime = (v) => {
+  if (!v) return '—';
+  const m = String(v).replace(' ', 'T').match(/T(\d{2}:\d{2})/);
+  return m ? m[1] : '—';
+};
+
+// Dispositivo registrado no EXIF (Make + Model). Check-in tem prioridade sobre checkout.
+const exifDevice = (c) => c?.exif_device || c?.checkout_exif_device || null;
+
 // ── SessionStorage cache para checkins pesados (2 minutos) ──
 const REPORTS_CACHE_KEY = 'reports_checkins_v1';
 const REPORTS_CACHE_TTL = 2 * 60_000;
@@ -543,6 +558,9 @@ const UnifiedReports = () => {
                       <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Longitude</span>
                     </th>
                     <th className="text-left px-4 py-2 font-medium">Origem GPS</th>
+                    <th className="text-left px-4 py-2 font-medium">
+                      <span className="flex items-center gap-1"><Camera className="h-3 w-3 text-muted-foreground" />Dispositivo</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -554,15 +572,11 @@ const UnifiedReports = () => {
                     const fromExif = c.exif_lat != null;
                     // Horários vêm do EXIF da foto (momento real da captura), NÃO do clique
                     // de check-in/checkout. Foto sem EXIF de data → "—" (não inventa horário).
-                    const toExifTime = (v) => {
-                      if (!v) return null;
-                      const d = new Date(String(v).replace(' ', 'T'));
-                      return isNaN(d) ? null : d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                    };
                     const inicioFromExif = exifStart(c);
                     const fimFromExif = exifEnd(c);
-                    const inicio = toExifTime(inicioFromExif) || '—';
-                    const fim = toExifTime(fimFromExif) || '—';
+                    const inicio = exifTime(inicioFromExif);
+                    const fim = exifTime(fimFromExif);
+                    const device = exifDevice(c);
                     const jobCode = job?.holdprint_data?.code || job?.code || c.job_id?.slice(0, 6);
                     const isSelected = selectedIds.has(c.id);
                     return (
@@ -616,6 +630,9 @@ const UnifiedReports = () => {
                               ? <span className="flex items-center gap-1 text-xs text-blue-400"><Navigation className="h-3 w-3" />GPS</span>
                               : <span className="text-xs text-muted-foreground/50">—</span>
                           }
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[160px] truncate" title={device || 'Sem dispositivo no EXIF'}>
+                          {device || <span className="text-muted-foreground/50">—</span>}
                         </td>
                       </tr>
                     );

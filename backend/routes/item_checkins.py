@@ -4,10 +4,11 @@ Handles per-item check-ins for installers (modern flow).
 """
 from fastapi import APIRouter, HTTPException, Depends, Form
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import asyncio
 import uuid
 import logging
+import re
 
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
@@ -18,6 +19,39 @@ from services.image import compress_base64_image
 
 
 router = APIRouter()
+
+# Fuso de Brasília: UTC-3 fixo. O Brasil aboliu o horário de verão em 2019 e as
+# duas filiais (POA e SP) são ambas UTC-3, então um offset fixo é exato e não
+# depende de tzdata no runtime serverless.
+BRT = timezone(timedelta(hours=-3))
+
+
+def _offset_to_tz(offset_str: Optional[str]):
+    """Converte "±HH:MM" (OffsetTimeOriginal do EXIF) em tzinfo. None se inválido."""
+    if not offset_str:
+        return None
+    m = re.match(r'^([+-])(\d{2}):?(\d{2})$', str(offset_str).strip())
+    if not m:
+        return None
+    sign = -1 if m.group(1) == '-' else 1
+    return timezone(sign * timedelta(hours=int(m.group(2)), minutes=int(m.group(3))))
+
+
+def _parse_exif_local(dt_str: Optional[str], offset_str: Optional[str] = None):
+    """
+    O DateTimeOriginal do EXIF é o relógio de parede LOCAL da câmera, sem fuso.
+    Constrói um datetime tz-aware correto: usa o offset do EXIF quando presente,
+    senão assume BRT (UTC-3). NUNCA carimba como UTC — isso deslocava a hora em 3h.
+    """
+    if not dt_str:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(dt_str).replace(' ', 'T'))
+    except (ValueError, TypeError):
+        return None
+    if dt.tzinfo is not None:
+        return dt
+    return dt.replace(tzinfo=_offset_to_tz(offset_str) or BRT)
 logger = logging.getLogger(__name__)
 
 # Pause reason labels
@@ -165,6 +199,7 @@ class ItemCheckin(BaseModel):
     exif_datetime: Optional[str] = None
     exif_device: Optional[str] = None
     exif_address: Optional[str] = None
+    exif_offset: Optional[str] = None
     product_name: Optional[str] = None
     family_name: Optional[str] = None
     installed_m2: Optional[float] = None
@@ -208,6 +243,7 @@ async def create_item_checkin(
     exif_datetime: Optional[str] = Form(None),
     exif_device: Optional[str] = Form(None),
     exif_address: Optional[str] = Form(None),
+    exif_offset: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user)
 ):
     """Create a check-in for a specific item in a job"""
@@ -326,6 +362,7 @@ async def create_item_checkin(
         exif_datetime=exif_datetime,
         exif_device=exif_device,
         exif_address=exif_address,
+        exif_offset=exif_offset,
         product_name=product.get("name", f"Item {item_index}"),
         family_name=family_name
     )
@@ -460,14 +497,10 @@ async def batch_item_checkin(
     exif_data_list = request.exif_data or []
     for exif in exif_data_list:
         dt_str = (exif or {}).get("exif_datetime")
-        if dt_str:
-            try:
-                ts = datetime.fromisoformat(dt_str.replace(' ', 'T'))
-                if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                exif_timestamps.append(ts)
-            except Exception:
-                pass
+        # Usa o offset real do EXIF quando disponível; senão assume BRT (UTC-3).
+        ts = _parse_exif_local(dt_str, (exif or {}).get("exif_offset"))
+        if ts:
+            exif_timestamps.append(ts)
 
     exif_timestamps.sort()
     exif_checkin_at = exif_timestamps[0] if exif_timestamps else None
@@ -497,6 +530,7 @@ async def batch_item_checkin(
         exif_datetime=first_exif.get("exif_datetime") if first_exif else None,
         exif_device=first_exif.get("exif_device") if first_exif else None,
         exif_address=first_exif.get("exif_address") if first_exif else None,
+        exif_offset=first_exif.get("exif_offset") if first_exif else None,
         product_name=product.get("name", f"Item {request.item_index}"),
         family_name=family_name,
     )
@@ -642,6 +676,7 @@ async def complete_item_checkout(
     exif_datetime: Optional[str] = Form(None),
     exif_device: Optional[str] = Form(None),
     exif_address: Optional[str] = Form(None),
+    exif_offset: Optional[str] = Form(None),
     installed_m2: Optional[float] = Form(None),
     complexity_level: Optional[int] = Form(None),
     height_category: Optional[str] = Form(None),
@@ -804,21 +839,24 @@ async def complete_item_checkout(
     exif_duration_minutes_calc = None
     if exif_datetime:
         try:
-            _exif_out = datetime.fromisoformat(exif_datetime.replace(' ', 'T'))
-            if _exif_out.tzinfo is None:
-                _exif_out = _exif_out.replace(tzinfo=timezone.utc)
-            exif_checkout_at_iso = _exif_out.isoformat()
-            _exif_in_raw = checkin.get('exif_checkin_at')
-            if _exif_in_raw:
-                _exif_in = (
-                    datetime.fromisoformat(_exif_in_raw.replace('Z', '+00:00').replace(' ', 'T'))
-                    if isinstance(_exif_in_raw, str) else _exif_in_raw
-                )
-                if _exif_in.tzinfo is None:
-                    _exif_in = _exif_in.replace(tzinfo=timezone.utc)
-                _diff_min = (_exif_out - _exif_in).total_seconds() / 60
-                if _diff_min >= 0:
-                    exif_duration_minutes_calc = int(_diff_min)
+            # Usa o offset real do EXIF do checkout; senão assume BRT (UTC-3).
+            _exif_out = _parse_exif_local(exif_datetime, exif_offset)
+            if _exif_out:
+                exif_checkout_at_iso = _exif_out.isoformat()
+                _exif_in_raw = checkin.get('exif_checkin_at')
+                if _exif_in_raw:
+                    _exif_in = (
+                        datetime.fromisoformat(_exif_in_raw.replace('Z', '+00:00').replace(' ', 'T'))
+                        if isinstance(_exif_in_raw, str) else _exif_in_raw
+                    )
+                    # Legado: check-ins antigos podem ter exif_checkin_at carimbado
+                    # como UTC. Para a diferença de duração assumimos BRT quando
+                    # não há fuso, alinhando com o novo padrão de gravação.
+                    if _exif_in.tzinfo is None:
+                        _exif_in = _exif_in.replace(tzinfo=BRT)
+                    _diff_min = (_exif_out - _exif_in).total_seconds() / 60
+                    if _diff_min >= 0:
+                        exif_duration_minutes_calc = int(_diff_min)
         except Exception:
             pass
 
@@ -837,6 +875,7 @@ async def complete_item_checkout(
         "checkout_exif_datetime": exif_datetime,
         "checkout_exif_device": exif_device,
         "checkout_exif_address": exif_address,
+        "checkout_exif_offset": exif_offset,
         "installed_m2": installed_m2,
         "complexity_level": complexity_level,
         "height_category": height_category,

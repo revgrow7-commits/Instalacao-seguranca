@@ -309,6 +309,8 @@ const InstallerJobDetail = () => {
       if (latestExif?.exif_long != null) formData.append('exif_long', latestExif.exif_long);
       if (latestExif?.exif_datetime) formData.append('exif_datetime', latestExif.exif_datetime);
       if (latestExif?.exif_device) formData.append('exif_device', latestExif.exif_device);
+      if (latestExif?.exif_offset) formData.append('exif_offset', latestExif.exif_offset);
+      if (latestExif?.exif_address) formData.append('exif_address', latestExif.exif_address);
       formData.append('installed_m2', installedM2);
       formData.append('complexity_level', complexityLevel);
       formData.append('height_category', heightCategory);

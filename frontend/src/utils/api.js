@@ -79,7 +79,8 @@ const getJobsWithCache = async (options = false) => {
   const freshPromise = axios
     .get(`${API_URL}/jobs${includeArchived ? '?include_archived=true' : ''}`, { headers: getAuthHeader() })
     .then(res => {
-      if (jobsCacheGeneration === capturedGeneration) {
+      // Só cacheia se o backend retornou um array real (evita cachear HTML de erros de roteamento)
+      if (jobsCacheGeneration === capturedGeneration && Array.isArray(res.data)) {
         try {
           localStorage.setItem(key, JSON.stringify({ data: res.data, t: Date.now() }));
         } catch { /* quota exceeded */ }
@@ -87,9 +88,14 @@ const getJobsWithCache = async (options = false) => {
       return res;
     });
 
-  if (stale && Date.now() - stale.t < JOBS_CACHE_TTL) {
+  // Só usa cache stale se contiver um array válido (proteção contra HTML cacheado por URL errada)
+  if (stale && Array.isArray(stale.data) && Date.now() - stale.t < JOBS_CACHE_TTL) {
     // retorna stale agora, fresh continua em background
     return { data: stale.data, _stale: true, _fresh: freshPromise };
+  }
+  // Limpa cache corrompido silenciosamente
+  if (stale && !Array.isArray(stale.data)) {
+    try { localStorage.removeItem(key); } catch {}
   }
   return freshPromise;
 };

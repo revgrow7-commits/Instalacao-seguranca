@@ -20,12 +20,22 @@ function formatDate(dt) {
   return null;
 }
 
+// Normaliza o OffsetTimeOriginal do EXIF para o formato "±HH:MM".
+// O EXIF grava como "-03:00", "+02:00" etc. Retorna null se ausente/inválido.
+function normalizeOffset(off) {
+  if (!off || typeof off !== 'string') return null;
+  const m = off.trim().match(/^([+-])(\d{2}):?(\d{2})$/);
+  if (!m) return null;
+  return `${m[1]}${m[2]}:${m[3]}`;
+}
+
 export async function extractExif(file) {
   const result = {
     exif_lat: null,
     exif_long: null,
     exif_datetime: null,
     exif_device: null,
+    exif_offset: null,
   };
 
   if (!file) return result;
@@ -44,7 +54,8 @@ export async function extractExif(file) {
       exif: true,
       gps: false,
       ifd1: false,
-      pick: ['Make', 'Model', 'DateTimeOriginal', 'DateTime', 'CreateDate'],
+      pick: ['Make', 'Model', 'DateTimeOriginal', 'DateTime', 'CreateDate',
+             'OffsetTimeOriginal', 'OffsetTime', 'OffsetTimeDigitized'],
     }).catch(() => null);
 
     if (data) {
@@ -56,6 +67,12 @@ export async function extractExif(file) {
 
       // DateTimeOriginal > CreateDate > DateTime (do mais ao menos preciso)
       result.exif_datetime = formatDate(data.DateTimeOriginal || data.CreateDate || data.DateTime);
+
+      // Offset UTC real da captura (quando o celular grava). É a fonte de verdade
+      // do fuso; sem ele o backend assume BRT (UTC-3).
+      result.exif_offset = normalizeOffset(
+        data.OffsetTimeOriginal || data.OffsetTime || data.OffsetTimeDigitized
+      );
     }
   } catch (_) {
     // Arquivo sem EXIF ou formato não suportado — retorna campos nulos

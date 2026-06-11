@@ -878,7 +878,8 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         "Área Total (m²)", "M² Instalado", "Instalador",
         "GPS Check-in (Lat)", "GPS Check-in (Long)",
         "GPS Check-out (Lat)", "GPS Check-out (Long)",
-        "Data Check-in", "Data Check-out", "Tempo (min)", "Status", "Filial"
+        "Data Check-in", "Data Check-out", "Tempo (min)", "Status", "Filial",
+        "Dispositivo (EXIF)"
     ]
     
     for col_num, header in enumerate(headers, 1):
@@ -938,26 +939,32 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         
         # Horários do relatório vêm do EXIF da foto (momento real da captura), não do
         # clique de check-in/checkout. Sem EXIF de data → célula vazia (não inventa hora).
+        # O DateTimeOriginal é sempre o relógio de parede LOCAL da câmera, então
+        # exibimos os dígitos verbatim (descartando o rótulo de fuso). Isso é legacy-safe:
+        # o dado antigo carimbado +00:00 tem 14:26 = horário local real, não 11:26.
         def _parse_exif_dt(val):
             if not val:
                 return None
-            if isinstance(val, datetime):
-                return val
-            try:
-                return datetime.fromisoformat(str(val).replace('Z', '+00:00').replace(' ', 'T'))
-            except (ValueError, TypeError):
-                return None
+            dt = val if isinstance(val, datetime) else None
+            if dt is None:
+                try:
+                    dt = datetime.fromisoformat(str(val).replace('Z', '+00:00').replace(' ', 'T'))
+                except (ValueError, TypeError):
+                    return None
+            # Remove o fuso para preservar o relógio de parede da captura no strftime.
+            return dt.replace(tzinfo=None)
 
         checkin_at = _parse_exif_dt(checkin.get('exif_checkin_at') or checkin.get('exif_datetime'))
         ws.cell(row=row_num, column=13, value=checkin_at.strftime('%d/%m/%Y %H:%M') if checkin_at else '').border = border
 
         checkout_at = _parse_exif_dt(checkin.get('exif_checkout_at') or checkin.get('checkout_exif_datetime'))
         ws.cell(row=row_num, column=14, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
-        
+
         ws.cell(row=row_num, column=15, value=checkin.get('duration_minutes', 0)).border = border
         ws.cell(row=row_num, column=16, value=checkin.get('status', '')).border = border
         ws.cell(row=row_num, column=17, value=job.get('branch', '')).border = border
-        
+        ws.cell(row=row_num, column=18, value=checkin.get('exif_device') or checkin.get('checkout_exif_device') or '').border = border
+
         row_num += 1
     
     logger.info(f"Excel report generated with {row_num - 2} rows")
@@ -966,7 +973,7 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         'A': 12, 'B': 35, 'C': 25, 'D': 35, 'E': 18,
         'F': 15, 'G': 15, 'H': 20, 'I': 15, 'J': 15,
         'K': 15, 'L': 15, 'M': 18, 'N': 18, 'O': 12,
-        'P': 15, 'Q': 12
+        'P': 15, 'Q': 12, 'R': 22
     }
     for col, width in column_widths.items():
         ws.column_dimensions[col].width = width
