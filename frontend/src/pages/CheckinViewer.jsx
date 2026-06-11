@@ -49,19 +49,6 @@ const CheckinViewer = () => {
     return date.toLocaleString('pt-BR');
   };
 
-  // EXIF da foto como fonte de verdade de horário (entrada/saída/duração).
-  // Cai para o clique apenas se a foto não tiver EXIF de data.
-  const exifCheckinAt = checkin?.exif_checkin_at || checkin?.exif_datetime || null;
-  const exifCheckoutAt = checkin?.exif_checkout_at || checkin?.checkout_exif_datetime || null;
-  const exifDurationMin = (() => {
-    if (checkin?.exif_duration_minutes != null) return checkin.exif_duration_minutes;
-    if (exifCheckinAt && exifCheckoutAt) {
-      const diff = (new Date(exifCheckoutAt) - new Date(exifCheckinAt)) / 60000;
-      return diff >= 0 ? Math.round(diff) : null;
-    }
-    return null;
-  })();
-
   const buildWhatsAppUrl = (installerData, jobData, checkinData) => {
     const phone = installerData?.phone;
     if (!phone) return null;
@@ -117,6 +104,20 @@ const CheckinViewer = () => {
   // Handle both old checkin format and new item_checkin format
   const checkin = data.checkin || data;
   const isItemCheckin = checkin.item_index !== undefined && checkin.item_index !== null;
+
+  // EXIF da foto como fonte de verdade de horário (entrada/saída/duração).
+  // Precisa vir DEPOIS da declaração de `checkin` (antes ficava acima e lia
+  // a variável na zona morta — horários saíam vazios/quebrados).
+  const exifCheckinAt = checkin?.exif_checkin_at || checkin?.exif_datetime || null;
+  const exifCheckoutAt = checkin?.exif_checkout_at || checkin?.checkout_exif_datetime || null;
+  const exifDurationMin = (() => {
+    if (checkin?.exif_duration_minutes != null) return checkin.exif_duration_minutes;
+    if (exifCheckinAt && exifCheckoutAt) {
+      const diff = (new Date(exifCheckoutAt) - new Date(exifCheckinAt)) / 60000;
+      return diff >= 0 ? Math.round(diff) : null;
+    }
+    return null;
+  })();
 
   const handleArchive = async () => {
     setActing(true);

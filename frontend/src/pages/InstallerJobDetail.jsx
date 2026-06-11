@@ -19,6 +19,7 @@ import { getPhotoSrc } from '../lib/photo';
 import { extractExif } from '../lib/extractExif';
 import { compressImage } from '../lib/compressImage';
 import { uploadExtraPhotos } from '../lib/uploadPhotos';
+import { exifTimeHM } from '../lib/exifTime';
 import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
 
 const PAUSE_REASON_LABELS = {
@@ -69,11 +70,10 @@ const InstallerJobDetail = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const formatExifTime = (isoStr) => {
-    if (!isoStr) return null;
-    try { return new Date(isoStr.replace(' ', 'T')).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); }
-    catch { return null; }
-  };
+  // Usa o helper central (timeZone America/Sao_Paulo explícito). O antigo
+  // toLocaleTimeString sem timeZone dependia do fuso do celular — em aparelho
+  // com TZ errado o horário exibido divergia em horas.
+  const formatExifTime = (isoStr) => exifTimeHM(isoStr) || null;
 
   const addPhotos = (setState, itemIndex, newPhotos, max = 10) => {
     setState(prev => {

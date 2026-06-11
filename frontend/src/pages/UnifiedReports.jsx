@@ -340,8 +340,10 @@ const UnifiedReports = () => {
           matchesDate = false;
         } else {
           const checkinDate = new Date(exifS);
-          if (startDate && checkinDate < new Date(startDate)) matchesDate = false;
-          if (endDate && checkinDate > new Date(endDate + 'T23:59:59')) matchesDate = false;
+          // Fuso fixado em BRT: string sem fuso é interpretada como local OU UTC
+          // dependendo do browser — bordas do dia entravam/saíam do filtro.
+          if (startDate && checkinDate < new Date(startDate + 'T00:00:00-03:00')) matchesDate = false;
+          if (endDate && checkinDate > new Date(endDate + 'T23:59:59-03:00')) matchesDate = false;
         }
       }
       return matchesInstaller && matchesJob && matchesFamily && matchesDate && (c.checkin_photo || c.checkout_photo || c.checkin_photo_url);

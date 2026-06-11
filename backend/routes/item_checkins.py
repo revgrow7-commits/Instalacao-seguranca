@@ -710,16 +710,17 @@ async def complete_item_checkout(
     # a foto de conclusão não pode ser anterior à foto de início (EXIF).
     if exif_datetime:
         try:
-            _ck_out = datetime.fromisoformat(exif_datetime.replace(' ', 'T'))
-            if _ck_out.tzinfo is None:
-                _ck_out = _ck_out.replace(tzinfo=timezone.utc)
+            # Mesmo helper usado na gravação (linha ~853): naive = relógio local
+            # da câmera → BRT (ou offset EXIF). Antes carimbava UTC aqui e BRT na
+            # gravação — a validação podia errar em ±3h.
+            _ck_out = _parse_exif_local(exif_datetime, exif_offset)
             _ck_in_raw = checkin.get('exif_checkin_at')
-            if _ck_in_raw:
-                _ck_in = (datetime.fromisoformat(_ck_in_raw.replace('Z', '+00:00').replace(' ', 'T'))
+            if _ck_out and _ck_in_raw:
+                _ck_in = (_parse_exif_local(_ck_in_raw.replace('Z', '+00:00'))
                           if isinstance(_ck_in_raw, str) else _ck_in_raw)
-                if _ck_in.tzinfo is None:
-                    _ck_in = _ck_in.replace(tzinfo=timezone.utc)
-                if _ck_out < _ck_in:
+                if _ck_in and _ck_in.tzinfo is None:
+                    _ck_in = _ck_in.replace(tzinfo=BRT)
+                if _ck_in and _ck_out < _ck_in:
                     raise HTTPException(
                         status_code=400,
                         detail="A foto de conclusão é anterior à foto de início (pelo horário da câmera). Selecione a foto correta da galeria.")

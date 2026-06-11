@@ -5,7 +5,10 @@ Handles all reporting endpoints for productivity, families, installers, etc.
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from typing import Optional, List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+
+# Fuso da operação (America/Sao_Paulo). EXIF naive = relógio de parede BRT.
+BRT = timezone(timedelta(hours=-3))
 from io import BytesIO
 import logging
 import re
@@ -45,13 +48,15 @@ def _exif_end(c: dict):
 
 
 def _parse_dt(v):
+    # Naive = relógio de parede da câmera (BRT), alinhado com _parse_exif_local
+    # do item_checkins.py. Carimbar UTC deslocava filtros/durações em 3h.
     if not v:
         return None
     if isinstance(v, datetime):
-        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+        return v if v.tzinfo else v.replace(tzinfo=BRT)
     try:
         d = datetime.fromisoformat(str(v).replace('Z', '+00:00').replace(' ', 'T'))
-        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+        return d if d.tzinfo else d.replace(tzinfo=BRT)
     except Exception:
         return None
 
