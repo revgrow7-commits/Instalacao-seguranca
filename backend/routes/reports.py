@@ -424,11 +424,21 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
         c for c in db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
         if c.get("job_id") in jobs_map
     ]
+
+    # Pré-indexa os checkins por instalador para eliminar os scans aninhados (antes
+    # O(n³): cada instalador re-escaneava toda a lista de checkins e cada job
+    # re-escaneava os checkins do instalador). Agora é O(n).
+    checkins_by_installer = {}
+    for c in item_checkins:
+        iid = c.get("installer_id")
+        if iid is not None:
+            checkins_by_installer.setdefault(iid, []).append(c)
+
     installer_report = []
-    
+
     for installer in installers:
         installer_id = installer["id"]
-        installer_checkins = [c for c in item_checkins if c.get("installer_id") == installer_id]
+        installer_checkins = checkins_by_installer.get(installer_id, [])
         
         completed_count = len(installer_checkins)
         total_net_duration_min = 0
@@ -447,15 +457,22 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
                     item_m2 = item.get("total_area_m2", 0) or 0
                     total_m2_installed += item_m2
         
-        job_ids = set(c.get("job_id") for c in installer_checkins if c.get("job_id"))
+        # Agrupa os checkins deste instalador por job uma única vez (evita o
+        # re-scan de installer_checkins dentro do loop de jobs).
+        checkins_by_job = {}
+        for c in installer_checkins:
+            jid = c.get("job_id")
+            if jid:
+                checkins_by_job.setdefault(jid, []).append(c)
+        job_ids = set(checkins_by_job.keys())
         jobs_worked = len(job_ids)
-        
+
         jobs_details = []
         for job_id in job_ids:
             job = jobs_map.get(job_id)
             if job:
                 job_area = job.get("area_m2", 0) or 0
-                job_item_checkins = [c for c in installer_checkins if c.get("job_id") == job_id]
+                job_item_checkins = checkins_by_job[job_id]
                 job_net_duration = sum(_exif_duration_min(c) or 0 for c in job_item_checkins)
                 
                 job_m2_installed = 0
