@@ -93,12 +93,16 @@ self.addEventListener('fetch', (event) => {
       caches.open(CACHE_NAME).then((cache) =>
         cache.match(event.request).then((cached) => {
           if (cached) return cached;
-          return fetch(event.request).then((response) => {
+          // cache:'reload' força ida à rede ignorando o cache HTTP do navegador.
+          // Crítico: chunks vêm com Cache-Control immutable — se o navegador tiver
+          // uma cópia truncada/quebrada em cache, 'reload' a contorna e baixa uma
+          // íntegra (senão webpack daria ChunkLoadError eterno). Só cacheia 200.
+          return fetch(event.request, { cache: 'reload' }).then((response) => {
             if (response && response.status === 200) {
               cache.put(event.request, response.clone());
             }
             return response;
-          });
+          }).catch(() => fetch(event.request));
         })
       )
     );

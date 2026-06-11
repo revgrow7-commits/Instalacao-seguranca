@@ -7,6 +7,22 @@ const isChunkLoadError = (error) =>
   /Failed to fetch dynamically imported module/i.test(error?.message || '') ||
   /Importing a module script failed/i.test(error?.message || '');
 
+// Soft reload: recarrega forçando index.html fresco, mas PRESERVA o cache do
+// SW (fallback offline). É a 1ª linha de recuperação — a esmagadora maioria dos
+// ChunkLoadError em celular é blip de rede 5G/4G, e o arquivo existe no servidor.
+// Apagar o cache nesse caso é contraproducente (destrói o offline sem resolver).
+function softReload() {
+  try {
+    const u = new URL(window.location.href);
+    u.searchParams.set('_cb', Date.now());
+    window.location.replace(u.toString());
+  } catch (_) {
+    window.location.reload();
+  }
+}
+
+// Nuclear: apaga todo o cache + desregistra o SW. Reservado para o botão manual,
+// quando o soft reload já não resolveu (raro — deploy inconsistente de verdade).
 async function clearCachesAndReload() {
   try {
     if ('caches' in window) {
@@ -18,15 +34,7 @@ async function clearCachesAndReload() {
       await Promise.all(regs.map((r) => r.unregister()));
     }
   } catch (_) { /* seguro ignorar */ }
-  // Cache-bust forte: garante index.html fresco mesmo se o SW antigo ainda
-  // controlar a página por um instante (reload simples poderia reservir stale).
-  try {
-    const u = new URL(window.location.href);
-    u.searchParams.set('_cb', Date.now());
-    window.location.replace(u.toString());
-  } catch (_) {
-    window.location.reload();
-  }
+  softReload();
 }
 
 class ErrorBoundary extends Component {
@@ -47,8 +55,10 @@ class ErrorBoundary extends Component {
       const last = parseInt(sessionStorage.getItem(RELOAD_KEY) || '0', 10);
       if (Date.now() - last > 30_000) {
         sessionStorage.setItem(RELOAD_KEY, String(Date.now()));
-        // Limpa caches antes de recarregar para evitar chunks obsoletos do SW
-        clearCachesAndReload();
+        // 1ª tentativa: soft reload (preserva cache/SW). Resolve o caso comum —
+        // blip de rede móvel — sem destruir o offline. Se falhar de novo dentro
+        // de 30s, cai na tela manual com o botão "nuclear" (clearCachesAndReload).
+        softReload();
       } else {
         this.setState({ isReloading: false });
       }
@@ -69,7 +79,7 @@ class ErrorBoundary extends Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '2rem', textAlign: 'center', color: '#fff', fontFamily: 'monospace', maxWidth: 360, margin: '0 auto' }}>
-          <p style={{ marginBottom: '1.5rem' }}>Erro no app. Toque no botão abaixo para limpar o cache e recarregar.</p>
+          <p style={{ marginBottom: '1.5rem' }}>Não foi possível carregar o app. Verifique sua conexão e toque abaixo para limpar o cache e recarregar.</p>
           <button
             onClick={this.handleClear}
             disabled={this.state.clearing}
@@ -103,20 +113,30 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
 import './App.css';
 
-// Lazy import com retry: ChunkLoadError em celular costuma ser falha transiente
-// de rede ao baixar o chunk. Tenta de novo 2x com backoff antes de propagar o
-// erro (que aí cai no ErrorBoundary, que limpa cache/SW e recarrega). Evita a
-// tela "Erro no app" por um simples blip de rede móvel.
+// Lazy import com retry: ChunkLoadError em celular é quase sempre falha
+// transiente de rede 5G/4G ao baixar o chunk (o arquivo existe no servidor).
+// Tenta de novo até 5x com backoff exponencial (~0.4→3s, ~9s no total) antes de
+// propagar o erro pro ErrorBoundary. Se o aparelho estiver offline, espera a
+// conexão voltar (até 8s) em vez de gastar uma tentativa à toa. Recupera no
+// próprio lugar, sem reload, na maioria dos blips — evita a tela "Erro no app".
 function lazyWithRetry(importer) {
   return lazy(async () => {
     let lastErr;
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 5; attempt++) {
       try {
         return await importer();
       } catch (err) {
         lastErr = err;
         if (!isChunkLoadError(err)) throw err;
-        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+        // Offline: espera o evento 'online' (ou 8s) antes da próxima tentativa.
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          await new Promise((resolve) => {
+            const t = setTimeout(resolve, 8000);
+            window.addEventListener('online', () => { clearTimeout(t); resolve(); }, { once: true });
+          });
+        }
+        // Backoff exponencial limitado: 0.4s, 0.8s, 1.6s, 3s, 3s.
+        await new Promise((r) => setTimeout(r, Math.min(400 * 2 ** attempt, 3000)));
       }
     }
     throw lastErr;
