@@ -403,3 +403,12 @@ grep -r "add_coins" backend/routes/ --include="*.py"
 # Verificar campos em TABLE_COLUMNS vs migrations recentes
 grep -r "ALTER TABLE\|ADD COLUMN" backend/migrations/ --include="*.sql" | tail -20
 ```
+
+## Sessao 2026-06-11 (tarde) — Remocao da gamificacao + fixes EXIF
+
+- **Gamificacao REMOVIDA por completo** (commit `ab6f3bf`, decisao de negocio): rotas, services, models, paginas, componentes, flags. Tabelas `gamification_*`/`coin_transactions`/`rewards`/`reward_requests` mantidas no banco como historico, sem uso no codigo. PENDING-002/003 encerrados.
+- **Pipeline EXIF corrigido** (commit `b3dc310`): validacao de timeline do checkout e `_parse_dt` dos reports agora assumem BRT para horarios naive (antes UTC — erro de 3h); tela do instalador usa `exifTimeHM` (TZ America/Sao_Paulo fixo); TDZ no CheckinViewer corrigida; filtro de data do UnifiedReports com fuso fixo BRT.
+- Sentinel do index.html preserva querystring (`?token=` do reset de senha) — commit `561e997`.
+- Docs criados: `docs/business/produto.md`, `docs/architecture/arquitetura.md`, `docs/ux/fluxos.md`, `docs/RESUMO-EXECUTIVO-2026-06-11.md`.
+- Deploys: frontend (`instalacao-seguranca`) e backend (`backend-henna-one-82`) em producao com tudo acima. Verificado: `/api/gamification/*` retorna 404; sentinel novo no ar.
+
