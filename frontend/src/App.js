@@ -95,33 +95,53 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { Toaster } from 'sonner';
 import './App.css';
 
+// Lazy import com retry: ChunkLoadError em celular costuma ser falha transiente
+// de rede ao baixar o chunk. Tenta de novo 2x com backoff antes de propagar o
+// erro (que aí cai no ErrorBoundary, que limpa cache/SW e recarrega). Evita a
+// tela "Erro no app" por um simples blip de rede móvel.
+function lazyWithRetry(importer) {
+  return lazy(async () => {
+    let lastErr;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await importer();
+      } catch (err) {
+        lastErr = err;
+        if (!isChunkLoadError(err)) throw err;
+        await new Promise((r) => setTimeout(r, 500 * (attempt + 1)));
+      }
+    }
+    throw lastErr;
+  });
+}
+
 // Lazy load all pages for better performance
-const Login = lazy(() => import('./pages/Login'));
-const Register = lazy(() => import('./pages/Register'));
-const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const InstallerDashboard = lazy(() => import('./pages/InstallerDashboard'));
-const InstallerJobDetail = lazy(() => import('./pages/InstallerJobDetail'));
-const InstallerCalendar = lazy(() => import('./pages/InstallerCalendar'));
-const Jobs = lazy(() => import('./pages/Jobs'));
-const JobDetail = lazy(() => import('./pages/JobDetail'));
-const Users = lazy(() => import('./pages/Users'));
-const Calendar = lazy(() => import('./pages/Calendar'));
-const CheckinViewer = lazy(() => import('./pages/CheckinViewer'));
-const Checkins = lazy(() => import('./pages/Checkins'));
-const UnifiedReports = lazy(() => import('./pages/UnifiedReports'));
-const FamilyReport = lazy(() => import('./pages/FamilyReport'));
-const InstallerReport = lazy(() => import('./pages/InstallerReport'));
-const FamilyKPIsReport = lazy(() => import('./pages/FamilyKPIsReport'));
-const Profile = lazy(() => import('./pages/Profile'));
+const Login = lazyWithRetry(() => import('./pages/Login'));
+const Register = lazyWithRetry(() => import('./pages/Register'));
+const ForgotPassword = lazyWithRetry(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazyWithRetry(() => import('./pages/ResetPassword'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const InstallerDashboard = lazyWithRetry(() => import('./pages/InstallerDashboard'));
+const InstallerJobDetail = lazyWithRetry(() => import('./pages/InstallerJobDetail'));
+const InstallerCalendar = lazyWithRetry(() => import('./pages/InstallerCalendar'));
+const Jobs = lazyWithRetry(() => import('./pages/Jobs'));
+const JobDetail = lazyWithRetry(() => import('./pages/JobDetail'));
+const Users = lazyWithRetry(() => import('./pages/Users'));
+const Calendar = lazyWithRetry(() => import('./pages/Calendar'));
+const CheckinViewer = lazyWithRetry(() => import('./pages/CheckinViewer'));
+const Checkins = lazyWithRetry(() => import('./pages/Checkins'));
+const UnifiedReports = lazyWithRetry(() => import('./pages/UnifiedReports'));
+const FamilyReport = lazyWithRetry(() => import('./pages/FamilyReport'));
+const InstallerReport = lazyWithRetry(() => import('./pages/InstallerReport'));
+const FamilyKPIsReport = lazyWithRetry(() => import('./pages/FamilyKPIsReport'));
+const Profile = lazyWithRetry(() => import('./pages/Profile'));
 // [GAMIFICATION DISABLED 2026-05-15] páginas suspensas (rotas redirecionam para /dashboard).
-// const LojaFaixaPreta = lazy(() => import('./pages/LojaFaixaPreta'));
-// const GamificationReport = lazy(() => import('./pages/GamificationReport'));
-const SchedulerAdmin = lazy(() => import('./pages/SchedulerAdmin'));
-const VisitasTecnicas = lazy(() => import('./pages/VisitasTecnicas'));
-const VisitaDetail = lazy(() => import('./pages/VisitaDetail'));
-const VisitasRelatorios = lazy(() => import('./pages/VisitasRelatorios'));
+// const LojaFaixaPreta = lazyWithRetry(() => import('./pages/LojaFaixaPreta'));
+// const GamificationReport = lazyWithRetry(() => import('./pages/GamificationReport'));
+const SchedulerAdmin = lazyWithRetry(() => import('./pages/SchedulerAdmin'));
+const VisitasTecnicas = lazyWithRetry(() => import('./pages/VisitasTecnicas'));
+const VisitaDetail = lazyWithRetry(() => import('./pages/VisitaDetail'));
+const VisitasRelatorios = lazyWithRetry(() => import('./pages/VisitasRelatorios'));
 
 // Non-lazy imports for layout components (always needed)
 import Sidebar from './components/layout/Sidebar';
