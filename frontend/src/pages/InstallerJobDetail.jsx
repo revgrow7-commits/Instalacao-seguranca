@@ -826,7 +826,9 @@ const InstallerJobDetail = () => {
                             onRemove={(pi) => removePhoto(setCheckinPhotos, itemIndex, pi)}
                             disabled={isProcessing}
                             maxPhotos={10}
-                            label="Fotos de início"
+                            label="Foto de INÍCIO (define o horário de início pelo EXIF da foto)"
+                            galleryOnly
+                            requireExifDate
                           />
                           <Button
                             onClick={() => handleItemCheckin(itemIndex)}
@@ -918,7 +920,9 @@ const InstallerJobDetail = () => {
                             onRemove={(pi) => removePhoto(setCheckoutPhotos, itemIndex, pi)}
                             disabled={isProcessing}
                             maxPhotos={10}
-                            label="Fotos de conclusão"
+                            label="Foto de CONCLUSÃO (define o horário de fim pelo EXIF da foto)"
+                            galleryOnly
+                            requireExifDate
                           />
 
                           {/* Action Buttons */}

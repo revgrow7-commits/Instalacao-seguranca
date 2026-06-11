@@ -13,6 +13,10 @@ import { toast } from 'sonner';
  *   disabled    – boolean
  *   maxPhotos   – number (default 10)
  *   label       – string
+ *   galleryOnly – boolean: esconde o botão Câmera (só galeria). Para fotos que
+ *                 definem horário (início/fim), pois a câmera-agora carimba o dia
+ *                 errado (o instalador registra dias depois da obra).
+ *   requireExifDate – boolean: bloqueia foto sem DateTimeOriginal no EXIF.
  */
 const PhotoGalleryPicker = ({
   photos = [],
@@ -21,6 +25,8 @@ const PhotoGalleryPicker = ({
   disabled = false,
   maxPhotos = 10,
   label = 'Fotos',
+  galleryOnly = false,
+  requireExifDate = false,
 }) => {
   const atLimit = photos.length >= maxPhotos;
 
@@ -91,6 +97,11 @@ const PhotoGalleryPicker = ({
           // em vez de fingir um horário que não é o real da captura.
           if (!exif.exif_datetime) {
             exif.datetime_fallback = true;
+            // Para fotos que definem início/fim, sem a data EXIF não há horário
+            // real da instalação → rejeitar e orientar a usar a foto original.
+            if (requireExifDate) {
+              throw new Error('Essa foto não tem data de captura (EXIF). Selecione a FOTO ORIGINAL da galeria, tirada no dia da instalação — não use foto editada, de WhatsApp ou screenshot.');
+            }
           }
 
           return { file: processedFile, exif, preview, isHeic };
@@ -217,6 +228,7 @@ const PhotoGalleryPicker = ({
       )}
 
       <div className="flex gap-2">
+        {!galleryOnly && (
         <button
           type="button"
           onClick={() => openPicker('camera')}
@@ -229,6 +241,7 @@ const PhotoGalleryPicker = ({
           <Camera className="h-3.5 w-3.5" />
           Câmera
         </button>
+        )}
         <button
           type="button"
           onClick={() => openPicker('gallery')}

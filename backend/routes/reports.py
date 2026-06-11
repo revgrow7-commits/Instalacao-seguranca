@@ -297,16 +297,11 @@ async def get_family_productivity_kpis(
     """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
+    # Recorte de período pela data EXIF da foto de início (não pelo clique).
+    _start_dt = _parse_dt(date_from + "T00:00:00") if date_from else None
+    _end_dt = _parse_dt(date_to + "T23:59:59") if date_to else None
+
     query = {"status": "completed"}
-    if date_from or date_to:
-        date_filter = {}
-        if date_from:
-            date_filter["$gte"] = date_from + "T00:00:00"
-        if date_to:
-            date_filter["$lte"] = date_to + "T23:59:59"
-        if date_filter:
-            query["checkin_at"] = date_filter
-    
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {j["id"]: j for j in jobs if not _metrics_excluded(j)}
     checkins = [
@@ -318,6 +313,11 @@ async def get_family_productivity_kpis(
     global_totals = {"total_m2": 0, "total_minutes": 0, "count": 0}
 
     for checkin in checkins:
+        # Filtro de período pela data EXIF; sem EXIF de início → fora de intervalos
+        if _start_dt or _end_dt:
+            _es = _parse_dt(_exif_start(checkin))
+            if not _es or (_start_dt and _es < _start_dt) or (_end_dt and _es > _end_dt):
+                continue
         family = checkin.get("family_name") or "Outros"
         installed_m2 = checkin.get("installed_m2", 0) or 0
         # Duração SOMENTE pelo EXIF da foto (não pelo clique)
@@ -992,7 +992,8 @@ async def export_reports(current_user: User = Depends(get_current_user)):
         checkout_at = _parse_exif_dt(checkin.get('exif_checkout_at') or checkin.get('checkout_exif_datetime'))
         ws.cell(row=row_num, column=14, value=checkout_at.strftime('%d/%m/%Y %H:%M') if checkout_at else '').border = border
 
-        ws.cell(row=row_num, column=15, value=checkin.get('duration_minutes', 0)).border = border
+        _exif_dur = _exif_duration_min(checkin)
+        ws.cell(row=row_num, column=15, value=round(_exif_dur, 1) if _exif_dur is not None else '').border = border
         ws.cell(row=row_num, column=16, value=checkin.get('status', '')).border = border
         ws.cell(row=row_num, column=17, value=job.get('branch', '')).border = border
         ws.cell(row=row_num, column=18, value=checkin.get('exif_device') or checkin.get('checkout_exif_device') or '').border = border

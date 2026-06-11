@@ -704,19 +704,29 @@ async def complete_item_checkout(
         logger.error(f"Checkin {checkin_id} already completed")
         raise HTTPException(status_code=400, detail="Item already checked out")
 
-    # Regra de tempo mínimo: checkout não permitido antes de 5 minutos do check-in
-    checkin_at_raw = checkin.get('checkin_at')
-    if checkin_at_raw:
-        checkin_at_parsed = datetime.fromisoformat(checkin_at_raw.replace('Z', '+00:00')) if isinstance(checkin_at_raw, str) else checkin_at_raw
-        if checkin_at_parsed.tzinfo is None:
-            checkin_at_parsed = checkin_at_parsed.replace(tzinfo=timezone.utc)
-        elapsed_seconds = (datetime.now(timezone.utc) - checkin_at_parsed).total_seconds()
-        if elapsed_seconds < MIN_CHECKOUT_DURATION_SECONDS:
-            remaining = int(MIN_CHECKOUT_DURATION_SECONDS - elapsed_seconds)
-            remaining_min = remaining // 60
-            remaining_sec = remaining % 60
-            detail = f"Você precisa registrar checkin e checkout no tempo correto. Aguarde mais {remaining_min}min {remaining_sec}s para finalizar."
-            raise HTTPException(status_code=400, detail=detail)
+    # Início e fim vêm SEMPRE do EXIF das fotos da galeria. Como o instalador faz
+    # o registro DEPOIS da obra (outro dia), o horário do clique não vale e NÃO
+    # bloqueamos checkout por intervalo de clique. A única validação de timeline:
+    # a foto de conclusão não pode ser anterior à foto de início (EXIF).
+    if exif_datetime:
+        try:
+            _ck_out = datetime.fromisoformat(exif_datetime.replace(' ', 'T'))
+            if _ck_out.tzinfo is None:
+                _ck_out = _ck_out.replace(tzinfo=timezone.utc)
+            _ck_in_raw = checkin.get('exif_checkin_at')
+            if _ck_in_raw:
+                _ck_in = (datetime.fromisoformat(_ck_in_raw.replace('Z', '+00:00').replace(' ', 'T'))
+                          if isinstance(_ck_in_raw, str) else _ck_in_raw)
+                if _ck_in.tzinfo is None:
+                    _ck_in = _ck_in.replace(tzinfo=timezone.utc)
+                if _ck_out < _ck_in:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="A foto de conclusão é anterior à foto de início (pelo horário da câmera). Selecione a foto correta da galeria.")
+        except HTTPException:
+            raise
+        except Exception:
+            pass
 
     # FIX M9 (relaxado para produção): se o item foi arquivado APÓS o check-in,
     # NÃO bloqueia o checkout — apenas loga warning. Bloquear deixaria o
