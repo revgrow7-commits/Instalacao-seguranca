@@ -903,7 +903,13 @@ async def export_reports(current_user: User = Depends(get_current_user)):
 
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
 
-    checkins = db.item_checkins.find({"is_archived": {"$ne": True}}, {"_id": 0})
+    # Excluir fotos base64 da projeção: o export não as usa e em registros
+    # legados cada uma tem ~300-400KB — sem isso o Excel de 200 checkins
+    # carregava dezenas de MB em memória (risco de timeout serverless).
+    checkins = db.item_checkins.find(
+        {"is_archived": {"$ne": True}},
+        {"_id": 0, "checkin_photo": 0, "checkout_photo": 0}
+    )
     jobs = db.jobs.find({}, {"_id": 0})
     installers = db.installers.find({}, {"_id": 0})
 

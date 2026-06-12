@@ -317,7 +317,11 @@ async def _do_checkout(checkin_id, photo_base64, gps_lat, gps_long, gps_accuracy
     
     checkout_at = datetime.now(timezone.utc)
     checkin_at = datetime.fromisoformat(checkin_doc['checkin_at']) if isinstance(checkin_doc['checkin_at'], str) else checkin_doc['checkin_at']
-    
+    # Registro legado pode vir naive (sem fuso) — o checkin_at do clique sempre
+    # foi gravado em UTC; sem este guard a subtração lança TypeError.
+    if checkin_at is not None and checkin_at.tzinfo is None:
+        checkin_at = checkin_at.replace(tzinfo=timezone.utc)
+
     # Calculate duration in minutes with decimal precision
     duration_seconds = (checkout_at - checkin_at).total_seconds()
     duration_minutes = round(duration_seconds / 60, 2)

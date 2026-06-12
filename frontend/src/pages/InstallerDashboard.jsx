@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
+import { exifTimeHM } from '../lib/exifTime';
 
 const MAX_PHOTOS = 10;
 const MAX_PHOTO_B64_BYTES = 200 * 1024; // 200KB por foto no lote
@@ -95,13 +96,9 @@ const compressForBatch = (file) => {
   });
 };
 
-const formatExifTime = (isoStr) => {
-  if (!isoStr) return null;
-  try {
-    const d = new Date(isoStr.replace(' ', 'T'));
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  } catch { return null; }
-};
+// Helper canônico com timeZone America/Sao_Paulo fixo (regra 3 de
+// docs/REGRAS-DE-NEGOCIO.md) — não depende do fuso configurado no celular.
+const formatExifTime = (isoStr) => exifTimeHM(isoStr) || null;
 
 const formatDuration = (minutes) => {
   if (!minutes) return null;
