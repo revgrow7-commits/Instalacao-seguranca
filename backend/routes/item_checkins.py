@@ -678,7 +678,7 @@ async def get_all_item_checkins(
         "checkout_photo": 0
     }
 
-    query = {}
+    query = {"is_archived": {"$ne": True}}
     if status:
         statuses = [s.strip() for s in status.split(",") if s.strip()]
         if len(statuses) == 1:
