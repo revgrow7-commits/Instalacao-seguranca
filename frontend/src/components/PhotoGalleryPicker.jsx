@@ -18,6 +18,11 @@ import { toast } from 'sonner';
  *                 definem horário (início/fim), pois a câmera-agora carimba o dia
  *                 errado (o instalador registra dias depois da obra).
  *   requireExifDate – boolean: bloqueia foto sem DateTimeOriginal no EXIF.
+ *   onPicked    – (validPhotos) => void: MODO BOTÃO ÚNICO. Quando definido, o
+ *                 componente vira UM botão ("triggerLabel"); ao selecionar as
+ *                 fotos da galeria, chama onPicked direto (o caller envia/salva
+ *                 na hora — sem grade de revisão nem botão de confirmar).
+ *   triggerLabel – string: rótulo do botão no modo onPicked.
  */
 const PhotoGalleryPicker = ({
   photos = [],
@@ -28,6 +33,8 @@ const PhotoGalleryPicker = ({
   label = 'Fotos',
   galleryOnly = false,
   requireExifDate = false,
+  onPicked = null,
+  triggerLabel = 'Carregar fotos',
 }) => {
   const atLimit = photos.length >= maxPhotos;
 
@@ -130,7 +137,7 @@ const PhotoGalleryPicker = ({
           toast.error(msg, { duration: 5000 });
         }
 
-        if (valid.length > 0) onPhotos(valid);
+        if (valid.length > 0) (onPicked || onPhotos)(valid);
       } catch (err) {
         console.error('[PhotoGalleryPicker] erro ao processar fotos:', err);
         toast.error('Erro ao processar foto. Tente tirar uma nova com a câmera.', { duration: 5000 });
@@ -146,6 +153,28 @@ const PhotoGalleryPicker = ({
   const latest = exifTimes[exifTimes.length - 1];
   // withGps: prefere GPS real do EXIF; fallback: GPS do dispositivo (_live_lat)
   const withGps = photos.find(f => f.exif?.exif_lat != null || f.exif?._live_lat != null);
+
+  // MODO BOTÃO ÚNICO (Opção A): renderiza só UM botão; ao escolher as fotos da
+  // galeria, dispara onPicked(valid) e o caller envia/salva direto. Reaproveita
+  // openPicker (extração de EXIF + recusa de foto sem data via requireExifDate).
+  if (onPicked) {
+    return (
+      <button
+        type="button"
+        onClick={() => openPicker('gallery')}
+        disabled={disabled}
+        className={`w-full flex items-center justify-center gap-2 h-14 rounded-lg text-base font-medium transition-transform active:scale-[0.98]
+          ${disabled
+            ? 'bg-white/5 text-muted-foreground cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
+      >
+        {disabled
+          ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+          : <Images className="h-5 w-5" />}
+        {triggerLabel}
+      </button>
+    );
+  }
 
   return (
     <div className="space-y-2">

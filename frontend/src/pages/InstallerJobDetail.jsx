@@ -40,34 +40,10 @@ const InstallerJobDetail = () => {
     notes: ''
   });
 
-  // Fotos de check-in múltiplas — { [itemIndex]: [{file, exif, preview}] }
-  const [checkinPhotos, setCheckinPhotos] = useState({});
-  // Fotos de conclusão múltiplas (galeria) — { [itemIndex]: [{file, exif, preview}] }
-  const [checkoutPhotos, setCheckoutPhotos] = useState({});
-
-
   // Usa o helper central (timeZone America/Sao_Paulo explícito). O antigo
   // toLocaleTimeString sem timeZone dependia do fuso do celular — em aparelho
   // com TZ errado o horário exibido divergia em horas.
   const formatExifTime = (isoStr) => exifTimeHM(isoStr) || null;
-
-  const addPhotos = (setState, itemIndex, newPhotos, max = 10) => {
-    setState(prev => {
-      const current = prev[itemIndex] || [];
-      const available = max - current.length;
-      if (available <= 0) { toast.warning(`Máximo de ${max} fotos`); return prev; }
-      return { ...prev, [itemIndex]: [...current, ...newPhotos.slice(0, available)] };
-    });
-  };
-
-  const removePhoto = (setState, itemIndex, photoIdx) => {
-    setState(prev => {
-      const copy = [...(prev[itemIndex] || [])];
-      URL.revokeObjectURL(copy[photoIdx].preview);
-      copy.splice(photoIdx, 1);
-      return { ...prev, [itemIndex]: copy };
-    });
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -168,11 +144,12 @@ const InstallerJobDetail = () => {
     }
   };
 
-  // handleItemCheckin — usa batchCheckin com fotos acumuladas em checkinPhotos[itemIndex]
-  const handleItemCheckin = async (itemIndex) => {
-    const photos = checkinPhotos[itemIndex] || [];
+  // handleItemCheckin — recebe as fotos escolhidas na galeria (modo botão único)
+  // e envia direto. Horário/local vêm do EXIF de cada foto (batchCheckin/B1).
+  const handleItemCheckin = async (itemIndex, pickedPhotos) => {
+    const photos = pickedPhotos || [];
     if (photos.length === 0) {
-      toast.error('Adicione pelo menos uma foto de Início');
+      toast.error('Selecione pelo menos uma foto de Início');
       return;
     }
     if (processingItem !== null) return;
@@ -187,7 +164,6 @@ const InstallerJobDetail = () => {
         exif_data: exifData,
       });
       toast.success('Início registrado!');
-      setCheckinPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(itemIndex);
       hasAutoExpanded.current = true;
       await loadJobData();
@@ -217,16 +193,16 @@ const InstallerJobDetail = () => {
   };
 
   // handleItemCheckout — foto[0] via FormData (retrocompatível), extras via uploadExtraPhotos
-  const handleItemCheckout = async (itemIndex) => {
+  const handleItemCheckout = async (itemIndex, pickedPhotos) => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) { toast.error('Registre o Início primeiro'); return; }
 
     // NOVA REGRA: o tempo é 100% EXIF (o registro é feito depois da obra, às vezes
     // outro dia). Sem trava de tempo de clique. A única validação de ordem
     // (fim ≥ início) é feita no backend pelo EXIF das fotos.
-    const photos = checkoutPhotos[itemIndex] || [];
+    const photos = pickedPhotos || [];
     if (photos.length === 0) {
-      toast.error('Adicione pelo menos uma foto para finalizar');
+      toast.error('Selecione pelo menos uma foto de Fim');
       return;
     }
     if (processingItem !== null) return;
@@ -269,7 +245,6 @@ const InstallerJobDetail = () => {
 
       toast.success('Fim registrado!');
       setCheckoutForm({ notes: '' });
-      setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(null);
       await loadJobData();
     } catch (error) {
@@ -279,7 +254,6 @@ const InstallerJobDetail = () => {
       if (status === 400 && detail === 'Item already checked out') {
         toast.success('Fim registrado!');
         setCheckoutForm({ notes: '' });
-        setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
         setExpandedItem(null);
         await loadJobData();
         return;
@@ -698,33 +672,19 @@ const InstallerJobDetail = () => {
                         </div>
                       )}
 
-                      {/* Actions */}
+                      {/* Ação: carregar fotos de Início (carrega → lê EXIF → salva direto) */}
                       {status === 'pending' && (
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                           <PhotoGalleryPicker
-                            photos={checkinPhotos[itemIndex] || []}
-                            onPhotos={(newPhotos) => addPhotos(setCheckinPhotos, itemIndex, newPhotos)}
-                            onRemove={(pi) => removePhoto(setCheckinPhotos, itemIndex, pi)}
+                            onPicked={(picked) => handleItemCheckin(itemIndex, picked)}
+                            triggerLabel="Carregar fotos início"
                             disabled={isProcessing}
-                            maxPhotos={10}
-                            label="Fotos de Início — o horário de início vem do EXIF da foto"
                             galleryOnly
                             requireExifDate
                           />
-                          <Button
-                            onClick={() => handleItemCheckin(itemIndex)}
-                            disabled={isProcessing || (checkinPhotos[itemIndex] || []).length === 0}
-                            className="w-full bg-blue-600 hover:bg-blue-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
-                          >
-                            {isProcessing ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                            ) : (
-                              <Check className="h-4 w-4 mr-2" />
-                            )}
-                            {(checkinPhotos[itemIndex] || []).length === 0
-                              ? 'Adicione fotos de Início'
-                              : `Salvar Início (${(checkinPhotos[itemIndex] || []).length} foto${(checkinPhotos[itemIndex] || []).length > 1 ? 's' : ''})`}
-                          </Button>
+                          <p className="text-[11px] text-muted-foreground text-center">
+                            Escolha a(s) foto(s) de início da galeria — o horário vem do EXIF da foto.
+                          </p>
                         </div>
                       )}
 
@@ -789,35 +749,17 @@ const InstallerJobDetail = () => {
                             />
                           </div>
 
-                          {/* Fotos de conclusão */}
+                          {/* Ação: carregar fotos de Fim (carrega → lê EXIF → salva direto) */}
                           <PhotoGalleryPicker
-                            photos={checkoutPhotos[itemIndex] || []}
-                            onPhotos={(newPhotos) => addPhotos(setCheckoutPhotos, itemIndex, newPhotos)}
-                            onRemove={(pi) => removePhoto(setCheckoutPhotos, itemIndex, pi)}
+                            onPicked={(picked) => handleItemCheckout(itemIndex, picked)}
+                            triggerLabel="Carregar fotos final"
                             disabled={isProcessing}
-                            maxPhotos={10}
-                            label="Fotos de Fim — o horário de fim vem do EXIF da foto"
                             galleryOnly
                             requireExifDate
                           />
-
-                          {/* Botão: salvar Fim (registro por foto, sem trava de tempo) */}
-                          <Button
-                            onClick={() => handleItemCheckout(itemIndex)}
-                            disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0}
-                            className="w-full bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
-                          >
-                            {isProcessing ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                            ) : (
-                              <Check className="h-4 w-4 mr-2" />
-                            )}
-                            {isProcessing
-                              ? 'Aguarde...'
-                              : (checkoutPhotos[itemIndex] || []).length === 0
-                                ? 'Adicione fotos de Fim'
-                                : 'Salvar Fim'}
-                          </Button>
+                          <p className="text-[11px] text-muted-foreground text-center">
+                            Escolha a(s) foto(s) de conclusão da galeria — o horário vem do EXIF da foto.
+                          </p>
                         </div>
                       )}
 

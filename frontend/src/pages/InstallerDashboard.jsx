@@ -13,7 +13,6 @@ import { toast } from 'sonner';
 import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
 import { exifTimeHM } from '../lib/exifTime';
 
-const MAX_PHOTOS = 10;
 const MAX_PHOTO_B64_BYTES = 200 * 1024; // 200KB por foto no lote
 
 const STATUS_ORDER = { instalando: 0, in_progress: 0, agendado: 1, scheduled: 1, aguardando: 2, pending: 2 };
@@ -117,7 +116,6 @@ const InstallerDashboard = () => {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [sheetJob, setSheetJob] = useState(null);
   const [sheetItemIndex, setSheetItemIndex] = useState('0');
-  const [selectedFiles, setSelectedFiles] = useState([]); // { file, exif, preview }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [checkinResult, setCheckinResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -170,7 +168,6 @@ const InstallerDashboard = () => {
     const items = getJobItemsWithIndex(job);
     setSheetJob(job);
     setSheetItemIndex(String(items[0]?.originalIndex ?? 0));
-    setSelectedFiles([]);
     setCheckinResult(null);
     setSheetOpen(true);
   };
@@ -180,29 +177,13 @@ const InstallerDashboard = () => {
     if (checkinResult) loadJobs();
   };
 
-  const addSheetPhotos = (newPhotos) => {
-    setSelectedFiles(prev => {
-      const available = MAX_PHOTOS - prev.length;
-      if (available <= 0) return prev;
-      return [...prev, ...newPhotos.slice(0, available)];
-    });
-  };
-
-  const removeSheetPhoto = (idx) => {
-    setSelectedFiles(prev => {
-      const copy = [...prev];
-      URL.revokeObjectURL(copy[idx].preview);
-      copy.splice(idx, 1);
-      return copy;
-    });
-  };
-
-  const handleSubmit = async () => {
-    if (!sheetJob || selectedFiles.length === 0) return;
+  const handleSubmit = async (pickedPhotos) => {
+    const files = pickedPhotos || [];
+    if (!sheetJob || files.length === 0) return;
     setIsSubmitting(true);
     let photos;
     try {
-      photos = await Promise.all(selectedFiles.map(f => compressForBatch(f.file)));
+      photos = await Promise.all(files.map(f => compressForBatch(f.file)));
     } catch (compressionErr) {
       console.error('[InstallerDashboard] compressForBatch falhou:', compressionErr);
       toast.error('Erro ao processar a foto. Tente outra imagem.', { duration: 6000 });
@@ -210,7 +191,7 @@ const InstallerDashboard = () => {
       return;
     }
     try {
-      const exif_data = selectedFiles.map(f => f.exif);
+      const exif_data = files.map(f => f.exif);
 
       const res = await api.batchCheckin({
         job_id: sheetJob.id,
@@ -338,7 +319,7 @@ const InstallerDashboard = () => {
                       className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-primary/15 border border-primary/30 text-primary text-sm font-medium active:bg-primary/25 transition-colors"
                     >
                       <Camera className="h-4 w-4" />
-                      Registrar Início
+                      Carregar fotos início
                     </button>
                   </div>
                 )}
@@ -448,41 +429,26 @@ const InstallerDashboard = () => {
                   </div>
                 )}
 
-                {/* Seletor de fotos — câmera ou galeria (com EXIF automático) */}
+                {/* Carregar fotos de Início — carrega → lê EXIF → salva direto */}
                 <PhotoGalleryPicker
-                  photos={selectedFiles}
-                  onPhotos={addSheetPhotos}
-                  onRemove={removeSheetPhoto}
+                  onPicked={handleSubmit}
+                  triggerLabel="Carregar fotos início"
                   disabled={isSubmitting}
-                  maxPhotos={MAX_PHOTOS}
-                  label="Carregar foto(s) de Início — o horário vem do EXIF da foto"
                   galleryOnly
                   requireExifDate
                 />
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Escolha a(s) foto(s) de início da galeria — o horário vem do EXIF da foto.
+                </p>
 
-                {/* Ações */}
-                <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={closeSheet}
-                    className="flex-1 h-12 border-white/10"
-                    disabled={isSubmitting}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={selectedFiles.length === 0 || isSubmitting}
-                    className="flex-1 h-12 bg-primary hover:bg-primary/90 active:scale-[0.98] transition-transform"
-                  >
-                    {isSubmitting ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                    ) : (
-                      <Camera className="h-4 w-4 mr-2" />
-                    )}
-                    {isSubmitting ? 'Enviando...' : 'Salvar Início'}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  onClick={closeSheet}
+                  className="w-full h-11 border-white/10"
+                  disabled={isSubmitting}
+                >
+                  Cancelar
+                </Button>
               </div>
             )}
           </div>
