@@ -261,6 +261,18 @@ const UnifiedReports = () => {
     });
   };
 
+  const toggleJobRows = (e, jobId) => {
+    e.stopPropagation();
+    const jobIds = consolidatedCheckins.filter(c => c.job_id === jobId).map(c => c.id);
+    const allSelected = jobIds.every(id => selectedIds.has(id));
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) jobIds.forEach(id => next.delete(id));
+      else jobIds.forEach(id => next.add(id));
+      return next;
+    });
+  };
+
   const handleExportExcel = async () => {
     setExporting(true);
     try {
@@ -643,7 +655,20 @@ const UnifiedReports = () => {
                         <td className="px-4 py-2.5 text-white">{installer?.full_name || c.installer_id?.slice(0, 8) || '—'}</td>
                         <td className="px-4 py-2.5 text-muted-foreground max-w-[180px] truncate">{c.product_name || job?.title || '—'}</td>
                         <td className="px-4 py-2.5">
-                          {jobCode ? <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded">#{jobCode}</span> : '—'}
+                          {jobCode ? (() => {
+                            const jobItemIds = consolidatedCheckins.filter(x => x.job_id === c.job_id).map(x => x.id);
+                            const allJobSelected = jobItemIds.length > 0 && jobItemIds.every(id => selectedIds.has(id));
+                            return (
+                              <button
+                                type="button"
+                                title={`Clique para ${allJobSelected ? 'desselecionar' : 'selecionar'} todos os ${jobItemIds.length} itens do job #${jobCode}`}
+                                onClick={e => toggleJobRows(e, c.job_id)}
+                                className={`text-xs font-mono px-2 py-0.5 rounded transition-colors ${allJobSelected ? 'bg-yellow-400/20 text-yellow-300 border border-yellow-400/40' : 'text-primary bg-primary/10 hover:bg-primary/20'}`}
+                              >
+                                #{jobCode}
+                              </button>
+                            );
+                          })() : '—'}
                         </td>
                         <td className="px-4 py-2.5 font-mono text-green-400" title={inicioFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{inicio}</td>
                         <td className="px-4 py-2.5 font-mono text-red-400" title={fimFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{fim}</td>
