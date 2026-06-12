@@ -433,8 +433,11 @@ async def get_checkin_details(
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
     photo_projection = {"_id": 0, "checkin_photo": 0, "checkout_photo": 0}
-    checkin = db.checkins.find_one({"id": checkin_id}, photo_projection)
-
+    checkin = None
+    try:
+        checkin = db.checkins.find_one({"id": checkin_id}, photo_projection)
+    except Exception:
+        pass
     if not checkin:
         checkin = db.item_checkins.find_one({"id": checkin_id}, photo_projection)
     

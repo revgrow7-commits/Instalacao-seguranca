@@ -15,7 +15,7 @@ import {
   Download, User, Camera, X, MapPin,
   ChevronLeft, ChevronRight, Loader2, BarChart3, Ruler, RefreshCw,
   ChevronDown, ChevronUp, Package, Navigation, DollarSign, FileSpreadsheet,
-  AlertTriangle, Trash2
+  AlertTriangle, Trash2, Archive
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -118,6 +118,10 @@ const UnifiedReports = () => {
   const [archiving, setArchiving] = useState(false);
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
+  // Ação por linha individual
+  const [itemAction, setItemAction] = useState(null); // {id, type: 'archive'|'delete', label}
+  const [actingItem, setActingItem] = useState(false);
+
   // Guards contra double-fire
   const primaryStartedRef = useRef(false);
   const checkinsStartedRef = useRef(false);
@@ -213,6 +217,28 @@ const UnifiedReports = () => {
     } finally {
       setArchiving(false);
       setShowArchiveConfirm(false);
+    }
+  };
+
+  const handleSingleAction = async () => {
+    if (!itemAction) return;
+    setActingItem(true);
+    try {
+      if (itemAction.type === 'archive') {
+        await api.archiveItemCheckin(itemAction.id);
+        toast.success('Registro removido dos relatórios e KPIs.');
+      } else {
+        await api.deleteItemCheckin(itemAction.id);
+        toast.success('Registro excluído permanentemente.');
+      }
+      setItemCheckins(prev => prev.filter(c => c.id !== itemAction.id));
+      sessionStorage.removeItem(REPORTS_CACHE_KEY);
+      setSelectedIds(prev => { const n = new Set(prev); n.delete(itemAction.id); return n; });
+    } catch {
+      toast.error('Erro ao processar ação.');
+    } finally {
+      setActingItem(false);
+      setItemAction(null);
     }
   };
 
@@ -564,6 +590,7 @@ const UnifiedReports = () => {
                     <th className="text-left px-4 py-2 font-medium">
                       <span className="flex items-center gap-1"><Camera className="h-3 w-3 text-muted-foreground" />Dispositivo</span>
                     </th>
+                    <th className="text-right px-4 py-2 font-medium">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -645,6 +672,26 @@ const UnifiedReports = () => {
                         </td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[160px] truncate" title={device || 'Sem dispositivo no EXIF'}>
                           {device || <span className="text-muted-foreground/50">—</span>}
+                        </td>
+                        <td className="px-4 py-2.5" onClick={e => e.stopPropagation()}>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              title="Arquivar — remove dos KPIs e relatórios (reversível)"
+                              onClick={e => { e.stopPropagation(); setItemAction({ id: c.id, type: 'archive', label: c.product_name || '#' + (jobCode || c.id.slice(0, 6)) }); }}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-amber-400 hover:bg-amber-400/10 transition-colors"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              title="Excluir permanentemente"
+                              onClick={e => { e.stopPropagation(); setItemAction({ id: c.id, type: 'delete', label: c.product_name || '#' + (jobCode || c.id.slice(0, 6)) }); }}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-red-400 hover:bg-red-400/10 transition-colors"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -1282,6 +1329,41 @@ const UnifiedReports = () => {
                 }
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmação de ação por linha */}
+      <Dialog open={!!itemAction} onOpenChange={() => !actingItem && setItemAction(null)}>
+        <DialogContent className="bg-card border-white/10 text-white max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {itemAction?.type === 'archive'
+                ? <><Archive className="h-5 w-5 text-amber-400" />Arquivar registro?</>
+                : <><Trash2 className="h-5 w-5 text-red-400" />Excluir registro?</>
+              }
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground mt-1">
+            {itemAction?.type === 'archive'
+              ? <><strong className="text-white">{itemAction?.label}</strong> será removido dos relatórios e KPIs. Os dados permanecem no sistema (reversível via banco).</>
+              : <><strong className="text-white">{itemAction?.label}</strong> será excluído permanentemente. Esta ação não pode ser desfeita.</>
+            }
+          </p>
+          <div className="flex gap-2 justify-end mt-4">
+            <Button variant="outline" onClick={() => setItemAction(null)} disabled={actingItem} className="border-white/20 text-white hover:bg-white/5">
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSingleAction}
+              disabled={actingItem}
+              className={itemAction?.type === 'archive'
+                ? 'bg-amber-600 hover:bg-amber-700 text-white'
+                : 'bg-red-600 hover:bg-red-700 text-white'}
+            >
+              {actingItem && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {itemAction?.type === 'archive' ? 'Arquivar' : 'Excluir'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
