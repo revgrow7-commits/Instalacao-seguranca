@@ -320,16 +320,37 @@ class SupabaseTable:
     def _table(self):
         return self._client.table(self.table_name)
 
+    def _select_columns(self, projection: Dict[str, Any]) -> str:
+        """Traduz uma projeção estilo MongoDB para a lista de colunas do PostgREST.
+
+        - Inclusão (`{campo: 1}`): seleciona só os campos pedidos.
+        - Exclusão (`{campo: 0}`): o PostgREST não tem exclusão nativa, então
+          subtraímos os campos do registro de colunas (`TABLE_COLUMNS`). Sem o
+          registro da tabela, não há como excluir com segurança → cai em '*'.
+          (Sem isto, uma projeção de exclusão era silenciosamente ignorada e o
+          select trazia '*' — inclusive colunas pesadas como fotos base64.)
+        - `_id` é sempre ignorado (não existe no Supabase).
+        """
+        if not projection:
+            return '*'
+        include = [k for k, v in projection.items() if v and k != '_id']
+        if include:
+            return ','.join(include)
+        exclude = {k for k, v in projection.items() if not v and k != '_id'}
+        if exclude:
+            allowed = TABLE_COLUMNS.get(self.table_name)
+            if allowed:
+                cols = [c for c in allowed if c not in exclude]
+                if cols:
+                    return ','.join(cols)
+        return '*'
+
     # ============ FIND OPERATIONS ============
 
     def find_one(self, query: Dict[str, Any], projection: Dict[str, Any] = None) -> Optional[Dict]:
         """Find single document"""
         try:
-            columns = '*'
-            if projection:
-                cols = [k for k, v in projection.items() if v and k != '_id']
-                if cols:
-                    columns = ','.join(cols)
+            columns = self._select_columns(projection)
 
             builder = self._table().select(columns)
             for key, value in query.items():
@@ -359,11 +380,7 @@ class SupabaseTable:
         try:
             query = dict(query) if query else {}
 
-            columns = '*'
-            if projection:
-                cols = [k for k, v in projection.items() if v and k != '_id']
-                if cols:
-                    columns = ','.join(cols)
+            columns = self._select_columns(projection)
 
             builder = self._table().select(columns)
 

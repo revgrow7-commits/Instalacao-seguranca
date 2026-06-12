@@ -310,7 +310,7 @@ async def get_family_productivity_kpis(
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {j["id"]: j for j in jobs if not _metrics_excluded(j)}
     checkins = [
-        c for c in db.item_checkins.find({**query, "is_archived": {"$ne": True}}, {"_id": 0})
+        c for c in db.item_checkins.find({**query, "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
         if c.get("job_id") in jobs_map
     ]
 
@@ -426,7 +426,7 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {job["id"]: job for job in jobs if not _metrics_excluded(job)}
     item_checkins = [
-        c for c in db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
+        c for c in db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
         if c.get("job_id") in jobs_map
     ]
 
@@ -550,7 +550,7 @@ async def get_productivity_report(
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
-    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
+    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
     installers = db.installers.find({}, {"_id": 0})
     legacy_checkins = db.checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
     
