@@ -95,7 +95,11 @@ VERCEL_ENV_*.txt
 .gstack/
 
 # Claude Code + VS Code local history — never commit
-.claude/
+# (.claude/* ignorado, EXCETO commands e settings, que são versionados de propósito:
+#  contêm o loop de revisão /revisar e o hook de compilação automática)
+.claude/*
+!.claude/commands/
+!.claude/settings.json
 .history/
 
 # Git bundles (backups)

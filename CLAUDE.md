@@ -412,3 +412,16 @@ grep -r "ALTER TABLE\|ADD COLUMN" backend/migrations/ --include="*.sql" | tail -
 - Docs criados: `docs/business/produto.md`, `docs/architecture/arquitetura.md`, `docs/ux/fluxos.md`, `docs/RESUMO-EXECUTIVO-2026-06-11.md`.
 - Deploys: frontend (`instalacao-seguranca`) e backend (`backend-henna-one-82`) em producao com tudo acima. Verificado: `/api/gamification/*` retorna 404; sentinel novo no ar.
 
+
+---
+
+## ⚙️ PROTOCOLO OBRIGATÓRIO DE TRABALHO (loop automático de revisão)
+
+Estas regras valem para TODA sessão de agente neste repositório:
+
+1. **Antes de alterar qualquer código**: ler `docs/REGRAS-DE-NEGOCIO.md` (fonte canônica do comportamento do sistema). Para áreas sensíveis, ler também o doc correspondente (`docs/architecture/arquitetura.md`, `docs/ux/fluxos.md`, `MEMORIA-INSTABILIDADE.md`).
+2. **Divergência entre código e regra documentada** = parar e perguntar ao usuário; nunca "corrigir" assumindo um lado.
+3. **Depois de QUALQUER alteração**: executar o loop `/revisar` (em `.claude/commands/revisar.md`) — analisar → corrigir → testar (compileall + npm run build) → validar (grep de referências órfãs + conferência contra as regras de negócio) → documentar. Repetir até 2 passadas limpas consecutivas.
+4. **Mudou comportamento de negócio** ⇒ atualizar `docs/REGRAS-DE-NEGOCIO.md` no mesmo commit.
+5. **Nunca** fazer deploy/push sem o usuário pedir; nunca rodar SQL fora do projeto `qfsxtwkltfraounsjjah`; nunca tocar `REACT_APP_BACKEND_URL` sem ler MEMORIA-INSTABILIDADE.md.
+6. Um hook em `.claude/settings.json` compila o backend automaticamente após cada Edit/Write — se ele acusar erro de sintaxe, corrigir antes de continuar.
