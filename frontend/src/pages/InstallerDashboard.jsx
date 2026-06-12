@@ -220,7 +220,7 @@ const InstallerDashboard = () => {
       });
 
       setCheckinResult(res.data);
-      toast.success('Check-in registrado!');
+      toast.success('Início registrado!');
     } catch (error) {
       const status = error.response?.status;
       const data = error.response?.data;
@@ -238,7 +238,7 @@ const InstallerDashboard = () => {
       } else if (status === 403) {
         msg = 'Sua conta não tem perfil de instalador. Faça logout e entre com a conta correta.';
       } else {
-        msg = 'Erro ao fazer check-in. Tente novamente.';
+        msg = 'Erro ao registrar início. Tente novamente.';
       }
       toast.error(msg, { duration: 6000 });
     } finally {
@@ -338,7 +338,7 @@ const InstallerDashboard = () => {
                       className="w-full flex items-center justify-center gap-2 h-10 rounded-lg bg-primary/15 border border-primary/30 text-primary text-sm font-medium active:bg-primary/25 transition-colors"
                     >
                       <Camera className="h-4 w-4" />
-                      Fazer Check-in
+                      Registrar Início
                     </button>
                   </div>
                 )}
@@ -359,13 +359,13 @@ const InstallerDashboard = () => {
         )}
       </div>
 
-      {/* Bottom Sheet de Check-in Rápido */}
+      {/* Bottom Sheet de Registrar Início */}
       <Drawer open={sheetOpen} onOpenChange={(open) => { if (!open) closeSheet(); }}>
         <DrawerContent className="bg-card border-white/10 max-h-[90vh]">
           <DrawerHeader className="text-left pb-2">
             <DrawerTitle className="text-white flex items-center gap-2 text-base">
               <Camera className="h-5 w-5 text-primary" />
-              Check-in Rápido
+              Registrar Início
             </DrawerTitle>
             {sheetJob && (
               <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
@@ -381,12 +381,12 @@ const InstallerDashboard = () => {
                 <div className="rounded-xl bg-green-500/10 border border-green-500/30 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-green-400 font-semibold">
                     <CheckCheck className="h-5 w-5" />
-                    Check-in registrado!
+                    Início registrado!
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {checkinResult.exif_checkin_at && (
                       <div className="col-span-2">
-                        <span className="text-muted-foreground">Horário entrada (EXIF):</span>
+                        <span className="text-muted-foreground">Horário de início (EXIF):</span>
                         <span className="ml-2 text-white font-medium">
                           {formatExifTime(checkinResult.exif_checkin_at)}
                         </span>
@@ -455,7 +455,9 @@ const InstallerDashboard = () => {
                   onRemove={removeSheetPhoto}
                   disabled={isSubmitting}
                   maxPhotos={MAX_PHOTOS}
-                  label="Fotos do check-in"
+                  label="Carregar foto(s) de Início — o horário vem do EXIF da foto"
+                  galleryOnly
+                  requireExifDate
                 />
 
                 {/* Ações */}
@@ -478,7 +480,7 @@ const InstallerDashboard = () => {
                     ) : (
                       <Camera className="h-4 w-4 mr-2" />
                     )}
-                    {isSubmitting ? 'Enviando...' : 'Confirmar Check-in'}
+                    {isSubmitting ? 'Enviando...' : 'Salvar Início'}
                   </Button>
                 </div>
               </div>

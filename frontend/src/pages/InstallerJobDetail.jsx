@@ -172,7 +172,7 @@ const InstallerJobDetail = () => {
   const handleItemCheckin = async (itemIndex) => {
     const photos = checkinPhotos[itemIndex] || [];
     if (photos.length === 0) {
-      toast.error('Adicione pelo menos uma foto para fazer check-in');
+      toast.error('Adicione pelo menos uma foto de Início');
       return;
     }
     if (processingItem !== null) return;
@@ -186,7 +186,7 @@ const InstallerJobDetail = () => {
         photos: photosBase64,
         exif_data: exifData,
       });
-      toast.success('Check-in realizado!');
+      toast.success('Início registrado!');
       setCheckinPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(itemIndex);
       hasAutoExpanded.current = true;
@@ -207,7 +207,7 @@ const InstallerJobDetail = () => {
         const isTimeout = error.code === 'ECONNABORTED' || error.message?.toLowerCase().includes('timeout');
         userMessage = isTimeout ? 'O servidor demorou para responder. Tente novamente.' : 'Falha de conexão. Tente novamente.';
       } else {
-        userMessage = 'Erro ao fazer check-in. Tente novamente.';
+        userMessage = 'Erro ao registrar início. Tente novamente.';
       }
       toast.error(userMessage, { duration: 6000 });
       console.error('[InstallerJobDetail] handleItemCheckin:', error.code, status, error.response?.data || error);
@@ -219,7 +219,7 @@ const InstallerJobDetail = () => {
   // handleItemCheckout — foto[0] via FormData (retrocompatível), extras via uploadExtraPhotos
   const handleItemCheckout = async (itemIndex) => {
     const checkin = itemCheckins[itemIndex];
-    if (!checkin) { toast.error('Faça o check-in primeiro'); return; }
+    if (!checkin) { toast.error('Registre o Início primeiro'); return; }
 
     // NOVA REGRA: o tempo é 100% EXIF (o registro é feito depois da obra, às vezes
     // outro dia). Sem trava de tempo de clique. A única validação de ordem
@@ -267,7 +267,7 @@ const InstallerJobDetail = () => {
           .catch(e => console.warn('[checkout extra photos]', e));
       }
 
-      toast.success('Check-out realizado!');
+      toast.success('Fim registrado!');
       setCheckoutForm({ notes: '' });
       setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
       setExpandedItem(null);
@@ -277,7 +277,7 @@ const InstallerJobDetail = () => {
       const detail = error.response?.data?.detail;
 
       if (status === 400 && detail === 'Item already checked out') {
-        toast.success('Check-out realizado!');
+        toast.success('Fim registrado!');
         setCheckoutForm({ notes: '' });
         setCheckoutPhotos(prev => { const n = {...prev}; delete n[itemIndex]; return n; });
         setExpandedItem(null);
