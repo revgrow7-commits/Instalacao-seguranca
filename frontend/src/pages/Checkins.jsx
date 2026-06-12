@@ -480,7 +480,7 @@ const Checkins = () => {
       time: rescheduleTime,
       timeEnd: rescheduleTimeEnd || undefined,
       installerIds: rescheduleInstallerIds,
-      status: rescheduleCheckin.status === 'completed' ? 'agendado' : rescheduleCheckin.status,
+      status: 'agendado',
       rescheduleNote: rescheduleNote || undefined,
     });
     if (success) handleCloseReschedule();

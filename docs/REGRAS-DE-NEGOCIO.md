@@ -10,22 +10,28 @@
 
 ## 2. Ciclo de vida do job
 - Origem: importado do ERP **Holdprint** (sync manual via `/integration` ou cron diário 06:00 BRT `/api/cron/sync-holdprint`) ou criado manualmente.
-- Fluxo de status: AGUARDANDO → agendado (data + instaladores) → INSTALANDO (1º check-in) → concluído/finalizado. Jobs agendados e arquivados podem ser REAGENDADOS (com histórico auditável + nota).
+- Fluxo de status: AGUARDANDO → agendado (data + instaladores) → INSTALANDO (1ª foto de início) → concluído/finalizado. Jobs em **qualquer status, incluindo `finalizado`**, podem ser REAGENDADOS — o reagendamento sempre devolve o job para `agendado` (com histórico auditável + nota), independente do status das fotos de início/conclusão do item. `jobs.status` só aceita os valores do CHECK constraint `jobs_status_check`: aguardando, agendado, instalando, pausado, finalizado, atrasado, arquivado, justificado.
 - Soft-delete: job excluído no Relatório Consolidado é arquivado, não apagado.
-- Itens (produtos) do job podem ser arquivados individualmente; item arquivado **bloqueia novo check-in** mas **NÃO bloqueia checkout** de trabalho já iniciado (regra M9 relaxada — instalador em campo nunca pode ficar travado; loga warning).
+- Itens (produtos) do job podem ser arquivados individualmente; item arquivado **bloqueia novo registro de início** mas **NÃO bloqueia registro de conclusão** de trabalho já iniciado (regra M9 relaxada — instalador em campo nunca pode ficar travado; loga warning).
 
-## 3. Check-in / Checkout de campo (regra mais crítica do sistema)
-- O instalador registra o trabalho **DEPOIS da obra** (às vezes outro dia). Por isso o horário OFICIAL de início/fim **vem SEMPRE do EXIF da foto da galeria** (DateTimeOriginal), NUNCA do horário do clique.
+## 3. Registro de início e conclusão em campo (regra mais crítica do sistema)
+
+> **Não existem mais botões de "check-in" e "checkout".** O instalador usa dois botões de upload de galeria: **"Registrar Início"** e **"Registrar Conclusão"**. Todo o horário e GPS oficial vêm do EXIF da foto selecionada.
+
+- O instalador registra o trabalho **DEPOIS da obra** (às vezes outro dia). Por isso o horário OFICIAL de início/fim **vem SEMPRE do EXIF da foto da galeria** (DateTimeOriginal), NUNCA do momento do upload.
+- **Fluxo do instalador:**
+  1. Botão **"Registrar Início"** → abre galeria → instalador seleciona foto(s) de início → sistema extrai DateTimeOriginal e GPS do EXIF → registra como início do serviço.
+  2. Botão **"Registrar Conclusão"** → abre galeria → instalador seleciona foto(s) de conclusão → sistema extrai DateTimeOriginal e GPS do EXIF → registra como conclusão do serviço.
 - **Convenção de fuso (inegociável):** EXIF sem offset = relógio de parede em **BRT (America/Sao_Paulo, UTC-3)**. Nunca carimbar naive como UTC. Helpers canônicos: `_parse_exif_local`/`_offset_to_tz` (backend `item_checkins.py`) e `exifTimeHM` (`frontend/src/lib/exifTime.js`, timeZone fixo). Qualquer código novo de data/hora DEVE usar esses helpers.
-- Única validação de timeline: foto de conclusão não pode ser anterior à foto de início (EXIF). Não bloquear checkout por intervalo de clique.
-- Check-in duplicado no mesmo item dentro de 5 min = idempotente (retorna o existente); fora disso, 409.
-- Fotos: múltiplas por check-in/checkout (máx. 10), galeria do celular, HEIC convertido/aceito (exifr + pillow-heif). Foto SEM data EXIF é recusada quando o horário oficial depende dela.
+- Única validação de timeline: foto(s) de conclusão não podem ter EXIF anterior ao EXIF de início. Não bloquear por intervalo de upload.
+- Registro duplicado de início no mesmo item dentro de 5 min = idempotente (retorna o existente); fora disso, 409.
+- Fotos: múltiplas por registro (máx. 10), galeria do celular, HEIC convertido/aceito (exifr + pillow-heif). Foto **SEM data EXIF é recusada** — o horário oficial depende dela.
 - Upload: base64 → comprimido (~300KB, 1200px) → Supabase Storage bucket `checkin-photos` → URL pública no banco; base64 no banco só como fallback se o Storage falhar.
-- GPS: `gps_lat/long` (clique) + `exif_lat/long` (foto). Checkout a mais de **500 m** (`MAX_CHECKOUT_DISTANCE_METERS`, config.py) gera registro em `location_alerts` — alerta, não bloqueio.
-- Duração mínima entre check-in e checkout: **60 s** (`MIN_CHECKOUT_DURATION_SECONDS`).
+- **GPS:** vem exclusivamente do EXIF da foto (`exif_lat/long`). Não há mais captura de localização pelo dispositivo no momento do upload. Conclusão com GPS a mais de **500 m** do GPS de início (`MAX_CHECKOUT_DISTANCE_METERS`, config.py) gera registro em `location_alerts` — alerta, não bloqueio.
+- Duração mínima entre início e conclusão (EXIF): **60 s** (`MIN_CHECKOUT_DURATION_SECONDS`).
 
 ## 4. Relatórios
-- Início/fim/duração vêm **SOMENTE do EXIF** (`_exif_start/_exif_end/_exif_duration_min` em `reports.py`). Sem EXIF de data → registro fica sem timeline (não cair no clique).
+- Início/fim/duração vêm **SOMENTE do EXIF** (`_exif_start/_exif_end/_exif_duration_min` em `reports.py`). Sem EXIF de data → registro fica sem timeline (nunca usar horário de upload como fallback).
 - `_parse_dt` assume **BRT** para strings naive (alinhado à gravação). Filtros de data no frontend usam fuso fixo `-03:00` (UnifiedReports).
 - Produtividade: m² instalado / horas EXIF, agrupado por instalador e por família de produto.
 - Famílias de produto: classificação por keywords (adesivos, lonas, acm, painéis, outros). ⚠️ Existem 3 implementações divergentes (`reports.py`, `jobs.py`, `services/product_classifier.py`) — consolidar é melhoria futura; ao mexer, não criar uma 4ª.

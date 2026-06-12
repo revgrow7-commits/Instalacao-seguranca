@@ -983,7 +983,13 @@ async def schedule_job(job_id: str, schedule_data: JobSchedule, background_tasks
     update_data["reschedule_history"] = existing_history + [history_entry]
 
     client = get_client()
-    result = client.table("jobs").update(update_data).eq("id", job_id).execute()
+    try:
+        result = client.table("jobs").update(update_data).eq("id", job_id).execute()
+    except Exception as e:
+        logger.error(f"schedule_job: falha ao atualizar job {job_id}: {e}")
+        if "jobs_status_check" in str(e):
+            raise HTTPException(status_code=400, detail=f"Status inválido para o job: '{update_data['status']}'")
+        raise HTTPException(status_code=400, detail=f"Erro ao reagendar job: {str(e)}")
 
     if not result.data:
         raise HTTPException(status_code=404, detail="Job not found")
