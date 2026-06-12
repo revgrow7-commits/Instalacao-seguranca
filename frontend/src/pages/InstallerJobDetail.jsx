@@ -222,8 +222,16 @@ const InstallerJobDetail = () => {
       const primaryBase64 = await compressImage(photos[0].file);
       const formData = new FormData();
       formData.append('photo_base64', primaryBase64);
-      if (latestExif?.exif_lat != null) formData.append('exif_lat', latestExif.exif_lat);
-      if (latestExif?.exif_long != null) formData.append('exif_long', latestExif.exif_long);
+      if (latestExif?.exif_lat != null) {
+        formData.append('exif_lat', latestExif.exif_lat);
+      } else if (latestExif?._live_lat != null) {
+        formData.append('gps_lat', latestExif._live_lat);
+      }
+      if (latestExif?.exif_long != null) {
+        formData.append('exif_long', latestExif.exif_long);
+      } else if (latestExif?._live_long != null) {
+        formData.append('gps_long', latestExif._live_long);
+      }
       if (latestExif?.exif_datetime) formData.append('exif_datetime', latestExif.exif_datetime);
       if (latestExif?.exif_device) formData.append('exif_device', latestExif.exif_device);
       if (latestExif?.exif_offset) formData.append('exif_offset', latestExif.exif_offset);

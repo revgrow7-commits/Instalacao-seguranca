@@ -551,12 +551,16 @@ const UnifiedReports = () => {
                     <th className="text-left px-4 py-2 font-medium">H. Início</th>
                     <th className="text-left px-4 py-2 font-medium">H. Fim</th>
                     <th className="text-left px-4 py-2 font-medium">
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-orange-400" />Tempo Total</span>
+                    </th>
+                    <th className="text-left px-4 py-2 font-medium">
                       <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Latitude</span>
                     </th>
                     <th className="text-left px-4 py-2 font-medium">
                       <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-blue-400" />Longitude</span>
                     </th>
                     <th className="text-left px-4 py-2 font-medium">Origem GPS</th>
+                    <th className="text-left px-4 py-2 font-medium">Endereço</th>
                     <th className="text-left px-4 py-2 font-medium">
                       <span className="flex items-center gap-1"><Camera className="h-3 w-3 text-muted-foreground" />Dispositivo</span>
                     </th>
@@ -616,6 +620,9 @@ const UnifiedReports = () => {
                         </td>
                         <td className="px-4 py-2.5 font-mono text-green-400" title={inicioFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{inicio}</td>
                         <td className="px-4 py-2.5 font-mono text-red-400" title={fimFromExif ? 'Horário extraído do EXIF da foto' : 'Foto sem horário no EXIF'}>{fim}</td>
+                        <td className="px-4 py-2.5 font-mono text-orange-400" title="Tempo total de instalação — fim menos início (EXIF da foto)">
+                          {exifDurationMin(c) != null ? formatDuration(exifDurationMin(c)) : <span className="text-muted-foreground/50">—</span>}
+                        </td>
                         <td className="px-4 py-2.5 font-mono text-blue-300 text-xs">
                           {lat != null ? lat.toFixed(6) : <span className="text-muted-foreground/50">—</span>}
                         </td>
@@ -628,6 +635,12 @@ const UnifiedReports = () => {
                             : lat != null
                               ? <span className="flex items-center gap-1 text-xs text-blue-400"><Navigation className="h-3 w-3" />GPS</span>
                               : <span className="text-xs text-muted-foreground/50">—</span>
+                          }
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[200px] truncate" title={c.exif_address || 'Sem endereço'}>
+                          {c.exif_address
+                            ? <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-green-400 shrink-0" />{c.exif_address}</span>
+                            : <span className="text-muted-foreground/50">—</span>
                           }
                         </td>
                         <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[160px] truncate" title={device || 'Sem dispositivo no EXIF'}>

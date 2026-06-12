@@ -534,16 +534,22 @@ async def batch_item_checkin(
     compressed_first = compress_base64_image(request.photos[0], max_size_kb=200, max_dimension=1024)
     first_exif = exif_data_list[0] if exif_data_list else {}
 
+    # Localização: prefere GPS real do EXIF; se ausente, usa GPS ativo do dispositivo
+    # capturado no momento do upload (_live_lat). GPS do dispositivo vai para gps_lat
+    # (não exif_lat, que é reservado para coordenadas lidas do EXIF da foto).
+    _exif_lat = first_exif.get("exif_lat") if first_exif else None
+    _live_lat = (first_exif.get("_live_lat") if first_exif else None) if _exif_lat is None else None
+    _live_long = (first_exif.get("_live_long") if first_exif else None) if _exif_lat is None else None
     item_checkin = ItemCheckin(
         job_id=request.job_id,
         item_index=request.item_index,
         installer_id=installer_id,
         checkin_at=checkin_time,
         checkin_photo=compressed_first,
-        gps_lat=request.gps_lat,
-        gps_long=request.gps_long,
+        gps_lat=request.gps_lat or _live_lat,
+        gps_long=request.gps_long or _live_long,
         gps_accuracy=request.gps_accuracy,
-        exif_lat=first_exif.get("exif_lat") if first_exif else None,
+        exif_lat=_exif_lat,
         exif_long=first_exif.get("exif_long") if first_exif else None,
         exif_datetime=first_exif.get("exif_datetime") if first_exif else None,
         exif_device=first_exif.get("exif_device") if first_exif else None,
@@ -591,6 +597,7 @@ async def batch_item_checkin(
             "exif_lat": exif.get("exif_lat"),
             "exif_long": exif.get("exif_long"),
             "exif_device": exif.get("exif_device"),
+            "exif_address": exif.get("exif_address"),
         })
     checkin_dict['fotos_inicio'] = fotos_inicio
 
