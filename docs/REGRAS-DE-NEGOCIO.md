@@ -28,7 +28,8 @@
 - Fotos: múltiplas por registro (máx. 10), galeria do celular, HEIC convertido/aceito (exifr + pillow-heif). Foto **SEM data EXIF é recusada** — o horário oficial depende dela.
 - Upload: base64 → comprimido (~300KB, 1200px) → Supabase Storage bucket `checkin-photos` → URL pública no banco; base64 no banco só como fallback se o Storage falhar.
 - **GPS:** vem exclusivamente do EXIF da foto (`exif_lat/long`). Não há mais captura de localização pelo dispositivo no momento do upload. Conclusão com GPS a mais de **500 m** do GPS de início (`MAX_CHECKOUT_DISTANCE_METERS`, config.py) gera registro em `location_alerts` — alerta, não bloqueio.
-- Duração mínima entre início e conclusão (EXIF): **60 s** (`MIN_CHECKOUT_DURATION_SECONDS`).
+- **Sem duração mínima:** o tempo é 100% EXIF (registro feito depois da obra). NÃO há piso de 60 s — a única validação temporal é fim ≥ início (EXIF). (`MIN_CHECKOUT_DURATION_SECONDS` ficou deprecado/sem uso.)
+- **Pausar/Retomar removido** do fluxo do instalador: como a duração vem do EXIF das fotos, a pausa não tinha efeito no tempo oficial. Itens legados em `paused` são tratados como em andamento.
 
 ## 4. Relatórios
 - Início/fim/duração vêm **SOMENTE do EXIF** (`_exif_start/_exif_end/_exif_duration_min` em `reports.py`). Sem EXIF de data → registro fica sem timeline (nunca usar horário de upload como fallback).

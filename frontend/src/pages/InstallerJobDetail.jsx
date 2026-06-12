@@ -6,12 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '../components/ui/drawer';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import {
   ArrowLeft, Package, MapPin, Camera, Check, Clock,
   Ruler, AlertCircle, CheckCircle2, PlayCircle,
-  ChevronDown, ChevronUp, Pause, Play,
+  ChevronDown, ChevronUp,
   Images, X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -22,16 +20,6 @@ import { uploadExtraPhotos } from '../lib/uploadPhotos';
 import { exifTimeHM } from '../lib/exifTime';
 import PhotoGalleryPicker from '../components/PhotoGalleryPicker';
 
-const PAUSE_REASON_LABELS = {
-  "aguardando_cliente": "Aguardando Cliente",
-  "chuva": "Chuva/Intempérie",
-  "falta_material": "Falta de Material",
-  "almoco_intervalo": "Almoço/Intervalo",
-  "problema_acesso": "Problema de Acesso",
-  "problema_equipamento": "Problema com Equipamento",
-  "aguardando_aprovacao": "Aguardando Aprovação",
-  "outro": "Outro Motivo"
-};
 
 const InstallerJobDetail = () => {
   const { jobId } = useParams();
@@ -40,18 +28,12 @@ const InstallerJobDetail = () => {
   const [job, setJob] = useState(null);
   const [meuPapel, setMeuPapel] = useState(null); // papel do usuário nesta instalação (VC)
   const [itemCheckins, setItemCheckins] = useState({});
-  const [pauseLogs, setPauseLogs] = useState({});
   const [loading, setLoading] = useState(true);
   const [expandedItem, setExpandedItem] = useState(null);
   const [processingItem, setProcessingItem] = useState(null);
   const fileInputRef = useRef({});
   const hasAutoExpanded = useRef(false);
   const itemRefs = useRef({});
-
-  // Pause modal state
-  const [showPauseModal, setShowPauseModal] = useState(false);
-  const [pauseItemIndex, setPauseItemIndex] = useState(null);
-  const [pauseReason, setPauseReason] = useState('');
 
   // Form state for checkout (apenas observação, os outros campos vêm da atribuição)
   const [checkoutForm, setCheckoutForm] = useState({
@@ -63,12 +45,6 @@ const InstallerJobDetail = () => {
   // Fotos de conclusão múltiplas (galeria) — { [itemIndex]: [{file, exif, preview}] }
   const [checkoutPhotos, setCheckoutPhotos] = useState({});
 
-  // Relógio reativo para contagem regressiva do tempo mínimo de checkout
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   // Usa o helper central (timeZone America/Sao_Paulo explícito). O antigo
   // toLocaleTimeString sem timeZone dependia do fuso do celular — em aparelho
@@ -173,36 +149,10 @@ const InstallerJobDetail = () => {
       if (isCancelled()) return;
       const checkinsList = Array.isArray(checkinsRes.data) ? checkinsRes.data : [];
       const checkinsMap = {};
-      const pauseLogsMap = {};
-
-      // FIX M1 (auditoria 2026-05-14): pause logs em paralelo (Promise.allSettled)
-      // em vez do loop sequencial original. Antes: N+1 round-trips bloqueando
-      // a tela em 3G ruim — agora 1 ida única e fallback silencioso por checkin.
       checkinsList.forEach(c => { checkinsMap[c.item_index] = c; });
-
-      const activeCheckins = checkinsList.filter(c =>
-        c.status === 'in_progress' || c.status === 'paused'
-      );
-
-      if (activeCheckins.length > 0) {
-        const pauseResults = await Promise.allSettled(
-          activeCheckins.map(c => api.getItemPauseLogs(c.id))
-        );
-        if (isCancelled()) return;
-        activeCheckins.forEach((c, idx) => {
-          const r = pauseResults[idx];
-          if (r.status === 'fulfilled') {
-            pauseLogsMap[c.item_index] = r.value.data;
-          } else {
-            console.warn('[InstallerJobDetail] getItemPauseLogs falhou:', r.reason);
-            pauseLogsMap[c.item_index] = { pauses: [], total_pause_minutes: 0 };
-          }
-        });
-      }
 
       if (isCancelled()) return;
       setItemCheckins(checkinsMap);
-      setPauseLogs(pauseLogsMap);
     } catch (error) {
       if (isCancelled()) return;
       // Check if it's an access denied error
@@ -271,15 +221,9 @@ const InstallerJobDetail = () => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) { toast.error('Faça o check-in primeiro'); return; }
 
-    // Mínimo 1 minuto entre check-in e checkout
-    if (checkin.checkin_at) {
-      const elapsedMs = Date.now() - new Date(checkin.checkin_at).getTime();
-      if (elapsedMs < 60 * 1000) {
-        toast.error('você precisa registrar checkin e checkout no tempo correto', { duration: 8000 });
-        return;
-      }
-    }
-
+    // NOVA REGRA: o tempo é 100% EXIF (o registro é feito depois da obra, às vezes
+    // outro dia). Sem trava de tempo de clique. A única validação de ordem
+    // (fim ≥ início) é feita no backend pelo EXIF das fotos.
     const photos = checkoutPhotos[itemIndex] || [];
     if (photos.length === 0) {
       toast.error('Adicione pelo menos uma foto para finalizar');
@@ -374,7 +318,8 @@ const InstallerJobDetail = () => {
     const checkin = itemCheckins[itemIndex];
     if (!checkin) return 'pending';
     if (checkin.status === 'completed') return 'completed';
-    if (checkin.status === 'paused') return 'paused';
+    // Pausa removida (registro 100% EXIF): itens legados em 'paused' viram
+    // 'in_progress' para que o instalador possa concluí-los normalmente.
     return 'in_progress';
   };
 
@@ -396,53 +341,6 @@ const InstallerJobDetail = () => {
     }
   };
 
-  const handleOpenPauseModal = (itemIndex) => {
-    setPauseItemIndex(itemIndex);
-    setPauseReason('');
-    setShowPauseModal(true);
-  };
-
-  const handlePauseItem = async () => {
-    if (!pauseReason) {
-      toast.error('Selecione o motivo da pausa');
-      return;
-    }
-    
-    const checkin = itemCheckins[pauseItemIndex];
-    if (!checkin) return;
-    
-    try {
-      setProcessingItem(pauseItemIndex);
-      await api.pauseItemCheckin(checkin.id, pauseReason);
-      toast.success('Item pausado');
-      setShowPauseModal(false);
-      await loadJobData();
-    } catch (error) {
-      const errorMessage = error.response?.data?.detail || 'Erro ao pausar item';
-      toast.error(errorMessage);
-      console.error('Pause error:', error.response?.data || error);
-    } finally {
-      setProcessingItem(null);
-    }
-  };
-
-  const handleResumeItem = async (itemIndex) => {
-    const checkin = itemCheckins[itemIndex];
-    if (!checkin) return;
-    
-    try {
-      setProcessingItem(itemIndex);
-      await api.resumeItemCheckin(checkin.id);
-      toast.success('Item retomado');
-      await loadJobData();
-    } catch (error) {
-      toast.error('Erro ao retomar item');
-      console.error(error);
-    } finally {
-      setProcessingItem(null);
-    }
-  };
-
   const formatDuration = (minutes) => {
     if (!minutes) return '0min';
     const hours = Math.floor(minutes / 60);
@@ -451,15 +349,6 @@ const InstallerJobDetail = () => {
       return `${hours}h ${mins}min`;
     }
     return `${mins}min`;
-  };
-
-  const getElapsedTime = (checkin) => {
-    if (!checkin || !checkin.checkin_at) return 0;
-    const start = new Date(checkin.checkin_at);
-    const now = new Date();
-    const grossMinutes = Math.floor((now - start) / 60000);
-    const pauseMin = pauseLogs[checkin.item_index]?.total_pause_minutes || 0;
-    return Math.max(0, grossMinutes - Math.round(pauseMin));
   };
 
   const getCompletedItemsCount = () => {
@@ -650,9 +539,9 @@ const InstallerJobDetail = () => {
                   <span className="text-xs text-green-400/70 shrink-0">
                     {(item.total_area_m2 || 0).toFixed(1)} m²
                   </span>
-                  {checkin?.net_duration_minutes && (
+                  {checkin?.exif_duration_minutes != null && (
                     <span className="text-xs text-muted-foreground shrink-0">
-                      {formatDuration(checkin.net_duration_minutes)}
+                      {formatDuration(checkin.exif_duration_minutes)}
                     </span>
                   )}
                   <button
@@ -786,24 +675,24 @@ const InstallerJobDetail = () => {
                               <span className="ml-2 text-foreground font-medium">{checkin.installed_m2 || 0}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Tempo Líquido:</span>
-                              <span className="ml-2 text-foreground font-medium">{formatDuration(checkin.net_duration_minutes || checkin.duration_minutes)}</span>
+                              <span className="text-muted-foreground">Duração (EXIF):</span>
+                              <span className="ml-2 text-foreground font-medium">{checkin.exif_duration_minutes != null ? formatDuration(checkin.exif_duration_minutes) : '—'}</span>
                             </div>
-                            {checkin.total_pause_minutes > 0 && (
-                              <>
-                                <div>
-                                  <span className="text-muted-foreground">Tempo Bruto:</span>
-                                  <span className="ml-2 text-foreground">{formatDuration(checkin.duration_minutes)}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted-foreground">Pausas:</span>
-                                  <span className="ml-2 text-orange-400">{formatDuration(checkin.total_pause_minutes)}</span>
-                                </div>
-                              </>
-                            )}
+                            <div>
+                              <span className="text-muted-foreground">Início:</span>
+                              <span className="ml-2 text-foreground">{formatExifTime(checkin.exif_checkin_at) || '—'}</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Fim:</span>
+                              <span className="ml-2 text-foreground">{formatExifTime(checkin.exif_checkout_at) || '—'}</span>
+                            </div>
                             <div>
                               <span className="text-muted-foreground">Produtividade:</span>
-                              <span className="ml-2 text-primary font-medium">{checkin.productivity_m2_h || 0} m²/h</span>
+                              <span className="ml-2 text-primary font-medium">
+                                {checkin.installed_m2 > 0 && checkin.exif_duration_minutes > 0
+                                  ? `${(checkin.installed_m2 / (checkin.exif_duration_minutes / 60)).toFixed(1)} m²/h`
+                                  : '—'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -818,7 +707,7 @@ const InstallerJobDetail = () => {
                             onRemove={(pi) => removePhoto(setCheckinPhotos, itemIndex, pi)}
                             disabled={isProcessing}
                             maxPhotos={10}
-                            label="Foto de INÍCIO (define o horário de início pelo EXIF da foto)"
+                            label="Fotos de Início — o horário de início vem do EXIF da foto"
                             galleryOnly
                             requireExifDate
                           />
@@ -833,8 +722,8 @@ const InstallerJobDetail = () => {
                               <Check className="h-4 w-4 mr-2" />
                             )}
                             {(checkinPhotos[itemIndex] || []).length === 0
-                              ? 'Adicione fotos para fazer check-in'
-                              : `Fazer Check-in (${(checkinPhotos[itemIndex] || []).length} foto${(checkinPhotos[itemIndex] || []).length > 1 ? 's' : ''})`}
+                              ? 'Adicione fotos de Início'
+                              : `Salvar Início (${(checkinPhotos[itemIndex] || []).length} foto${(checkinPhotos[itemIndex] || []).length > 1 ? 's' : ''})`}
                           </Button>
                         </div>
                       )}
@@ -842,17 +731,12 @@ const InstallerJobDetail = () => {
                       {status === 'in_progress' && (
                         <div className="space-y-4">
                           <div className="bg-blue-500/10 rounded-lg p-3">
-                            <div className="flex items-center justify-between">
-                              <p className="text-sm text-blue-400 flex items-center gap-2">
-                                <Clock className="h-4 w-4" />
-                                Em execução: {formatDuration(getElapsedTime(checkin))}
-                              </p>
-                              {pauseLogs[itemIndex]?.total_pause_minutes > 0 && (
-                                <span className="text-xs text-orange-400">
-                                  Pausado: {formatDuration(pauseLogs[itemIndex].total_pause_minutes)}
-                                </span>
-                              )}
-                            </div>
+                            <p className="text-sm text-blue-400 flex items-center gap-2">
+                              <Clock className="h-4 w-4" />
+                              {formatExifTime(checkin?.exif_checkin_at)
+                                ? `Início registrado: ${formatExifTime(checkin.exif_checkin_at)}`
+                                : 'Início registrado'}
+                            </p>
                           </div>
 
                           {/* Info definida pelo Gerente (somente leitura) */}
@@ -912,95 +796,31 @@ const InstallerJobDetail = () => {
                             onRemove={(pi) => removePhoto(setCheckoutPhotos, itemIndex, pi)}
                             disabled={isProcessing}
                             maxPhotos={10}
-                            label="Foto de CONCLUSÃO (define o horário de fim pelo EXIF da foto)"
+                            label="Fotos de Fim — o horário de fim vem do EXIF da foto"
                             galleryOnly
                             requireExifDate
                           />
 
-                          {/* Action Buttons */}
-                          {(() => {
-                            const checkinAt = checkin?.checkin_at ? new Date(checkin.checkin_at).getTime() : null;
-                            const remainingMs = checkinAt ? Math.max(0, 60 * 1000 - (now - checkinAt)) : 0;
-                            const tooEarly = remainingMs > 0;
-                            const remainingMin = Math.floor(remainingMs / 60000);
-                            const remainingSec = Math.ceil((remainingMs % 60000) / 1000);
-                            const countdownLabel = remainingMin > 0 ? `${remainingMin}m ${remainingSec}s` : `${remainingSec}s`;
-                            return (
-                              <div className="flex gap-2">
-                                <Button
-                                  onClick={() => handleOpenPauseModal(itemIndex)}
-                                  disabled={isProcessing}
-                                  variant="outline"
-                                  className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 h-14 active:scale-[0.98] transition-transform"
-                                >
-                                  <Pause className="h-4 w-4 mr-2" />
-                                  Pausar
-                                </Button>
-                                <Button
-                                  onClick={() => handleItemCheckout(itemIndex)}
-                                  disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0 || tooEarly}
-                                  className="flex-1 bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
-                                >
-                                  {isProcessing ? (
-                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                                  ) : tooEarly ? (
-                                    <Clock className="h-4 w-4 mr-2" />
-                                  ) : (
-                                    <Check className="h-4 w-4 mr-2" />
-                                  )}
-                                  {isProcessing
-                                    ? 'Aguarde...'
-                                    : tooEarly
-                                      ? `Aguarde ${countdownLabel}`
-                                      : (checkoutPhotos[itemIndex] || []).length === 0
-                                        ? 'Adicione fotos'
-                                        : 'Finalizar'}
-                                </Button>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-
-                      {/* Estado PAUSADO */}
-                      {status === 'paused' && (
-                        <div className="space-y-4">
-                          <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/30">
-                            <div className="flex items-center gap-2 text-orange-400 mb-2">
-                              <Pause className="h-4 w-4" />
-                              <span className="font-medium">Item Pausado</span>
-                            </div>
-                            {pauseLogs[itemIndex]?.active_pause && (
-                              <div className="text-sm">
-                                <p className="text-muted-foreground">
-                                  Motivo: <span className="text-orange-300">{PAUSE_REASON_LABELS[pauseLogs[itemIndex].active_pause.reason] || pauseLogs[itemIndex].active_pause.reason}</span>
-                                </p>
-                                <p className="text-muted-foreground">
-                                  Pausado há: <span className="text-orange-300">{formatDuration(Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.paused_at)) / 60000))}</span>
-                                </p>
-                              </div>
-                            )}
-                            {pauseLogs[itemIndex]?.total_pause_minutes > 0 && (
-                              <p className="text-xs text-muted-foreground mt-2">
-                                Tempo total em pausa: {formatDuration(pauseLogs[itemIndex].total_pause_minutes + (pauseLogs[itemIndex].active_pause ? Math.floor((new Date() - new Date(pauseLogs[itemIndex].active_pause.paused_at)) / 60000) : 0))}
-                              </p>
-                            )}
-                          </div>
-
+                          {/* Botão: salvar Fim (registro por foto, sem trava de tempo) */}
                           <Button
-                            onClick={() => handleResumeItem(itemIndex)}
-                            disabled={isProcessing}
-                            className="w-full bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform"
+                            onClick={() => handleItemCheckout(itemIndex)}
+                            disabled={isProcessing || (checkoutPhotos[itemIndex] || []).length === 0}
+                            className="w-full bg-green-600 hover:bg-green-700 h-14 text-base active:scale-[0.98] transition-transform disabled:opacity-40"
                           >
                             {isProcessing ? (
                               <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
                             ) : (
-                              <Play className="h-4 w-4 mr-2" />
+                              <Check className="h-4 w-4 mr-2" />
                             )}
-                            Retomar Trabalho
+                            {isProcessing
+                              ? 'Aguarde...'
+                              : (checkoutPhotos[itemIndex] || []).length === 0
+                                ? 'Adicione fotos de Fim'
+                                : 'Salvar Fim'}
                           </Button>
                         </div>
                       )}
+
                     </div>
                   )}
                 </CardContent>
@@ -1032,65 +852,6 @@ const InstallerJobDetail = () => {
         </div>
       )}
 
-      {/* Pause Drawer (Mobile-First) */}
-      <Drawer open={showPauseModal} onOpenChange={setShowPauseModal}>
-        <DrawerContent className="bg-card border-white/10">
-          <DrawerHeader className="text-left">
-            <DrawerTitle className="text-white flex items-center gap-2">
-              <Pause className="h-5 w-5 text-orange-400" />
-              Pausar Item
-            </DrawerTitle>
-            <p className="text-sm text-muted-foreground mt-2">
-              Informe o motivo da pausa. O tempo pausado nao sera contado na sua produtividade.
-            </p>
-          </DrawerHeader>
-
-          <div className="px-4 pb-8 space-y-4">
-            <div>
-              <Label className="text-sm text-muted-foreground">Motivo da Pausa *</Label>
-              <Select value={pauseReason} onValueChange={setPauseReason}>
-                <SelectTrigger className="bg-background border-white/10 h-12 mt-1">
-                  <SelectValue placeholder="Selecione o motivo..." />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-white/10">
-                  {Object.entries(PAUSE_REASON_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="bg-orange-500/10 rounded-lg p-3 border border-orange-500/20">
-              <p className="text-xs text-orange-400">
-                <strong>Importante:</strong> O tempo em pausa sera registrado e excluido do calculo de produtividade (m2/h),
-                garantindo que sua metrica seja justa e reflita apenas o tempo efetivamente trabalhado.
-              </p>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setShowPauseModal(false)}
-                className="flex-1 h-12"
-              >
-                Cancelar
-              </Button>
-              <Button
-                onClick={handlePauseItem}
-                disabled={!pauseReason || processingItem !== null}
-                className="flex-1 bg-orange-500 hover:bg-orange-600 h-12 active:scale-[0.98] transition-transform"
-              >
-                {processingItem !== null ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
-                ) : (
-                  <Pause className="h-4 w-4 mr-2" />
-                )}
-                Confirmar Pausa
-              </Button>
-            </div>
-          </div>
-        </DrawerContent>
-      </Drawer>
     </div>
   );
 };

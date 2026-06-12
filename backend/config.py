@@ -54,7 +54,7 @@ VAPID_CLAIMS_EMAIL = os.environ.get('VAPID_CLAIMS_EMAIL', 'noreply@instal-visual
 
 # GPS/Location Settings
 MAX_CHECKOUT_DISTANCE_METERS = 500
-MIN_CHECKOUT_DURATION_SECONDS = 60  # 1 minuto mínimo entre check-in e checkout
+MIN_CHECKOUT_DURATION_SECONDS = 60  # DEPRECATED (registro por foto, tempo 100% EXIF): não há mais piso de duração; não é usado.
 
 # Upload directory
 _is_serverless = os.environ.get('VERCEL') == '1' or os.environ.get('SERVERLESS') == 'true'

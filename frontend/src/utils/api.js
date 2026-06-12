@@ -276,6 +276,8 @@ export const api = {
   deleteCheckin: (checkinId) => axios.delete(`${API_URL}/checkins/${checkinId}`, { headers: getAuthHeader() }),
   
   // Item Check-ins (per item) — submits críticos usam withRetry (instalador em campo, 3G)
+  // DEPRECATED: createItemCheckin (foto única por clique) — o fluxo novo (registro por
+  // foto da galeria, horário 100% EXIF) usa batchCheckin. Mantido apenas por compatibilidade.
   createItemCheckin: (formData) => {
     const jobId = formData.get ? formData.get('job_id') : null;
     clearJobsCache();

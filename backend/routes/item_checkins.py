@@ -13,7 +13,7 @@ import re
 from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
-from config import MAX_CHECKOUT_DISTANCE_METERS, MIN_CHECKOUT_DURATION_SECONDS
+from config import MAX_CHECKOUT_DISTANCE_METERS
 from services.gps import calculate_gps_distance
 from services.image import compress_base64_image
 
@@ -230,6 +230,9 @@ class ItemPauseLog(BaseModel):
 
 # ============ ROUTES ============
 
+# DEPRECATED — registro de foto única por clique. O fluxo novo (registro por foto
+# da galeria, horário 100% EXIF) usa POST /item-checkins/batch. Mantido apenas para
+# leitura de registros legados criados por ele; o frontend novo não chama esta rota.
 @router.post("/item-checkins")
 async def create_item_checkin(
     job_id: str = Form(...),
@@ -503,14 +506,29 @@ async def batch_item_checkin(
             exif_timestamps.append(ts)
 
     exif_timestamps.sort()
-    exif_checkin_at = exif_timestamps[0] if exif_timestamps else None
+    # NOVA REGRA (registro por foto): o horário oficial de início vem SEMPRE do
+    # EXIF da foto da galeria, NUNCA do clique. Sem nenhum timestamp EXIF válido
+    # não há como marcar o início — recusa explícita. Defesa em profundidade: o
+    # frontend já bloqueia via requireExifDate no PhotoGalleryPicker.
+    if not exif_timestamps:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Foto sem data de captura (EXIF). Selecione a FOTO ORIGINAL da "
+                "galeria, tirada no dia da instalação — não use foto editada, de "
+                "WhatsApp ou screenshot."
+            ),
+        )
+
+    exif_checkin_at = exif_timestamps[0]
     exif_checkout_at = exif_timestamps[-1] if len(exif_timestamps) > 1 else None
     exif_duration_minutes = None
     if exif_checkin_at and exif_checkout_at:
         diff = (exif_checkout_at - exif_checkin_at).total_seconds() / 60
         exif_duration_minutes = int(diff) if diff >= 0 else None
 
-    checkin_time = exif_checkin_at or datetime.now(timezone.utc)
+    # Início oficial = menor EXIF das fotos (garantido não-nulo pelo guard acima).
+    checkin_time = exif_checkin_at
 
     # Primeira foto: comprime e sobe ao Storage
     compressed_first = compress_base64_image(request.photos[0], max_size_kb=200, max_dimension=1024)
@@ -550,6 +568,31 @@ async def batch_item_checkin(
         checkin_dict['exif_checkout_at'] = exif_checkout_at.isoformat()
     if exif_duration_minutes is not None:
         checkin_dict['exif_duration_minutes'] = exif_duration_minutes
+
+    # D5: persiste TODAS as fotos de início com seu EXIF (url do Storage + metadados,
+    # NUNCA base64 — evita payload gigante na listagem). Reaproveita o upload da 1ª
+    # foto (photo_url) para não subir duas vezes.
+    fotos_inicio = []
+    for idx, b64 in enumerate(request.photos):
+        exif = (exif_data_list[idx] if idx < len(exif_data_list) else {}) or {}
+        if idx == 0:
+            url = photo_url
+        else:
+            try:
+                _c = compress_base64_image(b64, max_size_kb=200, max_dimension=1024)
+                url = upload_photo_to_storage(_c, f"item-checkins/{item_checkin.id}_checkin_{idx}.jpg")
+            except Exception as _e:
+                logger.warning("Falha ao subir foto de início %s: %s", idx, _e)
+                url = None
+        fotos_inicio.append({
+            "url": url,
+            "exif_datetime": exif.get("exif_datetime"),
+            "exif_offset": exif.get("exif_offset"),
+            "exif_lat": exif.get("exif_lat"),
+            "exif_long": exif.get("exif_long"),
+            "exif_device": exif.get("exif_device"),
+        })
+    checkin_dict['fotos_inicio'] = fotos_inicio
 
     db.item_checkins.insert_one(checkin_dict)
 
@@ -704,6 +747,19 @@ async def complete_item_checkout(
         logger.error(f"Checkin {checkin_id} already completed")
         raise HTTPException(status_code=400, detail="Item already checked out")
 
+    # NOVA REGRA (registro por foto): a foto de conclusão marca o horário de FIM
+    # pelo EXIF. Sem data de captura (EXIF) na foto não há fim oficial — recusa
+    # explícita. Defesa em profundidade: o frontend já bloqueia via requireExifDate.
+    if not exif_datetime:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Foto de conclusão sem data de captura (EXIF). Selecione a FOTO "
+                "ORIGINAL da galeria, tirada no dia da conclusão — não use foto "
+                "editada, de WhatsApp ou screenshot."
+            ),
+        )
+
     # Início e fim vêm SEMPRE do EXIF das fotos da galeria. Como o instalador faz
     # o registro DEPOIS da obra (outro dia), o horário do clique não vale e NÃO
     # bloqueamos checkout por intervalo de clique. A única validação de timeline:
@@ -749,12 +805,16 @@ async def complete_item_checkout(
     auto_paused = False
     distance_meters = 0
     
-    checkin_lat = checkin.get("gps_lat")
-    checkin_long = checkin.get("gps_long")
-    
-    if all(v is not None for v in [checkin_lat, checkin_long, gps_lat, gps_long]):
-        distance_meters = calculate_gps_distance(checkin_lat, checkin_long, gps_lat, gps_long)
-        
+    # NOVA REGRA: a localização oficial vem do EXIF da foto (início = exif_lat/long
+    # gravado no check-in; fim = exif_lat/long da foto de conclusão), NUNCA do GPS
+    # do clique. Sem GPS no EXIF de alguma das fotos, a distância não é calculada
+    # (sem alerta) — não cair no GPS do navegador.
+    checkin_lat = checkin.get("exif_lat")
+    checkin_long = checkin.get("exif_long")
+
+    if all(v is not None for v in [checkin_lat, checkin_long, exif_lat, exif_long]):
+        distance_meters = calculate_gps_distance(checkin_lat, checkin_long, exif_lat, exif_long)
+
         if distance_meters > MAX_CHECKOUT_DISTANCE_METERS:
             location_log = {
                 "id": str(uuid.uuid4()),
@@ -764,8 +824,8 @@ async def complete_item_checkout(
                 "event_type": "location_alert",
                 "checkin_lat": checkin_lat,
                 "checkin_long": checkin_long,
-                "checkout_lat": gps_lat,
-                "checkout_long": gps_long,
+                "checkout_lat": exif_lat,
+                "checkout_long": exif_long,
                 "distance_meters": round(distance_meters, 2),
                 "max_allowed_meters": MAX_CHECKOUT_DISTANCE_METERS,
                 "created_at": datetime.now(timezone.utc).isoformat(),
@@ -871,11 +931,26 @@ async def complete_item_checkout(
         except Exception:
             logger.warning("Falha ao calcular duração EXIF no checkout", exc_info=True)
 
+    # D5: persiste a foto de conclusão (primária) com seu EXIF no registro (url do
+    # Storage + metadados, NUNCA base64). Fotos extras de conclusão continuam em
+    # job_photos (uploadExtraPhotos no frontend), já gravadas com seu EXIF.
+    fotos_conclusao = []
+    if checkout_photo_url:
+        fotos_conclusao.append({
+            "url": checkout_photo_url,
+            "exif_datetime": exif_datetime,
+            "exif_offset": exif_offset,
+            "exif_lat": exif_lat,
+            "exif_long": exif_long,
+            "exif_device": exif_device,
+        })
+
     update_data = {
         "checkout_at": checkout_at.isoformat(),
         # checkout_photo (base64) removido do update_data: armazenar ~400KB no
         # PostgREST bloqueava a função e causava timeout no Vercel.
         **({"checkout_photo_url": checkout_photo_url} if checkout_photo_url else {}),
+        **({"fotos_conclusao": fotos_conclusao} if fotos_conclusao else {}),
         **({"exif_checkout_at": exif_checkout_at_iso} if exif_checkout_at_iso else {}),
         **({"exif_duration_minutes": exif_duration_minutes_calc} if exif_duration_minutes_calc is not None else {}),
         "checkout_gps_lat": gps_lat,

@@ -12,11 +12,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import {
   CheckCircle, MapPin, Clock, Image, Eye, Search,
   Trash2, Archive, RefreshCw, LogIn, LogOut, Play, Pause,
-  ChevronDown, Package, Hand, AlertTriangle, Timer, ChevronRight, MessageCircle,
+  ChevronDown, Package, Hand, AlertTriangle, ChevronRight, MessageCircle,
   CalendarClock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPhotoSrc } from '../lib/photo';
+import { exifDateTimeBR } from '../lib/exifTime';
 import { useReschedule } from '../hooks/useReschedule';
 
 // Skeleton loader component
@@ -34,69 +35,22 @@ const CheckinSkeleton = () => (
   </Card>
 );
 
-// Cronometer component that updates every second
-const Cronometer = ({ startTime, isPaused }) => {
-  const [elapsed, setElapsed] = useState('');
-
-  useEffect(() => {
-    if (!startTime) return;
-
-    const updateTimer = () => {
-      const start = new Date(startTime);
-      const now = new Date();
-      const diffMs = now - start;
-
-      const hours = Math.floor(diffMs / (1000 * 60 * 60));
-      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-      if (hours > 0) {
-        setElapsed(`${hours}h ${minutes.toString().padStart(2, '0')}m`);
-      } else {
-        setElapsed(`${minutes}m ${seconds.toString().padStart(2, '0')}s`);
-      }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-
-    return () => clearInterval(interval);
-  }, [startTime]);
-
-  if (!startTime) return null;
-
-  return (
-    <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-bold ${
-      isPaused
-        ? 'bg-orange-500/20 text-orange-400'
-        : 'bg-blue-500/20 text-blue-400'
-    }`}>
-      <Timer className="h-3 w-3" />
-      {elapsed}
-    </div>
-  );
-};
-
 // Mini card for check-in/checkout without photo for performance
 const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, onReschedule, type, installers }) => {
   const isCheckout = type === 'checkout';
   const photo = isCheckout ? checkin.checkout_photo : checkin.checkin_photo;
-  const date = isCheckout ? checkin.checkout_at : checkin.checkin_at;
+  // NOVA REGRA: horário oficial vem do EXIF da foto (início/fim), nunca do clique.
+  const date = isCheckout ? checkin.exif_checkout_at : checkin.exif_checkin_at;
 
   // Get installer phone
   const installer = installers?.find(i => i.id === checkin.installer_id || i.user_id === checkin.installer_id);
   const installerPhone = installer?.phone;
 
-  // Calculate if checkin is late (more than 4 hours without checkout)
-  const isLate = useMemo(() => {
-    if (checkin.status === 'completed') return false;
-    const start = new Date(checkin.checkin_at);
-    const now = new Date();
-    const hours = (now - start) / (1000 * 60 * 60);
-    return hours >= 4;
-  }, [checkin]);
+  // D6: badge "Atraso (+4h sem checkout)" removido — media tempo desde o clique,
+  // sem sentido com registro pós-obra por foto.
+  const isLate = false;
 
-  // Check if paused
+  // Check if paused (apenas registros legados — pausa removida do fluxo novo)
   const isPaused = checkin.status === 'paused';
 
   // Check if in progress (not completed, not paused)
@@ -163,9 +117,7 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, onR
                   {checkin.installer_name || 'Instalador'}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {date ? new Date(date).toLocaleString('pt-BR', {
-                    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
-                  }) : 'N/A'}
+                  {exifDateTimeBR(date) || '—'}
                 </p>
               </div>
               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
@@ -192,15 +144,16 @@ const MiniCheckinCard = ({ checkin, onView, onDelete, onArchive, onWhatsApp, onR
                 </span>
               )}
 
-              {/* Show cronometer for active/paused checkins, duration for completed */}
-              {checkin.status === 'completed' && checkin.duration_minutes ? (
+              {/* Duração oficial vem do EXIF (registro por foto). Sem cronômetro de
+                  clique — para itens com início mas sem conclusão, mostra "em campo". */}
+              {checkin.exif_duration_minutes != null ? (
                 <span className="text-green-400 whitespace-nowrap">
                   <Clock className="h-3 w-3 inline mr-1" />
-                  {checkin.duration_minutes}min
+                  {checkin.exif_duration_minutes}min
                 </span>
-              ) : (checkin.status === 'in_progress' || checkin.status === 'paused') && (
-                <Cronometer startTime={checkin.checkin_at} isPaused={isPaused} />
-              )}
+              ) : (checkin.exif_checkin_at && !checkin.exif_checkout_at) ? (
+                <span className="text-blue-400 whitespace-nowrap text-xs">em campo</span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -332,7 +285,7 @@ const Checkins = () => {
       // Filter out archived checkins and sort by most recent
       const activeCheckins = (checkinsRes || [])
         .filter(c => !c.archived)
-        .sort((a, b) => new Date(b.checkin_at || 0) - new Date(a.checkin_at || 0));
+        .sort((a, b) => new Date(b.exif_checkin_at || b.checkin_at || 0) - new Date(a.exif_checkin_at || a.checkin_at || 0));
 
       setCheckins(activeCheckins);
       setInstallers(installersRes.data || []);
@@ -361,8 +314,9 @@ const Checkins = () => {
     });
 
     // Separate check-ins from checkouts
-    const withCheckout = filtered.filter(c => c.checkout_at && c.checkout_photo);
-    const withoutCheckout = filtered.filter(c => !c.checkout_at || !c.checkout_photo);
+    // "Concluído" = tem horário de FIM por EXIF (foto de conclusão com data).
+    const withCheckout = filtered.filter(c => c.exif_checkout_at);
+    const withoutCheckout = filtered.filter(c => !c.exif_checkout_at);
 
     return {
       filteredCheckins: filtered,
@@ -770,7 +724,7 @@ const Checkins = () => {
                       <MiniCheckinCard
                         key={checkin.id}
                         checkin={checkin}
-                        type={checkin.checkout_at ? 'checkout' : 'checkin'}
+                        type={checkin.exif_checkout_at ? 'checkout' : 'checkin'}
                         onView={handleView}
                         onDelete={handleDelete}
                         onArchive={handleArchive}

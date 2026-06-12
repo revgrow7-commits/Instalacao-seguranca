@@ -99,7 +99,8 @@ TABLE_COLUMNS = {
         "exif_lat", "exif_long", "exif_datetime", "exif_device", "exif_address", "exif_offset",
         "checkout_exif_lat", "checkout_exif_long", "checkout_exif_datetime", "checkout_exif_device",
         "checkout_exif_address", "checkout_exif_offset",
-        "exif_checkin_at", "exif_checkout_at", "exif_duration_minutes", "photos_count"
+        "exif_checkin_at", "exif_checkout_at", "exif_duration_minutes", "photos_count",
+        "fotos_inicio", "fotos_conclusao"
     ]),
     "item_pause_logs": frozenset([
         "id", "checkin_id", "job_id", "item_index", "installer_id",
