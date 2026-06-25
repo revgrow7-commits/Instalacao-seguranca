@@ -53,14 +53,16 @@ def _item_family(job: dict, item_index: int, checkin: dict) -> str:
       3. family_name do próprio check-in; 4. 'Outros'."""
     products = (job or {}).get("products_with_area", []) or []
     item = products[item_index] if (isinstance(item_index, int) and 0 <= item_index < len(products)) else {}
-    if (item or {}).get("family_name"):
-        return normalize_family_name(item["family_name"])
+    stored = normalize_family_name((item or {}).get("family_name")) if (item or {}).get("family_name") else None
+    # Família real gravada vence; mas 'Outros'/ausente ainda tenta classificar ao vivo.
+    if stored and stored != "Outros":
+        return stored
     name = (item or {}).get("name") or (checkin or {}).get("product_name")
     if name:
         _id, fam = classify_family(name)
-        if fam:
+        if fam and fam != "Outros":
             return fam
-    return normalize_family_name((checkin or {}).get("family_name")) or "Outros"
+    return stored or normalize_family_name((checkin or {}).get("family_name")) or "Outros"
 
 
 def _checkin_area_share(checkin: dict, job: dict, participants: dict) -> float:

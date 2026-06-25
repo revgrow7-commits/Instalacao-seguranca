@@ -31,17 +31,31 @@ log = logging.getLogger("backfill")
 
 
 def _rebuild_products(job: dict) -> tuple:
-    """Reconstrói products_with_area a partir do holdprint_data cru.
+    """Recalcula dimensões (parser multi-linha) e família, MESCLANDO sobre o item
+    já gravado (preserva campos que a UI usa, ex.: unit_area_m2, unit_price).
     Retorna (products_with_area, total_area_m2)."""
     raw = (job.get("holdprint_data") or {}).get("products", []) or []
+    existing = job.get("products_with_area") or []
     rebuilt = []
     total = 0.0
-    for product in raw:
+    for i, product in enumerate(raw):
         dims = extract_product_dimensions(product)
         fam_id, fam_name = classify_family(dims.get("name", ""))
-        dims["family_id"] = fam_id
-        dims["family_name"] = fam_name
-        rebuilt.append(dims)
+        base = dict(existing[i]) if i < len(existing) and isinstance(existing[i], dict) else {}
+        # Atualiza só os campos recalculados; mantém o resto do item.
+        base["name"] = dims.get("name") or base.get("name")
+        base["width_m"] = dims.get("width_m")
+        base["height_m"] = dims.get("height_m")
+        base["quantity"] = dims.get("quantity")
+        base["copies"] = dims.get("quantity")
+        base["area_m2"] = dims.get("area_m2")
+        base["total_area_m2"] = dims.get("total_area_m2")
+        if dims.get("width_m") and dims.get("height_m"):
+            base["unit_area_m2"] = round(dims["width_m"] * dims["height_m"], 4)
+        base["family_id"] = fam_id
+        base["family_name"] = fam_name
+        base["family"] = fam_name  # alias legado mantido em sincronia
+        rebuilt.append(base)
         total += dims.get("total_area_m2", 0) or 0
     return rebuilt, round(total, 4)
 
