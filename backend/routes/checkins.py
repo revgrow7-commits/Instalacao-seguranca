@@ -12,6 +12,7 @@ from db_supabase import db, upload_photo_to_storage
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from services.image import compress_base64_image
+from services.product_classifier import classify_family
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -38,38 +39,18 @@ def _get_product_families_cached():
 
 
 async def detect_product_family(product_names: list) -> tuple:
-    """Detects the product family based on product names."""
-    families = _get_product_families_cached()
-    
-    family_keywords = {
-        "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
-        "lonas": ["lona", "banner", "faixa", "frontlight", "backlight"],
-        "acm": ["acm", "alumínio composto", "chapa", "placa"],
-        "painéis": ["painel", "outdoor", "totem", "display"],
-        "outros": []
-    }
-    
-    for name in product_names:
-        name_lower = name.lower() if name else ""
-        
-        for family in families:
-            family_name_lower = family.get("name", "").lower()
-            
-            if family_name_lower in name_lower:
-                return family.get("id"), family.get("name")
-            
-            keywords = family_keywords.get(family_name_lower, [])
-            for keyword in keywords:
-                if keyword in name_lower:
-                    return family.get("id"), family.get("name")
-    
-    if families:
-        outros = next((f for f in families if "outro" in f.get("name", "").lower()), None)
-        if outros:
-            return outros.get("id"), outros.get("name")
-        return families[0].get("id"), families[0].get("name")
-    
-    return None, None
+    """Delega ao classificador ÚNICO (services.product_classifier).
+
+    Antes casava o NOME DA FAMÍLIA como substring do nome do produto + keywords
+    hardcoded ('adesivos/lonas/acm/painéis') que não batiam com os nomes reais
+    do banco → quase tudo virava 'Outros'. Retorna (family_id, family_name)."""
+    for name in (product_names or []):
+        if name:
+            fid, fname = classify_family(name)
+            if fname and fname != "Outros":
+                return fid, fname
+    first = next((n for n in (product_names or []) if n), "")
+    return classify_family(first)
 
 
 async def update_productivity_history(installed_product):

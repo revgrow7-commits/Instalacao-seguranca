@@ -28,6 +28,7 @@ from config import (
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
 from services.holdprint import extract_product_dimensions
+from services.product_classifier import classify_family
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -116,30 +117,11 @@ class JobJustificationRequest(BaseModel):
 # ============ HELPER FUNCTIONS ============
 
 def classify_product_family(product_name: str) -> str:
-    """Classify a product into a family based on name"""
-    if not product_name:
-        return "Outros"
-    
-    name_lower = product_name.lower()
-    
-    mappings = [
-        (["adesivo", "vinil"], "Adesivos"),
-        (["lona", "banner", "faixa"], "Lonas e Banners"),
-        (["chapa", "placa", "acm", "acrílico"], "Chapas e Placas"),
-        (["totem"], "Totens"),
-        (["letra caixa"], "Letras Caixa"),
-        (["tecido", "bandeira"], "Tecidos"),
-        (["envelopamento"], "Envelopamento"),
-        (["painel", "backlight"], "Painéis Luminosos"),
-        (["serviço", "instalação", "entrega"], "Serviços"),
-    ]
-    
-    for keywords, family in mappings:
-        for keyword in keywords:
-            if keyword in name_lower:
-                return family
-    
-    return "Outros"
+    """Classifica um produto em família. Delega ao classificador ÚNICO
+    (services.product_classifier) — antes era mais um classificador parcial
+    divergente. Mantém a assinatura (retorna só o nome) para os chamadores."""
+    _id, fam = classify_family(product_name)
+    return fam or "Outros"
 
 
 def calculate_job_products_area(holdprint_data: dict) -> tuple:
@@ -151,13 +133,18 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
     
     for product in products:
         product_info = extract_product_dimensions(product)
-        quantity = product.get('quantity', 1)
-        unit_area = product_info.get('area_m2', 0)
-        total_area = unit_area * quantity
-        
+        quantity = product_info.get('quantity', 1)
+        unit_area = product_info.get('area_m2', 0) or 0
+        # total_area_m2 do extractor JÁ soma todas as linhas de "Medidas do
+        # trabalho" e multiplica pela quantidade. Antes usava area_m2 (só a 1ª
+        # linha) × quantity, subdimensionando itens com várias peças.
+        total_area = product_info.get('total_area_m2', 0) or 0
+        fam_id, fam_name = classify_family(product_info.get('name', ''))
+
         product_with_area = {
-            "name": product.get('name', ''),
-            "family_name": classify_product_family(product.get('name', '')),
+            "name": product_info.get('name', '') or product.get('name', ''),
+            "family_id": fam_id,
+            "family_name": fam_name,
             "quantity": quantity,
             "width_m": product_info.get('width_m'),
             "height_m": product_info.get('height_m'),

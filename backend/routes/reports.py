@@ -17,6 +17,7 @@ from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
 from services.product_classifier import classify_family, normalize_family_name
+from services.holdprint import extract_product_dimensions
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -169,24 +170,16 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
         quantity = product.get("quantity", 1)
         description = product.get("description", "")
         
-        width_m = None
-        height_m = None
-        
-        width_match = re.search(r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
-        height_match = re.search(r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
-        
-        if width_match:
-            width_m = float(width_match.group(1).replace(',', '.'))
-        if height_match:
-            height_m = float(height_match.group(1).replace(',', '.'))
-        
-        area_m2 = None
-        if width_m and height_m:
-            area_m2 = round(width_m * height_m * quantity, 2)
+        # Reusa o extractor único (parser multi-linha + cm/m), não mais regex inline.
+        _dims = extract_product_dimensions(product)
+        width_m = _dims.get("width_m") or None
+        height_m = _dims.get("height_m") or None
+        area_m2 = _dims.get("total_area_m2") or None
+        if area_m2:
             total_area_m2 += area_m2
-        
+
         family_name, confidence = classify_product_to_family(product_name)
-        
+
         products_with_area.append({
             "name": product_name,
             "quantity": quantity,
@@ -239,21 +232,12 @@ async def get_report_by_family(
             quantity = product.get("quantity", 1)
             description = product.get("description", "")
             
-            width_m = None
-            height_m = None
-            
-            width_match = re.search(r'Largura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
-            height_match = re.search(r'Altura:\s*<span[^>]*>([0-9.,]+)\s*m', description, re.IGNORECASE)
-            
-            if width_match:
-                width_m = float(width_match.group(1).replace(',', '.'))
-            if height_match:
-                height_m = float(height_match.group(1).replace(',', '.'))
-            
-            area_m2 = None
-            if width_m and height_m:
-                area_m2 = round(width_m * height_m * quantity, 2)
-            
+            # Reusa o extractor único (parser multi-linha + cm/m), não mais regex inline.
+            _dims = extract_product_dimensions(product)
+            width_m = _dims.get("width_m") or None
+            height_m = _dims.get("height_m") or None
+            area_m2 = _dims.get("total_area_m2") or None
+
             family_name, confidence = classify_product_to_family(product_name)
             
             product_data = {
