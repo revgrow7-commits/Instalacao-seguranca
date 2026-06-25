@@ -56,54 +56,48 @@ def extract_product_dimensions(product: dict) -> dict:
         except (ValueError, TypeError):
             pass
 
-    # 3. HTML description — Holdprint sends values in cm ("Largura: 13cm") or meters ("Largura: 1.5m")
+    # 3. HTML description — "Medidas do trabalho" pode ter VÁRIAS linhas (ex.: Totem
+    #    Face e Verso, ou várias matérias-primas). Cada linha traz Largura/Altura/Cópias.
+    #    Somamos a área de TODAS as linhas (antes lia só a primeira → subdimensionava).
+    #    Holdprint manda em cm ("Largura: 13cm") ou metros ("Largura: 1.5m").
     description = product.get("description", "")
+    desc_total_area = 0.0
     if description and (not width_m or not height_m):
-        def _parse_dimension(pattern, text):
-            """Return dimension in meters. Handles cm and m units."""
-            m = re.search(pattern, text, re.IGNORECASE)
-            if not m:
-                return 0.0
+        def _to_m(raw_value, raw_unit):
             try:
-                value = float(m.group(1).replace(',', '.'))
-                unit = (m.group(2) or 'm').lower().strip()
-                return value / 100 if unit == 'cm' else value
-            except (ValueError, TypeError, IndexError):
+                value = float(str(raw_value).replace(',', '.'))
+            except (ValueError, TypeError):
                 return 0.0
+            return value / 100 if (raw_unit or 'm').lower().strip() == 'cm' else value
 
-        width_patterns = [
-            r'Largura:\s*<span[^>]*>([0-9.,]+)\s*(cm|m)\b',
-            r'Largura[:\s•&#8226;]+([0-9.,]+)\s*(cm|m)\b',
-        ]
-        for pattern in width_patterns:
-            v = _parse_dimension(pattern, description)
-            if v:
-                width_m = v
-                break
+        # Captura TODAS as ocorrências (findall), na ordem do texto, e pareia por índice.
+        # `<span ...>` é opcional (cobre "Largura: <span>0.9m</span>" e "Largura: 1.12m").
+        widths = [_to_m(v, u) for v, u in re.findall(
+            r'Largura\s*[:\-]?\s*(?:<span[^>]*>)?\s*([0-9.,]+)\s*(cm|m)\b', description, re.IGNORECASE)]
+        heights = [_to_m(v, u) for v, u in re.findall(
+            r'Altura\s*[:\-]?\s*(?:<span[^>]*>)?\s*([0-9.,]+)\s*(cm|m)\b', description, re.IGNORECASE)]
+        copies_raw = re.findall(
+            r'C[óo]pias\s*[:\-]?\s*(?:<span[^>]*>)?\s*([0-9]+)', description, re.IGNORECASE)
+        copies = []
+        for c in copies_raw:
+            try:
+                copies.append(int(c))
+            except (ValueError, TypeError):
+                copies.append(1)
 
-        height_patterns = [
-            r'Altura:\s*<span[^>]*>([0-9.,]+)\s*(cm|m)\b',
-            r'Altura[:\s•&#8226;]+([0-9.,]+)\s*(cm|m)\b',
-        ]
-        for pattern in height_patterns:
-            v = _parse_dimension(pattern, description)
-            if v:
-                height_m = v
-                break
+        n_lines = max(len(widths), len(heights))
+        for i in range(n_lines):
+            w_i = widths[i] if i < len(widths) else 0.0
+            h_i = heights[i] if i < len(heights) else 0.0
+            c_i = copies[i] if i < len(copies) else 1
+            if w_i and h_i:
+                desc_total_area += w_i * h_i * c_i
 
-        if quantity == 1:
-            copies_patterns = [
-                r'Cópias:\s*<span[^>]*>([0-9]+)',
-                r'Cópias[:\s]+([0-9]+)',
-            ]
-            for pattern in copies_patterns:
-                match = re.search(pattern, description, re.IGNORECASE)
-                if match:
-                    try:
-                        quantity = int(match.group(1))
-                        break
-                    except (ValueError, TypeError):
-                        pass
+        # width_m/height_m da PRIMEIRA linha apenas para exibição (a área usa a soma).
+        if not width_m and widths:
+            width_m = widths[0]
+        if not height_m and heights:
+            height_m = heights[0]
 
     # 4. Product name fallback — e.g. "Banner 2,5x1,2m" (values in meters)
     name = product.get("name", product.get("title", ""))
@@ -121,7 +115,12 @@ def extract_product_dimensions(product: dict) -> dict:
                 pass
 
     area_m2 = round(width_m * height_m, 4) if width_m and height_m else 0.0
-    total_area_m2 = round(area_m2 * quantity, 4)
+    if desc_total_area > 0:
+        # Soma multi-linha da descrição (já inclui as cópias por linha). O quantity
+        # de nível de produto multiplica o conjunto (normalmente 1).
+        total_area_m2 = round(desc_total_area * quantity, 4)
+    else:
+        total_area_m2 = round(area_m2 * quantity, 4)
 
     return {
         "name": name or "Produto sem nome",

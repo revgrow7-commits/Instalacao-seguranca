@@ -16,6 +16,7 @@ from models.user import User, UserRole
 from config import MAX_CHECKOUT_DISTANCE_METERS
 from services.gps import calculate_gps_distance
 from services.image import compress_base64_image
+from services.product_classifier import classify_family
 
 
 router = APIRouter()
@@ -118,39 +119,15 @@ def _get_enrichment_maps():
 
 # ============ HELPER FUNCTIONS ============
 
-async def detect_product_family(product_names: list) -> tuple:
-    """Detects the product family based on product names."""
-    families = db.product_families.find({}, {"_id": 0})
-    
-    family_keywords = {
-        "adesivos": ["adesivo", "vinil", "adesivos", "plotagem", "recorte"],
-        "lonas": ["lona", "banner", "faixa", "frontlight", "backlight"],
-        "acm": ["acm", "alumínio composto", "chapa", "placa"],
-        "painéis": ["painel", "outdoor", "totem", "display"],
-        "outros": []
-    }
-    
-    for name in product_names:
-        name_lower = name.lower() if name else ""
-        
-        for family in families:
-            family_name_lower = family.get("name", "").lower()
-            
-            if family_name_lower in name_lower:
-                return family.get("id"), family.get("name")
-            
-            keywords = family_keywords.get(family_name_lower, [])
-            for keyword in keywords:
-                if keyword in name_lower:
-                    return family.get("id"), family.get("name")
-    
-    if families:
-        outros = next((f for f in families if "outro" in f.get("name", "").lower()), None)
-        if outros:
-            return outros.get("id"), outros.get("name")
-        return families[0].get("id"), families[0].get("name")
-    
-    return None, None
+def _resolve_family(product: dict) -> tuple:
+    """Família do item: herda a já gravada na importação (sync/backfill) ou,
+    como fallback, classifica pelo nome via o classificador único."""
+    product = product or {}
+    fid = product.get("family_id")
+    fname = product.get("family_name")
+    if fname:
+        return fid, fname
+    return classify_family(product.get("name", ""))
 
 
 async def update_productivity_history(product_data: dict):
@@ -345,8 +322,8 @@ async def create_item_checkin(
             ),
         )
     
-    family_id, family_name = await detect_product_family([product.get("name", "")])
-    
+    family_id, family_name = _resolve_family(product)
+
     compressed_photo = None
     photo_url = None
     if photo_base64:
@@ -493,7 +470,7 @@ async def batch_item_checkin(
         )
 
     product = products[request.item_index]
-    family_id, family_name = await detect_product_family([product.get("name", "")])
+    family_id, family_name = _resolve_family(product)
 
     # Extrai timestamps EXIF e ordena para calcular duração estimada
     exif_timestamps = []
@@ -988,8 +965,8 @@ async def complete_item_checkout(
     if job:
         products = job.get("products_with_area", [])
         product = products[checkin["item_index"]] if checkin["item_index"] < len(products) else {}
-        
-        family_id, family_name = await detect_product_family([product.get("name", "")])
+
+        family_id, family_name = _resolve_family(product)
         
         installed_product_dict = {
             "id": str(uuid.uuid4()),

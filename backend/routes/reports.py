@@ -16,12 +16,65 @@ import re
 from db_supabase import db
 from security import get_current_user, require_role
 from models.user import User, UserRole
+from services.product_classifier import classify_family, normalize_family_name
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 # ============ HELPER FUNCTIONS ============
+
+def _participant_index(checkins: list) -> dict:
+    """Conta check-ins concluídos por (job_id, item_index) → nº de participantes do item.
+
+    Usado para dividir o m² igualmente entre os instaladores que fizeram o mesmo
+    item (evita a dupla/tripla contagem que existia ao somar a área cheia por
+    check-in)."""
+    idx = {}
+    for c in checkins:
+        key = (c.get("job_id"), c.get("item_index", 0))
+        idx[key] = idx.get(key, 0) + 1
+    return idx
+
+
+def _item_total_area(job: dict, item_index: int) -> float:
+    """Área TOTAL importada do item (products_with_area[item_index].total_area_m2)."""
+    products = (job or {}).get("products_with_area", []) or []
+    if isinstance(item_index, int) and 0 <= item_index < len(products):
+        return (products[item_index] or {}).get("total_area_m2", 0) or 0
+    return 0
+
+
+def _item_family(job: dict, item_index: int, checkin: dict) -> str:
+    """Família do item. Prioridade:
+      1. família gravada no item (sync/backfill);
+      2. classificação AO VIVO pelo nome do produto (autocorrige o histórico sem
+         depender do backfill — os check-ins antigos têm family_name='Outros');
+      3. family_name do próprio check-in; 4. 'Outros'."""
+    products = (job or {}).get("products_with_area", []) or []
+    item = products[item_index] if (isinstance(item_index, int) and 0 <= item_index < len(products)) else {}
+    if (item or {}).get("family_name"):
+        return normalize_family_name(item["family_name"])
+    name = (item or {}).get("name") or (checkin or {}).get("product_name")
+    if name:
+        _id, fam = classify_family(name)
+        if fam:
+            return fam
+    return normalize_family_name((checkin or {}).get("family_name")) or "Outros"
+
+
+def _checkin_area_share(checkin: dict, job: dict, participants: dict) -> float:
+    """Área atribuível a ESTE check-in, já dividida pelos participantes do item.
+
+    base = installed_m2 (se preenchido) senão a área importada do item; depois
+    dividida pelo nº de check-ins concluídos do mesmo item. A soma das parcelas
+    dos participantes reconstrói a área do item (sem dupla contagem). Itens sem
+    installed_m2 deixam de ser descartados — usam a área importada."""
+    item_index = checkin.get("item_index", 0)
+    n = max(1, participants.get((checkin.get("job_id"), item_index), 1))
+    installed = checkin.get("installed_m2", 0) or 0
+    base = installed if installed > 0 else _item_total_area(job, item_index)
+    return base / n
 
 def _metrics_excluded(job: dict) -> bool:
     """
@@ -33,6 +86,19 @@ def _metrics_excluded(job: dict) -> bool:
         or job.get("exclude_from_metrics")
         or job.get("deleted")
     )
+
+
+# Default da janela de relatórios. Os relatórios pesados (by-family, by-installer,
+# metrics) passaram a filtrar por período no próprio find() (índice no banco, em vez
+# de carregar a tabela inteira na memória). Sobrescrevível via ?days=N; days=0 = tudo.
+DEFAULT_REPORT_WINDOW_DAYS = 90
+
+
+def _period_cutoff_iso(days: Optional[int]) -> Optional[str]:
+    """Cutoff ISO (UTC) para 'últimos N dias'. days<=0/None => None (sem filtro)."""
+    if not days or days <= 0:
+        return None
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
 
 # ── Fonte de verdade dos relatórios: EXIF das fotos da galeria ──
@@ -74,31 +140,14 @@ def _exif_duration_min(c: dict):
 
 
 def classify_product_to_family(product_name: str) -> tuple:
-    """
-    Classifies a product into a family based on keywords.
-    Returns (family_name, confidence_percent).
-    """
+    """Delega ao classificador ÚNICO (services.product_classifier). Devolve nomes
+    de família oficiais do banco — não mais rótulos divergentes ("Lonas/Banners",
+    "Chapas/Fachadas") que não existiam em product_families.
+    Returns (family_name, confidence_percent)."""
     if not product_name:
         return "Outros", 0
-    
-    name = product_name.lower()
-    
-    classifications = [
-        (["adesivo", "vinil", "plotagem", "recorte", "adesivos"], "Adesivos", 90),
-        (["lona", "banner", "faixa", "frontlight", "backlight"], "Lonas/Banners", 90),
-        (["chapa", "acm", "fachada", "alumínio composto"], "Chapas/Fachadas", 85),
-        (["placa", "legenda", "sinalização"], "Placas/Legendas", 80),
-        (["display", "expositor", "totem", "stand"], "Displays/Totens", 85),
-        (["serviço", "instalação", "entrega", "mão de obra"], "Serviços", 70),
-        (["impressão", "impresso", "papel"], "Impressos", 75),
-    ]
-    
-    for keywords, family, confidence in classifications:
-        for keyword in keywords:
-            if keyword in name:
-                return family, confidence
-    
-    return "Outros", 30
+    _id, fam = classify_family(product_name)
+    return fam, (90 if fam and fam != "Outros" else 30)
 
 
 def calculate_job_products_area(holdprint_data: dict) -> tuple:
@@ -157,14 +206,20 @@ def calculate_job_products_area(holdprint_data: dict) -> tuple:
 # ============ ROUTES ============
 
 @router.get("/reports/by-family")
-async def get_report_by_family(current_user: User = Depends(get_current_user)):
+async def get_report_by_family(
+    days: int = Query(DEFAULT_REPORT_WINDOW_DAYS, ge=0, le=3650,
+                      description="Janela de dias (por created_at do job). 0 = todos os tempos. Default 90."),
+    current_user: User = Depends(get_current_user),
+):
     """
     Relatório completo por família de produtos.
-    Analisa todos os jobs importados e classifica seus produtos por família.
+    Analisa os jobs importados na janela de `days` e classifica seus produtos por família.
     """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
-    jobs = [j for j in db.jobs.find({}, {"_id": 0}) if not _metrics_excluded(j)]
+
+    cutoff = _period_cutoff_iso(days)
+    job_query = {"created_at": {"$gte": cutoff}} if cutoff else {}
+    jobs = [j for j in db.jobs.find(job_query, {"_id": 0}) if not _metrics_excluded(j)]
     families = db.product_families.find({}, {"_id": 0})
     family_map = {f["name"]: f for f in families}
     
@@ -317,20 +372,24 @@ async def get_family_productivity_kpis(
     family_data = {}
     global_totals = {"total_m2": 0, "total_minutes": 0, "count": 0}
 
+    # Participantes por item (para dividir o m² igualmente entre quem fez o mesmo item).
+    participants = _participant_index(checkins)
+
     for checkin in checkins:
         # Filtro de período pela data EXIF; sem EXIF de início → fora de intervalos
         if _start_dt or _end_dt:
             _es = _parse_dt(_exif_start(checkin))
             if not _es or (_start_dt and _es < _start_dt) or (_end_dt and _es > _end_dt):
                 continue
-        family = checkin.get("family_name") or "Outros"
-        installed_m2 = checkin.get("installed_m2", 0) or 0
+        job = jobs_map.get(checkin.get("job_id"))
+        # Família herdada do item (sync/backfill); fallback p/ check-in/classificador.
+        family = _item_family(job, checkin.get("item_index", 0), checkin)
+        # m² já DIVIDIDO pelos participantes do item; itens sem installed_m2 não são
+        # mais descartados — usam a área importada (decisão de produto 2026-06-25).
+        installed_m2 = _checkin_area_share(checkin, job, participants)
         # Duração SOMENTE pelo EXIF da foto (não pelo clique)
         duration = _exif_duration_min(checkin) or 0
-        
-        if installed_m2 <= 0:
-            continue
-            
+
         if family not in family_data:
             family_data[family] = {
                 "family_name": family,
@@ -416,17 +475,26 @@ async def get_family_productivity_kpis(
 
 
 @router.get("/reports/by-installer")
-async def get_report_by_installer(current_user: User = Depends(get_current_user)):
+async def get_report_by_installer(
+    days: int = Query(DEFAULT_REPORT_WINDOW_DAYS, ge=0, le=3650,
+                      description="Janela de dias (por checkin_at, data de instalação). 0 = todos os tempos. Default 90."),
+    current_user: User = Depends(get_current_user),
+):
     """
-    Relatório de produtividade por instalador.
+    Relatório de produtividade por instalador (instalações na janela de `days`).
     """
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
+
+    cutoff = _period_cutoff_iso(days)
+    ic_query = {"status": "completed", "is_archived": {"$ne": True}}
+    if cutoff:
+        ic_query["checkin_at"] = {"$gte": cutoff}
+
     installers = db.installers.find({}, {"_id": 0})
     jobs = db.jobs.find({}, {"_id": 0})
     jobs_map = {job["id"]: job for job in jobs if not _metrics_excluded(job)}
     item_checkins = [
-        c for c in db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
+        c for c in db.item_checkins.find(ic_query, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
         if c.get("job_id") in jobs_map
     ]
 
@@ -438,6 +506,9 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
         iid = c.get("installer_id")
         if iid is not None:
             checkins_by_installer.setdefault(iid, []).append(c)
+
+    # Participantes por item → divide o m² igualmente entre quem fez o mesmo item.
+    participants = _participant_index(item_checkins)
 
     installer_report = []
 
@@ -455,12 +526,8 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
             
             job = jobs_map.get(checkin.get("job_id"))
             if job:
-                products = job.get("products_with_area", [])
-                item_index = checkin.get("item_index", 0)
-                if item_index < len(products):
-                    item = products[item_index]
-                    item_m2 = item.get("total_area_m2", 0) or 0
-                    total_m2_installed += item_m2
+                # m² dividido pelos participantes do item (sem dupla contagem).
+                total_m2_installed += _checkin_area_share(checkin, job, participants)
         
         # Agrupa os checkins deste instalador por job uma única vez (evita o
         # re-scan de installer_checkins dentro do loop de jobs).
@@ -481,11 +548,8 @@ async def get_report_by_installer(current_user: User = Depends(get_current_user)
                 job_net_duration = sum(_exif_duration_min(c) or 0 for c in job_item_checkins)
                 
                 job_m2_installed = 0
-                products = job.get("products_with_area", [])
                 for checkin in job_item_checkins:
-                    item_index = checkin.get("item_index", 0)
-                    if item_index < len(products):
-                        job_m2_installed += products[item_index].get("total_area_m2", 0) or 0
+                    job_m2_installed += _checkin_area_share(checkin, job, participants)
                 
                 jobs_details.append({
                     "job_id": job_id,
@@ -550,9 +614,12 @@ async def get_productivity_report(
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
     
     jobs = db.jobs.find({}, {"_id": 0})
-    item_checkins = db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
+    item_checkins = list(db.item_checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0, "checkin_photo": 0, "checkout_photo": 0}))
     installers = db.installers.find({}, {"_id": 0})
     legacy_checkins = db.checkins.find({"status": "completed", "is_archived": {"$ne": True}}, {"_id": 0})
+
+    # Participantes por item → divide o m² igualmente entre quem fez o mesmo item.
+    participants = _participant_index(item_checkins)
     
     # Apenas jobs válidos entram no mapa; check-ins de jobs arquivados/excluídos/deletados
     # são ignorados automaticamente pelos loops (que fazem `if not job: continue`).
@@ -591,6 +658,9 @@ async def get_productivity_report(
         item = products[item_index] if item_index < len(products) else {}
 
         item_m2 = item.get("total_area_m2", 0) or 0
+        # Parcela dividida pelos participantes — usada nas agregações por
+        # instalador/job/família (o by_item mantém a área cheia do item).
+        item_share = _checkin_area_share(checkin, job, participants)
 
         total_pause_minutes = checkin.get("total_pause_minutes", 0) or 0
         # Duração SOMENTE pelo EXIF (fim - início pela foto); sem EXIF → 0
@@ -599,7 +669,7 @@ async def get_productivity_report(
         installer_id = checkin.get("installer_id")
         installer = installers_map.get(installer_id, {})
         installer_name = installer.get("full_name", "Desconhecido")
-        family_name = item.get("family_name", "Não Classificado")
+        family_name = _item_family(job, item_index, checkin)
         
         record = {
             "job_id": job.get("id"),
@@ -641,7 +711,7 @@ async def get_productivity_report(
                 "jobs": set(),
                 "records": []
             }
-        by_installer[installer_id]["total_m2"] += item_m2
+        by_installer[installer_id]["total_m2"] += item_share
         by_installer[installer_id]["total_minutes"] += duration_minutes
         by_installer[installer_id]["items_count"] += 1
         by_installer[installer_id]["jobs"].add(job.get("id"))
@@ -661,7 +731,7 @@ async def get_productivity_report(
                 "installers": set(),
                 "records": []
             }
-        by_job[job_id]["total_m2_executed"] += item_m2
+        by_job[job_id]["total_m2_executed"] += item_share
         by_job[job_id]["total_minutes"] += duration_minutes
         by_job[job_id]["items_count"] += 1
         by_job[job_id]["installers"].add(installer_id)
@@ -678,7 +748,7 @@ async def get_productivity_report(
                 "installers": set(),
                 "records": []
             }
-        by_family[family_name]["total_m2"] += item_m2
+        by_family[family_name]["total_m2"] += item_share
         by_family[family_name]["total_minutes"] += duration_minutes
         by_family[family_name]["items_count"] += 1
         by_family[family_name]["jobs"].add(job.get("id"))

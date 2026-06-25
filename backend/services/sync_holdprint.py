@@ -9,6 +9,7 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any
 from services.holdprint import extract_product_dimensions  # noqa: F401 – re-exported for callers
+from services.product_classifier import classify_family
 from config import HOLDPRINT_API_URL
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,11 @@ def sync_holdprint_jobs_sync(
 
                                 for product in products:
                                     product_info = extract_product_dimensions(product)
+                                    # Classifica a família AGORA (na importação) e grava no item.
+                                    # O check-in herda daqui — fonte única de classificação.
+                                    fam_id, fam_name = classify_family(product_info.get('name', ''))
+                                    product_info['family_id'] = fam_id
+                                    product_info['family_name'] = fam_name
                                     products_with_area.append(product_info)
                                     total_area_m2 += product_info.get('total_area_m2', 0)
 
