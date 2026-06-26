@@ -317,95 +317,109 @@ async def get_productivity_history(
 
 @router.get("/productivity-metrics")
 async def get_productivity_metrics(current_user: User = Depends(get_current_user)):
-    """Get comprehensive productivity metrics."""
+    """Métricas de produtividade — agora derivadas de item_checkins + jobs (mesma
+    fonte de /reports/kpis), reusando os helpers do reports.py. Antes lia
+    installed_products: agrupava por family_id histórico (classificador antigo),
+    somava area_m2 cheio por linha (dupla contagem em itens multi-instalador) e
+    NÃO excluía check-ins arquivados/jobs fora de métrica."""
     require_role(current_user, [UserRole.ADMIN, UserRole.MANAGER])
-    
-    # Get all product families
+
+    # Import local evita qualquer ciclo no carregamento dos routers.
+    from routes.reports import (
+        _participant_index, _item_family, _checkin_area_share,
+        _exif_duration_min, _metrics_excluded,
+    )
+
     families = db.product_families.find({}, {"_id": 0})
-    
-    # Get all products installed
-    products = db.installed_products.find({}, {"_id": 0})
-    
-    # Get productivity history
     history = db.productivity_history.find({}, {"_id": 0})
-    
-    # Calculate metrics by family
+
+    jobs = db.jobs.find({}, {"_id": 0})
+    jobs_map = {j["id"]: j for j in jobs if not _metrics_excluded(j)}
+    checkins = [
+        c for c in db.item_checkins.find(
+            {"status": "completed", "is_archived": {"$ne": True}},
+            {"_id": 0, "checkin_photo": 0, "checkout_photo": 0})
+        if c.get("job_id") in jobs_map
+    ]
+    participants = _participant_index(checkins)
+
+    fam_acc, comp_acc, height_acc, scen_acc = {}, {}, {}, {}
+    total_area_all = 0.0
+    total_time_all = 0.0
+
+    def _acc(bucket, key, area, tmin):
+        d = bucket.setdefault(key, {"area": 0.0, "time": 0.0, "count": 0})
+        d["area"] += area
+        d["time"] += tmin
+        d["count"] += 1
+
+    for c in checkins:
+        job = jobs_map.get(c.get("job_id"))
+        idx = c.get("item_index", 0)
+        area = _checkin_area_share(c, job, participants)  # m² dividido p/ participantes
+        tmin = _exif_duration_min(c) or 0                  # duração só pelo EXIF
+        total_area_all += area
+        total_time_all += tmin
+        _acc(fam_acc, _item_family(job, idx, c), area, tmin)
+        if c.get("complexity_level") is not None:
+            _acc(comp_acc, c.get("complexity_level"), area, tmin)
+        if c.get("height_category"):
+            _acc(height_acc, c.get("height_category"), area, tmin)
+        if c.get("scenario_category"):
+            _acc(scen_acc, c.get("scenario_category"), area, tmin)
+
+    def _prod(area, time_min):
+        return round(area / (time_min / 60), 2) if time_min > 0 and area > 0 else 0
+
+    fam_color = {f["name"]: f.get("color", "#3B82F6") for f in families}
+    fam_id_by_name = {f["name"]: f["id"] for f in families}
     family_metrics = {}
-    for family in families:
-        family_products = [p for p in products if p.get("family_id") == family["id"]]
-        
-        total_area = sum(p.get("area_m2", 0) or 0 for p in family_products)
-        total_time = sum(p.get("actual_time_min", 0) or 0 for p in family_products)
-        total_products = len(family_products)
-        
-        avg_productivity = 0
-        if total_time > 0:
-            avg_productivity = round((total_area / (total_time / 60)), 2) if total_area > 0 else 0
-        
-        family_metrics[family["name"]] = {
-            "family_id": family["id"],
-            "color": family.get("color", "#3B82F6"),
-            "total_products": total_products,
-            "total_area_m2": round(total_area, 2),
-            "total_time_hours": round(total_time / 60, 2),
-            "avg_productivity_m2_h": avg_productivity,
-            "avg_time_per_m2_min": round(60 / avg_productivity, 2) if avg_productivity > 0 else 0
+    for name, d in fam_acc.items():
+        p = _prod(d["area"], d["time"])
+        family_metrics[name] = {
+            "family_id": fam_id_by_name.get(name),
+            "color": fam_color.get(name, "#3B82F6"),
+            "total_products": d["count"],
+            "total_area_m2": round(d["area"], 2),
+            "total_time_hours": round(d["time"] / 60, 2),
+            "avg_productivity_m2_h": p,
+            "avg_time_per_m2_min": round(60 / p, 2) if p > 0 else 0,
         }
-    
-    # Calculate overall metrics
-    total_area_all = sum(p.get("area_m2", 0) or 0 for p in products)
-    total_time_all = sum(p.get("actual_time_min", 0) or 0 for p in products)
-    overall_productivity = round((total_area_all / (total_time_all / 60)), 2) if total_time_all > 0 and total_area_all > 0 else 0
-    
-    # Metrics by complexity
+
     complexity_metrics = {}
     for level in [1, 2, 3, 4, 5]:
-        level_products = [p for p in products if p.get("complexity_level") == level]
-        total_area = sum(p.get("area_m2", 0) or 0 for p in level_products)
-        total_time = sum(p.get("actual_time_min", 0) or 0 for p in level_products)
-        
+        d = comp_acc.get(level, {"area": 0.0, "time": 0.0, "count": 0})
         complexity_metrics[f"level_{level}"] = {
-            "total_products": len(level_products),
-            "total_area_m2": round(total_area, 2),
-            "avg_productivity_m2_h": round((total_area / (total_time / 60)), 2) if total_time > 0 and total_area > 0 else 0
+            "total_products": d["count"], "total_area_m2": round(d["area"], 2),
+            "avg_productivity_m2_h": _prod(d["area"], d["time"]),
         }
-    
-    # Metrics by height category
+
     height_metrics = {}
     for category in ["terreo", "media", "alta", "muito_alta"]:
-        cat_products = [p for p in products if p.get("height_category") == category]
-        total_area = sum(p.get("area_m2", 0) or 0 for p in cat_products)
-        total_time = sum(p.get("actual_time_min", 0) or 0 for p in cat_products)
-        
+        d = height_acc.get(category, {"area": 0.0, "time": 0.0, "count": 0})
         height_metrics[category] = {
-            "total_products": len(cat_products),
-            "total_area_m2": round(total_area, 2),
-            "avg_productivity_m2_h": round((total_area / (total_time / 60)), 2) if total_time > 0 and total_area > 0 else 0
+            "total_products": d["count"], "total_area_m2": round(d["area"], 2),
+            "avg_productivity_m2_h": _prod(d["area"], d["time"]),
         }
-    
-    # Metrics by scenario
+
     scenario_metrics = {}
     for scenario in ["loja_rua", "shopping", "evento", "fachada", "outdoor", "veiculo"]:
-        scen_products = [p for p in products if p.get("scenario_category") == scenario]
-        total_area = sum(p.get("area_m2", 0) or 0 for p in scen_products)
-        total_time = sum(p.get("actual_time_min", 0) or 0 for p in scen_products)
-        
+        d = scen_acc.get(scenario, {"area": 0.0, "time": 0.0, "count": 0})
         scenario_metrics[scenario] = {
-            "total_products": len(scen_products),
-            "total_area_m2": round(total_area, 2),
-            "avg_productivity_m2_h": round((total_area / (total_time / 60)), 2) if total_time > 0 and total_area > 0 else 0
+            "total_products": d["count"], "total_area_m2": round(d["area"], 2),
+            "avg_productivity_m2_h": _prod(d["area"], d["time"]),
         }
-    
+
     return {
         "overall": {
-            "total_products": len(products),
+            "total_products": len(checkins),
             "total_area_m2": round(total_area_all, 2),
             "total_time_hours": round(total_time_all / 60, 2),
-            "avg_productivity_m2_h": overall_productivity
+            "avg_productivity_m2_h": _prod(total_area_all, total_time_all),
         },
         "by_family": family_metrics,
         "by_complexity": complexity_metrics,
         "by_height": height_metrics,
         "by_scenario": scenario_metrics,
-        "benchmarks": history
+        "benchmarks": history,
     }
