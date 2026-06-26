@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { brtWallToUtcIso } from '../lib/brtDate';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -825,7 +826,8 @@ const Jobs = () => {
     if (!selectedJob) return;
 
     const installerIds = [...scheduleInstallerIds];
-    const isoDate = scheduleDate ? new Date(`${scheduleDate}T${scheduleTime || '08:00'}:00`).toISOString() : null;
+    // Hora de parede BRT → UTC (fixa -03:00, não depende do fuso do navegador).
+    const isoDate = scheduleDate ? brtWallToUtcIso(scheduleDate, scheduleTime || '08:00') : null;
 
     try {
       setProcessingJobId(selectedJob.id);

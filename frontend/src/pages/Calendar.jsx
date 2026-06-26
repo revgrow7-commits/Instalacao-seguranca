@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { brtDateStr, brtTimeStr, brtWallToUtcIso } from '../lib/brtDate';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -309,11 +310,12 @@ const Calendar = () => {
     
     setScheduling(true);
     try {
-      const dateTime = new Date(`${scheduleDate}T${scheduleTime}`);
+      // Hora de parede BRT → instante UTC (fixa -03:00, não depende do fuso do navegador).
+      const scheduledIso = brtWallToUtcIso(scheduleDate, scheduleTime);
       const installerIds = selectedInstaller && selectedInstaller !== 'none' ? [selectedInstaller] : [];
 
       await api.scheduleJob(jobToSchedule.id, {
-        scheduledDate: dateTime.toISOString(),
+        scheduledDate: scheduledIso,
         installerIds,
         status: 'agendado',
       });
@@ -321,7 +323,7 @@ const Calendar = () => {
       if (googleConnected && sendEmailNotification && installerIds.length > 0) {
         await syncJobToGoogleCalendar({
           ...jobToSchedule,
-          scheduled_date: dateTime.toISOString(),
+          scheduled_date: scheduledIso,
           assigned_installers: installerIds
         }, true);
       }
@@ -1157,11 +1159,9 @@ const Calendar = () => {
           setShowJobDetail(false);
           const d = job.scheduled_date ? new Date(job.scheduled_date) : null;
           setSelectedJob(job);
-          setScheduleDate(d ? d.toISOString().split('T')[0] : '');
-          setScheduleTime(d
-            ? `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
-            : '08:00'
-          );
+          // Data e hora ambas em BRT (antes: data UTC + hora local → pulava de dia à noite).
+          setScheduleDate(d ? brtDateStr(d) : '');
+          setScheduleTime(d ? brtTimeStr(d) : '08:00');
           setSelectedInstaller(job.assigned_installers?.[0] || '');
           setIsRescheduling(!!job.scheduled_date);
           setShowScheduleDialog(true);

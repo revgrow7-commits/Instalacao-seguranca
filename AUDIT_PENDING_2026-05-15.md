@@ -25,9 +25,9 @@
 
 | Arquivo | Segredo exposto |
 |---|---|
-| `GITHUB_VERCEL_SETUP.md:92` | `SUPABASE_SERVICE_KEY = sb_secret_uMmCrswTXuAAI0buga8NQQ_vFRSMRWb` |
+| `GITHUB_VERCEL_SETUP.md:92` | `SUPABASE_SERVICE_KEY = sb_secret_***REDACTED*** (ROTACIONAR)` |
 | `GITHUB_VERCEL_SETUP.md:95-96` | `HOLDPRINT_API_KEY_POA` e `HOLDPRINT_API_KEY_SP` (UUIDs reais) |
-| `GITHUB_VERCEL_SETUP.md:97` | `RESEND_API_KEY = re_hh6JyAXw_6sykfRUqxqkE1FbDzja6H7V5` |
+| `GITHUB_VERCEL_SETUP.md:97` | `RESEND_API_KEY = re_***REDACTED*** (ROTACIONAR)` |
 | `GITHUB_VERCEL_SETUP.md:101` | `VAPID_PRIVATE_KEY` em PEM completo |
 | `DOCUMENTATION.md:100-101` | Mesmas chaves Holdprint |
 
